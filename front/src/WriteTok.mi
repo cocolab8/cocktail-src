@@ -1,0 +1,115 @@
+(* generate output procedure for tokens *)
+
+(* $Id: WriteTok.mi,v 2.3 1997/05/27 15:14:05 grosch rel $ *)
+
+(*
+ * $Log: WriteTok.mi,v $
+ * Revision 2.3  1997/05/27 15:14:05  grosch
+ * cosmetic changes
+ *
+ * Revision 2.2  1993/05/28 14:13:21  grosch
+ * added target language Eiffel
+ *
+ * Revision 2.1  1991/11/21  14:47:50  grosch
+ * new version of RCS on SPARC
+ *
+ * Revision 2.0  91/03/08  18:26:45  grosch
+ * turned tables into initialized arrays (in C)
+ * moved mapping tokens -> strings from Errors to Parser
+ * changed interface for source position
+ * 
+ * Revision 1.3  91/01/18  17:46:25  grosch
+ * calmed down lint
+ * 
+ * Revision 1.2  90/06/11  18:45:52  grosch
+ * layout improvements
+ * 
+ * Revision 1.1	 89/01/12  17:45:56  vielsack
+ * supply source file name
+ * 
+ * Revision 1.0	 88/10/04  14:27:30  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE WriteTok;
+
+FROM IO		IMPORT WriteC, WriteI, WriteNl, WriteS, tFile;
+FROM Strings	IMPORT Length, Char, tString;
+FROM Idents	IMPORT GetString, tIdent, WriteIdent;
+FROM TokenTab	IMPORT MAXTerm, MINTerm, Terminal, TokenError, GetTokenType,
+			TokenType, TokenToSymbol;
+
+  PROCEDURE GenWrTo (f : tFile);
+    VAR
+      t		: Terminal;
+      sym	: tIdent;
+      s		: tString;
+      error	: TokenError;
+      l		: CARDINAL;
+      del	: CHAR;
+    BEGIN
+      FOR t := MINTerm TO MAXTerm DO
+	IF GetTokenType (t) = Term THEN
+	  sym := TokenToSymbol (t, error);
+	  GetString (sym, s);
+	  CASE Language OF
+	  | Modula2:
+	    WriteS (f, '      | ');
+	    WriteI (f, t, 0);
+	    WriteS (f, ': Copy (');
+	    del := Char (s, 1);
+	    IF (del = '"') OR (del = "'") THEN
+	      WriteIdent (f, sym);
+	    ELSE
+	      WriteC (f, '"');
+	      WriteIdent (f, sym);
+	      WriteC (f, '"');
+	    END;
+	    WriteS (f, ', Name);');
+	    WriteNl (f);
+	  | C:
+	    WriteS (f, '"');
+	    IF (Char (s, 1) = '"') OR (Char (s, 1) = "'") THEN
+	      FOR l := 2 TO Length (s) - 1 DO
+	        IF (Char (s, l) = '\') OR (Char (s, l) = '"') THEN WriteC (f, '\'); END;
+	        WriteC (f, Char (s, l));
+	      END;
+	    ELSE
+	      FOR l := 1 TO Length (s) DO
+	        IF (Char (s, l) = '\') OR (Char (s, l) = '"') THEN WriteC (f, '\'); END;
+	        WriteC (f, Char (s, l));
+	      END;
+	    END;
+	    WriteS (f, '",');
+	    WriteNl (f);
+	  | Eiffel:
+	    WriteS (f, '      when ');
+	    WriteI (f, t, 0);
+	    WriteS (f, ' then RESULT.Append (');
+	    del := Char (s, 1);
+	    IF (del = '"') OR (del = "'") THEN
+	      WriteC (f, '"');
+	      FOR l := 2 TO Length (s) - 1 DO
+	        WriteC (f, Char (s, l));
+	      END;
+	      WriteC (f, '"');
+	    ELSE
+	      WriteC (f, '"');
+	      WriteIdent (f, sym);
+	      WriteC (f, '"');
+	    END;
+	    WriteS (f, ');');
+	    WriteNl (f);
+	  END;
+ 	ELSIF Language = C THEN
+	  WriteS (f, '0,');
+	  WriteNl (f);
+	END;
+      END;
+    END GenWrTo;
+
+BEGIN
+  Language := Modula2;
+  SourceFileName := ' ';
+END WriteTok.

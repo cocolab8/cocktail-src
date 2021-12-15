@@ -1,0 +1,52 @@
+!INCLUDE ..\..\config.mak
+
+CFLAGS	= $(CFG_CFLAGS) /W1 /I $(COMMON) /I $(REUSE)
+
+LDFLAGS	= $(COMMON_LIB) $(REUSE_LIB)
+
+all	:
+
+# HEAD
+
+all	: mpp.exe
+
+mpp.obj	: mpp.c	\
+	Parser.h	\
+	Table.h	\
+	Scanner.h
+
+Parser.obj	: Parser.c	\
+	Parser.h	\
+	Table.h	\
+	Scanner.h
+
+Scanner.obj	: Scanner.c	\
+	Scanner.h
+
+Table.obj	: Table.c	\
+	Table.h
+
+SYSTEM_.obj	: SYSTEM_.c SYSTEM_.h
+
+mpp_OBJS =	\
+	mpp.obj	\
+	Parser.obj	\
+	Table.obj	\
+	Scanner.obj
+
+mpp.exe	: $(mpp_OBJS) $(SYSTEM)
+	$(CC) /nologo $(mpp_OBJS) $(SYSTEM) /link /out:mpp.exe $(LDFLAGS)
+
+install: mpp.exe
+	if not exist $(CT_DIR)\bin\ mkdir $(CT_DIR)\bin
+	copy mpp.exe $(CT_DIR)\bin
+
+# TAIL
+
+clean	:
+	del *.obj *.exe
+
+.SUFFIXES: .h .c .obj
+
+.c.obj:
+	$(CC) $(CFLAGS) /c $*.c

@@ -1,0 +1,151 @@
+#include "SYSTEM_.h"
+
+#ifndef DEFINITION_IO
+#include "IO.h"
+#endif
+
+#ifndef DEFINITION_Strings
+#include "Strings.h"
+#endif
+
+#ifndef DEFINITION_SysError
+#include "SysError.h"
+#endif
+
+#ifndef DEFINITION_rSystem
+#include "rSystem.h"
+#endif
+
+#ifndef DEFINITION_Errors
+#include "Errors.h"
+#endif
+
+#ifndef DEFINITION_Checks
+#include "Checks.h"
+#endif
+
+
+
+void Zgg728H_0
+# ifdef HAVE_ARGS
+(CHAR Z134[], LONGCARD O_1, INTEGER Z135)
+# else
+(Z134, O_1, Z135)
+CHAR Z134[];
+LONGCARD O_1;
+INTEGER Z135;
+# endif
+{
+Zp1PEAFD_2 Z136;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_1 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z134, O_1, CHAR)
+if (Zp6VmlNKK_0(Z135)) {
+Zp1PEAFD_13(Z134, O_1, &Z136);
+Zp6VmlNKK_1(Z135, (LONGCARD)ZblNKKO_45, (LONGCARD)ZblNKKO_40, ADR (Z136));
+}
+FREE_OPEN_ARRAYS
+}
+
+void Zgg728H_1
+# ifdef HAVE_ARGS
+(ZfM_3 *Z138, CHAR Z134[], LONGCARD O_2)
+# else
+(Z138, Z134, O_2)
+ZfM_3 *Z138;
+CHAR Z134[];
+LONGCARD O_2;
+# endif
+{
+Zp1PEAFD_2 Z136;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_2 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z134, O_2, CHAR)
+if (Zp6VmlNKK_0(*Z138)) {
+Zp1PEAFD_13(Z134, O_2, &Z136);
+Zp6VmlNKK_1(*Z138, (LONGCARD)ZblNKKO_47, (LONGCARD)ZblNKKO_40, ADR (Z136));
+}
+FREE_OPEN_ARRAYS
+}
+
+void Zgg728H_2
+# ifdef HAVE_ARGS
+(ZfM_3 *Z138, CHAR Z134[], LONGCARD O_3)
+# else
+(Z138, Z134, O_3)
+ZfM_3 *Z138;
+CHAR Z134[];
+LONGCARD O_3;
+# endif
+{
+Zp1PEAFD_2 Z136;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_3 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z134, O_3, CHAR)
+if (Zp6VmlNKK_0(*Z138)) {
+Zp1PEAFD_13(Z134, O_3, &Z136);
+Zp6VmlNKK_1(*Z138, (LONGCARD)ZblNKKO_47, (LONGCARD)ZblNKKO_40, ADR (Z136));
+}
+FREE_OPEN_ARRAYS
+}
+
+void Zgg728H_3
+# ifdef HAVE_ARGS
+(ZfM_3 *Z138, CHAR Z134[], LONGCARD O_4)
+# else
+(Z138, Z134, O_4)
+ZfM_3 *Z138;
+CHAR Z134[];
+LONGCARD O_4;
+# endif
+{
+Zp1PEAFD_2 Z136;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_4 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z134, O_4, CHAR)
+if (Zp6VmlNKK_0(*Z138)) {
+Zp1PEAFD_13(Z134, O_4, &Z136);
+Zp6VmlNKK_1(*Z138, (LONGCARD)ZblNKKO_47, (LONGCARD)ZblNKKO_40, ADR (Z136));
+}
+FREE_OPEN_ARRAYS
+}
+
+void Zgg728H_4
+# ifdef HAVE_ARGS
+(ZfM_3 *Z138, CHAR Z134[], LONGCARD O_5)
+# else
+(Z138, Z134, O_5)
+ZfM_3 *Z138;
+CHAR Z134[];
+LONGCARD O_5;
+# endif
+{
+Zp1PEAFD_2 Z136;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_5 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z134, O_5, CHAR)
+if (Zp6VmlNKK_0(*Z138)) {
+Zp1PEAFD_13(Z134, O_5, &Z136);
+Zp6VmlNKK_1(*Z138, (LONGCARD)ZblNKKO_47, (LONGCARD)ZblNKKO_40, ADR (Z136));
+}
+FREE_OPEN_ARRAYS
+}
+
+void BEGIN_Checks ARGS ((void))
+{
+  static BOOLEAN has_been_called = FALSE;
+  if (has_been_called) return;
+  has_been_called = TRUE;
+BEGIN_IO ();
+BEGIN_IO ();
+BEGIN_Strings ();
+BEGIN_SysError ();
+BEGIN_rSystem ();
+BEGIN_Errors ();
+
+}

@@ -1,0 +1,21 @@
+BEGIN	{ n = 60; }
+
+/\?.*\?/ {    if ($3 == "W") proc = "Warning";
+	 else if ($3 == "I") proc = "Information";
+	 else		     proc = "Error";
+
+	      if ($4 == "?") print "Tree." proc " (" $2 ", t^." sel ".Pos);";
+	 else
+	   print "Tree." proc "I (" $2 ", t^." sel ".Pos, Errors." $4 ", ADR (" $5 "));";
+
+	 if (m [$2] == "") {
+	   m [$2] = 1;
+	   print $2 "	=", n ++ "	;" > "yyconsts2";
+	   print "|", $2, "	: WriteS (StdError, \"" $2 "\");" > "yywrites02";
+	 };
+	 next; }
+
+/[A-Za-z][A-Za-z0-9]*\. [A-Za-z][A-Za-z0-9]* :$/ { sel = $3; print; next; }
+/[A-Za-z][A-Za-z0-9]*	:$/ { sel = $1; print; next; }
+/ :-/	{ sel = $1; print; next; }
+	{ print; next; }

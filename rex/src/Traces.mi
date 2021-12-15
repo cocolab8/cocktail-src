@@ -1,0 +1,112 @@
+(* $Id: Traces.mi,v 3.3 2007/03/27 09:49:25 grosch rel $ *)
+
+(*
+ * $Log: Traces.mi,v $
+ * Revision 3.3  2007/03/27 09:49:25  grosch
+ * fixed overflow of variable NodeCount
+ * changed some INT types to CARD
+ *
+ * Revision 3.2  1998/04/21 10:32:25  grosch
+ * cosmetic changes
+ *
+ * Revision 3.1  1991/11/21 14:41:19  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.0  91/04/04  18:08:01  grosch
+ * introduced partitioning of character set
+ * 
+ * Revision 1.2  89/11/06  12:36:33  grosch
+ * renamed module Rex to GenTabs to avoid name clash with rex under VMS
+ * 
+ * Revision 1.1  88/10/24  20:12:18  grosch
+ * fixed bug: ExtendArray in ResetTraces must be called earlier
+ * 
+ * Revision 1.0  88/10/04  11:59:53  grosch
+ * Initial revision
+ * 
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Nov. 1987 *)
+
+IMPLEMENTATION MODULE Traces;
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM Dfa	IMPORT DStateRange, DNoState;
+FROM GenTabs	IMPORT StartStateCount;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+
+CONST
+   InitialRELength	= 16;
+
+TYPE
+   TraceStepPtr		= POINTER TO TraceStep;
+   TraceStep		= RECORD
+			     TraceState	: DStateRange	;
+			     NewState	: DStateRange	;
+			     Next	: TraceStepPtr	;
+			  END;
+   Trace		= ARRAY [0 .. 100000] OF TraceStep;
+   PosToTrace		= ARRAY [0 .. 100000] OF TraceStepPtr;
+
+VAR
+   TracePtr		: POINTER TO Trace;
+   TraceSize		: LONGINT;
+   PosToTracePtr	: POINTER TO PosToTrace;
+   PosToTraceSize	: LONGINT;
+   TraceCount		: INTEGER;
+
+PROCEDURE InitTraces	;
+   BEGIN
+      PosToTraceSize := InitialRELength;
+      MakeArray (PosToTracePtr, PosToTraceSize, TSIZE (TraceStepPtr));
+      TraceSize := SHORTINT (StartStateCount) * PosToTraceSize;
+      MakeArray (TracePtr, TraceSize, TSIZE (TraceStep));
+   END InitTraces;
+
+PROCEDURE ResetTraces	(StringLength: INTEGER);
+   VAR i	: INTEGER;
+   BEGIN
+      WHILE PosToTraceSize <= StringLength DO
+	 ExtendArray (PosToTracePtr, PosToTraceSize, TSIZE (TraceStepPtr));
+      END;
+      WHILE TraceSize <= SHORTINT (StartStateCount) * StringLength DO
+	 ExtendArray (TracePtr, TraceSize, TSIZE (TraceStep));
+      END;
+      TraceCount := 0;
+      FOR i := 1 TO StringLength DO
+	 PosToTracePtr^[i] := NIL;
+      END;
+   END ResetTraces;
+
+PROCEDURE RecordTrace	(Position: SHORTCARD; pTraceState, pNewState: DStateRange);
+   BEGIN
+      INC (TraceCount);				(* record trace step *)
+      WITH TracePtr^[TraceCount] DO
+	 TraceState := pTraceState;
+	 NewState   := pNewState;
+	 Next 	    := PosToTracePtr^[Position];
+      END;
+      PosToTracePtr^[Position] := ADR (TracePtr^[TraceCount]);
+   END RecordTrace;
+
+PROCEDURE RecordedTrace (Position: SHORTCARD; pTraceState: DStateRange): DStateRange;
+   VAR ActTraceStep	: TraceStepPtr;
+   BEGIN
+      ActTraceStep := PosToTracePtr^[Position];	(* search previous traces *)
+      WHILE ActTraceStep # NIL DO
+	 IF ActTraceStep^.TraceState = pTraceState THEN
+	    RETURN ActTraceStep^.NewState;
+	 END;
+	 ActTraceStep := ActTraceStep^.Next;
+      END;
+      RETURN DNoState;
+   END RecordedTrace;
+
+PROCEDURE FinalizeTraces;
+   BEGIN
+      ReleaseArray (TracePtr, TraceSize, TSIZE (TraceStep));
+      ReleaseArray (PosToTracePtr, PosToTraceSize, TSIZE (TraceStepPtr));
+   END FinalizeTraces;
+
+END Traces.

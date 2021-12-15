@@ -1,0 +1,156 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+Actions$(ES)	: Actions$(ED)	; $(MD) Actions$(SD)
+Actions$(ES)	: TokenTab$(ES)
+
+Actions$(EO)	: Actions$(EI)	; $(MI) Actions$(SI)
+Actions$(EO)	: Actions$(ES)
+Actions$(EO)	: TokenTab$(ES)
+Actions$(EO)	: WriteTok$(ES)
+
+Characte$(ES)	: Characte$(ED)	; $(MD) Characte$(SD)
+
+Characte$(EO)	: Characte$(EI)	; $(MI) Characte$(SI)
+Characte$(EO)	: Characte$(ES)
+
+Checks$(ES)	: Checks$(ED)	; $(MD) Checks$(SD)
+
+Checks$(EO)	: Checks$(EI)	; $(MI) Checks$(SI)
+Checks$(EO)	: Checks$(ES)
+Checks$(EO)	: SysError$(ES)
+Checks$(EO)	: Errors$(ES)
+
+Errors$(ES)	: Errors$(ED)	; $(MD) Errors$(SD)
+
+Errors$(EO)	: Errors$(EI)	; $(MI) Errors$(SI)
+Errors$(EO)	: Errors$(ES)
+Errors$(EO)	: Listing$(ES)
+Errors$(EO)	: SysError$(ES)
+Errors$(EO)	: TokenTab$(ES)
+
+Limits$(ES)	: Limits$(ED)	; $(MD) Limits$(SD)
+
+Limits$(EO)	: Limits$(EI)	; $(MI) Limits$(SI)
+Limits$(EO)	: Limits$(ES)
+
+Listing$(ES)	: Listing$(ED)	; $(MD) Listing$(SD)
+
+Listing$(EO)	: Listing$(EI)	; $(MI) Listing$(SI)
+Listing$(EO)	: Listing$(ES)
+
+Oper$(ES)	: Oper$(ED)	; $(MD) Oper$(SD)
+Oper$(ES)	: TokenTab$(ES)
+
+Oper$(EO)	: Oper$(EI)	; $(MI) Oper$(SI)
+Oper$(EO)	: Oper$(ES)
+Oper$(EO)	: TokenTab$(ES)
+Oper$(EO)	: Errors$(ES)
+
+all	: Pars
+Pars$(EO)	: Pars$(EP)	; $(MP) Pars$(SP)
+Pars$(EO)	: WriteTok$(ES)
+Pars$(EO)	: Characte$(ES)
+Pars$(EO)	: Path$(ES)
+Pars$(EO)	: Checks$(ES)
+Pars$(EO)	: Errors$(ES)
+Pars$(EO)	: Parser$(ES)
+Pars$(EO)	: Scanner$(ES)
+Pars$(EO)	: TokenTab$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Actions$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Oper$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: TokenTab$(ES)
+Parser$(EO)	: Tokens$(ES)
+Parser$(EO)	: Rules$(ES)
+Parser$(EO)	: WriteTok$(ES)
+
+Path$(ES)	: Path$(ED)	; $(MD) Path$(SD)
+
+Path$(EO)	: Path$(EI)	; $(MI) Path$(SI)
+Path$(EO)	: Path$(ES)
+
+Rules$(ES)	: Rules$(ED)	; $(MD) Rules$(SD)
+Rules$(ES)	: TokenTab$(ES)
+
+Rules$(EO)	: Rules$(EI)	; $(MI) Rules$(SI)
+Rules$(EO)	: Rules$(ES)
+Rules$(EO)	: TokenTab$(ES)
+Rules$(EO)	: Errors$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+Scanner$(ES)	: Rules$(ES)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Checks$(ES)
+Scanner$(EO)	: Limits$(ES)
+Scanner$(EO)	: WriteTok$(ES)
+Scanner$(EO)	: Errors$(ES)
+
+SysError$(ES)	: SysError$(ED)	; $(MD) SysError$(SD)
+
+SysError$(EO)	: SysError$(EI)	; $(MI) SysError$(SI)
+SysError$(EO)	: SysError$(ES)
+SysError$(EO)	: Errors$(ES)
+
+TokenTab$(ES)	: TokenTab$(ED)	; $(MD) TokenTab$(SD)
+
+TokenTab$(EO)	: TokenTab$(EI)	; $(MI) TokenTab$(SI)
+TokenTab$(EO)	: TokenTab$(ES)
+TokenTab$(EO)	: Errors$(ES)
+
+Tokens$(ES)	: Tokens$(ED)	; $(MD) Tokens$(SD)
+Tokens$(ES)	: TokenTab$(ES)
+
+Tokens$(EO)	: Tokens$(EI)	; $(MI) Tokens$(SI)
+Tokens$(EO)	: Tokens$(ES)
+Tokens$(EO)	: TokenTab$(ES)
+Tokens$(EO)	: TokenTab$(ES)
+Tokens$(EO)	: Errors$(ES)
+
+WriteTok$(ES)	: WriteTok$(ED)	; $(MD) WriteTok$(SD)
+
+WriteTok$(EO)	: WriteTok$(EI)	; $(MI) WriteTok$(SI)
+WriteTok$(EO)	: WriteTok$(ES)
+WriteTok$(EO)	: TokenTab$(ES)
+
+Pars	: Pars$(EO) TokenTab$(EO) Errors$(EO) SysError$(EO) Listing$(EO) Scanner$(EO) WriteTok$(EO) Limits$(EO) Checks$(EO) Rules$(EO) Parser$(EO) Tokens$(EO) Oper$(EO) Actions$(EO) Path$(EO) Characte$(EO)	; $(ML) Pars $(OUT) Pars
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

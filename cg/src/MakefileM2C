@@ -1,0 +1,340 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+Dialog$(ES)	: Dialog$(ED)	; $(MD) Dialog$(SD)
+Dialog$(ES)	: Tree$(ES)
+
+Dialog$(EO)	: Dialog$(EI)	; $(MI) Dialog$(SI)
+Dialog$(EO)	: Dialog$(ES)
+Dialog$(EO)	: Tree$(ES)
+Dialog$(EO)	: Order$(ES)
+Dialog$(EO)	: Tree$(ES)
+
+Errors$(ES)	: Errors$(ED)	; $(MD) Errors$(SD)
+Errors$(ES)	: Position$(ES)
+
+Errors$(EO)	: Errors$(EI)	; $(MI) Errors$(SI)
+Errors$(EO)	: Errors$(ES)
+Errors$(EO)	: Position$(ES)
+
+EvalC$(ES)	: EvalC$(ED)	; $(MD) EvalC$(SD)
+EvalC$(ES)	: Tree$(ES)
+
+EvalC$(EO)	: EvalC$(EI)	; $(MI) EvalC$(SI)
+EvalC$(EO)	: EvalC$(ES)
+EvalC$(EO)	: Tree$(ES)
+EvalC$(EO)	: Semantic$(ES)
+EvalC$(EO)	: TreeC1$(ES)
+EvalC$(EO)	: TreeC2$(ES)
+EvalC$(EO)	: EvalC3$(ES)
+EvalC$(EO)	: Tree$(ES)
+
+EvalC2$(ES)	: EvalC2$(ED)	; $(MD) EvalC2$(SD)
+EvalC2$(ES)	: Tree$(ES)
+
+EvalC2$(EO)	: EvalC2$(EI)	; $(MI) EvalC2$(SI)
+EvalC2$(EO)	: EvalC2$(ES)
+EvalC2$(EO)	: Tree$(ES)
+EvalC2$(EO)	: TreeC2$(ES)
+EvalC2$(EO)	: EvalC$(ES)
+EvalC2$(EO)	: Tree$(ES)
+
+EvalC3$(ES)	: EvalC3$(ED)	; $(MD) EvalC3$(SD)
+EvalC3$(ES)	: Tree$(ES)
+
+EvalC3$(EO)	: EvalC3$(EI)	; $(MI) EvalC3$(SI)
+EvalC3$(EO)	: EvalC3$(ES)
+EvalC3$(EO)	: Tree$(ES)
+EvalC3$(EO)	: TreeC1$(ES)
+EvalC3$(EO)	: TreeC2$(ES)
+EvalC3$(EO)	: EvalC$(ES)
+EvalC3$(EO)	: Errors$(ES)
+EvalC3$(EO)	: Position$(ES)
+EvalC3$(EO)	: EvalC$(ES)
+EvalC3$(EO)	: Tree$(ES)
+
+EvalC4$(ES)	: EvalC4$(ED)	; $(MD) EvalC4$(SD)
+EvalC4$(ES)	: Tree$(ES)
+
+EvalC4$(EO)	: EvalC4$(EI)	; $(MI) EvalC4$(SI)
+EvalC4$(EO)	: EvalC4$(ES)
+EvalC4$(EO)	: Tree$(ES)
+EvalC4$(EO)	: TreeC1$(ES)
+EvalC4$(EO)	: TreeC2$(ES)
+EvalC4$(EO)	: EvalC$(ES)
+EvalC4$(EO)	: EvalC3$(ES)
+EvalC4$(EO)	: EvalC$(ES)
+EvalC4$(EO)	: Tree$(ES)
+
+EvalMod$(ES)	: EvalMod$(ED)	; $(MD) EvalMod$(SD)
+EvalMod$(ES)	: Tree$(ES)
+
+EvalMod$(EO)	: EvalMod$(EI)	; $(MI) EvalMod$(SI)
+EvalMod$(EO)	: EvalMod$(ES)
+EvalMod$(EO)	: Tree$(ES)
+EvalMod$(EO)	: Semantic$(ES)
+EvalMod$(EO)	: TreeMod1$(ES)
+EvalMod$(EO)	: TreeMod2$(ES)
+EvalMod$(EO)	: EvalMod3$(ES)
+EvalMod$(EO)	: Tree$(ES)
+
+EvalMod2$(ES)	: EvalMod2$(ED)	; $(MD) EvalMod2$(SD)
+EvalMod2$(ES)	: Tree$(ES)
+
+EvalMod2$(EO)	: EvalMod2$(EI)	; $(MI) EvalMod2$(SI)
+EvalMod2$(EO)	: EvalMod2$(ES)
+EvalMod2$(EO)	: Tree$(ES)
+EvalMod2$(EO)	: TreeMod2$(ES)
+EvalMod2$(EO)	: EvalMod$(ES)
+EvalMod2$(EO)	: Tree$(ES)
+
+EvalMod3$(ES)	: EvalMod3$(ED)	; $(MD) EvalMod3$(SD)
+EvalMod3$(ES)	: Tree$(ES)
+
+EvalMod3$(EO)	: EvalMod3$(EI)	; $(MI) EvalMod3$(SI)
+EvalMod3$(EO)	: EvalMod3$(ES)
+EvalMod3$(EO)	: Tree$(ES)
+EvalMod3$(EO)	: TreeMod1$(ES)
+EvalMod3$(EO)	: TreeMod2$(ES)
+EvalMod3$(EO)	: EvalMod$(ES)
+EvalMod3$(EO)	: Errors$(ES)
+EvalMod3$(EO)	: Position$(ES)
+EvalMod3$(EO)	: EvalMod$(ES)
+EvalMod3$(EO)	: Tree$(ES)
+
+EvalMod4$(ES)	: EvalMod4$(ED)	; $(MD) EvalMod4$(SD)
+EvalMod4$(ES)	: Tree$(ES)
+
+EvalMod4$(EO)	: EvalMod4$(EI)	; $(MI) EvalMod4$(SI)
+EvalMod4$(EO)	: EvalMod4$(ES)
+EvalMod4$(EO)	: Tree$(ES)
+EvalMod4$(EO)	: TreeMod1$(ES)
+EvalMod4$(EO)	: TreeMod2$(ES)
+EvalMod4$(EO)	: EvalMod$(ES)
+EvalMod4$(EO)	: EvalMod3$(ES)
+EvalMod4$(EO)	: EvalMod$(ES)
+EvalMod4$(EO)	: Tree$(ES)
+
+GramAda$(ES)	: GramAda$(ED)	; $(MD) GramAda$(SD)
+GramAda$(ES)	: Tree$(ES)
+
+GramAda$(EO)	: GramAda$(EI)	; $(MI) GramAda$(SI)
+GramAda$(EO)	: GramAda$(ES)
+GramAda$(EO)	: Tree$(ES)
+GramAda$(EO)	: Tree$(ES)
+
+GramC$(ES)	: GramC$(ED)	; $(MD) GramC$(SD)
+GramC$(ES)	: Tree$(ES)
+
+GramC$(EO)	: GramC$(EI)	; $(MI) GramC$(SI)
+GramC$(EO)	: GramC$(ES)
+GramC$(EO)	: Tree$(ES)
+GramC$(EO)	: Tree$(ES)
+
+GramMod$(ES)	: GramMod$(ED)	; $(MD) GramMod$(SD)
+GramMod$(ES)	: Tree$(ES)
+
+GramMod$(EO)	: GramMod$(EI)	; $(MI) GramMod$(SI)
+GramMod$(EO)	: GramMod$(ES)
+GramMod$(EO)	: Tree$(ES)
+GramMod$(EO)	: Tree$(ES)
+
+GramYacc$(ES)	: GramYacc$(ED)	; $(MD) GramYacc$(SD)
+GramYacc$(ES)	: Tree$(ES)
+
+GramYacc$(EO)	: GramYacc$(EI)	; $(MI) GramYacc$(SI)
+GramYacc$(EO)	: GramYacc$(ES)
+GramYacc$(EO)	: Tree$(ES)
+GramYacc$(EO)	: Tree$(ES)
+
+Optimize$(ES)	: Optimize$(ED)	; $(MD) Optimize$(SD)
+Optimize$(ES)	: Tree$(ES)
+
+Optimize$(EO)	: Optimize$(EI)	; $(MI) Optimize$(SI)
+Optimize$(EO)	: Optimize$(ES)
+Optimize$(EO)	: Tree$(ES)
+Optimize$(EO)	: Tree$(ES)
+Optimize$(EO)	: Order$(ES)
+
+Order$(ES)	: Order$(ED)	; $(MD) Order$(SD)
+Order$(ES)	: Tree$(ES)
+
+Order$(EO)	: Order$(EI)	; $(MI) Order$(SI)
+Order$(EO)	: Order$(ES)
+Order$(EO)	: Tree$(ES)
+Order$(EO)	: Queue$(ES)
+Order$(EO)	: Tree$(ES)
+Order$(EO)	: Optimize$(ES)
+Order$(EO)	: Queue$(ES)
+Order$(EO)	: Errors$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Position$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Position$(ES)
+Parser$(EO)	: Tree$(ES)
+
+Position$(ES)	: Position$(ED)	; $(MD) Position$(SD)
+
+Position$(EO)	: Position$(EI)	; $(MI) Position$(SI)
+Position$(EO)	: Position$(ES)
+
+Queue$(ES)	: Queue$(ED)	; $(MD) Queue$(SD)
+
+Queue$(EO)	: Queue$(EI)	; $(MI) Queue$(SI)
+Queue$(EO)	: Queue$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+Scanner$(ES)	: Position$(ES)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Position$(ES)
+Scanner$(EO)	: Tree$(ES)
+Scanner$(EO)	: Position$(ES)
+Scanner$(EO)	: Errors$(ES)
+
+Semantic$(ES)	: Semantic$(ED)	; $(MD) Semantic$(SD)
+Semantic$(ES)	: Tree$(ES)
+
+Semantic$(EO)	: Semantic$(EI)	; $(MI) Semantic$(SI)
+Semantic$(EO)	: Semantic$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Position$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Errors$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+Tree$(ES)	: Position$(ES)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+Tree$(EO)	: Position$(ES)
+Tree$(EO)	: Position$(ES)
+Tree$(EO)	: Errors$(ES)
+
+Tree2$(ES)	: Tree2$(ED)	; $(MD) Tree2$(SD)
+Tree2$(ES)	: Tree$(ES)
+
+Tree2$(EO)	: Tree2$(EI)	; $(MI) Tree2$(SI)
+Tree2$(EO)	: Tree2$(ES)
+Tree2$(EO)	: Position$(ES)
+Tree2$(EO)	: Tree$(ES)
+
+TreeC1$(ES)	: TreeC1$(ED)	; $(MD) TreeC1$(SD)
+TreeC1$(ES)	: Tree$(ES)
+
+TreeC1$(EO)	: TreeC1$(EI)	; $(MI) TreeC1$(SI)
+TreeC1$(EO)	: TreeC1$(ES)
+TreeC1$(EO)	: Tree$(ES)
+TreeC1$(EO)	: Semantic$(ES)
+TreeC1$(EO)	: TreeC2$(ES)
+TreeC1$(EO)	: Tree$(ES)
+
+TreeC2$(ES)	: TreeC2$(ED)	; $(MD) TreeC2$(SD)
+TreeC2$(ES)	: Tree$(ES)
+TreeC2$(ES)	: Position$(ES)
+
+TreeC2$(EO)	: TreeC2$(EI)	; $(MI) TreeC2$(SI)
+TreeC2$(EO)	: TreeC2$(ES)
+TreeC2$(EO)	: Tree$(ES)
+TreeC2$(EO)	: Position$(ES)
+TreeC2$(EO)	: Tree$(ES)
+
+TreeMod1$(ES)	: TreeMod1$(ED)	; $(MD) TreeMod1$(SD)
+TreeMod1$(ES)	: Tree$(ES)
+
+TreeMod1$(EO)	: TreeMod1$(EI)	; $(MI) TreeMod1$(SI)
+TreeMod1$(EO)	: TreeMod1$(ES)
+TreeMod1$(EO)	: Tree$(ES)
+TreeMod1$(EO)	: Semantic$(ES)
+TreeMod1$(EO)	: TreeMod2$(ES)
+TreeMod1$(EO)	: Tree$(ES)
+
+TreeMod2$(ES)	: TreeMod2$(ED)	; $(MD) TreeMod2$(SD)
+TreeMod2$(ES)	: Tree$(ES)
+TreeMod2$(ES)	: Position$(ES)
+
+TreeMod2$(EO)	: TreeMod2$(EI)	; $(MI) TreeMod2$(SI)
+TreeMod2$(EO)	: TreeMod2$(ES)
+TreeMod2$(EO)	: Tree$(ES)
+TreeMod2$(EO)	: Position$(ES)
+TreeMod2$(EO)	: Tree$(ES)
+
+all	: cg
+cg$(EO)	: cg$(EP)	; $(MP) cg$(SP)
+cg$(EO)	: Errors$(ES)
+cg$(EO)	: Scanner$(ES)
+cg$(EO)	: Parser$(ES)
+cg$(EO)	: Tree$(ES)
+cg$(EO)	: Tree2$(ES)
+cg$(EO)	: Semantic$(ES)
+cg$(EO)	: Order$(ES)
+cg$(EO)	: Dialog$(ES)
+cg$(EO)	: GramMod$(ES)
+cg$(EO)	: TreeMod1$(ES)
+cg$(EO)	: EvalMod$(ES)
+cg$(EO)	: EvalMod2$(ES)
+cg$(EO)	: EvalMod3$(ES)
+cg$(EO)	: EvalMod4$(ES)
+cg$(EO)	: GramC$(ES)
+cg$(EO)	: GramYacc$(ES)
+cg$(EO)	: TreeC1$(ES)
+cg$(EO)	: EvalC$(ES)
+cg$(EO)	: EvalC2$(ES)
+cg$(EO)	: EvalC3$(ES)
+cg$(EO)	: EvalC4$(ES)
+cg$(EO)	: GramAda$(ES)
+
+all	: lpp
+lpp$(EO)	: lpp$(EP)	; $(MP) lpp$(SP)
+lpp$(EO)	: Errors$(ES)
+lpp$(EO)	: Scanner$(ES)
+lpp$(EO)	: Parser$(ES)
+lpp$(EO)	: Tree$(ES)
+lpp$(EO)	: Semantic$(ES)
+lpp$(EO)	: Order$(ES)
+lpp$(EO)	: Dialog$(ES)
+lpp$(EO)	: GramMod$(ES)
+lpp$(EO)	: GramC$(ES)
+lpp$(EO)	: GramYacc$(ES)
+lpp$(EO)	: GramAda$(ES)
+
+cg	: cg$(EO) GramAda$(EO) Tree$(EO) Errors$(EO) Position$(EO) EvalC4$(EO) EvalC$(EO) EvalC3$(EO) TreeC2$(EO) TreeC1$(EO) Semantic$(EO) EvalC2$(EO) GramYacc$(EO) GramC$(EO) EvalMod4$(EO) EvalMod$(EO) EvalMod3$(EO) TreeMod2$(EO) TreeMod1$(EO) EvalMod2$(EO) GramMod$(EO) Dialog$(EO) Order$(EO) Queue$(EO) Optimize$(EO) Tree2$(EO) Parser$(EO) Scanner$(EO)	; $(ML) cg $(OUT) cg
+
+lpp	: lpp$(EO) GramAda$(EO) Tree$(EO) Errors$(EO) Position$(EO) GramYacc$(EO) GramC$(EO) GramMod$(EO) Dialog$(EO) Order$(EO) Queue$(EO) Optimize$(EO) Semantic$(EO) Parser$(EO) Scanner$(EO)	; $(ML) lpp $(OUT) lpp
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

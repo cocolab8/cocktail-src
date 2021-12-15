@@ -1,0 +1,501 @@
+(* $Id: Grammar.mi,v 2.1 1992/08/07 15:47:31 grosch rel $ *)
+
+IMPLEMENTATION MODULE Grammar;
+
+FROM	Convert		IMPORT  IdToAdr, AdrToId;
+
+FROM	Heap		IMPORT	Alloc;
+
+FROM	DynArray	IMPORT	MakeArray, ReleaseArray;
+
+FROM	Idents		IMPORT	tIdent;
+
+FROM	Lists		IMPORT	tList, MakeList, Append, Head, Tail;
+
+FROM	Scanner		IMPORT	NoIdent, NoValue, MaxIdent;
+
+FROM	Stack		IMPORT	tStack, MakeStack, ReleaseStack, Push,
+				Pop, Depth;
+
+FROM	Sets		IMPORT	tSet, MakeSet, ReleaseSet, Assign, Include,
+				Exclude, Union, Extract, IsEmpty, IsElement,
+				Card, Minimum, Maximum, IsSubset, Complement,
+				Intersection;
+
+FROM	SYSTEM		IMPORT	TSIZE, ADDRESS;
+
+FROM	Types		IMPORT	tType, Type, AllNodes, AllClasses;
+
+
+(* GRAM_ *)
+FROM	Errors		IMPORT	ERROR;
+FROM	Info		IMPORT	WriteIdentSet;
+FROM	Idents		IMPORT	WriteIdent;
+FROM	IO		IMPORT	tFile, StdOutput;
+FROM	StdIO		IMPORT	WriteI, WriteS, WriteNl, WriteN;
+IMPORT	IO;
+(* _GRAM *)
+
+CONST
+
+  NoArity = -1;
+  infinite = 100000;
+
+
+TYPE
+  tIndexes = POINTER TO ARRAY [0..1000] OF INTEGER;
+
+  tClass =
+    RECORD
+      superclass: tIdent;
+      nodes: tSet;
+      directsubclasses: tSet;
+      subclasses: tSet;
+      layouts: tList;
+    END;
+
+  tNode =
+    RECORD
+      mainclass: tIdent;
+      nodeident: tIdent;
+      arity: INTEGER;
+      sonnames: tSons;
+      classes: tSet;
+      layouts: tList;
+      numbers: tSet;
+    END;
+
+  tClassOrNode =
+    POINTER TO RECORD
+      CASE :tType OF
+      | cClass: Class: tClass;
+      | cNode:  Node:  tNode;
+      END;
+    END;
+
+VAR
+  TG : POINTER TO ARRAY [0..1000] OF tClassOrNode;
+  vMaxArity: INTEGER;
+
+
+PROCEDURE BeginGrammar;
+  VAR size: LONGINT; id: tIdent;
+  BEGIN
+    (* GRAM1_   
+    WriteS ('BeginGrammar'); WriteNl;
+       _GRAM1 *)
+    size := MaxIdent + 1;
+    MakeArray (TG, size, TSIZE (tClassOrNode));
+    FOR id := 0 TO MaxIdent DO
+      CASE Type (id) OF
+      | cClass: 
+	  TG^[id] := Alloc (TSIZE (tClass));
+	  WITH TG^[id]^.Class DO
+	    (* GRAM1_   
+	    WriteS ('Class: '); WriteI (id,1); WriteNl;
+	       _GRAM1 *)
+	    superclass := NoIdent;
+	    MakeSet (nodes, MaxIdent);
+	    MakeSet (directsubclasses, MaxIdent);
+	    MakeSet (subclasses, MaxIdent);
+	    MakeList (layouts);
+	  END;
+      | cNode:
+	    (* GRAM1_   
+	    WriteS ('Node: '); WriteI (id,1); WriteNl;
+	       _GRAM1 *)
+	  TG^[id] := Alloc (TSIZE (tNode));
+	  WITH TG^[id]^.Node DO
+	    mainclass := NoIdent;
+	    nodeident := id;
+	    arity := NoArity;
+	    sonnames := NIL;
+	    MakeSet (classes, MaxIdent);
+	    MakeList (layouts);
+	  END;
+      ELSE
+	TG^[id] := NIL;
+      END;
+    END;
+  END BeginGrammar;
+
+
+PROCEDURE SetSuperClass		(class, super: tIdent);
+  BEGIN
+    (* GRAM_ *)
+  IF Type (class) # cClass THEN ERROR ('SetSuperClass: class is no class'); END;
+  IF Type (super) # cClass THEN ERROR ('SetSuperClass: super is no class'); END;
+    (* _GRAM *)
+    TG^[class]^.Class.superclass := super;
+    Include (TG^[super]^.Class.directsubclasses, class);
+  END SetSuperClass;
+
+
+PROCEDURE Connect		(node, class: tIdent);
+  BEGIN
+    (* GRAM1_   
+    IF Type (node) # cNode THEN ERROR ('Connect: no node'); END;
+    IF Type (class) # cClass THEN ERROR ('Connect: no class'); END;
+    WriteS ('connect');
+    WriteS ('  node: '); WriteI (node,1);
+    WriteS ('  class: '); WriteI (class,1); WriteNl;
+       _GRAM1 *)
+    Include (TG^[class]^.Class.nodes, node);
+    Include (TG^[node]^.Node.classes, class);
+  END Connect;
+
+
+PROCEDURE CompleteSubclasses;
+  BEGIN
+    Digraph;
+  END CompleteSubclasses;
+
+PROCEDURE Digraph;
+  VAR
+    S: tStack;
+    N: tIndexes;
+    x: tIdent;
+    size: LONGINT;
+
+  BEGIN
+    MakeStack (S);
+    size := MaxIdent + 1;
+    MakeArray (N, size, TSIZE (INTEGER));
+    
+    FOR x := 0 TO MaxIdent DO
+      N^[x] := 0;
+    END;
+
+    FOR x := 0 TO MaxIdent DO
+      IF (N^[x] = 0) & (Type (x) = cClass) THEN
+	Traverse (x, N, S);
+      END;
+    END;
+
+    ReleaseArray (N, size, TSIZE (INTEGER));
+    ReleaseStack (S);
+  END Digraph;
+
+
+PROCEDURE Traverse (x: tIdent; N: tIndexes; VAR S: tStack);
+  VAR
+    d: INTEGER;
+    X: tSet;
+    y: tIdent;
+  BEGIN
+    MakeSet (X, MaxIdent);
+    Push (S, IdToAdr (x));
+    d := Depth (S);
+    N^[x] := d;
+    Assign (TG^[x]^.Class.subclasses, TG^[x]^.Class.directsubclasses);
+    DirectSubclasses (x, X);
+    WHILE NOT IsEmpty (X) DO
+      y := Extract (X);
+      IF N^[y] = 0 THEN
+	Traverse (y, N, S);
+      END;
+      IF N^[x] > N^[y] THEN
+	N^[x] := N^[y];
+      END;
+      Union (TG^[x]^.Class.subclasses, TG^[y]^.Class.subclasses);
+    END;
+    IF N^[x] = d THEN
+      REPEAT
+	y := AdrToId (Pop (S));
+	N^[y] := infinite;
+	IF x # y THEN
+	  Assign (TG^[y]^.Class.subclasses, TG^[x]^.Class.subclasses);
+	END;
+      UNTIL y = x
+    END;
+    ReleaseSet (X);
+  END Traverse;
+
+
+PROCEDURE FixMainClasses;
+  VAR nodes: tSet;
+  BEGIN
+    MakeSet (nodes, MaxIdent);
+    AllNodes (nodes);
+    WHILE NOT IsEmpty (nodes) DO
+      FixMainClass (Extract (nodes));
+    END;
+    ReleaseSet (nodes);
+  END FixMainClasses;
+
+PROCEDURE FixMainClass (node: tIdent);
+  VAR card: INTEGER; cl: tIdent; mcl: tSet;
+  BEGIN
+    (* GRAM_ *)
+    IF Type (node) # cNode THEN ERROR ('FixMainClass: no node'); END;
+    (* _GRAM *)
+    WITH TG^[node]^.Node DO
+      card := Card (classes);
+      IF card = 0 THEN
+	(* no class at all *)
+      ELSIF card = 1 THEN
+	mainclass := Minimum (classes);
+      ELSE
+	MakeSet (mcl, MaxIdent);	(* posible main classes *)
+	FOR cl := Minimum (classes) TO Maximum (classes) DO
+	  IF IsElement (cl, classes) THEN
+	    Exclude (classes, cl);
+	    IF IsSubset (classes, TG^[cl]^.Class.subclasses) THEN
+	      Include (mcl, cl);
+	    END;
+	    Include (classes, cl);
+	  END;
+	END;
+	IF Card (mcl) = 1 THEN
+	  mainclass := Minimum (mcl);	(* else there is no uniq main class *)
+	END;
+	ReleaseSet (mcl);
+      END;
+    END;
+  END FixMainClass;
+
+
+PROCEDURE NodesOfClass		(class: tIdent; VAR nodes: tSet);
+  BEGIN
+    (* GRAM_ *)
+    IF Type (class) # cClass THEN ERROR ('NodesOfClass: no class'); END;
+    (* _GRAM *)
+    Assign (nodes, TG^[class]^.Class.nodes);
+  END NodesOfClass;
+
+
+PROCEDURE ClassesOfNode		(node: tIdent; VAR classes: tSet);
+  BEGIN
+    (* GRAM_ *)
+    IF Type (node) # cNode THEN ERROR ('ClassesOfNode: no node'); END;
+    (* _GRAM *)
+    Assign (classes, TG^[node]^.Node.classes);
+  END ClassesOfNode;
+
+
+PROCEDURE SuperClass		(class: tIdent): tIdent;
+  BEGIN
+    (* GRAM_ *)
+    IF Type (class) # cClass THEN ERROR ('SuperClass: no class'); END;
+    (* _GRAM *)
+    RETURN TG^[class]^.Class.superclass;
+  END SuperClass;
+
+
+PROCEDURE IsSubclass		(class, super: tIdent): BOOLEAN;
+  BEGIN
+    (* GRAM_ *)
+    IF Type (class) # cClass THEN ERROR ('IsSubClass: class is no class'); END;
+    IF Type (super) # cClass THEN ERROR ('IsSubClass: super is no class'); END;
+    (* _GRAM *)
+    RETURN IsElement (class, TG^[super]^.Class.subclasses);
+  END IsSubclass;
+
+
+PROCEDURE DirectSubclasses	(class: tIdent; VAR sub: tSet);
+  BEGIN
+    (* GRAM_ *)
+    IF Type (class) # cClass THEN ERROR ('DirectSubClass: no class'); END;
+    (* _GRAM *)
+    Assign (sub, TG^[class]^.Class.directsubclasses);
+  END DirectSubclasses;
+
+
+PROCEDURE Subclasses	(class: tIdent; VAR sub: tSet);
+  BEGIN
+    (* GRAM_ *)
+    IF Type (class) # cClass THEN ERROR ('DirectSubClass: no class'); END;
+    (* _GRAM *)
+    Assign (sub, TG^[class]^.Class.subclasses);
+  END Subclasses;
+
+
+PROCEDURE MainClass		(node: tIdent): tIdent;
+  BEGIN
+    RETURN TG^[node]^.Node.mainclass;
+  END MainClass;
+
+
+
+PROCEDURE SetNodeIdent		(node, id: tIdent);
+  BEGIN
+    TG^[node]^.Node.nodeident := id;
+  END SetNodeIdent;
+
+
+PROCEDURE SetArity		(node: tIdent; ari: INTEGER);
+  VAR pos: INTEGER; size: LONGINT;
+  BEGIN
+    (* GRAM1_   
+    IF Type (node) # cNode THEN ERROR ('SetArity: no node'); END;
+    WriteS ('Arity ('); WriteIdent (StdOutput, node);
+    WriteS (') = '); WriteI (ari, 1); WriteNl;
+       _GRAM1 *)
+    WITH TG^[node]^.Node DO
+      arity := ari;
+      size := ari + 1;
+      MakeArray (sonnames, size, TSIZE (tSon));
+      FOR pos := 0 TO arity DO
+	sonnames^[pos] := NoIdent;
+      END;
+    END;
+    IF ari > vMaxArity THEN vMaxArity := ari END;
+  END SetArity;
+
+
+PROCEDURE SetSonName		(node: tIdent; pos: INTEGER; name: tIdent);
+  BEGIN
+    TG^[node]^.Node.sonnames^[pos] := name;
+  END SetSonName;
+
+
+PROCEDURE CreateLayout		(no, cl: tIdent): tLayout;
+  VAR layout: tLayout; size: LONGINT; arity, pos: INTEGER;
+  BEGIN
+    (* GRAM_ *)
+    IF Type (no) # cNode THEN ERROR ('CreateLayout: no node'); END;
+    IF Type (cl) # cClass THEN ERROR ('CreateLayout: no class'); END;
+    (* _GRAM *)
+    arity := Arity (no);
+    layout := Alloc (TSIZE (tLayoutRec));
+    WITH layout^ DO
+      node := no;
+      class := cl;
+      size := arity + 1;
+      MakeArray (sons, size, TSIZE (tSon));
+      FOR pos := 0 TO arity DO
+	sons^[pos] := NoIdent;
+      END;
+    END;
+    Append (TG^[no]^.Node.layouts, layout);
+    Append (TG^[cl]^.Class.layouts, layout);
+    RETURN layout;
+  END CreateLayout;
+
+
+PROCEDURE SetSonClass		(layout: tLayout; pos: INTEGER; class: tIdent);
+  BEGIN
+    layout^.sons^[pos] := class;
+  END SetSonClass;
+
+
+PROCEDURE NodeIdent		(node: tIdent): tIdent;
+  BEGIN
+    RETURN TG^[node]^.Node.nodeident;
+  END NodeIdent;
+
+
+PROCEDURE Arity			(node: tIdent): INTEGER;
+  BEGIN
+    RETURN TG^[node]^.Node.arity;
+  END Arity;
+
+
+PROCEDURE SonName		(node: tIdent; pos: INTEGER): tIdent;
+  BEGIN
+    RETURN TG^[node]^.Node.sonnames^[pos];
+  END SonName;
+
+
+PROCEDURE Layout		(node, class: tIdent): tLayout;
+  VAR layouts: tList; layout: tLayout;
+  BEGIN
+    (* GRAM_ *)
+    IF Type (node) # cNode THEN ERROR ('Layout: no node'); END;
+    IF Type (class) # cClass THEN ERROR ('Layout: no class'); END;
+    (* _GRAM *)
+    layouts := TG^[node]^.Node.layouts;
+    LOOP
+      layout := Head (layouts);
+      IF layout^.class = class THEN RETURN layout END;
+      Tail (layouts);
+    END;
+  END Layout;
+
+
+PROCEDURE SonClass		(layout: tLayout; pos: INTEGER): tIdent;
+  BEGIN
+    RETURN layout^.sons^[pos];
+  END SonClass;
+
+
+PROCEDURE MakePatNumbers (size: INTEGER);
+  VAR nodes: tSet;
+  BEGIN
+    MakeSet (nodes, MaxIdent);
+    AllNodes (nodes);
+    WHILE NOT IsEmpty (nodes) DO
+      MakeSet (TG^[Extract (nodes)]^.Node.numbers, size);
+    END;
+    ReleaseSet (nodes);
+  END MakePatNumbers;
+
+PROCEDURE AddPatNumber (node: tIdent; number: INTEGER);
+  BEGIN
+    Include (TG^[node]^.Node.numbers, number);
+  END AddPatNumber;
+
+PROCEDURE PatsOfNode (node: tIdent; VAR numbers: tSet);
+  BEGIN
+    Assign (numbers, TG^[node]^.Node.numbers);
+  END PatsOfNode;
+
+PROCEDURE MaxArity (): INTEGER;
+  BEGIN
+    RETURN vMaxArity;
+  END MaxArity;
+
+
+(* GRAM_ *)
+PROCEDURE WriteGrammar		(f: tFile);
+  VAR id: tIdent;
+  BEGIN
+    FOR id := 1 TO MaxIdent DO
+      CASE Type (id) OF
+      | cClass:
+	  WITH TG^[id]^.Class DO
+	    IO.WriteS (f, 'class:                ');
+	    WriteIdent (f, id);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  super class:        ');
+	    WriteIdent (f, superclass);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  nodes:              ');
+	    WriteIdentSet (f, nodes);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  direct sub classes: ');
+	    WriteIdentSet (f, directsubclasses);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  sub classes:        ');
+	    WriteIdentSet (f, subclasses);
+	    IO.WriteNl (f);
+	  END;
+      | cNode:
+	  WITH TG^[id]^.Node DO
+	    IO.WriteS (f, 'node:                 ');
+	    WriteIdent (f, id);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  main class:         ');
+	    WriteIdent (f, mainclass);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  node ident:         ');
+	    WriteIdent (f, nodeident);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  arity:              ');
+	    IO.WriteI (f, arity, 1);
+	    IO.WriteNl (f);
+	    IO.WriteS (f, '  classes:            ');
+	    WriteIdentSet (f, classes);
+	    IO.WriteNl (f);
+	  END;
+      ELSE
+      END;
+    END;
+  END WriteGrammar;
+(* _GRAM *)
+
+
+
+BEGIN
+  vMaxArity := 0;
+END Grammar.

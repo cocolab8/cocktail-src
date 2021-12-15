@@ -1,0 +1,831 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 19.6.1990 */
+
+TRAFO EvalJav2
+TREE Tree
+PUBLIC EvalImplJava
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT ADR;
+FROM IO		IMPORT WriteS, WriteNl, WriteI, StdOutput;
+FROM StringM	IMPORT WriteString;
+FROM Idents	IMPORT tIdent;
+FROM Texts	IMPORT WriteText;
+FROM Sets	IMPORT tSet, MakeSet, ReleaseSet, Include, Minimum, IsElement, WriteSet;
+FROM Relation	IMPORT IsRelated;
+FROM TreeJav2	IMPORT WriteLine;
+FROM EvalJava	IMPORT EvalImplHead;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Referenced	, NoCodeClass	,
+   Computed	, Reverse	, Write		, Read		,
+   Inherited	, Synthesized	, Input		, Output	,
+   Stack	, Parameter	, Variable	,
+   CopyDef	, CopyUse	, Thread	, Virtual	,
+   Test		, Left		, Right		,
+   NonBaseComp	, First		, Dummy		, Trace		,
+   Demand	, Funct		, NoClass	, Options	,
+   TreeRoot	, iMain		, itTree	, iTreeNode	,
+   ForallClasses, ForallAttributes, f		, WI	, WN	,
+   IdentifyAttribute, GrammarClass, cOAG	, MaxVisit	,
+   WriteInstance, ErrorCount;
+
+IMPORT Errors;
+
+VAR
+   Count, Start, Stop, Visit, ChildVisit, i, j, k, gInstCount	: SHORTCARD;
+   Node, Attr, Class, CurClass, AttrClass, Child, Child2, ChildsClass	: tTree;
+   Success	: BOOLEAN;
+   HasChanged	: tSet;
+
+PROCEDURE Representative (i: CARDINAL): CARDINAL;	(* Class	*)
+   VAR
+      s		: tSet;
+      r		: CARDINAL;
+      Stable	: BOOLEAN;
+      j, k	: CARDINAL;
+   BEGIN
+      WITH Class^.Class DO
+	 MakeSet (s, InstCount);
+	 Include (s, i);
+	 REPEAT
+	    Stable := TRUE;
+	    FOR j := 1 TO InstCount DO
+	       IF IsElement (j, s) THEN
+		  IF CopyDef IN Instance^[j].Properties THEN
+		     k := Instance^[j].CopyArg;
+		     IF (Parameter IN Instance^[k].Attribute^.Attribute.Properties) AND
+			NOT IsElement (k, s) THEN
+			Include (s, k);
+			Stable := FALSE;
+		     END;
+		  END;
+		  IF CopyUse IN Instance^[j].Properties THEN
+		     FOR k := 1 TO InstCount DO
+			IF (CopyDef IN Instance^[k].Properties) AND
+			   (Parameter IN Instance^[k].Attribute^.Attribute.Properties) AND
+			   (Instance^[k].CopyArg = j) AND
+			   NOT IsElement (k, s) THEN
+			   Include (s, k);
+			   Stable := FALSE;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 UNTIL Stable;
+	 r := Minimum (s);
+	 IF r <= AttrCount THEN
+	    Stable := TRUE;
+	    j := r + 1;
+	    LOOP
+	       IF j > AttrCount THEN EXIT; END;
+	       IF IsElement (j, s) THEN Stable := FALSE; EXIT; END;
+	       INC (j);
+	    END;
+	    IF NOT Stable THEN
+	       j := 1;
+	       LOOP
+		  k := Instance^ [j].Order;
+		  IF (k <= AttrCount) AND IsElement (k, s) THEN r := k; EXIT; END;
+		  INC (j);
+	       END;
+	    END;
+	 END;
+	 ReleaseSet (s);
+	 RETURN r;
+      END;
+   END Representative;
+
+PROCEDURE GenAttribute (i: CARDINAL; repr: BOOLEAN; isDecl: BOOLEAN);	(* Class = subtype, Node = current type, k	*)
+   BEGIN
+      IF repr THEN
+	 WITH Class^.Class.Instance^[i] DO
+	    IF (Parameter IN Attribute^.Attribute.Properties) AND
+	       (({CopyDef, CopyUse} * Properties) # {}) THEN
+	       i := Representative (i);
+	    END;
+	 END;
+      END;
+      WITH Class^.Class.Instance^[i] DO
+	 IF Virtual IN Properties THEN RETURN; END;
+	 IF Left IN Properties THEN					(* left		*)
+	    WITH Attribute^.Attribute DO
+	       IF Parameter IN Properties THEN
+		  IF IdentifyAttribute (Node, Name) = NoTree THEN
+		     WI (Class^.Class.Name); !yy! WI (Name);		(* local	*)
+		  ELSIF Inherited IN Properties THEN
+		     !yy! WI (Name);					(* param INH	*)
+		  ELSIF isDecl THEN
+		     ![] yy! WI (Name);
+		  ELSE
+		     !yy! WI (Name); ![0]!;
+		  END;
+	       ELSIF Demand IN Properties THEN				(* demand	*)
+		  IF Funct IN Properties THEN
+		     AttrClass := GetClass (Class, Name);		(* function	*)
+		     !y! WI (AttrClass^.Class.Name); !y! WI (Name); !(yyt)! 
+		  ELSIF i # k THEN
+		     WI (Class^.Class.Name); !yy! WI (Name);		(* local	*)
+		     IF NOT (Inherited IN Properties) THEN
+		        ![0]!;
+		     END;
+		  ELSE
+		     !(yy! WI (Name); ![0])!				(* param	*)
+		  END;
+	       ELSE							(* tree		*)
+		  !((! WI (iMain); !.! WI (Class^.Class.Name); !) yyt).! WI (Name);
+	       END;
+	    END;
+	 ELSE								(* right	*)
+	    WITH Attribute^.Attribute DO
+	       IF Parameter IN Properties THEN				(* param	*)
+		  WI (Class^.Class.Name); !y! WI (Selector^.Child.Name); !y! WI (Name);
+(*		  IF (NOT (Inherited IN Properties)) AND isDecl THEN !    [0]! END;*)
+		  IF (NOT (Inherited IN Properties)) AND NOT isDecl THEN ![0]! END;
+!/*! IF Inherited IN Properties THEN !Inh ! END;
+IF isDecl THEN !Decl ! END;
+IF repr THEN !repr! END;
+!*/!
+	       ELSIF Demand IN Properties THEN				(* demand	*)
+		  IF Funct IN Properties THEN				(* function	*)
+		     AttrClass := GetClass (Selector^.Child.Class, Name);
+		     !y! WI (AttrClass^.Class.Name); !y! WI (Name);
+		     !(((! WI (iMain); !.! WI (Class^.Class.Name); !) yyt).! WI (Selector^.Child.Name); !)! 
+		  ELSE
+		     WI (Class^.Class.Name); !y! WI (Selector^.Child.Name); !y! WI (Name);
+		  END;
+	       ELSE							(* tree		*)
+		  !((! WI (iMain); !.! WI (Class^.Class.Name); !) yyt).! WI (Selector^.Child.Name);
+		  !.! WI (Selector^.Child.Type); !.! WI (Name);
+	       END;
+	    END;
+	 END;
+      END;
+   END GenAttribute;
+
+PROCEDURE GetClass (Class: tTree; Attribute: tIdent): tTree;
+   BEGIN
+      WHILE Class^.Kind # NoClass DO
+	 IF IdentifyAttribute (Class^.Class.Attributes, Attribute) # NoTree THEN RETURN Class; END;
+	 Class := Class^.Class.BaseClass;
+      END;
+      RETURN NoTree;
+   END GetClass;
+
+PROCEDURE CheckUsage (Usage: BITSET): BOOLEAN;	(* Class, Child, Start, Stop	*)
+   VAR i, i2: SHORTCARD;
+   BEGIN
+      FOR i := Start TO Stop DO
+	 i2 := Class^.Class.Instance^ [i].Order;
+	 WITH Class^.Class.Instance^ [i2] DO
+	    IF ({Synthesized, Right, First} <= Properties) AND
+	       (Child = Selector) AND
+	       (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) AND
+	       (Attribute^.Child.Partition IN Usage) THEN
+	       RETURN TRUE;
+	    END;
+	    IF ({Inherited, Right} <= Properties) AND (i2 = j) THEN
+	       RETURN TRUE;
+	    END;
+	 END;
+      END;
+      RETURN FALSE;
+   END CheckUsage;
+}
+
+BEGIN	{ k := 0; }
+
+PROCEDURE EvalImplJava (t: Tree)
+	
+Ag (..) :- {
+	EvalImplHead (t);
+      IF NOT IsElement (ORD ('9'), Options) THEN
+	!!
+	!static void Eval (! WI (iTreeNode); ! yyt) {!
+	Node := Classes;
+	Class := Classes;
+	ForallAttributes (Class, GenTemposLocal);
+	!! 
+	IF MaxVisit > 0 THEN
+	   Class := Classes;
+	   Visit := 1;
+	   ! yyVisit1! WI (GetName (Classes)); ! (yyt! 
+	   ForallAttributes (Class, GenActualsLeft);
+	   !);! 
+	END;
+	!}!
+      ELSE
+	!!
+	!int yyMinLow;!
+	!!
+	! void Eval (! WI (iMain); !.! WI (itTree); ! yyt) {!
+	!  boolean yyHigh;!
+	Node := Classes;
+	Class := Classes;
+	ForallAttributes (Class, GenTemposLocal);
+	!!
+	! yyMinLow = MAX (int);!
+	IF MaxVisit > 0 THEN
+	   Class := Classes;
+	   Visit := 1;
+	   ! yyVisit1! WI (GetName (Classes)); ! (yyt! 
+	   ForallAttributes (Class, GenActualsLeft);
+	   !);! 
+	END; !!
+	! }!
+      END;
+	!!
+	ForallClasses (Classes, GenDemandProc);
+	ForallClasses (Classes, EvalImplJava);
+	! static void begin () {!
+	WriteLine (EvalCodes^.Codes.BeginLine);
+	WriteText (f, EvalCodes^.Codes.Begin);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.BeginLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Begin);
+	   Node := Node^.Module.Next;
+	END;
+	! }!
+	!!
+	! static void close () {!
+	WriteLine (EvalCodes^.Codes.CloseLine);
+	WriteText (f, EvalCodes^.Codes.Close);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.CloseLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Close);
+	   Node := Node^.Module.Next;
+	END;
+	! }!
+	!!
+	! static {!
+      IF IsElement (ORD ('X'), Options) THEN
+	! yyf = IO.StdOutput;!
+      END;
+	! }!
+	!}!
+}; .
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	CONDITION Referenced IN Properties;
+     lHasTailRecursion: BOOLEAN;
+{
+	Generated := 0;
+	ForallClasses (Extensions, Generated0);
+	FOR Visit := 1 TO Visits DO
+	   ! private static void yyVisit! WN (Visit); WI (Name); ! (! WI (iTreeNode); ! yyt!
+	   Node := t;
+	   Class := t;
+	   CurClass := t;
+	   ForallAttributes (t, GenFormals); !) {!
+	   Node := t;
+	   GenTempos (t);
+	   ForallClasses (Extensions, GenTempos);
+	   WriteLine (TreeRoot^.Ag.EvalCodes^.Codes.LocalLine);
+	   WriteText (f, TreeRoot^.Ag.EvalCodes^.Codes.Local);
+	   Node := TreeRoot^.Ag.Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	      WriteLine (Node^.Module.EvalCodes^.Codes.LocalLine);
+	      WriteText (f, Node^.Module.EvalCodes^.Codes.Local);
+	      Node := Node^.Module.Next;
+	   END;
+      IF IsElement (ORD ('9'), Options) THEN
+	   ! boolean yyLow;!
+	   !!
+	   !  yyMinLow = General.min (yyMinLow, SYSTEM.ADR (yyLow));!
+      END;
+	   lHasTailRecursion := (cOAG IN GrammarClass) AND HasTailRecursion (t);
+	   IF lHasTailRecursion THEN
+	      ! for (;;) {!
+	   END;
+	   !  switch (yyt.yyKind) {!
+	   IF cOAG IN GrammarClass THEN		(* generate evaluator	*)
+	      Node := t;
+	      GenEvaluator (t);
+	      ForallClasses (Extensions, GenEvaluator);
+	   END;
+	   !  default:!
+      IF IsElement (ORD ('Z'), Options) THEN
+	   !   yyVisitParent (yyt);!
+      END;
+	   !  }!
+	   IF lHasTailRecursion THEN
+	      !  return;!
+	      ! }!
+	   END;
+	   ! }!
+	   !!
+	END;
+}; .
+
+PROCEDURE GenEvaluator	/* Node, Class (sometimes)	*/ (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	CONDITION (Generated # InstCount);
+     HasTailRecursion: BOOLEAN; HasTailRecursion := FALSE;
+	!case ! WI (iMain); !.k! WI (Name); !:!
+{
+	Start := Generated + 1;
+	LOOP
+	   IF Generated = InstCount THEN EXIT; END;
+	   INC (Generated);
+	   WITH Instance^ [Instance^ [Generated].Order] DO
+	      IF (Left IN Properties) AND (Attribute^.Child.Partition > Visit) THEN
+	         DEC (Generated); EXIT;
+	      END;
+	   END;
+	END;
+	Stop := Generated;
+
+	Class := t;
+
+	FOR Start := Start TO Stop DO
+	   i := Instance^ [Start].Order;
+	   WITH Instance^ [i] DO
+	      IF ({Inherited, Right, First} <= Properties) AND ({Dummy, Virtual, Demand} * Properties = {}) THEN
+		 GenDemandEval (t);
+      IF IsElement (ORD ('X'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 !yyWriteEval (yyt, '! WI (Selector^.Child.Name); !:! WI (Attribute^.Child.Name); !');!
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END; !!
+		 IF (Attribute^.Kind = Tree.Child) OR (Attribute^.Attribute.Type = itTree) THEN
+		    !write! WI (itTree);
+		 ELSE
+		    !write! WI (Attribute^.Child.Type);
+		 END;
+		 ! (! GenAttribute (i, TRUE, FALSE); !).yyWriteNl ();!
+      ELSIF IsElement (ORD ('Y'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 !yyWriteEval (yyt, '! WI (Selector^.Child.Name); !:! WI (Attribute^.Child.Name); !');!
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      ELSE
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      END;
+	      END;
+	      IF ({Synthesized, Left, First} <= Properties) AND ({Dummy, Virtual, Demand} * Properties = {}) THEN
+		 GenDemandEval (t);
+      IF IsElement (ORD ('X'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 !yyWriteEval (yyt, '! WI (Attribute^.Child.Name); !');!
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END; !!
+		 IF Test IN Properties THEN
+		    !writeBOOLEAN (yyb).yyWriteNl ();!
+		 ELSIF (Attribute^.Kind = Tree.Child) OR (Attribute^.Attribute.Type = itTree) THEN
+		    !write! WI (itTree); !(! GenAttribute (i, TRUE, FALSE); !).yyWriteNl ();!
+		 ELSE
+		    !write! WI (Attribute^.Child.Type); !(! GenAttribute (i, TRUE, FALSE); !).yyWriteNl ();!
+		 END;
+      ELSIF IsElement (ORD ('Y'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 !yyWriteEval (yyt, '! WI (Attribute^.Child.Name); !');!
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      ELSE
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      END;
+	      END;
+	      IF ({Synthesized, Right, First} <= Properties) AND
+		 (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) THEN
+      IF IsElement (ORD ('Z'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 !yyWriteVisit (yyt, '! WI (Selector^.Child.Name); ! ! 
+		 WN (Attribute^.Child.Partition); !');!
+      END;
+		 ChildVisit := Attribute^.Child.Partition;
+		 Child := Selector;
+	         IF (Visit = ChildVisit) AND (CurClass^.Class.Name = Child^.Child.Type) AND
+		    NoCode1 (Class, Start + 1, Stop) AND CheckArguments (Child^.Child.Class) THEN
+		    !  yyt = ((! WI (iMain); !.! WI (Name); !) yyt).! WI (Child^.Child.Name); !;!
+		    ForallAttributes (Child^.Child.Class, GenTailActuals);
+		    !break;!
+		    HasTailRecursion := TRUE;
+		    Start := Stop + 1;					(* EXIT *)
+		 ELSE
+		    !yyVisit! WN (ChildVisit); WI (Child^.Child.Type);
+		    ! (((! WI (iMain); !.! WI (Name); !) yyt).! WI (Child^.Child.Name);
+		    ForallAttributes (Child^.Child.Class, GenActualsRight);
+		    !);!
+		 END;
+	      END;
+	   END;
+	END;
+	IF NOT HasTailRecursion THEN
+      IF IsElement (ORD ('Z'), Options) AND (Trace IN t^.Class.Properties) THEN
+	   !yyVisitParent (yyt);!
+      END;
+	END;
+	!      break;!
+}; .
+Assign (..) :-
+	WriteLine (Pos);
+	!  ! GenEvaluator (Results);	!=! GenEvaluator (Arguments); !;!
+	.
+Copy (..) :- {
+	j := Class^.Class.Instance^[i].CopyArg;
+	IF (Parameter IN Class^.Class.Instance^[i].Attribute^.Attribute.Properties) AND
+	   (Parameter IN Class^.Class.Instance^[j].Attribute^.Attribute.Properties) THEN
+	   IF (Left IN Class^.Class.Instance^[i].Properties) AND
+	      (Left IN Class^.Class.Instance^[j].Properties) THEN
+
+	      WriteLine (Pos);
+	      GenAttribute (i, FALSE, FALSE); ! = ! GenEvaluator (Arguments); !;!
+	   END;
+	ELSE
+	   WriteLine (Pos);
+	   GenEvaluator (Results); !=! GenEvaluator (Arguments); !;!
+	END;
+}; .
+TargetCode (..) :-
+	WriteLine (Pos);
+	GenEvaluator (Code); !!
+	.
+Check (..) :- {
+	WriteLine (Pos);
+	IF Condition # NoTree THEN
+      IF IsElement (ORD ('X'), Options) THEN
+	   !yyb = ! GenEvaluator (Condition); @; if (!yyb) {@ 
+      ELSE
+	   @if (! (@
+	   GenEvaluator (Condition); !)) { ! 
+      END;
+	   GenEvaluator (Statement); !;!
+	   IF Actions^.Kind = Tree.Check THEN
+	      !} else { ! GenEvaluator (Actions);
+	   END;
+	   !}!
+	ELSE
+      IF IsElement (ORD ('X'), Options) THEN
+	   !yyb = false; ! 
+      END;
+	   GenEvaluator (Statement); !;!
+	   GenEvaluator (Actions);
+	END;
+}; .
+Designator (..) :- {
+	Child2 := IdentifyAttribute (Class, Selector);
+	IF Child2 # NoTree THEN
+	   ChildsClass := Child2^.Child.Class;
+	   Attr := IdentifyAttribute (ChildsClass, Attribute);
+	   IF Attr # NoTree THEN
+	      GenAttribute (Class^.Class.AttrCount + Child2^.Child.InstOffset + Attr^.Attribute.AttrIndex, TRUE, FALSE); 
+	   ELSE
+	      WI (Selector); !:! WI (Attribute); 
+	   END;
+	ELSE
+	   WI (Selector); !:! WI (Attribute); 
+	END;
+};
+	GenEvaluator (Next);
+	.
+Ident (..) :- {
+	Attr := IdentifyAttribute (Class, Attribute);
+	IF Attr # NoTree THEN
+	   GenAttribute (Attr^.Attribute.AttrIndex, TRUE, FALSE); 
+	ELSE
+	   WI (Attribute); 
+	END;
+};
+	GenEvaluator (Next);
+	.
+Any (..) :-
+	WriteString (f, Code);
+	GenEvaluator (Next);
+	.
+Anys (..) :-
+	GenEvaluator (Layouts);
+	GenEvaluator (Next);
+	.
+LayoutAny (..) :-
+	WriteString (f, Code);
+	GenEvaluator (Next);
+	.
+
+PROCEDURE Generated0 (t: Tree)
+
+Class (..) :- Generated := 0; .
+
+PROCEDURE GenFormals	/* Node, Class, Visit	*/ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) AND (Visit IN Usage);
+   !, ! 
+{  IF Synthesized IN Properties THEN !! END; };
+   WI (Type); ! ! GenAttribute (AttrIndex, FALSE, TRUE); 
+   .
+
+PROCEDURE GenActualsRight	/* Node = current type, Class = subtype, Child, ChildVisit	*/ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) AND (ChildVisit IN Usage);
+   !, ! GenAttribute (Class^.Class.AttrCount + Child^.Child.InstOffset + AttrIndex, TRUE, TRUE); !//was not isDecl!
+   .
+
+PROCEDURE GenActualsLeft	/* Node = current type, Class = subtype, Visit	*/ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) AND (Visit IN Usage);
+   IF Inherited IN Properties THEN
+     Errors.MessageI ("inherited attribute at root node", Errors.Error, Pos, Errors.Ident, ADR (Name));
+     INC (ErrorCount);
+   END
+   !, ! GenAttribute (AttrIndex, FALSE, FALSE); 
+   .
+
+PROCEDURE GenTempos	/* Node, Class (sometimes), Visit, k	*/ (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	Start := Generated + 1;
+{
+	LOOP
+	   IF Generated = InstCount THEN EXIT; END;
+	   INC (Generated);
+	   WITH Instance^ [Instance^ [Generated].Order] DO
+	      IF (Left IN Properties) AND (Attribute^.Child.Partition > Visit) THEN
+	         DEC (Generated); EXIT;
+	      END;
+	   END;
+	END;
+	Stop := Generated;
+	Generated := Start - 1;
+
+	Count := 0;
+	Class := t;
+	ForallAttributes (t, CountTempos);
+	IF Count > 0 THEN
+	   Class := t;
+	   ForallAttributes (t, GenTempos);
+	END;
+}; .
+Child (..) :-
+	Child := t;
+	ForallAttributes (Class, GenTemposChildren);
+	.
+Attribute (..) :-
+	CONDITION (Parameter IN Properties) AND (IdentifyAttribute (Node, Name) = NoTree) AND (Visit IN Usage) OR
+	   (Demand IN Properties) AND NOT (Funct IN Properties) AND (AttrIndex # k);
+	!  ! WI (Type); {IF NOT (Inherited IN Properties) THEN ![]! END;}; ! !;
+	GenAttribute (AttrIndex, FALSE, FALSE);
+	{IF NOT (Inherited IN Properties) THEN ! = new ! WI (Type); ![1]! END;}; !;!
+	.
+
+PROCEDURE GenTemposChildren	/* Node, Class, Child	*/ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) OR (Demand IN Properties) AND NOT (Funct IN Properties);
+   j := Class^.Class.AttrCount + Child^.Child.InstOffset + AttrIndex;
+   CONDITION (Demand IN Properties) OR
+      (({{CopyDef, CopyUse}} * Class^.Class.Instance^[j].Properties) = {{}}) OR
+      (j = Representative (j));
+   CONDITION CheckUsage (Usage);
+   !  ! WI (Type); {IF NOT (Inherited IN Properties) THEN ![]! END;}; ! !;
+   GenAttribute (j, FALSE, TRUE);
+   {IF NOT (Inherited IN Properties) THEN ! = new ! WI (Type); ![1]! END;}; !;!
+   .
+
+PROCEDURE CountTempos	/* Node, Class (sometimes), Visit, k	*/ (t: Tree)
+
+Child (..) :-
+   Child := t;
+   ForallAttributes (Class, CountTemposChildren);
+   .
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) AND (IdentifyAttribute (Node, Name) = NoTree) AND (Visit IN Usage) OR
+      (Demand IN Properties) AND NOT (Funct IN Properties) AND (AttrIndex # k);
+   INC (Count);
+   .
+
+PROCEDURE CountTemposChildren	/* Node, Class, Child	*/ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) OR (Demand IN Properties) AND NOT (Funct IN Properties);
+   j := Class^.Class.AttrCount + Child^.Child.InstOffset + AttrIndex;
+   CONDITION (Demand IN Properties) OR
+      (({{CopyDef, CopyUse}} * Class^.Class.Instance^[j].Properties) = {{}}) OR
+      (j = Representative (j));
+   CONDITION CheckUsage (Usage);
+   INC (Count);
+   .
+
+PROCEDURE GenTemposLocal	/* Node, Class	*/ (t: Tree)
+
+Attribute (..) :-
+   CONDITION Parameter IN Properties;
+   !  ! WI (Type); ! ! GenAttribute (AttrIndex, FALSE, FALSE); !;!
+   .
+
+PROCEDURE GenDemandProc	/* Node, Class	*/ (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	Node := t;
+	ForallAttributes (Attributes, GenDemandProc);
+	.
+Attribute (..) :-
+	CONDITION Demand IN Properties;
+	Class := Node;
+	k := AttrIndex;
+{
+	IF Funct IN Properties THEN
+	   WI (Type); ! y! WI (Class^.Class.Name); !y! WI (Name);
+	   ! (! WI (iMain); !.! WI (itTree); ! yyt);!
+	ELSE
+	   !void y! WI (Class^.Class.Name); !y! WI (Name);
+	   ! (! WI (iMain); !.! WI (itTree); !yyt, ! WI (Type); ! ! GenAttribute (AttrIndex, FALSE, TRUE); !);!
+	END;
+	! class yyTempo!
+	GenTempos (Class);
+	ForallClasses (Class^.Class.Extensions, GenTempos);
+	! }}!
+	!!
+	!  switch (yyt.yyKind) {!
+	IF cOAG IN GrammarClass THEN
+	   i := AttrIndex;
+	   Class := Node;
+	   GenDemandProc2 (Class);
+	   ForallClasses (Class^.Class.Extensions, GenDemandProc2);
+	   Class := Node;
+	END;
+	!  default: break;!
+	!  }!
+	! }!
+	!}!
+	!!
+	k := 0;
+}; .
+
+PROCEDURE GenDemandProc2	/* Node, Class, i	*/ (t: Tree)
+
+Class (..) :- {
+	!case ! WI (iMain); !.! WI (Name); !:!
+	WITH Instance^ [i] DO
+	   Class := t;
+	   GenDemandEval (t);
+	   IF Funct IN Properties THEN
+	      GenDemandProc2 (Action);
+	   ELSE
+	      GenEvaluator (Action); !!
+	   END;
+	END;
+	!break;!
+}; .
+Assign (..) ;
+Copy (..) :-
+	!return ! GenEvaluator (Arguments); !;!
+	.
+TargetCode (..) :-
+	!NoBlockStatementForDemandFunctionAttributes;!
+	.
+
+PROCEDURE GenDemandEval	/* Node, Class, i	*/ (t: Tree)
+
+Class (..) :- {
+	FOR j := 1 TO InstCount DO
+	   WITH Instance^ [j] DO
+	      IF IsRelated (i, j, DP) AND 
+		 (Demand IN Properties) AND NOT (Funct IN Properties) THEN
+		 IF Left IN Properties THEN
+		    AttrClass := GetClass (t, Attribute^.Child.Name);
+		    !   y! WI (AttrClass^.Class.Name); !y! WI (Attribute^.Child.Name);
+		    !(yyt, ! GenAttribute (j, FALSE, FALSE); !);!
+		 ELSE
+		    AttrClass := GetClass (Selector^.Child.Class, Attribute^.Child.Name);
+		    !   y! WI (AttrClass^.Class.Name); !y! WI (Attribute^.Child.Name);
+		    !(((! WI (Name); !) yyt).! WI (Selector^.Child.Name);
+		    !, ! GenAttribute (j, FALSE, FALSE); !);!
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+PREDICATE NoCode1 (Class, Start: INTEGER, Stop: INTEGER)	/* Class */
+
+   LOCAL { VAR i, j: INTEGER; }
+
+Class (..), .. :- {
+   FOR j := Start TO Stop DO
+      i := Instance^ [j].Order;
+      WITH Instance^ [i] DO
+	 IF ({Inherited, Right, First} <= Properties) AND ({Dummy, Virtual, Demand} * Properties = {}) THEN
+	    IF (Action # tTree (ADR (Action))) AND NOT NoCode2 (Action, i) THEN RETURN FALSE; END;
+	 END;
+	 IF ({Synthesized, Left, First} <= Properties) AND ({Dummy, Virtual, Demand} * Properties = {}) THEN
+	    IF (Action # tTree (ADR (Action))) AND NOT NoCode2 (Action, i) THEN RETURN FALSE; END;
+	 END;
+	 IF ({Synthesized, Right, First} <= Properties) AND
+	    (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) THEN
+	    RETURN FALSE;
+	 END;
+      END;
+   END;
+}; .
+
+PREDICATE NoCode2 (Action, INTEGER)	/* Class */
+
+Copy (..), i :-
+   j := Class^.Class.Instance^[i].CopyArg;
+   CONDITION (Parameter IN Class^.Class.Instance^[i].Attribute^.Attribute.Properties) AND
+      (Parameter IN Class^.Class.Instance^[j].Attribute^.Attribute.Properties) AND NOT
+      ((Left IN Class^.Class.Instance^[i].Properties) AND
+       (Left IN Class^.Class.Instance^[j].Properties));
+   .
+
+PROCEDURE GenTailActuals /* Node = current type, Class = subtype, Child, ChildVisit */ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) AND (ChildVisit IN Usage);
+   i: SHORTCARD;
+   i := Class^.Class.AttrCount + Child^.Child.InstOffset + AttrIndex;
+{  WITH Class^.Class.Instance^[i] DO
+      IF ({CopyDef, CopyUse} * Properties) # {} THEN i := Representative (i); END;
+   END;
+};
+   CONDITION AttrIndex # i;
+   !yy! WI (Name); ! = ! GenAttribute (i, TRUE, FALSE); !;!
+
+
+   IF AttrIndex # i THEN
+      IF Inherited IN Properties THEN
+	 !yy! WI (Name); ! = ! GenAttribute (i, TRUE, FALSE); !;!
+      ELSE
+	 !yy! WI (Name); ! = new ! WI (Type); ![] {! GenAttribute (i, TRUE, FALSE); !};!
+      END;
+   END;
+   .
+
+PREDICATE HasTailRecursion (t: Class)
+
+Class (..) :-
+   CONDITION HasTailRecursion2 (t) OR HasTailRecursion1 (Extensions);
+   .
+
+PREDICATE HasTailRecursion1 (Classes)
+
+t: Class (..) :-
+   CONDITION HasTailRecursion (t) OR HasTailRecursion1 (Next);
+   .
+
+PREDICATE HasTailRecursion2 (t: Class)
+
+Class (..) :-
+   CONDITION (NoCodeClass * Properties) = {{}};
+   CONDITION Generated # InstCount;
+   Class := t;
+{
+   Stop := Generated;
+   LOOP
+      IF Stop = InstCount THEN EXIT; END;
+      INC (Stop);
+      WITH Instance^ [Instance^ [Stop].Order] DO
+         IF (Left IN Properties) AND (Attribute^.Child.Partition > Visit) THEN
+            DEC (Stop); EXIT;
+         END;
+      END;
+   END;
+
+   FOR Start := Generated + 1 TO Stop DO
+      i := Instance^ [Start].Order;
+      WITH Instance^ [i] DO
+         IF ({Synthesized, Right, First} <= Properties) AND
+	    (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) THEN
+	    ChildVisit := Attribute^.Child.Partition;
+	    Child := Selector;
+            IF (Visit = ChildVisit) AND (CurClass^.Class.Name = Child^.Child.Type) AND
+	       NoCode1 (Class, Start + 1, Stop) THEN
+	       RETURN TRUE;
+            END;
+         END;
+      END;
+   END;
+   RETURN FALSE;
+}; .
+
+PREDICATE CheckArguments /* Node = current type, Class = subtype, Child, ChildVisit */ (t: Class)
+
+Class (..) :-
+   Success := TRUE;
+   gInstCount := InstCount;
+   MakeSet (HasChanged, InstCount);
+   ForallAttributes (t, CheckArguments2);
+   ReleaseSet (HasChanged);
+   CONDITION Success;
+   .
+
+PROCEDURE CheckArguments2 /* Node = current type, Class = subtype, Child, ChildVisit */ (t: Tree)
+
+Attribute (..) :-
+   CONDITION (Parameter IN Properties) AND (ChildVisit IN Usage);
+   i: SHORTCARD;
+   i := Class^.Class.AttrCount + Child^.Child.InstOffset + AttrIndex;
+{  WITH Class^.Class.Instance^[i] DO
+      IF ({CopyDef, CopyUse} * Properties) # {} THEN i := Representative (i); END;
+   END;
+   IF AttrIndex # i THEN
+      IF (i <= gInstCount) AND IsElement (i, HasChanged) THEN Success := FALSE; END;
+      Include (HasChanged, AttrIndex);
+   END;
+};
+   .
+
+FUNCTION GetName (Classes) tIdent
+
+Class (..) :- CONDITION (NoCodeClass * Properties) = {{}}; RETURN Name; .
+Class (Next := Next) :- RETURN GetName (Next); .

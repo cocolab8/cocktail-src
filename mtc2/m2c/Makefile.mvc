@@ -1,0 +1,249 @@
+!INCLUDE ..\..\config.mak
+
+CFLAGS	= $(CFG_CFLAGS) /W1 /I$(REUSE)
+
+LDFLAGS	= /STACK:2000000 $(REUSE_LIB)
+
+SYSTEM	= SYSTEM_.obj
+
+all	:
+
+# HEAD
+
+all	: mtc2.exe
+
+AssocTab.obj	: AssocTab.c	\
+	AssocTab.h
+
+Base.obj	: Base.c	\
+	Base.h
+
+Code.obj	: Code.c	\
+	Code.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h	\
+	GenIdent.h	\
+	AssocTab.h	\
+	Types.h	\
+	Values.h	\
+	Defs.h	\
+	Base.h	\
+	Tree.h	\
+	UniqueId.h
+
+DefMods.obj	: DefMods.c	\
+	DefMods.h	\
+	AssocTab.h	\
+	Defs.h	\
+	GenIdent.h	\
+	Values.h	\
+	Types.h	\
+	Code.h	\
+	Position.h	\
+	Errors.h	\
+	Parser.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Base.h	\
+	Tree.h	\
+	UniqueId.h
+
+Defs.obj	: Defs.c	\
+	Defs.h	\
+	GenIdent.h	\
+	Base.h	\
+	Tree.h	\
+	UniqueId.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h	\
+	Values.h	\
+	Types.h	\
+	Code.h	\
+	AssocTab.h
+
+Errors.obj	: Errors.c	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h
+
+GenIdent.obj	: GenIdent.c	\
+	GenIdent.h	\
+	Base.h
+
+Parser.obj	: Parser.c	\
+	Parser.h	\
+	Defs.h	\
+	GenIdent.h	\
+	Base.h	\
+	Values.h	\
+	Types.h	\
+	Code.h	\
+	AssocTab.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Errors.h	\
+	Position.h	\
+	Tree.h	\
+	UniqueId.h
+
+Position.obj	: Position.c	\
+	Position.h
+
+Scanner.obj	: Scanner.c	\
+	Scanner.h	\
+	Errors.h	\
+	Source.h	\
+	Position.h	\
+	Tokens.h
+
+Semantic.obj	: Semantic.c	\
+	Semantic.h	\
+	Code.h	\
+	AssocTab.h	\
+	Base.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h	\
+	Types.h	\
+	GenIdent.h	\
+	Defs.h	\
+	Values.h	\
+	UniqueId.h	\
+	Tree.h
+
+Source.obj	: Source.c	\
+	Source.h	\
+	Scanner.h	\
+	Errors.h	\
+	Position.h	\
+	Tokens.h
+
+Tokens.obj	: Tokens.c	\
+	Tokens.h
+
+Tree.obj	: Tree.c	\
+	Tree.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	UniqueId.h	\
+	Values.h	\
+	Types.h	\
+	Code.h	\
+	GenIdent.h	\
+	AssocTab.h	\
+	Base.h	\
+	Defs.h	\
+	Position.h
+
+Types.obj	: Types.c	\
+	Types.h	\
+	Code.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h	\
+	GenIdent.h	\
+	AssocTab.h	\
+	Tree.h	\
+	UniqueId.h	\
+	Base.h	\
+	Defs.h	\
+	Values.h
+
+UniqueId.obj	: UniqueId.c	\
+	UniqueId.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h
+
+Values.obj	: Values.c	\
+	Values.h	\
+	Types.h	\
+	Code.h	\
+	Errors.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Position.h	\
+	GenIdent.h	\
+	AssocTab.h	\
+	Base.h	\
+	Defs.h	\
+	Tree.h	\
+	UniqueId.h
+
+mtc2.obj	: mtc2.c	\
+	Errors.h	\
+	Position.h	\
+	Code.h	\
+	GenIdent.h	\
+	AssocTab.h	\
+	Types.h	\
+	Values.h	\
+	Semantic.h	\
+	UniqueId.h	\
+	Defs.h	\
+	DefMods.h	\
+	Tree.h	\
+	Parser.h	\
+	Scanner.h	\
+	Source.h	\
+	Tokens.h	\
+	Base.h
+
+SYSTEM_.obj	: SYSTEM_.c SYSTEM_.h
+	$(CC) $(CFG_CFLAGS) /W1 /c SYSTEM_.c
+
+mtc2_OBJS =	\
+	mtc2.obj	\
+	Errors.obj	\
+	Position.obj	\
+	Code.obj	\
+	GenIdent.obj	\
+	AssocTab.obj	\
+	Types.obj	\
+	Values.obj	\
+	Semantic.obj	\
+	UniqueId.obj	\
+	Defs.obj	\
+	DefMods.obj	\
+	Tree.obj	\
+	Parser.obj	\
+	Scanner.obj	\
+	Source.obj	\
+	Tokens.obj	\
+	Base.obj
+
+mtc2.exe	: $(mtc2_OBJS) $(SYSTEM)
+	$(CC) /nologo $(mtc2_OBJS) $(SYSTEM) /link /out:mtc2.exe $(LDFLAGS)
+
+install: mtc2.exe
+	if not exist $(CT_DIR)\bin\ mkdir $(CT_DIR)\bin
+	copy mtc2.exe $(CT_DIR)\bin
+
+# TAIL
+
+clean	:
+	del *.obj *.exe
+
+.SUFFIXES: .h .c .obj
+
+.c.obj:
+	$(CC) $(CFLAGS) /c $*.c

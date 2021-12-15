@@ -1,0 +1,29 @@
+(* $Id: rpp.mi,v 1.1 1997/05/27 15:43:02 grosch rel $ *)
+
+(*
+ * $Log: rpp.mi,v $
+ * Revision 1.1  1997/05/27 15:43:02  grosch
+ * cosmetic changes
+ *
+ * Revision 1.0  1993/08/17 15:54:43  grosch
+ * Initial revision
+ *
+ *)
+
+MODULE rpp;
+
+FROM Scanner	IMPORT BeginScanner, GetToken, EofToken, CloseScanner;
+FROM IO		IMPORT CloseIO;
+FROM rSystem	IMPORT rExit;
+
+VAR Token	: INTEGER;
+
+BEGIN
+   BeginScanner;
+   REPEAT
+      Token := GetToken ();
+   UNTIL Token = EofToken;
+   CloseScanner;
+   CloseIO;
+   rExit (0);
+END rpp.

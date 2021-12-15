@@ -1,0 +1,282 @@
+(* $Id: Classes.mi,v 3.6 2001/01/05 12:09:13 grosch rel $ *)
+
+(*
+ * $Log: Classes.mi,v $
+ * Revision 3.6  2001/01/05 12:09:13  grosch
+ * changed creation of array ToClassRange
+ *
+ * Revision 3.5  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 3.4  1998/04/21 10:25:23  grosch
+ * truncation of file and module names to 8.3 format
+ * cosmetic changes
+ *
+ * Revision 3.3  1993/08/18 15:10:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 3.2  1991/11/21  14:41:19  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.1  91/04/08  15:50:12  grosch
+ * release memory after use in Classes and Tree0
+ *
+ * Revision 3.0  91/04/04  18:26:37  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, March 1991/August 2000 *)
+
+IMPLEMENTATION MODULE Classes;
+
+FROM SYSTEM	IMPORT TSIZE;
+FROM General	IMPORT MinCard, MaxCard;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+FROM Strings	IMPORT tString, Char, Length;
+FROM StringM	IMPORT GetString;
+FROM IO		IMPORT StdOutput, WriteC, WriteS, WriteI, WriteN, WriteNl,
+			WriteFlush, StdError;
+FROM HugeSets	IMPORT tSet, MakeSet, Assign, Include, IsEqual, Extract,
+			WriteSet, Intersection, Union, Difference, Complement,
+			ReleaseSet, IsEmpty, IsSubset, AssignEmpty,
+			IncludeRange, ExcludeRange;
+FROM Tree0	IMPORT tTree0, Tree0Root, TraverseTree0TD, Ch, Set, String;
+FROM Dfa	IMPORT FirstCh, EobCh, LastCh;
+FROM UniCode	IMPORT UCHAR;
+FROM Sort	IMPORT Sort;
+FROM ScanGen	IMPORT Language, tLanguage;
+
+IMPORT Sets;
+
+PROCEDURE IsInSetMem (Set: tSet): INTEGER;
+   VAR i	: INTEGER;
+   BEGIN
+      FOR i := 1 TO SetCount DO
+	 IF IsEqual (Set, SetMemPtr^[i].Set) THEN RETURN i; END;
+      END;
+      RETURN 0;
+   END IsInSetMem;
+
+PROCEDURE CollectSets (t: tTree0);
+   VAR i	: CARDINAL;
+   VAR string	: tString;
+   BEGIN
+      CASE t^.Kind OF
+      | Ch	: Include (CharSet, t^.Ch.Ch);
+
+      | Set	: IF IsInSetMem (t^.Set.Set) = 0 THEN
+		     INC (SetCount);
+		     IF SetCount = SetMemSize THEN
+			ExtendArray (SetMemPtr, SetMemSize, TSIZE (tClassInfo));
+		     END;
+		     MakeSet (SetMemPtr^[SetCount].Set);
+		     Assign (SetMemPtr^[SetCount].Set, t^.Set.Set);
+		     Union (Unused, t^.Set.Set);
+		  END;
+
+      | String	: GetString (t^.String.String, string);
+		  FOR i := Length (string) TO 1 BY -1 DO
+		     Include (CharSet, ORD (Char (string, i)));
+		  END;
+      ELSE
+      END;
+   END CollectSets;
+
+PROCEDURE addToClass (Lwb, Upb: UCHAR; Class: tCharClass);
+VAR i, lowerUpb, upperLwb: UCHAR;
+BEGIN
+   lowerUpb := MinCard (ToClassArraySize - 1, Upb);
+   upperLwb := MaxCard (ToClassArraySize, Lwb);
+   FOR i := Lwb TO lowerUpb DO
+      ToClassArrayPtr^[i] := Class;
+   END;
+   IF upperLwb <= Upb THEN
+      INC (ToClassCount);
+      IF ToClassCount >= ToClassSize THEN
+	 ExtendArray (ToClassRange, ToClassSize, TSIZE (tClassRange));
+      END;
+      ToClassRange^[ToClassCount].Upb := Upb;
+      ToClassRange^[ToClassCount].Class := Class;
+   END;
+END addToClass;
+
+PROCEDURE ToClass (Ch: UCHAR): tCharClass;
+VAR lower, upper, middle: INTEGER;
+BEGIN
+   IF Ch < UCHAR (ToClassArraySize) THEN
+      RETURN ToClassArrayPtr^[Ch];
+   ELSE
+      lower := 1;				(* binary search *)
+      upper := ToClassCount;
+      WHILE upper - lower > 1 DO
+         middle := (lower + upper) DIV 2;
+	 IF ToClassRange^[middle].Upb < Ch THEN
+	    lower := middle;
+	 ELSE
+	    upper := middle;
+	 END;
+      END;
+      IF (ToClassRange^[lower - 1].Upb < Ch) AND (Ch <= ToClassRange^[lower].Upb) THEN
+	 RETURN ToClassRange^[lower].Class;
+      ELSE
+	 RETURN ToClassRange^[upper].Class;
+      END;
+   END;
+END ToClass;
+
+PROCEDURE ToChar (Class: tCharClass): UCHAR;
+BEGIN
+   RETURN ToCharArray [Class];
+END ToChar;
+
+PROCEDURE ComputeClasses;
+   VAR
+      i, j	: INTEGER;
+      Set	: tSet;
+      Lwb, Upb, k: LONGCARD;
+   BEGIN
+      MakeSet (CharSet);
+      MakeSet (Unused);
+      SetMemSize := 16;
+      MakeArray (SetMemPtr, SetMemSize, TSIZE (tClassInfo));
+      SetCount := 0;
+
+      IF b THEN
+	 TraverseTree0TD (Tree0Root, CollectSets);
+	 Include (CharSet, ORD (EobCh));
+	 Union (Unused, CharSet);
+	 Complement (Unused);
+      ELSE
+	 Include (CharSet, ORD (FirstCh));
+	 Complement (CharSet);
+      END;
+
+      ClassMemSize := 16;
+      MakeArray (ClassMemPtr, ClassMemSize, TSIZE (tSet));
+      ClassCount := 0;
+		(* initialize class 0 with union of all chars from sets *)
+      MakeSet (ClassMemPtr^[0]);
+      Assign (ClassMemPtr^[0], CharSet);
+      Union (ClassMemPtr^[0], Unused);
+      Complement (ClassMemPtr^[0]);
+      IF NOT b THEN
+         AssignEmpty (CharSet); 
+         IncludeRange (CharSet, 1, LastCh); 
+      END;
+      IF Language = Java THEN
+         ExcludeRange (CharSet, 65536, 4294967295); 
+         ExcludeRange (ClassMemPtr^[0], 65536, 4294967295); 
+      END;
+
+      MakeSet (Set);
+      FOR i := 1 TO SetCount DO
+	 FOR j := 0 TO ClassCount DO
+	    Assign (Set, SetMemPtr^[i].Set);
+	    Difference (Set, CharSet);
+	    Intersection (Set, ClassMemPtr^[j]);
+	    IF NOT IsEmpty (Set) AND NOT IsEqual (Set, ClassMemPtr^[j]) THEN
+	       INC (ClassCount);
+	       IF ORD (ClassCount) = CARDINAL (ClassMemSize) THEN
+		  ExtendArray (ClassMemPtr, ClassMemSize, TSIZE (tSet));
+	       END;
+	       MakeSet (ClassMemPtr^[ClassCount]);
+	       Assign (ClassMemPtr^[ClassCount], Set);
+	       Difference (ClassMemPtr^[j], Set);
+	    END;
+	 END;
+      END;
+
+      MakeArray (ToClassArrayPtr, ToClassArraySize, TSIZE (tCharClass));
+      ToClassCount := 0;
+      ToClassSize := 16;
+      MakeArray (ToClassRange, ToClassSize, TSIZE (tClassRange));
+
+      FOR j := 0 TO ClassCount DO
+	 Assign (Set, ClassMemPtr^[j]);
+	 WHILE NOT IsEmpty (Set) DO
+	    Extract (Set, Lwb, Upb);
+	    addToClass (Lwb, Upb, j);
+	 END;
+      END;
+
+      LastClass := ClassCount;
+      Assign (Set, CharSet);
+      WHILE NOT IsEmpty (Set) DO
+         Extract (Set, Lwb, Upb);
+	 FOR k := Lwb TO Upb DO
+	    INC (LastClass);
+	    addToClass (k, k, LastClass);
+	    ToCharArray [LastClass] := k;
+	 END;
+      END;
+      ReleaseSet (Set);
+
+      IF LastCh >= UCHAR (ToClassArraySize) THEN
+	 ToClassRange^[0].Upb := ToClassArraySize - 1;
+	 ToClassRange^[0].Class := 0;
+	 Sort (1, ToClassCount, IsLess, Swap);
+      END;
+
+      FOR i := 1 TO SetCount DO
+	 Sets.MakeSet (SetMemPtr^[i].Classes, LastClass);
+	 FOR j := 0 TO ClassCount DO
+	    IF IsSubset (ClassMemPtr^[j], SetMemPtr^[i].Set) THEN
+	       Sets.Include (SetMemPtr^[i].Classes, ORD (j));
+	    END;
+	 END;
+      END;
+   END ComputeClasses;
+
+PROCEDURE IsLess (i, j: INTEGER): BOOLEAN;
+   BEGIN
+      RETURN ToClassRange^[i].Upb <= ToClassRange^[j].Upb;
+   END IsLess;
+
+PROCEDURE Swap (i, j: INTEGER);
+   VAR t: tClassRange;
+   BEGIN
+      t := ToClassRange^[i];
+      ToClassRange^[i] := ToClassRange^[j];
+      ToClassRange^[j] := t;
+   END Swap;
+
+PROCEDURE WriteClasses;
+   VAR i: INTEGER;
+   BEGIN
+      WriteS (StdOutput, "Classes"); WriteNl (StdOutput);
+      FOR i := 0 TO ClassCount DO
+	 WriteI (StdOutput, i, 2);
+	 WriteC (StdOutput, ' ');
+	 WriteSet (StdOutput, ClassMemPtr^[i]);
+	 WriteNl (StdOutput);
+      END;
+      WriteS (StdOutput, "ToChar"); WriteNl (StdOutput);
+      FOR i := ClassCount + 1 TO INTEGER (LastClass) DO
+	 WriteI (StdOutput, i, 3);
+	 WriteC (StdOutput, ' ');
+	 WriteI (StdOutput, ToCharArray [i], 3);
+	 WriteNl (StdOutput);
+      END;
+      WriteS (StdOutput, "ToClass"); WriteNl (StdOutput);
+      FOR i := 0 TO 255 DO
+	 WriteI (StdOutput, i, 3);
+	 WriteC (StdOutput, ' ');
+	 WriteI (StdOutput, ToClass (i), 3);
+	 WriteNl (StdOutput);
+      END;
+      WriteFlush (StdOutput);
+   END WriteClasses;
+
+PROCEDURE ReleaseSetMem;
+   VAR i: INTEGER;
+   BEGIN
+      FOR i := 1 TO SetCount DO
+	 ReleaseSet (SetMemPtr^[i].Set);
+	 Sets.ReleaseSet (SetMemPtr^[i].Classes);
+      END;
+      ReleaseArray (SetMemPtr, SetMemSize, TSIZE (tClassInfo));
+   END ReleaseSetMem;
+
+END Classes.

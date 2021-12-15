@@ -1,0 +1,190 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+ArgCheck$(ES)	: ArgCheck$(ED)	; $(MD) ArgCheck$(SD)
+
+ArgCheck$(EO)	: ArgCheck$(EI)	; $(MI) ArgCheck$(SI)
+ArgCheck$(EO)	: ArgCheck$(ES)
+ArgCheck$(EO)	: Scanner$(ES)
+
+Automaton$(ES)	: Automaton$(ED)	; $(MD) Automaton$(SD)
+
+Automaton$(EO)	: Automaton$(EI)	; $(MI) Automaton$(SI)
+Automaton$(EO)	: Automaton$(ES)
+Automaton$(EO)	: Info$(ES)
+
+CodeM2$(ES)	: CodeM2$(ED)	; $(MD) CodeM2$(SD)
+
+CodeM2$(EO)	: CodeM2$(EI)	; $(MI) CodeM2$(SI)
+CodeM2$(EO)	: CodeM2$(ES)
+CodeM2$(EO)	: ArgCheck$(ES)
+CodeM2$(EO)	: Automaton$(ES)
+CodeM2$(EO)	: Environs$(ES)
+CodeM2$(EO)	: Grammar$(ES)
+CodeM2$(EO)	: Match$(ES)
+CodeM2$(EO)	: Parser$(ES)
+CodeM2$(EO)	: Scanner$(ES)
+CodeM2$(EO)	: Tree$(ES)
+CodeM2$(EO)	: Types$(ES)
+CodeM2$(EO)	: ArgCheck$(ES)
+
+Complete$(ES)	: Complete$(ED)	; $(MD) Complete$(SD)
+Complete$(ES)	: Environs$(ES)
+
+Complete$(EO)	: Complete$(EI)	; $(MI) Complete$(SI)
+Complete$(EO)	: Complete$(ES)
+Complete$(EO)	: Environs$(ES)
+Complete$(EO)	: Patterns$(ES)
+
+Environs$(ES)	: Environs$(ED)	; $(MD) Environs$(SD)
+Environs$(ES)	: Patterns$(ES)
+
+Environs$(EO)	: Environs$(EI)	; $(MI) Environs$(SI)
+Environs$(EO)	: Environs$(ES)
+Environs$(EO)	: Grammar$(ES)
+Environs$(EO)	: Patterns$(ES)
+Environs$(EO)	: Scanner$(ES)
+Environs$(EO)	: Types$(ES)
+
+Grammar$(ES)	: Grammar$(ED)	; $(MD) Grammar$(SD)
+
+Grammar$(EO)	: Grammar$(EI)	; $(MI) Grammar$(SI)
+Grammar$(EO)	: Grammar$(ES)
+Grammar$(EO)	: Scanner$(ES)
+Grammar$(EO)	: Types$(ES)
+Grammar$(EO)	: Info$(ES)
+
+Info$(ES)	: Info$(ED)	; $(MD) Info$(SD)
+
+Info$(EO)	: Info$(EI)	; $(MI) Info$(SI)
+Info$(EO)	: Info$(ES)
+Info$(EO)	: Patterns$(ES)
+
+Match$(ES)	: Match$(ED)	; $(MD) Match$(SD)
+
+Match$(EO)	: Match$(EI)	; $(MI) Match$(SI)
+Match$(EO)	: Match$(ES)
+Match$(EO)	: ArgCheck$(ES)
+Match$(EO)	: Automaton$(ES)
+Match$(EO)	: Environs$(ES)
+Match$(EO)	: Grammar$(ES)
+Match$(EO)	: Parser$(ES)
+Match$(EO)	: Patterns$(ES)
+Match$(EO)	: Scanner$(ES)
+Match$(EO)	: Types$(ES)
+Match$(EO)	: Patterns$(ES)
+Match$(EO)	: ArgCheck$(ES)
+Match$(EO)	: Automaton$(ES)
+Match$(EO)	: Patterns$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+Parser$(ES)	: Tree$(ES)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Tree$(ES)
+Parser$(EO)	: Tree$(ES)
+
+Patterns$(ES)	: Patterns$(ED)	; $(MD) Patterns$(SD)
+
+Patterns$(EO)	: Patterns$(EI)	; $(MI) Patterns$(SI)
+Patterns$(EO)	: Patterns$(ES)
+Patterns$(EO)	: Grammar$(ES)
+Patterns$(EO)	: Scanner$(ES)
+Patterns$(EO)	: Types$(ES)
+Patterns$(EO)	: Scanner$(ES)
+
+Reduced$(ES)	: Reduced$(ED)	; $(MD) Reduced$(SD)
+
+Reduced$(EO)	: Reduced$(EI)	; $(MI) Reduced$(SI)
+Reduced$(EO)	: Reduced$(ES)
+Reduced$(EO)	: Grammar$(ES)
+Reduced$(EO)	: Scanner$(ES)
+Reduced$(EO)	: Types$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+
+Semantics$(ES)	: Semantics$(ED)	; $(MD) Semantics$(SD)
+
+Semantics$(EO)	: Semantics$(EI)	; $(MI) Semantics$(SI)
+Semantics$(EO)	: Semantics$(ES)
+Semantics$(EO)	: Complete$(ES)
+Semantics$(EO)	: Environs$(ES)
+Semantics$(EO)	: Grammar$(ES)
+Semantics$(EO)	: Parser$(ES)
+Semantics$(EO)	: Patterns$(ES)
+Semantics$(EO)	: Reduced$(ES)
+Semantics$(EO)	: Scanner$(ES)
+Semantics$(EO)	: Tree$(ES)
+Semantics$(EO)	: Types$(ES)
+
+Test$(ES)	: Test$(ED)	; $(MD) Test$(SD)
+
+Test$(EO)	: Test$(EI)	; $(MI) Test$(SI)
+Test$(EO)	: Test$(ES)
+Test$(EO)	: ArgCheck$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+Tree$(ES)	: Environs$(ES)
+Tree$(ES)	: Patterns$(ES)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+
+Types$(ES)	: Types$(ED)	; $(MD) Types$(SD)
+
+Types$(EO)	: Types$(EI)	; $(MI) Types$(SI)
+Types$(EO)	: Types$(ES)
+Types$(EO)	: Scanner$(ES)
+
+all	: estra
+estra$(EO)	: estra$(EP)	; $(MP) estra$(SP)
+estra$(EO)	: ArgCheck$(ES)
+estra$(EO)	: CodeM2$(ES)
+estra$(EO)	: Info$(ES)
+estra$(EO)	: Match$(ES)
+estra$(EO)	: Parser$(ES)
+estra$(EO)	: Semantics$(ES)
+estra$(EO)	: Test$(ES)
+estra$(EO)	: ArgCheck$(ES)
+estra$(EO)	: Grammar$(ES)
+estra$(EO)	: Parser$(ES)
+estra$(EO)	: Test$(ES)
+estra$(EO)	: Tree$(ES)
+
+estra	: estra$(EO) Tree$(EO) Patterns$(EO) Scanner$(EO) Types$(EO) Grammar$(EO) Info$(EO) Environs$(EO) Test$(EO) ArgCheck$(EO) Parser$(EO) Semantics$(EO) Reduced$(EO) Complete$(EO) Match$(EO) Automaton$(EO) CodeM2$(EO)	; $(ML) estra $(OUT) estra
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

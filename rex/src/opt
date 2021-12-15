@@ -1,0 +1,27 @@
+ + generate a lexical analyzer in C++
+ 1 print statistics about the generated lexical analyzer
+ a generate all (= ds)
+ b do not partition character set into blocks during generation
+ c generate a lexical analyzer in C
+ d generate a header file or definition module
+ e generate a lexical analyzer in Eiffel
+ f <file> specify a file to be used as skeleton for the scanner
+ g generate # line directives
+ h print help information
+ i use ISO 8 bit code (default: ASCII 7 bit code)
+ j generate a lexical analyzer in Java
+ k <n> generate scanner for characters having n bytes (default: 1)
+ l <dir>  specify the directory dir where rex finds its data files
+ m generate a lexical analyzer in Modula (default)
+ n do not optimize table size
+ o optimize table size
+ p print information about ambiguous rules
+ r reduce number of generated case/switch labels
+ s generate support modules:
+ t touch output files only if necessary
+ u generate a lexical analyzer in Ada
+ v do not predefine rules for skipping of white space
+ w suppress warnings
+ x require explicit definitions for used identifiers
+ y do not generate dummy labels
+ z map characters to classes at run time

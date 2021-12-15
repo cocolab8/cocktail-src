@@ -1,0 +1,1538 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: CodeM2.ESTRA,v $
+ *
+ *	purpose:	generation of MODULA-2 code
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+.. ^ Spaces;
+.. $ WriteNl (file);
+.. + INC (SpaCo%);
+.. - DEC (SpaCo%);
+.. % WriteS (file, '%');
+.. n WriteI (file, %, 0);
+.. i WriteIdent (file, %);
+.. s WriteS (file, %);
+.. c WriteI (file, Code (%), 0);
+.. I WriteIndex (file, %);
+.. R WriteRecIndex (file, %);
+.. t WriteTerminal (file, %);
+
+TRANSFORMATION	CodeM2
+
+EXPORT	{
+PROCEDURE ParM2;
+}
+
+GLOBAL	{
+FROM ArgCheck	IMPORT	DEF, IMP, SourceFileName,
+			TokenConstants, TokenPrefix;
+FROM Codes	IMPORT	cNoIndex, vMaxRecSetIndex, vMaxSetIndex, Code, MaxCode,
+			EmptyRecSetIndex,
+			WriteIndex, WriteRecIndex, Term, GetSet, GetRecSet,
+			WriteTerminal;
+FROM DynArray	IMPORT	MakeArray, ReleaseArray;
+FROM Errors	IMPORT	Message, MessageI, Error, Fatal, Array;
+FROM Position	IMPORT	NoPosition;
+FROM IO		IMPORT	tFile, WriteS, WriteI, WriteNl,
+			WriteOpen, WriteClose;
+FROM Idents	IMPORT	tIdent, WriteIdent, GetString, MakeIdent;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, Extract, IsEmpty, Assign,
+			IsElement, Include, Exclude, ResizeSet, Size;
+FROM StringM	IMPORT	WriteString;
+FROM SYSTEM	IMPORT	TSIZE, ADR;
+FROM Scanner	IMPORT	NoIdent, Epsilon;
+FROM Types	IMPORT	IsTerm, IsNonterm, Terminals;
+FROM Strings	IMPORT	tString, Char, Length, ArrayToString, Concatenate,
+			Append, StringToArray;
+FROM Tree	IMPORT	ScannerName, ParserName;
+FROM Pack       IMPORT  PackHandle, BeginPackCard, EndPack, PackCard;
+FROM Table	IMPORT	MaxId;
+
+IMPORT Idents, Codes;
+
+CONST
+  cBitsPerBitset	= 32;
+  cDefinition		= '.md';
+  cImplementation	= '.mi';
+  cDrvImp		= 'Drv.mi';
+
+VAR
+  file		: tFile;
+  SpaCo		: INTEGER;
+  vExport	: BOOLEAN;
+  InDefault	: BOOLEAN;
+  lSections	: Tree.tTree;
+  PathS, String	: tString;
+  PathA		: ARRAY [0..256] OF CHAR;
+
+PROCEDURE Prefix;
+  BEGIN
+    IF ScannerName # Idents.NoIdent THEN
+.	{i ScannerName}\
+    ELSE
+.	Scanner\
+    END;
+  END Prefix;
+
+PROCEDURE Spaces;
+  VAR i: INTEGER;
+  BEGIN FOR i := 1 TO SpaCo DO WriteS (file, '  '); END; END Spaces;
+
+PROCEDURE CodeIsElement (index: INTEGER; set: tSet);
+  VAR
+    todo: tSet;
+    id: tIdent;
+  BEGIN
+    IF index = cNoIndex THEN
+      MakeSet (todo, Size (set));
+      Assign (todo, set);
+      Exclude (todo, Epsilon);
+      IF NOT IsEmpty (todo) THEN
+	LOOP
+	  id := Extract (todo);
+	  WriteS (file, '(xxToken = ');
+	  WriteI (file, Code (id), 0);
+	  WriteS (file, ' (* ');
+	  WriteTerminal (file, id);
+	  WriteS (file, ' *))');
+	  IF IsEmpty (todo) THEN EXIT END;
+	  WriteS (file, ' OR ');
+	END;
+      END;
+      ReleaseSet (todo);
+    ELSE
+      WriteS (file, '(');
+      WriteI (file, index MOD cBitsPerBitset, 0);
+      WriteS (file, ' IN xxVerticalSet');
+      WriteI (file, index DIV cBitsPerBitset, 0);
+      WriteS (file, ' [xxToken]');
+      IF FALSE THEN
+	WriteS (file, ' (* ');
+	WriteIndex (file, index);
+	WriteS (file, ' *)');
+      END;
+      WriteS (file, ')');
+    END;
+  END CodeIsElement;
+
+PROCEDURE CodeRecovery (recover, expect: INTEGER);
+  BEGIN
+    IF expect = cNoIndex THEN
+.     xxUnexpected ({n recover}, xxGlobalRecoverySet);\
+      IF FALSE THEN
+.	(* {R recover} *)
+      ELSE
+.$
+      END;
+    ELSE
+.     xxExpected ({n expect}, {n recover}, xxGlobalRecoverySet);\
+      IF FALSE THEN
+.	(* {R expect} / {R recover} *)
+      ELSE
+.$
+      END;
+    END;
+  END CodeRecovery;
+
+PROCEDURE WriteLabels (set: tSet);
+  VAR
+    todo: tSet;
+    id: tIdent;
+  BEGIN
+    MakeSet (todo, Size (set));
+    Assign (todo, set);
+    Spaces;
+    WriteS (file, '| ');
+    IF NOT IsEmpty (todo) THEN
+      LOOP
+	id := Extract (todo);
+	WriteI (file, Code (id), 0);
+	WriteS (file, ' (* ');
+	WriteTerminal (file, id);
+	WriteS (file, ' *)');
+	IF IsEmpty (todo) THEN EXIT END;
+	WriteS (file, ', ');
+      END;
+    END;
+    WriteS (file, ':');
+    WriteNl (file);
+    ReleaseSet (todo);
+  END WriteLabels;
+
+VAR
+  NumberArray		: POINTER TO ARRAY [0..1000] OF INTEGER;
+  NumberArraySize	: LONGINT;
+  MaxNumberArray	: POINTER TO ARRAY [0..1000] OF INTEGER;
+  MaxNumberArraySize	: LONGINT;
+
+PROCEDURE ClearArray (VAR a: ARRAY OF INTEGER);
+  VAR id: tIdent;
+  BEGIN
+    FOR id := 0 TO MaxId DO a [id] := 0; END;
+  END ClearArray;
+
+PROCEDURE WriteAttributes;
+  VAR
+    id: tIdent;
+    i, max: INTEGER;
+  BEGIN
+    FOR id := 0 TO MaxId DO
+      max := MaxNumberArray^ [id];
+      IF max > 0 THEN
+.	\
+	FOR i := 1 TO max - 1 DO
+.	  {i id}{n i}, \
+	END;
+.	{i id}{n max}: \
+	IF IsTerm (id) THEN
+	  Prefix;
+.	  .tScanAttribute\
+	ELSE
+.	  tParsAttribute\
+	END;
+.	;
+      END;
+    END;
+  END WriteAttributes;
+
+  PROCEDURE PackHorizontalSet;
+  VAR
+    p		: PackHandle;
+    i, j, count	: INTEGER;
+    set		: tSet;
+
+  BEGIN
+    BeginPackCard(p, file);
+    MakeSet (set, MaxCode ());
+    FOR i := 0 TO vMaxRecSetIndex DO
+      GetRecSet (i, set);
+      count := 0;
+      FOR j := 0 TO MaxCode() DO
+        IF IsElement (j, set) THEN INC(count); END;
+      END;
+      PackCard(p, count);
+      FOR j := 0 TO MaxCode() DO
+        IF IsElement (j, set) THEN PackCard(p, j); END;
+      END;
+    END;
+    ReleaseSet (set);
+    EndPack(p);
+  END PackHorizontalSet;
+
+  PROCEDURE PackVerticalSet (setNumber: INTEGER);
+  VAR
+    bitset	: BITSET;
+    p		: PackHandle;
+    i, j, count	: INTEGER;
+    sets	: ARRAY [0..cBitsPerBitset-1] OF tSet;
+  BEGIN
+    BeginPackCard(p, file);
+    FOR i := 0 TO cBitsPerBitset - 1 DO MakeSet (sets [i], MaxCode ()); END;
+    FOR i := 0 TO cBitsPerBitset - 1 DO
+      j := setNumber * cBitsPerBitset + i;
+      IF j <= vMaxSetIndex THEN GetSet (j, sets [i]); END;
+    END;
+    FOR i := 0 TO MaxCode () DO
+      bitset := {};
+      count := 0;
+      FOR j := 0 TO cBitsPerBitset - 1 DO
+        IF IsElement (i, sets [j]) THEN INCL (bitset, j); INC(count); END;
+      END;
+      PackCard(p, count);
+      FOR j := 0 TO cBitsPerBitset - 1 DO
+        IF j IN bitset THEN PackCard(p, j); END;
+      END;
+    END;
+    FOR i := 0 TO cBitsPerBitset - 1 DO ReleaseSet (sets[i]); END;
+    EndPack(p);
+  END PackVerticalSet;
+
+PROCEDURE ParM2;
+  VAR file: tFile;
+  BEGIN
+    GetString		(ParserName, PathS);
+    ArrayToString	(cDrvImp, String);
+    Concatenate		(PathS, String);
+    Append		(PathS, 0C);
+    StringToArray	(PathS, PathA);
+    file := WriteOpen	(PathA);
+    IF file < 0 THEN
+      MessageI ("cannot open file", Fatal, NoPosition, Array, ADR (PathA));
+    END;
+
+.	MODULE {i ParserName}Drv;
+.
+.	FROM {i ParserName}	IMPORT {i ParserName}, Close{i ParserName};
+.	FROM IO		IMPORT CloseIO;
+.
+.	BEGIN
+.      \   IF {i ParserName} () = 0 THEN END;
+.      \   Close{i ParserName};
+.      \   CloseIO;
+.	END {i ParserName}Drv.
+
+    WriteClose (file);
+  END ParM2;
+
+VAR Hex: ARRAY [0..15] OF CHAR;
+
+PROCEDURE GenTokenConstants;
+  CONST
+    Initial	= 0;
+    Character	= 1;
+    Special	= 2;
+  VAR
+    UsedNames, IdentSet		: tSet;
+    MaxName, First, Last, i	: CARDINAL;
+    From, To, Str		: tString;
+    Ident	: tIdent;
+    Array	: ARRAY [0 .. 255] OF CHAR;
+    ch		: CHAR;
+    Text	: ARRAY [0 .. 31] OF CHAR;
+    State	: SHORTCARD;
+    code	: INTEGER;
+    term	: tIdent;
+  BEGIN
+    MaxName := MaxId + CARDINAL (MaxCode ());
+    MakeSet (UsedNames, MaxName);
+    MakeSet (IdentSet, 127);
+    FOR ch := 'A' TO 'Z' DO Include (IdentSet, ORD (ch)); END;
+    FOR ch := 'a' TO 'z' DO Include (IdentSet, ORD (ch)); END;
+    FOR ch := '0' TO '9' DO Include (IdentSet, ORD (ch)); END;
+    Include (IdentSet, ORD ('_'));
+.	CONST
+    FOR code := 0 TO MaxCode () DO
+      term := Term (code);
+      IF term # NoIdent THEN
+	GetString (term, From);
+	First := 1;
+	Last := Length (From);
+	ch := Char (From, 1);
+	IF (ch = "'") OR (ch = '"') THEN
+	  First := 2;
+	  DEC (Last);
+	END;
+	State := Initial;
+	ArrayToString (TokenPrefix, To);
+	FOR i := First TO Last DO
+	  ch := Char (From, i);
+	  IF ORD (ch) >= 128 THEN		(* 8 bit character *)
+	    IF State # Initial THEN Append (To, '_'); END;
+	    Append (To, Hex [ORD (ch) DIV 16]);
+	    Append (To, Hex [ORD (ch) MOD 16]);
+	    State := Special;
+						(* 7 bit character *)
+	  ELSIF IsElement (ORD (ch), IdentSet) THEN
+	    IF State = Special THEN Append (To, '_'); END;
+	    Append (To, ch);
+	    State := Character;
+	  ELSIF ch = '-' THEN
+	    IF State = Character THEN
+	      Append (To, '_');
+	    ELSE
+	      IF State # Initial THEN Append (To, '_'); END;
+	      ArrayToString ("minus", Str);
+	      Concatenate (To, Str);
+	      State := Special;
+	    END;
+	  ELSE
+	    CASE ch OF
+	    | CHR (0)	: Text := "NUL";
+	    | CHR (1)	: Text := "SOH";
+	    | CHR (2)	: Text := "STX";
+	    | CHR (3)	: Text := "ETX";
+	    | CHR (4)	: Text := "EOT";
+	    | CHR (5)	: Text := "ENQ";
+	    | CHR (6)	: Text := "ACK";
+	    | CHR (7)	: Text := "BEL";
+	    | CHR (8)	: Text := "BS";
+	    | CHR (9)	: Text := "HT";
+	    | CHR (10)	: Text := "LF";
+	    | CHR (11)	: Text := "VT";
+	    | CHR (12)	: Text := "FF";
+	    | CHR (13)	: Text := "CR";
+	    | CHR (14)	: Text := "SO";
+	    | CHR (15)	: Text := "SI";
+	    | CHR (16)	: Text := "DLE";
+	    | CHR (17)	: Text := "DC1";
+	    | CHR (18)	: Text := "DC2";
+	    | CHR (19)	: Text := "DC3";
+	    | CHR (20)	: Text := "DC4";
+	    | CHR (21)	: Text := "NAK";
+	    | CHR (22)	: Text := "SYN";
+	    | CHR (23)	: Text := "ETB";
+	    | CHR (24)	: Text := "CAN";
+	    | CHR (25)	: Text := "EM";
+	    | CHR (26)	: Text := "SUB";
+	    | CHR (27)	: Text := "ESC";
+	    | CHR (28)	: Text := "FS";
+	    | CHR (29)	: Text := "GS";
+	    | CHR (30)	: Text := "RS";
+	    | CHR (31)	: Text := "US";
+	    | ' '	: Text := "space";
+	    | '!'	: Text := "exclamation_mark";
+	    | '"'	: Text := "double_quote";
+	    | '#'	: Text := "hash_sign";
+	    | '$'	: Text := "dollar";
+	    | '%'	: Text := "percent";
+	    | '&'	: Text := "ampersand";
+	    | "'"	: Text := "quote";
+	    | '('	: Text := "left_parentheses";
+	    | ')'	: Text := "right_parentheses";
+	    | '*'	: Text := "asterisk";
+	    | '+'	: Text := "plus";
+	    | ','	: Text := "comma";
+	 (* | '-'	: Text := "minus"; *)
+	    | '.'	: Text := "dot";
+	    | '/'	: Text := "slash";
+	    | ':'	: Text := "colon";
+	    | ';'	: Text := "semicolon";
+	    | '<'	: Text := "less";
+	    | '='	: Text := "equal";
+	    | '>'	: Text := "greater";
+	    | '?'	: Text := "question_mark";
+	    | '@'	: Text := "at_sign";
+	    | '['	: Text := "left_bracket";
+	    | '\'	: Text := "backslash";
+	    | ']'	: Text := "right_bracket";
+	    | '^'	: Text := "uparrow";
+	 (* | '_'	: Text := "underscore"; *)
+	    | '`'	: Text := "backquote";
+	    | '{'	: Text := "left_curly";
+	    | '|'	: Text := "bar";
+	    | '}'	: Text := "right_curly";
+	    | '~'	: Text := "tilde";
+	    | CHR (127) : Text := "DEL";
+	    END;
+	    IF State # Initial THEN Append (To, '_'); END;
+	    ArrayToString (Text, Str);
+	    Concatenate (To, Str);
+	    State := Special;
+	  END;
+	END;
+	LOOP
+	  Ident := MakeIdent (To);
+	  IF Ident > MaxName THEN
+	    INC (MaxName, MaxCode ());
+	    ResizeSet (UsedNames, MaxName);
+	  END;
+	  IF NOT IsElement (Ident, UsedNames) THEN EXIT; END;
+	  Append (To, '_');
+	END;
+	Include (UsedNames, Ident);
+	StringToArray (To, Array);
+.      \  {s Array}	= {n code};	(* {i term} *)
+      END;
+    END;
+.
+    ReleaseSet (UsedNames);
+    ReleaseSet (IdentSet);
+  END GenTokenConstants;
+}
+
+BEGIN	{
+  vExport := FALSE;
+  SpaCo := 0;
+  InDefault := FALSE;
+  Hex [0] := '0';
+  Hex [1] := '1';
+  Hex [2] := '2';
+  Hex [3] := '3';
+  Hex [4] := '4';
+  Hex [5] := '5';
+  Hex [6] := '6';
+  Hex [7] := '7';
+  Hex [8] := '8';
+  Hex [9] := '9';
+  Hex [10] := 'A';
+  Hex [11] := 'B';
+  Hex [12] := 'C';
+  Hex [13] := 'D';
+  Hex [14] := 'E';
+  Hex [15] := 'F';
+}
+
+GRAMMAR Tree
+
+grammar		=
+| Grammar	(sections, tokens, rules)
+
+sections	=
+| Sections0	()
+| Sections	(section, sections)
+
+section		=
+| Export	(codes)
+| Global	(codes)
+| Local		(codes)
+| Begin		(codes)
+| Close		(codes)
+
+codes		=
+| Codes0	()
+| Codes		(code, codes)
+
+code		=
+| Code		()
+
+tokens		=
+| Tokens0	()
+| Tokens	(token, tokens)
+
+token		=
+| Token		(id)
+
+id		=
+| Id		()
+
+rules		=
+| Rules0	()
+| Rules		(rule, rules)
+
+rule		=
+| Rule		(id, codes, expr)
+
+expr		=
+| Option	(expr)
+| Times		(expr)
+| Plus		(expr)
+| List		(body: expr, sep: expr)
+| Action	(codes)
+| Leaf		(id)
+
+expr		->
+alternative	=
+| Alternative0	()
+| Alternative	(expr, alternative)
+
+expr		->
+sequence	=
+| Sequence0	()
+| Sequence	(expr, sequence)
+
+
+FUNCTION	CODE			/ grammar /
+
+  grammar
+		{
+		IF DEF THEN CodeDef (grammar); END;
+		IF IMP THEN CodeImp (grammar); END;
+		}
+
+
+/*
+ *	generate definition of parser
+ */
+
+FUNCTION	CodeDef			/ grammar /
+
+  Grammar	(sections, tokens, rules)
+		{
+		GetString	(ParserName, PathS);
+		ArrayToString	(cDefinition, String);
+		Concatenate	(PathS, String);
+		Append		(PathS, 0C);
+		StringToArray	(PathS, PathA);
+		file := WriteOpen (PathA);
+		IF file < 0 THEN
+		  MessageI ("cannot open file", Fatal, NoPosition,
+		    Array, ADR (PathA));
+		END;
+
+.		DEFINITION MODULE {i ParserName};
+.
+		CodeExport (sections);
+		IF NOT vExport THEN	(* Default EXPORT action *)
+.		  IMPORT \
+		Prefix;
+.		  ;
+.
+.		  TYPE tParsAttribute = \
+		Prefix;
+.		  .tScanAttribute;
+		END;
+.
+		IF TokenConstants THEN
+		  GenTokenConstants;
+		END;
+.		VAR
+.	       \  ParsAttribute	: tParsAttribute;
+.
+.		PROCEDURE {i ParserName} (): INTEGER;
+.		PROCEDURE Close{i ParserName} ();
+.		PROCEDURE xxTokenName (Token: CARDINAL; VAR Name: ARRAY OF CHAR);
+.
+.		END {i ParserName}.
+		WriteClose (file);
+		}
+
+
+/*
+ *	generate implementation of parser
+ */
+
+FUNCTION	CodeImp			/ grammar /
+
+  Grammar	(sections, tokens, Rules (Rule (Id (), codes, expr), rules))
+		DECLARE	{ VAR
+		  i	: INTEGER;
+		  id	: tIdent;
+		  str	: tIdent;
+		  s	: tString;
+		}
+		{
+		GetString	(ParserName, PathS);
+		ArrayToString	(cImplementation, String);
+		Concatenate	(PathS, String);
+		Append		(PathS, 0C);
+		StringToArray	(PathS, PathA);
+		file := WriteOpen (PathA);
+		IF file < 0 THEN
+		  MessageI ("cannot open file", Fatal, NoPosition,
+		    Array, ADR (PathA));
+		END;
+
+.		IMPLEMENTATION MODULE {i ParserName};
+.
+.		IMPORT Pack, Position, Errors, \
+		Prefix;
+.		  , Strings, SYSTEM;
+.
+		CodeGlobal (sections);
+		lSections := sections;
+
+.		CONST xxEof = 0;
+.
+.		TYPE
+.	       \  xxtUnionPtr	= POINTER TO xxtUnion;
+.	       \  xxtUnion	= RECORD GlobalRecoverySet: xxtUnionPtr; LocalRecoverySet: SHORTCARD; END;
+.	       \  xxtSet	= ARRAY [0..{n MaxCode () DIV cBitsPerBitset}] OF BITSET;
+.
+.		VAR
+.	       \  xxToken		: SHORTCARD;
+.	       \  xxErrorCount		: INTEGER;
+.	       \  xxIsRepairMode	: BOOLEAN;
+		IF vMaxRecSetIndex = cNoIndex THEN
+.	       \  xxHorizontalSet	: ARRAY [0..0] OF xxtSet;
+		ELSE
+.	       \  xxHorizontalSet	: ARRAY [0..{n vMaxRecSetIndex}] OF xxtSet;
+		END;
+		FOR i := 0 TO vMaxSetIndex DIV cBitsPerBitset DO
+.	       \  xxVerticalSet{n i}	: ARRAY [0..{n MaxCode ()}] OF BITSET;
+		END;
+.
+.		PROCEDURE xxTokenName (Token: CARDINAL; VAR Name: ARRAY OF CHAR);
+.	       \  PROCEDURE Copy (Source: ARRAY OF CHAR; VAR Target: ARRAY OF CHAR);
+.	       \    VAR i, j: CARDINAL;
+.	       \    BEGIN
+.	       \      IF HIGH (Source) < HIGH (Target)
+.	       \      THEN j := HIGH (Source); ELSE j := HIGH (Target); END;
+.	       \      FOR i := 0 TO j DO Target [i] := Source [i]; END;
+.	       \      IF HIGH (Target) > j THEN Target [j + 1] := CHR (0); END;
+.	       \    END Copy;
+.	       \  BEGIN
+.	       \    CASE Token OF
+		FOR i := 0 TO MaxCode () DO
+		  id := Term (i);
+		  IF id # NoIdent THEN
+		    str := Codes.String (i);
+		    GetString (str, s);
+		    IF (Char (s, 1) = "'") THEN
+.. % WriteS (file, '%');
+.	       \    | {n i}: Copy ({i str}, Name);
+.. % WriteS (file, "%");
+		  ELSIF (Char (s, 1) = '"') THEN
+.	       \    | {n i}: Copy ({i str}, Name);
+		  ELSE
+.	       \    | {n i}: Copy ('{i str}', Name);
+		    END;
+		  END;
+		END;
+.	       \    END;
+.	       \  END xxTokenName;
+.
+.		PROCEDURE {i ParserName} (): INTEGER;
+.+
+.		BEGIN
+.+
+.		xxErrorCount := 0;
+.		Begin{i ParserName};
+.		xxToken := \
+		Prefix;
+.		  .GetToken (); xxIsRepairMode := FALSE;
+.		yy{i Id.ident} (ParsAttribute, NIL);
+.		IF xxToken # xxEof THEN xxRecoveryLiteral (xxEof, {n EmptyRecSetIndex}, NIL); END;
+.		RETURN xxErrorCount;
+.-
+.		END {i ParserName};
+.-
+.
+.		PROCEDURE xxIsElement (VAR Set: xxtSet; Element: SHORTCARD): BOOLEAN;
+.	       \  BEGIN
+.	       \    RETURN Element MOD {n cBitsPerBitset} IN Set [Element DIV {n cBitsPerBitset}];
+.	       \  END xxIsElement;
+.
+.		PROCEDURE xxInclElement (VAR Set: xxtSet; Element: SHORTCARD);
+.	       \  BEGIN
+.	       \    INCL (Set [Element DIV {n cBitsPerBitset}], Element MOD {n cBitsPerBitset});
+.	       \  END xxInclElement;
+.
+.		PROCEDURE xxExclElement (VAR Set: xxtSet; Element: SHORTCARD);
+.	       \  BEGIN
+.	       \    EXCL (Set [Element DIV {n cBitsPerBitset}], Element MOD {n cBitsPerBitset});
+.	       \  END xxExclElement;
+.
+.		PROCEDURE xxReportError;
+.	       \  VAR
+.	       \    TokenArray		: ARRAY [0..255] OF CHAR;
+.	       \    TokenString		: Strings.tString;
+.	       \    ContinueString	: Strings.tString;
+.	       \  BEGIN
+.	       \    INC (xxErrorCount);
+.	       \    Errors.ErrorMessage (Errors.SyntaxError, Errors.Error, \
+		Prefix;
+.		      .Attribute.Position);
+.	       \    xxTokenName (xxToken, TokenArray);
+.	       \    Strings.ArrayToString (TokenArray, TokenString);
+.		(* # ifdef SPELLING
+.	       \    \
+	  	Prefix;
+.		      .GetWord (ContinueString);
+.	       \    IF NOT Strings.IsEqual (TokenString, ContinueString) THEN
+.	       \      Strings.Append (TokenString, ' ');
+.	       \      Strings.Concatenate (TokenString, ContinueString);
+.	       \    END;
+.		# endif *)
+.	       \    Errors.ErrorMessageI (Errors.TokenFound, Errors.Information, \
+		Prefix;
+.		      .Attribute.Position, Errors.String, SYSTEM.ADR (TokenString));
+.	       \  END xxReportError;
+.
+.		PROCEDURE xxUnexpected (LocalRecoverySet: SHORTCARD; GlobalRecoverySet: xxtUnionPtr);
+.	       \  BEGIN
+.	       \    IF NOT xxIsRepairMode THEN
+.	       \      xxReportError;
+.	       \      xxSkipTokens (LocalRecoverySet, GlobalRecoverySet);
+.	       \    END;
+.	       \  END xxUnexpected;
+.
+.		PROCEDURE xxExpected (ExpectedSet: SHORTCARD; LocalRecoverySet: SHORTCARD; GlobalRecoverySet: xxtUnionPtr);
+.	       \  VAR
+.	       \    Token		: SHORTCARD;
+.	       \    TokenArray		: ARRAY [0..255] OF CHAR;
+.	       \    TokenString		: Strings.tString;
+.	       \    ContinueString	: Strings.tString;
+.	       \  BEGIN
+.	       \    IF NOT xxIsRepairMode THEN
+.	       \      xxReportError;
+.	       \      Strings.AssignEmpty (ContinueString);
+.	       \      FOR Token := 0 TO {n MaxCode ()} DO
+.	       \        IF xxIsElement (xxHorizontalSet [ExpectedSet], Token) THEN
+.	       \	  xxTokenName (Token, TokenArray);
+.	       \	  Strings.ArrayToString (TokenArray, TokenString);
+.	       \	  IF (Strings.Length (ContinueString) + Strings.Length (TokenString) + 1 <= Strings.cMaxStrLength) THEN
+.	       \	    Strings.Concatenate (ContinueString, TokenString);
+.	       \	    Strings.Append (ContinueString, ' ');
+.	       \	  END;
+.	       \        END;
+.	       \      END;
+.	       \      Errors.ErrorMessageI (Errors.ExpectedTokens, Errors.Information, \
+		Prefix;
+.		        .Attribute.Position, Errors.String, SYSTEM.ADR (ContinueString));
+.	       \      xxSkipTokens (LocalRecoverySet, GlobalRecoverySet);
+.	       \    END;
+.	       \  END xxExpected;
+.
+.		PROCEDURE xxRecoveryLiteral (Expected: SHORTCARD; LocalRecoverySet: SHORTCARD; GlobalRecoverySet: xxtUnionPtr);
+.	       \  VAR
+.	       \    TokenArray	: ARRAY [0..255] OF CHAR;
+.	       \    TokenString	: Strings.tString;
+.	       \  BEGIN
+.	       \    IF NOT xxIsRepairMode THEN
+.	       \      xxReportError;
+.	       \      xxTokenName (Expected, TokenArray);
+.	       \      Strings.ArrayToString (TokenArray, TokenString);
+.	       \      Errors.ErrorMessageI (Errors.ExpectedTokens, Errors.Information, \
+		Prefix;
+.			.Attribute.Position, Errors.String, SYSTEM.ADR (TokenString));
+.	       \      xxSkipTokens (LocalRecoverySet, GlobalRecoverySet);
+.	       \    END;
+.	       \    IF xxToken # Expected THEN
+.	       \      xxTokenName (Expected, TokenArray);
+.	       \      Errors.ErrorMessageI (Errors.TokenInserted, Errors.Repair, \
+		Prefix;
+.			.Attribute.Position, Errors.Array, SYSTEM.ADR (TokenArray));
+.	       \    ELSE
+.	       \      IF xxToken # xxEof THEN xxToken := \
+		Prefix;
+.		        .GetToken (); END;
+.	       \      xxIsRepairMode := FALSE;
+.	       \    END;
+.	       \  END xxRecoveryLiteral;
+.
+.		PROCEDURE xxRecoveryTerminal (Expected: SHORTCARD; LocalRecoverySet: SHORTCARD; GlobalRecoverySet: xxtUnionPtr; VAR RepairAttribute: \
+		Prefix;
+.		  .tScanAttribute);
+.	       \  VAR
+.	       \    TokenArray	: ARRAY [0..255] OF CHAR;
+.	       \    TokenString	: Strings.tString;
+.	       \  BEGIN
+.	       \    IF NOT xxIsRepairMode THEN
+.	       \      xxReportError;
+.	       \      xxTokenName (Expected, TokenArray);
+.	       \      Strings.ArrayToString (TokenArray, TokenString);
+.	       \      Errors.ErrorMessageI (Errors.ExpectedTokens, Errors.Information, \
+		Prefix;
+.			.Attribute.Position, Errors.String, SYSTEM.ADR (TokenString));
+.	       \      xxSkipTokens (LocalRecoverySet, GlobalRecoverySet);
+.	       \    END;
+.	       \    IF xxToken # Expected THEN
+.	       \      xxTokenName (Expected, TokenArray);
+.	       \      Errors.ErrorMessageI (Errors.TokenInserted, Errors.Repair, \
+		Prefix;
+.			.Attribute.Position, Errors.Array, SYSTEM.ADR (TokenArray));
+.	       \      \
+		Prefix;
+.		        .ErrorAttribute (Expected, RepairAttribute);
+.	       \    ELSE
+.	       \      RepairAttribute := \
+		Prefix;
+.		        .Attribute;
+.	       \      IF xxToken # xxEof THEN xxToken := \
+		Prefix;
+.		        .GetToken (); END;
+.	       \      xxIsRepairMode := FALSE;
+.	       \    END;
+.	       \  END xxRecoveryTerminal;
+.
+.		PROCEDURE xxSkipTokens (LocalRecoverySet: SHORTCARD; GlobalRecoverySet: xxtUnionPtr);
+.	       \  VAR RecoverySet: xxtSet;
+.	       \      TokensSkipped: BOOLEAN;
+.	       \  BEGIN
+.	       \    RecoverySet := xxHorizontalSet [LocalRecoverySet];
+.	       \    INCL (RecoverySet [0], xxEof);
+.	       \    WHILE GlobalRecoverySet # NIL DO
+		FOR i := 0 TO MaxCode () DIV cBitsPerBitset DO
+.	       \      RecoverySet [{n i}] := RecoverySet [{n i}] + xxHorizontalSet [GlobalRecoverySet^.LocalRecoverySet] [{n i}];
+		END;
+.	       \      GlobalRecoverySet := GlobalRecoverySet^.GlobalRecoverySet;
+.	       \    END;
+.	       \    TokensSkipped := FALSE;
+.	       \    WHILE NOT xxIsElement (RecoverySet, xxToken) DO
+.	       \      xxToken := \
+		Prefix;
+.		        .GetToken ();
+.	       \      TokensSkipped := TRUE;
+.	       \    END;
+.	       \    IF TokensSkipped THEN
+.	       \      Errors.ErrorMessage (Errors.RestartPoint, Errors.Information, \
+		Prefix;
+.		        .Attribute.Position);
+.	       \    END;
+.	       \    xxIsRepairMode := TRUE;
+.	       \  END xxSkipTokens;
+.
+.	        VAR yyunpackindex, yyunpackcount, yyunpackset: CARDINAL;
+.	       \
+.		PROCEDURE yyUnpackHorizontalSetHandler (value: CARDINAL);
+.	       \  VAR i	: CARDINAL;
+.	       \  BEGIN
+.	       \    IF yyunpackindex > yyunpackcount THEN
+.	       \      yyunpackindex := 0;
+.	       \      INC (yyunpackset);
+.	       \    END;
+.	       \    IF yyunpackindex = 0 THEN
+.	       \      yyunpackcount := value;
+.	       \      FOR i := 0 TO {n MaxCode ()} DO
+.	       \        xxExclElement (xxHorizontalSet [yyunpackset], i)
+.	       \      END;
+.	       \    ELSE
+.	       \      xxInclElement (xxHorizontalSet [yyunpackset], value)
+.	       \    END;
+.	       \    INC (yyunpackindex);
+.	       \  END yyUnpackHorizontalSetHandler;
+.
+  		FOR i := 0 TO vMaxSetIndex DIV cBitsPerBitset DO
+.		PROCEDURE yyUnpackVerticalSet{n i}Handler (value: CARDINAL);
+.	       \  BEGIN
+.	       \    IF yyunpackindex > yyunpackcount THEN
+.	       \      yyunpackindex := 0;
+.	       \      INC (yyunpackset);
+.	       \    END;
+.	       \    IF yyunpackindex = 0 THEN
+.	       \      yyunpackcount := value;
+.	       \      xxVerticalSet{n i} [yyunpackset] := \{\};
+.	       \    ELSE
+.	       \      INCL (xxVerticalSet{n i} [yyunpackset], value);
+.	       \    END;
+.	       \    INC (yyunpackindex);
+.	       \  END yyUnpackVerticalSet{n i}Handler;
+.
+		END;
+.		PROCEDURE Begin{i ParserName};
+.	       \  VAR hc: Pack.UnpackCardHandler;
+.	       \  BEGIN
+		CodeBegin (sections);
+.	       \    yyunpackset := 0; yyunpackcount := 0; yyunpackindex := 0;
+.	       \    hc := yyUnpackHorizontalSetHandler;
+		PackHorizontalSet;
+		FOR i := 0 TO vMaxSetIndex DIV cBitsPerBitset DO
+.	       \    yyunpackset := 0; yyunpackcount := 0; yyunpackindex := 0;
+.	       \    hc := yyUnpackVerticalSet{n i}Handler;
+		  PackVerticalSet (i);
+		END;
+.	       \  END Begin{i ParserName};
+.
+.		PROCEDURE Close{i ParserName};
+.	       \  BEGIN
+		CodeClose (sections);
+.	       \  END Close{i ParserName};
+.
+		NumberArraySize := MaxId + 1;
+		MaxNumberArraySize := MaxId + 1;
+		MakeArray (NumberArray, NumberArraySize, TSIZE (INTEGER));
+		MakeArray (MaxNumberArray, MaxNumberArraySize, TSIZE (INTEGER));
+		CodeRules (Rules);
+		ReleaseArray (NumberArray, NumberArraySize, TSIZE (INTEGER));
+		ReleaseArray (MaxNumberArray, MaxNumberArraySize, TSIZE (INTEGER));
+
+.		BEGIN
+.		END {i ParserName}.
+
+		WriteClose (file);
+		}
+
+  Grammar	(sections, tokens, Rules0 ())
+		{
+		Message ('CodeM2.ESTRA: no rules', Error, NoPosition);
+		}
+
+
+/*
+ *	generate recursive descent procedure
+ */
+
+FUNCTION	CodeRules		/rules, expr/
+
+  Rules0	() {}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		ClearArray (MaxNumberArray^);
+		SetNumbers (expr, TRUE);
+.		PROCEDURE yy{i Id.ident} (VAR {i Id.ident}0: tParsAttribute; xxGlobalRecoverySet: xxtUnionPtr);
+.		(* {i Id.ident} : \
+		Print (expr);
+.		\ . *)
+.+
+.		VAR
+.+
+		  WriteAttributes;
+		  IF Rule.iscalling THEN
+.		    xxUnion: xxtUnion;
+		  END;
+		  CodeLocal (lSections);
+		  CodeCodes (codes);
+.-
+.		BEGIN
+.+
+		  IF Rule.iscalling THEN
+.		    xxUnion.GlobalRecoverySet := xxGlobalRecoverySet;
+		  END;
+		  CodeRules (expr);
+.-
+.		END yy{i Id.ident};
+.-
+.
+		CodeRules (rules);
+		}
+
+  Option	(expr)
+		{
+.		LOOP
+.+
+.		  IF \
+		    CodeIsElement (Option.index, Option.first);
+.		  \ THEN
+.+
+		    InDefault := FALSE;
+		    CodeRules (expr);
+.		    EXIT;
+.-
+.		  ELSIF \
+		    CodeIsElement (Option.followindex, Option.follow);
+.		  \ OR xxIsRepairMode THEN EXIT; END;
+		  CodeRecovery (Option.recindex, Option.expindex);
+.-
+.		END;
+		}
+
+  Times		(expr)
+		{
+.		LOOP
+.+
+.		  IF \
+		    CodeIsElement (Times.index, Times.first);
+.		  \ THEN
+.+
+		    InDefault := FALSE;
+		    CodeRules (expr);
+.-
+.		  ELSIF \
+		    CodeIsElement (Times.followindex, Times.follow);
+.		  \ OR xxIsRepairMode THEN EXIT;
+.		  ELSE
+.		  \
+		    CodeRecovery (Times.recindex, Times.expindex);
+.		  END;
+.-
+.		END;
+		}
+
+  Plus		(expr)
+		{
+.		LOOP
+.+
+		  CodeRules (expr);
+.		  IF NOT (\
+		    CodeIsElement (Plus.index, Plus.first);
+.		    ) THEN
+.+
+.		    IF \
+		      CodeIsElement (Plus.followindex, Plus.follow);
+.		    \ THEN EXIT; END;
+		    CodeRecovery (Plus.recindex, Plus.expindex);
+.		    IF NOT (\
+		      CodeIsElement (Plus.index, Plus.first);
+.		      ) THEN EXIT; END;
+.-
+.		  END;
+.-
+.		END;
+		}
+
+  List		(body: expr, sep: expr)
+		{
+.		LOOP
+.+
+		  CodeRules (body);
+.		  IF NOT (\
+		    CodeIsElement (sep.index, sep.first);
+.		    ) THEN
+.+
+.		    IF \
+		      CodeIsElement (List.followindex, List.follow);
+.		    \ THEN EXIT; END;
+		    CodeRecovery (List.recindex, List.expindex);
+.		    IF NOT (\
+		      CodeIsElement (sep.index, sep.first);
+.		    \ OR \
+		      CodeIsElement (List.index, List.first);
+.		      ) THEN EXIT; END;
+.-
+.		  END;
+		  CodeRules (sep);
+.-
+.		END;
+		}
+
+  Action	(Codes0 ()) {}
+
+  Action	(codes) { CodeCodes (codes); }
+
+  Leaf		(Id ())
+		CONDITION	{ IsTerm (Id.ident) & Leaf.sure & NOT Id.isstring }
+		{
+		IF InDefault THEN
+.		  IF xxToken # {c Id.ident} (* {i Id.ident} *) THEN
+.	         \  xxRecoveryTerminal ({c Id.ident}, {n Leaf.recindex}, xxGlobalRecoverySet, {i Id.ident}{n Leaf.number});\
+		  IF FALSE THEN
+.		    (* {R Leaf.recindex} *)
+		  ELSE
+.$
+		  END;
+.		  ELSE
+.	         \  {i Id.ident}{n Leaf.number} := \
+		Prefix;
+.		      .Attribute;
+.	         \  xxToken := \
+		Prefix;
+.		      .GetToken (); xxIsRepairMode := FALSE;
+.		  END;
+		  InDefault := FALSE;
+		ELSE
+.		  {i Id.ident}{n Leaf.number} := \
+		Prefix;
+.		    .Attribute;
+.		  xxToken := \
+		Prefix;
+.		    .GetToken (); xxIsRepairMode := FALSE;
+		END;
+		}
+
+  Leaf		(Id ())
+		CONDITION	{ IsTerm (Id.ident) & Leaf.sure & Id.isstring }
+		{
+		IF InDefault THEN
+.		  IF xxToken # {c Id.ident} (* {t Id.ident} *) THEN
+.	         \  xxRecoveryLiteral ({c Id.ident}, {n Leaf.recindex}, xxGlobalRecoverySet);\
+		  IF FALSE THEN
+.		    (* {R Leaf.recindex} *)
+		  ELSE
+.$
+		  END;
+.		  ELSE
+.	         \  xxToken := \
+		Prefix;
+.		      .GetToken (); xxIsRepairMode := FALSE;
+.		  END;
+		  InDefault := FALSE;
+		ELSE
+.		  xxToken := \
+		Prefix;
+.		    .GetToken (); xxIsRepairMode := FALSE;
+		END;
+		}
+
+  Leaf		(Id ())
+		CONDITION	{ IsTerm (Id.ident) & NOT Leaf.sure & NOT Id.isstring }
+		{
+.		IF xxToken # {c Id.ident} (* {i Id.ident} *) THEN
+.	       \  xxRecoveryTerminal ({c Id.ident}, {n Leaf.recindex}, xxGlobalRecoverySet, {i Id.ident}{n Leaf.number});\
+		  IF FALSE THEN
+.		    (* {R Leaf.recindex} *)
+		  ELSE
+.$
+		  END;
+.		ELSE
+.	       \  {i Id.ident}{n Leaf.number} := \
+		Prefix;
+.		    .Attribute;
+.	       \  xxToken := \
+		Prefix;
+.		    .GetToken (); xxIsRepairMode := FALSE;
+.		END;
+		}
+
+  Leaf		(Id ())
+		CONDITION	{ IsTerm (Id.ident) & NOT Leaf.sure & Id.isstring }
+		{
+.		IF xxToken # {c Id.ident} (* {t Id.ident} *) THEN
+.	       \  xxRecoveryLiteral ({c Id.ident}, {n Leaf.recindex}, xxGlobalRecoverySet);\
+		  IF FALSE THEN
+.		    (* {R Leaf.recindex} *)
+		  ELSE
+.$
+		  END;
+.		ELSE
+.	       \  xxToken := \
+		Prefix;
+.		    .GetToken (); xxIsRepairMode := FALSE;
+.		END;
+		}
+
+  Leaf		(Id ())
+		CONDITION	{ IsNonterm (Id.ident) }
+		{
+.		xxUnion.LocalRecoverySet := {n Leaf.recindex}; yy{i Id.ident} ({i Id.ident}{n Leaf.number}, SYSTEM.ADR (xxUnion));\
+		  IF FALSE THEN
+.		    (* {R Leaf.recindex} *)
+		  ELSE
+.$
+		  END;
+		}
+
+  Sequence0	() {}
+
+  Sequence	(expr, sequence)
+		{
+		CodeRules (expr);
+		CodeRules (sequence);
+		}
+
+  alternative	CONDITION	{ alternative.case }
+		{
+.		LOOP
+.+
+.		  CASE xxToken OF
+		  CodeAltCase (alternative);
+.		  END;
+.-
+.		END;
+		}
+
+  alternative	CONDITION	{ NOT alternative.case }
+		{
+		CodeAltIf (alternative, FALSE);
+		}
+
+
+FUNCTION	CodeAltCase			/ alternative /
+
+  Alternative0	()
+		{
+.		ELSE
+.+
+.		  IF xxIsRepairMode THEN
+.+
+		    InDefault := TRUE;
+		    CodeRules (Alternative0.default);
+		    InDefault := FALSE;
+.		    EXIT;
+.-
+.		  END;
+		  CodeRecovery (Alternative0.recindex, Alternative0.expindex);
+.-
+		}
+
+  Alternative	(expr, alternative)
+		{
+		WriteLabels (expr.fifo);
+.+
+		CodeRules (expr);
+.		EXIT;
+.-
+		CodeAltCase (alternative);
+		}
+
+
+FUNCTION	CodeAltIf	started: BOOLEAN ->	/ alternative /
+
+  Alternative0	()
+		{
+.		ELSE
+.+
+		  CodeRecovery (Alternative0.recindex, Alternative0.expindex);
+		  InDefault := TRUE;
+		  CodeRules (Alternative0.default);
+		  InDefault := FALSE;
+.-
+.		END;
+		}
+
+  Alternative	(expr, Alternative0 ())
+		{
+		IF NOT started THEN
+.		  IF \
+	            CodeIsElement (Alternative.index, expr.first);
+.	          \ THEN
+		ELSE
+.		  ELSE
+		END;
+.+
+		CodeRules (expr);
+.-
+.		END;
+		}
+
+  Alternative	(expr, alternative)
+		{
+		IF NOT started THEN
+.		  IF \
+		ELSE
+.		  ELSIF \
+		END;
+	        CodeIsElement (Alternative.index, expr.fifo);
+.	      \ THEN
+.+
+		CodeRules (expr);
+.-
+		CodeAltIf (alternative, TRUE);
+		}
+
+
+/*
+ *	set numbers for attribute access
+ */
+
+FUNCTION	SetNumbers	start: BOOLEAN	->	/expr/
+
+Option		(expr)
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		SetNumbers (expr, FALSE);
+		}
+
+Times		(expr)
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		SetNumbers (expr, FALSE);
+		}
+
+Plus		(expr)
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		SetNumbers (expr, FALSE);
+		}
+
+List		(body: expr, sep: expr)
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		SetNumbers (body, FALSE);
+		SetNumbers (sep, FALSE);
+		}
+
+Action		(codes) {}
+
+Sequence0	() {}
+
+Sequence	(expr, sequence)
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		SetNumbers (expr, FALSE);
+		SetNumbers (sequence, FALSE);
+		}
+
+Alternative0	() { }
+
+Alternative	(expr, alternative)
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		SetNumbers (expr, FALSE);
+		SetNumbers (alternative, start);
+		}
+
+Leaf		(Id ())
+		CONDITION	{ Id.isstring }
+		{
+		Leaf.number := 0;
+		}
+
+Leaf		(Id ())
+		CONDITION	{ NOT Id.isstring }
+		{
+		IF start THEN ClearArray (NumberArray^); END;
+		Leaf.number := NumberArray^ [Id.ident] + 1;
+		NumberArray^ [Id.ident] := Leaf.number;
+		IF Leaf.number > MaxNumberArray^ [Id.ident] THEN
+		  MaxNumberArray^ [Id.ident] := Leaf.number;
+		END;
+		}
+
+
+/*
+ *		common functions
+ */
+
+FUNCTION	CodeExport		/ sections /
+
+
+Sections	(Export (codes), sections)
+		{
+		vExport := TRUE;
+		CodeCodes (codes);
+		CodeExport (sections);
+		}
+
+Sections	(section, sections)
+		CONDITION { section^.Kind # Tree.Export }
+		{
+		CodeExport (sections);
+		}
+
+Sections0	() {}
+
+
+FUNCTION	CodeGlobal		/ sections /
+
+
+Sections	(Global (codes), sections)
+		{
+		CodeCodes (codes);
+		CodeGlobal (sections);
+		}
+
+Sections	(section, sections)
+		CONDITION { section^.Kind # Tree.Global }
+		{
+		CodeGlobal (sections);
+		}
+
+Sections0	() {}
+
+
+FUNCTION	CodeLocal		/ sections /
+
+
+Sections	(Local (codes), sections)
+		{
+		CodeCodes (codes);
+		CodeLocal (sections);
+		}
+
+Sections	(section, sections)
+		CONDITION { section^.Kind # Tree.Local }
+		{
+		CodeLocal (sections);
+		}
+
+Sections0	() {}
+
+
+FUNCTION	CodeBegin		/ sections /
+
+
+Sections	(Begin (codes), sections)
+		{
+		CodeCodes (codes);
+		CodeBegin (sections);
+		}
+
+Sections	(section, sections)
+		CONDITION { section^.Kind # Tree.Begin }
+		{
+		CodeBegin (sections);
+		}
+
+Sections0	() {}
+
+
+FUNCTION	CodeClose		/ sections /
+
+
+Sections	(Close (codes), sections)
+		{
+		CodeCodes (codes);
+		CodeClose (sections);
+		}
+
+Sections	(section, sections)
+		CONDITION { section^.Kind # Tree.Close }
+		{
+		CodeClose (sections);
+		}
+
+Sections0	() {}
+
+
+FUNCTION	CodeCodes		/ codes /
+
+Codes		(Code (), codes)
+		{
+.. ^
+.		(* line {n Code.pos.Line} '{i Code.pos.File}' *)
+		WriteString (file, Code.ref);
+		CodeCodes2 (codes);
+.
+.. ^ Spaces;
+		}
+
+Codes0		() {}
+
+
+FUNCTION	CodeCodes2		/ codes /
+
+Codes		(Code (), codes)
+		{
+		WriteString (file, Code.ref);
+		CodeCodes2 (codes);
+		}
+
+Codes0		() {}
+
+/*
+ *	print grammar rule
+ */
+
+FUNCTION	Print			/ expr /
+
+Option		(expr)
+		{
+.		[\
+		Print (expr);
+.		]\
+		}
+
+Times		(expr)
+		{
+		PrintParent2 (expr);
+.		\ *\
+		}
+
+Plus		(expr)
+		{
+		PrintParent2 (expr);
+.		\ +\
+		}
+
+List		(body: expr, sep: expr)
+		{
+		PrintParent2 (body);
+.		\ || \
+		PrintParent2 (sep);
+		}
+
+Action		(codes) {}
+
+Leaf		(Id ())
+		{
+		IF Id.isstring THEN
+		   WriteTerminal (file, Id.ident);
+		ELSE
+.		   {i Id.ident}\
+		END;
+		}
+
+Alternative0	() {}
+
+Alternative	(expr, Alternative0 ())
+		{
+		Print (expr);
+		}
+
+Alternative	(expr, alternative)
+		{
+		Print (expr);
+.
+.		\   | \
+		Print (alternative);
+		}
+
+Sequence0	() {}
+
+Sequence	(expr, sequence)
+		{
+.		\ \
+		PrintParent1 (expr);
+		Print (sequence);
+		}
+
+FUNCTION	PrintParent1		/ expr /
+
+alternative
+		{
+.		(\
+		Print (alternative);
+.		)\
+		}
+
+expr
+		{
+		Print (expr);
+		}
+
+FUNCTION	PrintParent2		/ expr /
+
+alternative
+		{
+.		(\
+		Print (alternative);
+.		)\
+		}
+
+sequence
+		{
+.		(\
+		Print (sequence);
+.		)\
+		}
+
+expr
+		{
+		Print (expr);
+		}

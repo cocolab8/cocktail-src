@@ -1,0 +1,449 @@
+/* $Id: input.lrk,v 2.7 2008/08/25 13:08:53 grosch rel $ */
+
+/*
+ * $Log: input.lrk,v $
+ * Revision 2.7  2008/08/25 13:08:53  grosch
+ * cared for pointer operations on 64 bit platforms: introduced module Pointers
+ *
+ * Revision 2.6  1997/05/27 15:13:37  grosch
+ * truncated module names to 8 characters:
+ * Characte, StringM, Position
+ *
+ * Revision 2.5  1994/07/13 09:09:15  grosch
+ * added handling of START phrase
+ *
+ * Revision 2.4  1993/05/28  14:13:21  grosch
+ * added target language Eiffel
+ *
+ * Revision 2.3  1993/01/16  11:53:48  grosch
+ * fixed bug in default GLOBAL section
+ *
+ * Revision 2.2  1992/08/07  15:15:11  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 2.1  1991/11/21  14:47:50  grosch
+ * new version of RCS on SPARC
+ *
+ * Revision 2.0  91/03/08  18:26:47  grosch
+ * turned tables into initialized arrays (in C)
+ * moved mapping tokens -> strings from Errors to Parser
+ * changed interface for source position
+ * 
+ * Revision 1.2  89/10/18  19:49:12  grosch
+ * renamed ScanTab and ParsTab to Scan.Tab and Pars.Tab because of PCTE
+ * 
+ * Revision 1.1  88/10/20  08:51:20  vielsack
+ * use tScanAttribute and tParsAttribute instead of tAttribute
+ * 
+ * Revision 1.0  88/10/04  14:27:31  vielsack
+ * Initial revision
+ * 
+ */
+
+EXPORT {
+FROM Sets	IMPORT tSet;
+
+VAR StartSymbols	: tSet;
+}
+
+GLOBAL {
+FROM Actions	IMPORT PutAction, PutComment, tActionMode, ScannerName, ParserName, InitDefaultActions;
+FROM Errors	IMPORT eError, eInteger, ErrorMessageI;
+FROM Lists	IMPORT Append, IsEmpty, Head, Tail, MakeList, tList;
+FROM Oper	IMPORT OperKind, MakePriority, CompletePriority, MakeOperator, MakeOperHeader;
+FROM Scanner	IMPORT GetToken, tScanAttribute, Attribute, ErrorAttribute;
+FROM Position	IMPORT NoPosition;
+FROM Strings	IMPORT AssignEmpty, tString, ArrayToString;
+FROM StringM	IMPORT PutString, tStringRef;
+FROM Idents	IMPORT NoIdent, MakeIdent;
+FROM SYSTEM	IMPORT ADR, ADDRESS;
+FROM Pointers	IMPORT INTPTR;
+FROM TokenTab	IMPORT Terminal;
+FROM Tokens	IMPORT MakeGlobalHeader, MakeTokensHeader, MakeDeclaration, CompleteDeclarations;
+FROM Rules	IMPORT MakeRulesHeader, MakeLeafNode, MakeActionNode, MakeUnaryNode,
+			MakeBracketNode, MakeBinaryNode, MakePrioAlternativeNode,
+			MakeRule, Operation, NoExpression;
+FROM WriteTok	IMPORT tLanguage, Language;
+FROM Sets	IMPORT MakeSet, ResizeSet, Size, Include;
+
+CONST
+  cEol = 12C;	(* eol character *)
+  eNumToBig = 9;
+
+TYPE tParsAttribute = RECORD Scan: tScanAttribute; END;
+
+VAR
+  String		,
+  EndOfLineString	: tString;
+  EndOfLine		: ADDRESS;
+}
+
+BEGIN {
+  AssignEmpty (EndOfLineString);
+  Strings.Append (EndOfLineString, cEol);
+  EndOfLine := INTPTR (PutString (EndOfLineString));
+  MakeSet (StartSymbols, 256);
+}
+
+LOCAL { VAR ActionMode : tActionMode; }
+
+TOKEN
+  '='		=  1
+  ':'		=  2
+  '.'		=  3
+  '|'		=  4
+  '*'		=  5
+  '+'		=  6
+  '||'		=  7
+  '('		=  8
+  ')'		=  9
+  '['		= 10
+  ']'		= 11
+  'EXPORT'	= 12
+  'GLOBAL'	= 13
+  'LOCAL'	= 14
+  'BEGIN'	= 15
+  'CLOSE'	= 16
+  'TOKEN'	= 17
+  'OPER'	= 18
+  'NONE'	= 19
+  'LEFT'	= 20
+  'RIGHT'	= 21
+  'RULE'	= 22
+  'PREC'	= 23
+  Comment	= 24 (* Schreibweise wie in MODULA-2                 *)
+  Number	= 25 (* vorzeichenlose ganze Zahl                    *)
+  Action	= 26 (* in '{' und '}' eingeschlossene Zeichenkette  *)
+  Identifier	= 27 (* letter (digit|letter)*                       *)
+  String	= 28 (* durch ' oder " begrenzte Zeichenkette        *)
+  'SCANNER'	= 29
+  'PARSER'	= 30
+  'START'	= 31
+  ','		= 32
+
+RULE
+
+  Grammar	: CommentPart ScannerName ParserName
+{
+InitDefaultActions;
+}
+		  Decl Tokens Oper StartPart Rules
+{
+MakeGlobalHeader ($1.Scan.Comm, $1.Scan.Position);
+}.
+
+  ScannerName	:
+{
+ScannerName := NoIdent;
+}
+		| 'SCANNER'
+{
+IF Language = Eiffel THEN
+   ArrayToString ("scanner", String);
+ELSE
+   ArrayToString ("Scanner", String);
+END;
+ScannerName := MakeIdent (String);
+}
+		| 'SCANNER' Identifier
+{
+ScannerName := $2.Scan.Sym;
+}.
+
+  ParserName	:
+{
+ParserName := NoIdent;
+}
+		| 'PARSER'
+{
+IF Language = Eiffel THEN
+   ArrayToString ("parser", String);
+ELSE
+   ArrayToString ("Parser", String);
+END;
+ParserName  := MakeIdent (String);
+}
+		| 'PARSER' Identifier
+{
+ParserName := $2.Scan.Sym;
+}.
+
+  Decl		: Decl 'EXPORT' {ActionMode := Export;} CommentPart Actions
+{
+PutComment(Export, $2.Scan.Position, $4.Scan.Comm, $4.Scan.Position);
+}
+		| Decl 'GLOBAL' {ActionMode := Global;} CommentPart Actions
+{
+PutComment(Global, $2.Scan.Position, $4.Scan.Comm, $4.Scan.Position);
+}
+		| Decl 'LOCAL' {ActionMode := Local;} CommentPart Actions
+{
+PutComment(Local, $2.Scan.Position, $4.Scan.Comm, $4.Scan.Position);
+}
+		| Decl 'BEGIN' {ActionMode := Begin;} CommentPart Actions
+{
+PutComment(Begin, $2.Scan.Position, $4.Scan.Comm, $4.Scan.Position);
+}
+		| Decl 'CLOSE' {ActionMode := Close;} CommentPart Actions
+{
+PutComment(Close, $2.Scan.Position, $4.Scan.Comm, $4.Scan.Position);
+}
+		| .
+
+  Actions	: Action CommentPart
+{
+PutAction (ActionMode, $1.Scan.Act, $1.Scan.Position, $2.Scan.Comm, $2.Scan.Position);
+}
+		| .
+
+  Tokens	: 'TOKEN' CommentPart Declarations
+{
+CompleteDeclarations;
+MakeTokensHeader( $1.Scan.Position, $2.Scan.Comm, $2.Scan.Position);
+}.
+
+  Declarations	: Declarations Declaration
+		| Declaration .
+
+  Declaration	: Terminal Coding CommentPart
+{
+MakeDeclaration( $1.Scan.Sym, $1.Scan.Position, $2.Scan.HasCoding, $2.Scan.Position,
+                 $2.Scan.CodValue, $2.Scan.CodNumbPos, $3.Scan.Comm, $3.Scan.Position);
+}.
+
+  Coding	: '=' Number
+{
+$$.Scan.Mode := Scanner.Coding;
+IF ($2.Scan.Value > MAX(Terminal)) THEN
+  ErrorMessageI (eNumToBig, eError, $2.Scan.Position, eInteger, ADR ($2.Scan.Value));
+  $$.Scan.HasCoding	:= FALSE;
+  $$.Scan.CodValue	:= 0; (* Dummywert *)
+  $$.Scan.CodNumbPos	:= NoPosition;
+ELSE
+  $$.Scan.HasCoding	:= TRUE;
+  $$.Scan.CodValue	:= $2.Scan.Value;
+  $$.Scan.CodNumbPos	:= $2.Scan.Position;
+END;
+}
+		| 
+{
+$$.Scan.Mode		:= Scanner.Coding;
+$$.Scan.HasCoding	:= FALSE;
+$$.Scan.CodValue	:= 0; (* Dummywert *)
+$$.Scan.CodNumbPos	:= NoPosition;
+}.
+
+  Oper		: 'OPER' CommentPart Priorities
+{
+MakeOperHeader($1.Scan.Position, $2.Scan.Comm, $2.Scan.Position);
+}
+		| .
+
+  Priorities	: Priority Priorities 
+		| .
+
+  Priority	: Associativity Operators CommentPart
+{
+CompletePriority($3.Scan.Comm, $3.Scan.Position);
+}.
+
+  Associativity	: 'LEFT'  {MakePriority(Left, $1.Scan.Position);}
+		| 'RIGHT' {MakePriority(Right, $1.Scan.Position);}
+		| 'NONE'  {MakePriority(None, $1.Scan.Position);}.
+
+  Operators	: Operator Operators
+		| Operator .
+
+  Operator	: Terminal
+{
+MakeOperator($1.Scan.Sym, $1.Scan.Position);
+}.
+
+  Terminal	: Identifier
+{
+$$.Scan.Mode		:= Scanner.Symbol;
+$$.Scan.Sym		:= $1.Scan.Sym;
+$$.Scan.Position	:= $1.Scan.Position;
+}
+		| String
+{
+$$.Scan.Mode		:= Scanner.Symbol;
+$$.Scan.Sym		:= $1.Scan.Sym;
+$$.Scan.Position	:= $1.Scan.Position;
+}.
+
+  StartPart	:
+		| 'START' Nonterminals
+		.
+  Nonterminals	:
+		| Nonterminals Identifier Comma_opt
+{
+WHILE Size (StartSymbols) < $2.Scan.Sym DO
+   ResizeSet (StartSymbols, 2 * Size (StartSymbols));
+END;
+Include (StartSymbols, $2.Scan.Sym);
+}.
+
+  Comma_opt	:
+		| ','
+		.
+  Rules		: 'RULE' CommentPart Rule *
+{
+MakeRulesHeader($1.Scan.Position, $2.Scan.Comm, $2.Scan.Position);
+}.
+
+  Rule		: Identifier ':' RightSide '.' CommentPart
+{
+MakeRule($1.Scan.Sym,
+         $1.Scan.Position,
+         $2.Scan.Position,
+         $3.Scan.Expr,
+         $5.Scan.Comm,
+         $5.Scan.Position,
+         $4.Scan.Position,
+         $3.Scan.HasPrio,   (* Prioritaet der letzten Alternative *)
+         $3.Scan.Position,
+         $3.Scan.PriSym,
+         $3.Scan.PriSymPos);
+}.
+
+  PrioPart	: 'PREC' Terminal
+{
+$$.Scan.Mode		:= Scanner.PrioPart;
+$$.Scan.HasPrio		:= TRUE;
+$$.Scan.Position	:= $1.Scan.Position;
+$$.Scan.PriSym		:= $2.Scan.Sym;
+$$.Scan.PriSymPos	:= $2.Scan.Position;
+}
+		| 
+{
+$$.Scan.Mode		:= Scanner.PrioPart;
+$$.Scan.HasPrio		:= FALSE;
+$$.Scan.PriSymPos	:= NoPosition;
+$$.Scan.PriSym		:= 0;
+}.
+
+  RightSide	: Expressions PrioPart '|' RightSide
+{
+$$.Scan		:= $4.Scan;  (* PrioPart an Rule zurueckgeben *)
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:=
+MakePrioAlternativeNode ($3.Scan.Position,
+                         $1.Scan.Expr,
+                         $4.Scan.Expr,
+                         $2.Scan.HasPrio,
+                         $2.Scan.Position,
+                         $2.Scan.PriSym,
+                         $2.Scan.PriSymPos);
+}
+		| Expressions PrioPart
+{
+$$.Scan		:= $2.Scan;  (* Priopart an Rule zurueckgeben *)
+$$.Scan.Mode	:= Scanner.RightSide;
+IF $1.Scan.Mode = Scanner.Empty THEN
+  $$.Scan.Expr	:= NoExpression;
+ELSE
+  $$.Scan.Expr	:= $1.Scan.Expr;
+END;
+}.
+
+  Expressions	: Expression Expressions
+{
+IF $2.Scan.Mode # Scanner.Empty
+THEN (* Binary *)
+  $$.Scan.Mode	:= Scanner.RightSide;
+  $$.Scan.Expr	:= MakeBinaryNode(Sequence, NoPosition, $1.Scan.Expr, $2.Scan.Expr);
+ELSE (* Expressions ist leer - Expression ist weiterzureichen *)
+  $$.Scan	:= $1.Scan;
+END; 
+}
+		| 
+{
+$$.Scan.Mode	:= Scanner.Empty;  (* noetig damit kein 'leeres Bein' entsteht *)
+$$.Scan.Expr	:= NoExpression;   (* noetig falls Expr weiterverwendet wird *)
+}.
+
+  Expression	: Unit
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= $1.Scan.Expr;
+}
+		| Unit '*'
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeUnaryNode(Star, $2.Scan.Position, $1.Scan.Expr);
+}
+		| Unit '+'
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeUnaryNode(Plus, $2.Scan.Position, $1.Scan.Expr);
+}
+		| Unit '||' Unit
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeBinaryNode(Separator, $2.Scan.Position , $1.Scan.Expr, $3.Scan.Expr);
+}.
+
+  Unit		: '[' Alternative ']'
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeBracketNode(Optional, $1.Scan.Position, $3.Scan.Position, $2.Scan.Expr);
+}
+		| '(' Alternative ')'
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeBracketNode(Bracket, $1.Scan.Position, $3.Scan.Position, $2.Scan.Expr);
+}
+		| Identifier
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeLeafNode($1.Scan.Sym, $1.Scan.Position);
+}
+		| String
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeLeafNode($1.Scan.Sym, $1.Scan.Position);
+}
+		| Action
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeActionNode ($1.Scan.Act, $1.Scan.Position);
+}.
+
+  Alternative	: Expressions '|' Alternative
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+$$.Scan.Expr	:= MakeBinaryNode (Alternative, $2.Scan.Position, $1.Scan.Expr, $3.Scan.Expr);
+}
+		| Expressions
+{
+$$.Scan.Mode	:= Scanner.RightSide;
+IF $1.Scan.Mode = Scanner.Empty THEN
+  $$.Scan.Expr	:= NoExpression;
+ELSE
+  $$.Scan.Expr	:= $1.Scan.Expr;
+END;
+}.
+
+  CommentPart	: CommentPart Comment
+{
+$$.Scan.Mode	:= Scanner.Comment;
+IF IsEmpty ($1.Scan.Comm) THEN
+  $$.Scan.Position	:= $2.Scan.Position;
+  $$.Scan.Comm		:= $2.Scan.Comm;
+ELSE
+  Append ($1.Scan.Comm, EndOfLine);
+  WHILE NOT IsEmpty ($2.Scan.Comm) DO
+    Append ($1.Scan.Comm, Head($2.Scan.Comm));
+    Tail ($2.Scan.Comm);
+  END;
+  $$.Scan.Position	:= $1.Scan.Position;
+  $$.Scan.Comm		:= $1.Scan.Comm;
+END;
+}
+		| 
+{
+$$.Scan.Mode		:= Scanner.Comment;
+$$.Scan.Position	:= NoPosition;
+MakeList ($$.Scan.Comm);
+}.

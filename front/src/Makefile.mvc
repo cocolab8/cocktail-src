@@ -1,0 +1,29 @@
+SOURCES	= Scanner.md Scanner.mi Parser.md Parser.mi
+
+sources: $(SOURCES)
+
+Scanner.md Scanner.mi: input.rex
+	rex -di input.rex
+
+Parser.md Parser.mi: input.lrk
+	bnf input.lrk | lark -di
+
+m2c:
+	nmake sources -c -f Makefile.mvc
+	copy ErrorTab ..\m2c
+	chmod u+w ../m2c/ErrorTab
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake sources -c -f Makefile.mvc
+	copy ErrorTab ..\m
+	chmod u+w ../m/ErrorTab
+	nmake sources M2FLAGS="-c -d../../reuse/src -o../m" -c -f ../m/Makefile
+
+clean:
+	del *.obj
+	del *.dbg
+
+CLEAN:	clean
+	del Scanner*
+	del Parser*

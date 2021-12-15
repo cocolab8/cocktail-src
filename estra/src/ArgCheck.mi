@@ -1,0 +1,172 @@
+(* $Id: ArgCheck.mi,v 2.6 2021/10/09 11:03:08 grosch Exp $ *)
+
+IMPLEMENTATION MODULE ArgCheck;
+
+
+FROM	Characte	IMPORT	Length,		Assign;
+FROM	Checks		IMPORT	CheckReadOpen;
+FROM	Errors		IMPORT	eFatal,		eRestriction,	eError,
+				eWarning,	eRepair,	eNote,
+				eInformation,
+				eInteger,	eString,	eCharacter,
+				eNoOption,	eTooManyArgs,
+				tReportMode,
+				ErrorMessageI,	ReportClass,	SetReportMode,
+				CloseErrors;
+FROM	IO		IMPORT	ReadOpen;
+FROM	Listing		IMPORT	SourceFile;
+FROM	Path		IMPORT	InsertPath;
+FROM	Scanner		IMPORT	BeginFile;
+FROM	Position	IMPORT	NoPosition;
+FROM	StdIO		IMPORT	WriteS, WriteNl;
+FROM	Strings		IMPORT	tString,	ArrayToString,	SubString,
+				Concatenate,	StringToArray,	Char;
+FROM	SysError	IMPORT	StatIsBad,	SysErrorMessageI;
+FROM	rSystem		IMPORT	GetArgCount,	GetArgument,	rExit,
+				StdInput,	OpenInput;
+FROM	SYSTEM		IMPORT	ADR;
+
+PROCEDURE CheckArgs;
+  VAR
+    Arg : ARRAY [0..255] OF CHAR;
+    ArgString : tString;
+    ArgNo : CARDINAL;
+    SourceFileIsOpen : BOOLEAN;
+    pos : INTEGER;
+    Help, HelpHelp: BOOLEAN;
+    Error : BOOLEAN;
+    Default : BOOLEAN;
+  BEGIN
+    SourceFileIsOpen := FALSE;
+    Help := FALSE;
+    HelpHelp := FALSE;
+    Error := FALSE;
+    Default := TRUE;
+
+    FOR ArgNo:=1 TO GetArgCount () - 1 DO
+
+      GetArgument (ArgNo, Arg);
+
+      IF Arg [0] = '-' THEN
+
+        (* check options *)
+
+	Default := FALSE;
+
+	FOR pos := 1 TO Length (Arg) - 1 DO
+          CASE Arg [pos] OF
+	  | 'W': EXCL (ReportClass, eWarning);
+	  | 'R': EXCL (ReportClass, eRepair);
+	  | 'N': EXCL (ReportClass, eNote);
+	  | 'I': EXCL (ReportClass, eInformation);
+
+	  | 'M': SetReportMode (eLongListing);
+	  | 'D': SetReportMode (eDirectly);
+
+	  | 't': TEST := TRUE;
+
+	  | 'b': BU := TRUE;
+	  | 'd': DEF := TRUE;
+	  | 'i': IMP := TRUE;
+	  | 'h': Help := TRUE;
+
+	  (* ARGCHECK_ *)
+	  | '?': Help := TRUE; HelpHelp := TRUE;
+	  | 'A': AUTO := TRUE;
+	  | 'C': DEBUG := TRUE;
+	  | 'G': GRAM := TRUE;
+	  | 'T': TREE := TRUE;
+	  | 'B': MATCH := TRUE;
+	  (* _ARGCHECK *)
+
+	  ELSE
+	    ErrorMessageI (eNoOption, eError, NoPosition, eCharacter, ADR (Arg [pos]));
+	    Error := TRUE;
+	  END;
+	END;
+
+      ELSE
+
+        (* open input file *)
+
+        IF SourceFileIsOpen THEN
+	  ArrayToString (Arg, ArgString);
+	  ErrorMessageI (eTooManyArgs, eError, NoPosition, eString, ADR (ArgString));
+	  Error := TRUE;
+	ELSE
+	  SourceFile := ReadOpen (Arg);
+	  IF StatIsBad (SourceFile) THEN
+	    CheckReadOpen (SourceFile, Arg);
+	  ELSE
+	    BeginFile (Arg);
+	    SourceFileIsOpen := TRUE;
+	    Assign (SourceFileName, Arg);
+	  END;
+	END;
+      END;
+    END;
+
+    IF Default THEN
+      DEF := TRUE;
+      IMP := TRUE;
+    END;
+
+    IF Error THEN
+      CloseErrors;
+      rExit (1);
+    END;
+
+    IF Help THEN
+(*    WriteS ('estra/'); WriteS ('cVersion'); WriteNl; *)
+      WriteS ('usage:  estra [-options] [file]'); WriteNl;
+      WriteNl;
+      WriteS ('file  specification to be compiled'); WriteNl;
+      WriteS ('      if no file is specified stdin is used instead'); WriteNl;
+      WriteNl;
+      WriteS ('options:'); WriteNl;
+      WriteS (' d    generate definition module'); WriteNl;
+      WriteS (' i    generate implementation module'); WriteNl;
+      WriteS (' b    generate bottom-up pattern matcher'); WriteNl;
+      WriteS (' h    print help information (this text)'); WriteNl;
+      WriteS (' t    print test information'); WriteNl;
+      WriteS (' D    report errors directly'); WriteNl;
+      WriteS (' M    report errors as a mixed listing'); WriteNl;
+      WriteS (' W    do not report warnings'); WriteNl;
+      WriteS (' R    do not report repairs'); WriteNl;
+      WriteS (' N    do not report notes'); WriteNl;
+      WriteS (' I    do not report informations'); WriteNl;
+      WriteNl;
+      (* ARGCHECK_ *)
+      IF HelpHelp THEN
+      WriteS (' private options for testing'); WriteNl;
+      WriteS (' A    test output of bottom up automaton'); WriteNl;
+      WriteS (' B    test output of bottom up automaton'); WriteNl;
+      WriteS (' C    generate code for debugging'); WriteNl;
+      WriteS (' G    test output of grammar'); WriteNl;
+      WriteS (' T    test output of tree'); WriteNl;
+      WriteNl;
+      END;
+      (* _ARGCHECK *)
+      WriteS ('the default options are -di'); WriteNl;
+      WriteNl;
+      rExit (0);
+    END;
+
+  END CheckArgs;
+
+
+BEGIN
+  TEST := FALSE;
+  DEF := FALSE;
+  IMP := FALSE;
+
+  SourceFileName := ' ';
+
+  (* ARGCHECK_ *)
+  GRAM := FALSE;
+  TREE := FALSE;
+  MATCH := FALSE;
+  AUTO := FALSE;
+  DEBUG := FALSE;
+  (* _ARGCHECK *)
+END ArgCheck.

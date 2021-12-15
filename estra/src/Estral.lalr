@@ -1,0 +1,649 @@
+(* $Id: Estral.lalr,v 2.4 1998/05/27 15:23:55 grosch rel $ *)
+
+EXPORT	{
+FROM	Tree		IMPORT	tTree;
+
+VAR AST : tTree;
+}
+
+GLOBAL	{
+
+FROM	Scanner		IMPORT	tScanAttribute, NoIdent,	NoValue,
+				BeginScanner,	CloseScanner;
+FROM	Tree		IMPORT	tTree,		NoTree;
+FROM	Position	IMPORT	NoPosition;
+
+IMPORT	Tree;
+
+TYPE
+  tParsAttribute =
+    RECORD
+      CASE :INTEGER OF
+      | 0: Scan: tScanAttribute;
+      | 1: Tree: tTree;
+      | 2: List: RECORD first, last: tTree; END;
+      | 3: Pair: RECORD tree: tTree; scan: tScanAttribute; END;
+      END;
+    END;
+      
+VAR tree	: tTree;
+}
+
+BEGIN	{ BeginScanner; }
+
+CLOSE	{ CloseScanner; }
+
+TOKEN
+  '('			= 1
+  ')'			= 2
+  ','			= 3
+  '.'			= 4
+  '/'			= 5
+  ':'			= 6
+  ';'			= 7
+  '='			= 8
+  '|'			= 11
+  '{'			= 12
+  '}'			= 13
+  '->'			= 15
+ \BEGIN			= 21
+ \CLOSE			= 22
+  CONDITION		= 23
+  COSTS			= 24
+  DECLARE		= 25
+ \EXPORT		= 26
+ \GLOBAL		= 27
+  GRAMMAR		= 28
+  FUNCTION		= 30
+  TRANSFORMATION	= 31
+  Ident			= 41
+  Number		= 42
+  String		= 43
+  "{"			= 51
+  "}"			= 52
+  "."			= 53
+  "("			= 54
+  ")"			= 55
+  ident			= 56
+  string		= 57
+  space			= 58
+  comment		= 59
+  rest			= 60
+  ","			= 61
+
+RULE
+  spec			: TRANSFORMATION Ident
+			  export
+			  global
+			  begin
+			  close 
+			  grammar
+			  functions 
+{
+AST	:= Tree.mSpec (	$2.Scan.ident, $2.Scan.Position,
+			$8.Pair.scan.ident, $8.Pair.scan.Position,
+			$3.Tree, $4.Tree,
+			$5.Tree, $6.Tree,
+			$7.Tree,
+			Tree.ReverseTree ($8.Pair.tree));
+}
+.
+
+  export		: \EXPORT code 
+{
+$$.Tree	:= $2.Tree;
+}
+.
+  export		: 
+{
+$$.Tree	:= Tree.mCdEnd (NoPosition);
+}
+.
+
+  global		: \GLOBAL code 
+{
+$$.Tree	:= $2.Tree;
+}
+.
+  global		: 
+{
+$$.Tree	:= Tree.mCdEnd (NoPosition);
+}
+.
+
+  begin			: \BEGIN code 
+{
+$$.Tree	:= $2.Tree;
+}
+.
+  begin			: 
+{
+$$.Tree	:= Tree.mCdEnd (NoPosition);
+}
+.
+
+  close			: \CLOSE code 
+{
+$$.Tree	:= $2.Tree;
+}
+.
+  close			: 
+{
+$$.Tree	:= Tree.mCdEnd (NoPosition);
+}
+.
+
+  grammar		: GRAMMAR Ident classes 
+{
+$$.Pair.scan.ident	:= $2.Scan.ident;
+$$.Pair.scan.Position	:= $2.Scan.Position;
+$$.Pair.tree		:= Tree.ReverseTree ($3.Tree);
+}
+.
+
+  classes		:
+{
+$$.Tree := Tree.mClass0 ();
+}
+.
+  classes		: classes
+			  Ident '->' Ident
+			  '=' nodes 
+{
+$$.Tree := Tree.mClass ($2.Scan.ident, $2.Scan.Position,
+			$4.Scan.ident, $4.Scan.Position,
+			Tree.ReverseTree ($6.Tree),
+			$1.Tree,
+			TRUE);
+}
+.
+  classes		: classes
+			  Ident '='
+			  nodes 
+{
+$$.Tree := Tree.mClass (NoIdent, NoPosition,
+			$2.Scan.ident, $2.Scan.Position,
+			Tree.ReverseTree ($4.Tree),
+			$1.Tree,
+			TRUE);
+}
+.
+
+  nodes			:
+{
+$$.Tree	:= Tree.mNode0 ();
+}
+.
+  nodes			: nodes '|'
+			  id_or_str ':' Ident
+			  '(' son_opt ')'
+{
+$$.Tree	:= Tree.mNode ( $3.Scan.ident, $3.Scan.Position,
+			$5.Scan.ident, $5.Scan.Position,
+			$7.Tree,
+			$1.Tree,
+			TRUE);
+}
+.
+  nodes			: nodes '|'
+			  id_or_str
+			  '(' son_opt ')'
+{
+$$.Tree	:= Tree.mNode ( $3.Scan.ident, $3.Scan.Position,
+			NoIdent, NoPosition,
+			$5.Tree,
+			$1.Tree,
+			TRUE);
+}
+.
+
+  son_opt		:
+{
+$$.Tree := Tree.mSon0 ();
+}
+.
+
+  son_opt		: sons
+{
+$$.Tree := Tree.ReverseTree ($1.Tree);
+}
+.
+
+  sons			: Ident
+{
+$$.Tree	:= Tree.mSon ( 	$1.Scan.ident, $1.Scan.Position,
+			$1.Scan.ident, $1.Scan.Position,
+			Tree.mSon0 (),
+			TRUE);
+}
+.
+  sons			: Ident ':' Ident
+{
+$$.Tree	:= Tree.mSon ( 	$1.Scan.ident, $1.Scan.Position,
+			$3.Scan.ident, $3.Scan.Position,
+			Tree.mSon0 (),
+			TRUE);
+}
+.
+  sons			: sons ',' Ident
+{
+$$.Tree := Tree.mSon (	$3.Scan.ident, $3.Scan.Position,
+			$3.Scan.ident, $3.Scan.Position,
+			$1.Tree,
+			TRUE);
+}
+.
+  sons			: sons ',' Ident ':' Ident
+{
+$$.Tree := Tree.mSon (	$3.Scan.ident, $3.Scan.Position,
+			$5.Scan.ident, $5.Scan.Position,
+			$1.Tree,
+			TRUE);
+}
+.
+
+  attributes		:
+{
+$$.Tree	:= Tree.mAttribute0 ();
+}
+.
+  attributes		: attr_list
+{
+$$.Tree := Tree.ReverseTree ($1.Tree);
+}
+.
+
+  attr_list		: attr_idents ':' Ident 
+{
+tree := $1.List.first;
+LOOP
+  tree^.Attribute.type := $3.Scan.ident;
+  tree^.Attribute.typos := $3.Scan.Position;
+  IF tree = $1.List.last THEN EXIT END;
+  tree := tree^.Attribute.attributes;
+END;
+$1.List.last^.Attribute.attributes := Tree.mAttribute0 ();
+$$.Tree := $1.List.first;
+}
+.
+  attr_list		: attr_idents ':' Ident '.' Ident
+{
+tree := $1.List.first;
+LOOP
+  tree^.Attribute.mod := $3.Scan.ident;
+  tree^.Attribute.mopos := $3.Scan.Position;
+  tree^.Attribute.type := $5.Scan.ident;
+  tree^.Attribute.typos := $5.Scan.Position;
+  IF tree = $1.List.last THEN EXIT END;
+  tree := tree^.Attribute.attributes;
+END;
+$1.List.last^.Attribute.attributes := Tree.mAttribute0 ();
+$$.Tree := $1.List.first;
+}
+.
+  attr_list		: attr_list ';' attr_idents ':' Ident 
+{
+tree := $3.List.first;
+LOOP
+  tree^.Attribute.type := $5.Scan.ident;
+  tree^.Attribute.typos := $5.Scan.Position;
+  IF tree = $3.List.last THEN EXIT END;
+  tree := tree^.Attribute.attributes;
+END;
+$3.List.last^.Attribute.attributes := $1.Tree;
+$$.Tree := $3.List.first;
+}
+.
+  attr_list		: attr_list ';' attr_idents ':' Ident '.' Ident 
+{
+tree := $3.List.first;
+LOOP
+  tree^.Attribute.mod := $5.Scan.ident;
+  tree^.Attribute.mopos := $5.Scan.Position;
+  tree^.Attribute.type := $7.Scan.ident;
+  tree^.Attribute.typos := $7.Scan.Position;
+  IF tree = $3.List.last THEN EXIT END;
+  tree := tree^.Attribute.attributes;
+END;
+$3.List.last^.Attribute.attributes := $1.Tree;
+$$.Tree := $3.List.first;
+}
+.
+
+  attr_idents		: Ident 
+{
+tree := Tree.mAttribute ($1.Scan.ident, $1.Scan.Position,
+			NoIdent, NoPosition,
+			NoIdent, NoPosition,
+			NoTree);
+$$.List.first := tree;
+$$.List.last := tree;
+}
+.
+  attr_idents		: attr_idents ',' Ident 
+{
+$$.List.first :=
+	Tree.mAttribute ($3.Scan.ident, $3.Scan.Position,
+			  NoIdent, NoPosition,
+			  NoIdent, NoPosition,
+			  $1.List.first);
+$$.List.last := $1.List.last;
+}
+.
+
+  functions		: 
+{
+$$.Tree := Tree.mFunction0 ();
+}
+.
+  functions		: functions
+			  FUNCTION Ident
+			  in_out
+			  domain
+			  directives 
+{
+$4.Tree^.Function.name	:= $3.Scan.ident;
+$4.Tree^.Function.napos	:= $3.Scan.Position;
+$4.Tree^.Function.domain	:= $5.Tree;
+$4.Tree^.Function.directives	:= Tree.ReverseTree ($6.Tree);
+$4.Tree^.Function.functions	:= $1.Tree;
+$$.Tree := $4.Tree
+}
+.
+
+  in_out		: attributes '->' attributes ':' Ident '.' Ident
+{
+$$.Tree	:= Tree.mFunction (NoIdent, NoPosition,
+			$1.Tree, $3.Tree,
+			Tree.mType ($5.Scan.ident, $5.Scan.Position,
+				    $7.Scan.ident, $7.Scan.Position),
+			NoTree, NoTree, NoTree);
+}
+
+.
+  in_out		: attributes '->' attributes ':' Ident
+{
+$$.Tree	:= Tree.mFunction (NoIdent, NoPosition,
+			$1.Tree, $3.Tree,
+			Tree.mType (NoIdent, NoPosition,
+				    $5.Scan.ident, $5.Scan.Position),
+			NoTree, NoTree, NoTree);
+}
+.
+  in_out		: attributes '->' attributes 
+{
+$$.Tree	:= Tree.mFunction (NoIdent, NoPosition,
+			$1.Tree, $3.Tree,
+			Tree.mNoResult (),
+			NoTree, NoTree, NoTree);
+}
+.
+  in_out		: ':' Ident '.' Ident
+{
+$$.Tree	:= Tree.mFunction (NoIdent, NoPosition,
+			Tree.mAttribute0 (), Tree.mAttribute0 (),
+			Tree.mType ($2.Scan.ident, $2.Scan.Position,
+				    $4.Scan.ident, $4.Scan.Position),
+			NoTree, NoTree, NoTree);
+}
+.
+  in_out		: ':' Ident
+{
+$$.Tree	:= Tree.mFunction (NoIdent, NoPosition,
+			Tree.mAttribute0 (), Tree.mAttribute0 (),
+			Tree.mType (NoIdent, NoPosition,
+				    $2.Scan.ident, $2.Scan.Position),
+			NoTree, NoTree, NoTree);
+}
+.
+  in_out		: 
+{
+$$.Tree	:= Tree.mFunction (NoIdent, NoPosition,
+			Tree.mAttribute0 (), Tree.mAttribute0 (),
+			Tree.mNoResult (),
+			NoTree, NoTree, NoTree);
+}
+.
+
+  domain		: '/' '/' 
+{
+$$.Tree	:= Tree.mIdent0 ();
+}
+.
+  domain		: '/' domain_idents '/' 
+{
+$$.Tree := Tree.ReverseTree ($2.Tree);
+}
+.
+
+  domain_idents		: Ident 
+{
+$$.Tree	:= Tree.mIdent ($1.Scan.ident, $1.Scan.Position,
+			Tree.mIdent0 ());
+}
+.
+  domain_idents		: domain_idents ',' Ident 
+{
+$$.Tree	:= Tree.mIdent ($3.Scan.ident, $3.Scan.Position, $1.Tree);
+}
+.
+
+  directives		:
+{
+$$.Tree := Tree.mDirective0 ();
+}
+.
+  directives		: directives
+			    pattern condition costs
+			    declarations instructions 
+{
+$$.Tree := Tree.mDirective ($2.Tree, $3.Tree, $4.Tree,
+			    $5.Tree, $6.Tree, $1.Tree,
+			    TRUE);
+}
+.
+
+  pattern		: Ident ':' id_or_str '(' pattern_opt ')' 
+{
+$$.Tree	:= Tree.mPattern ($1.Scan.Position,
+			  $1.Scan.ident, $1.Scan.Position,
+			  $3.Scan.ident, $3.Scan.Position,
+			  $5.Tree, TRUE);
+}
+.
+  pattern		:           id_or_str '(' pattern_opt ')' 
+{
+$$.Tree	:= Tree.mPattern ($1.Scan.Position,
+			  $1.Scan.ident, $1.Scan.Position,
+			  $1.Scan.ident, $1.Scan.Position,
+			  $3.Tree, TRUE);
+}
+.
+  pattern		:       ':' id_or_str '(' pattern_opt ')' 
+{
+$$.Tree	:= Tree.mPattern ($1.Scan.Position,
+			  NoIdent, NoPosition,
+			  $2.Scan.ident, $2.Scan.Position,
+			  $4.Tree, TRUE);
+}
+.
+  pattern		: Ident ':' Ident 
+{
+$$.Tree	:= Tree.mPattern1 ($1.Scan.Position,
+			   $1.Scan.ident, $1.Scan.Position,
+			  $3.Scan.ident, $3.Scan.Position, TRUE);
+}
+.
+  pattern		:           Ident 
+{
+$$.Tree	:= Tree.mPattern1 ($1.Scan.Position,
+			   $1.Scan.ident, $1.Scan.Position,
+			  $1.Scan.ident, $1.Scan.Position, TRUE);
+}
+.
+  pattern		: Ident ':' 
+{
+$$.Tree	:= Tree.mPattern1 ($1.Scan.Position,
+			   $1.Scan.ident, $1.Scan.Position,
+			   NoIdent, NoPosition, TRUE);
+}
+.
+  pattern		:       ':' Ident 
+{
+$$.Tree	:= Tree.mPattern1 ($1.Scan.Position,
+			   NoIdent, NoPosition,
+			  $2.Scan.ident, $2.Scan.Position, TRUE);
+}
+.
+  pattern		:       ':' 
+{
+$$.Tree	:= Tree.mPattern1 ($1.Scan.Position,
+			   NoIdent, NoPosition,
+			   NoIdent, NoPosition, TRUE);
+}
+.
+
+  pattern_opt		:
+{
+$$.Tree := Tree.mPatterns0 ();
+}
+.
+  pattern_opt		: patterns
+{
+$$.Tree := Tree.ReverseTree ($1.Tree);
+}
+.
+
+  patterns		: pattern
+{
+$$.Tree := Tree.mPatterns ($1.Tree,
+			   Tree.mPatterns0 ());
+}
+.
+  patterns		: patterns ',' pattern
+{
+$$.Tree := Tree.mPatterns ($3.Tree, $1.Tree);
+}
+.
+
+  id_or_str		: Ident 
+{
+$$.Scan := $1.Scan;
+}
+.
+  id_or_str		: String 
+{
+$$.Scan := $1.Scan;
+}
+.
+
+  condition		: 
+{
+$$.Tree := Tree.mCondD ();
+}
+.
+  condition		: CONDITION code 
+{
+$$.Tree	:= Tree.mCondF ($2.Tree);
+}
+.
+
+  costs			: 
+{
+$$.Tree := Tree.mCostD ();
+}
+.
+  costs			: COSTS Number 
+{
+$$.Tree	:= Tree.mCostN ($2.Scan.val, $2.Scan.Position);
+}
+.
+  costs			: COSTS code 
+{
+$$.Tree	:= Tree.mCostF ($2.Tree);
+}
+.
+
+  declarations		: DECLARE code 
+{
+$$.Tree := $2.Tree;
+}
+.
+  declarations		: 
+{
+$$.Tree := Tree.mCdEnd (NoPosition);
+}
+.
+
+  instructions		: code 
+{
+$$.Tree := $1.Tree;
+}
+.
+
+  code			: '{' code_list '}' 
+{
+$$.Tree := Tree.ReverseTree ($2.Tree);
+}
+.
+
+  code_list		:
+{
+$$.Tree := Tree.mCdEnd (NoPosition);
+}
+.
+  code_list		: code_list string 
+{
+$$.Tree := Tree.mCdStr ($2.Scan.Position, $2.Scan.ident, $1.Tree);
+}
+.
+  code_list		: code_list ident 
+{
+$$.Tree := Tree.mCdId ($2.Scan.Position, $2.Scan.ident, $1.Tree);
+}
+.
+  code_list		: code_list "." 
+{
+$$.Tree := Tree.mCdDot ($2.Scan.Position, $1.Tree);
+}
+.
+  code_list		: code_list "(" 
+{
+$$.Tree := Tree.mCdLPar ($2.Scan.Position, $1.Tree);
+}
+.
+  code_list		: code_list ")" 
+{
+$$.Tree := Tree.mCdRPar ($2.Scan.Position, $1.Tree);
+}
+.
+  code_list		: code_list "{" 
+{
+$$.Tree := Tree.mCdLBra ($2.Scan.Position, $1.Tree);
+}
+.
+  code_list		: code_list "}" 
+{
+$$.Tree := Tree.mCdRBra ($2.Scan.Position, $1.Tree);
+}
+.
+  code_list		: code_list space 
+{
+$$.Tree := Tree.mCdSpa ( $2.Scan.Position, $2.Scan.ref,$1.Tree);
+}
+.
+  code_list		: code_list comment 
+{
+$$.Tree := Tree.mCdCom ($2.Scan.Position, $2.Scan.ref, $1.Tree);
+}
+.
+  code_list		: code_list rest 
+{
+$$.Tree := Tree.mCdRst ($2.Scan.Position, $2.Scan.ref, $1.Tree);
+}
+.
+  code_list		: code_list "," 
+{
+$$.Tree := Tree.mCdComma ($2.Scan.Position, $1.Tree);
+}
+.

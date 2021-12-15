@@ -1,0 +1,21 @@
+IMPLEMENTATION MODULE Convert;
+
+FROM Idents	IMPORT	tIdent;
+FROM SYSTEM	IMPORT	ADDRESS;
+FROM Pointers	IMPORT	PTRINT, INTPTR;
+
+(* procedures to convert tIdent to ADDRESS and vice versa *)
+
+PROCEDURE IdToAdr (id: tIdent): ADDRESS;
+  VAR c: CARDINAL;
+  BEGIN
+    c := id;
+    RETURN INTPTR (c);
+  END IdToAdr;
+
+PROCEDURE AdrToId (adr: ADDRESS): tIdent;
+  BEGIN
+    RETURN PTRINT (adr);
+  END AdrToId;
+
+END Convert.

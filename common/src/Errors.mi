@@ -1,0 +1,382 @@
+(* Errors.mi		*)
+
+(* $Id: Errors.mi,v 1.10 2008/09/12 14:03:45 grosch rel $ *)
+
+(*
+ * $Log: Errors.mi,v $
+ * Revision 1.10  2008/09/12 14:03:45  grosch
+ * cosmetic changes
+ *
+ * Revision 1.9  1997/05/27 14:58:14  grosch
+ * cosmetic changes
+ *
+ * Revision 1.8  1993/08/18 15:09:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 1.7  1992/08/07  15:06:04  grosch
+ * adaption to the new interface of the module Errors
+ *
+ * Revision 1.6  1992/01/30  13:26:58  grosch
+ * redesign of interface to operating system
+ *
+ * Revision 1.5  1991/03/08  18:45:35  grosch
+ * changed interface of Errors
+ * changed interface for source position
+ *
+ * Revision 1.4  91/02/07  16:36:42  grosch
+ * adapted layout of source positions
+ *
+ * Revision 1.3  90/06/12  18:33:33  grosch
+ * layout improvements
+ *
+ * Revision 1.2  89/02/15	20:08:03  vielsack
+ * InError and NoReports are exported now
+ * line and column are only reported if not equal zero
+ *
+ * Revision 1.1  89/01/31	15:57:13  vielsack
+ * Initial revision
+ *
+ *)
+
+IMPLEMENTATION MODULE Errors;
+
+FROM	IO		IMPORT	tFile,		StdError,	WriteC,
+				WriteNl,	WriteS,		WriteI,
+				WriteLong,	WriteB,		WriteR,
+				ReadOpen,	ReadClose,	EndOfFile,
+				CloseIO;
+FROM	Listing		IMPORT	LongListing,	PutError,	HasError,
+				GetError;
+FROM	Strings		IMPORT	tString,	AssignEmpty,	SubString,
+				Char,		ReadL,		Length,
+				ArrayToString,	StringToInt;
+FROM	StringM		IMPORT	tStringRef,	PutString,	GetString,
+				WriteString;
+FROM	SysError	IMPORT	StatIsBad,	SysErrorMessageI;
+FROM	rSystem		IMPORT	rExit;
+FROM	SYSTEM		IMPORT	ADDRESS,	ADR,		TSIZE;
+FROM	Position	IMPORT	tPosition,	NoPosition;
+
+IMPORT Strings;
+
+CONST
+   cTab		= 11C	;	(* tab character	*)
+   NoStringRef	= -1	;
+   cESC		= '\'	;
+   cSEP		= '$'	;
+
+VAR
+  ReportMode	: tReportMode;
+  ErrorCount	: ARRAY [0..MaxErrorClass] OF SHORTCARD;
+  ErrorClassRef : ARRAY [0..MaxErrorClass] OF tStringRef;
+  ErrorCodeRef	: ARRAY [0..MaxCode]  OF tStringRef;
+  ErrorCountRef : ARRAY [0..MaxErrorClass] OF tStringRef;
+  i		: INTEGER;	(* index to initialize date structure *)
+
+PROCEDURE ErrorMessage	(ErrorCode, ErrorClass: CARDINAL; Position: tPosition);
+   BEGIN
+      ErrorMessageI (ErrorCode, ErrorClass, Position, eNone, NIL);
+   END ErrorMessage;
+
+PROCEDURE ErrorMessageI (ErrorCode, ErrorClass: CARDINAL; Position: tPosition;
+			 InfoClass: CARDINAL; Info: ADDRESS);
+   BEGIN
+      INC (ErrorCount [ErrorClass]);
+      IF ErrorClass <= eError THEN
+	InError := TRUE;
+      END;
+      IF ErrorClass IN ReportClass THEN
+	NoReports := FALSE;
+	IF ReportMode = eDirectly THEN
+	  WriteErrorMessage (ErrorCode, ErrorClass, Position.Line, Position.Column,
+			     InfoClass, Info);
+	  WriteNl (StdError);
+	ELSE
+	  Info := SaveProc (InfoClass, Info);
+	  PutError (ErrorCode, ErrorClass, Position.Line, Position.Column, InfoClass, Info);
+	END;
+      END;
+      IF ErrorClass < 3 THEN Finish END;
+   END ErrorMessageI;
+
+PROCEDURE SetReportMode (mode: tReportMode);
+  BEGIN
+    ReportMode := mode;
+    LongListing := mode = eLongListing;
+  END SetReportMode;
+
+PROCEDURE BeginErrors;
+  VAR
+    i : INTEGER;
+    f : tFile;
+    s : tString;
+    line : tString;
+  BEGIN
+    f := ReadOpen (ErrorTable);
+    IF StatIsBad (f) THEN
+      ArrayToString (ErrorTable, s);
+      SysErrorMessageI (f, eError, eString, ADR (s));
+      RETURN;
+    END;
+
+    LOOP
+      IF EndOfFile (f) THEN EXIT; END;
+      ReadL (f, line);
+      IF Char (line, 1) = '$' THEN EXIT; END;
+      IF Char (line, 1) # '%' THEN
+	SplitLine (line, i, s);
+	IF (i<0) OR (i>MaxErrorClass) THEN
+	  ErrorMessageI (eWrongClass, eError, NoPosition, eString, ADR(line));
+	ELSE
+	  ErrorClassRef [i] := PutString (s);
+	END;
+      END;
+    END;
+
+    LOOP
+      IF EndOfFile (f) THEN EXIT; END;
+      ReadL (f, line);
+      IF Char (line, 1) = '$' THEN EXIT; END;
+      IF Char (line, 1) # '%' THEN
+	SplitLine (line, i, s);
+	IF (i<0) OR (i>MaxCode) THEN
+	  ErrorMessageI (eWrongCode, eError, NoPosition, eString, ADR(line));
+	ELSE
+	  ErrorCodeRef [i] := PutString (s);
+	END;
+      END;
+    END;
+
+    LOOP
+      IF EndOfFile (f) THEN EXIT; END;
+      ReadL (f, line);
+      IF Char (line, 1) = '$' THEN EXIT; END;
+      IF Char (line, 1) # '%' THEN
+	SplitLine (line, i, s);
+	IF (i<0) OR (i>MaxErrorClass) THEN
+	  ErrorMessageI (eWrongClass, eError, NoPosition, eString, ADR(line));
+	ELSE
+	  ErrorCountRef [i] := PutString (s);
+	END;
+      END;
+    END;
+
+    ReadClose (f);
+  END BeginErrors;
+
+PROCEDURE CloseErrors ();
+   VAR
+     i : INTEGER;
+     r : tStringRef;
+     ErrorCode, ErrorClass, Line, Column, InfoClass: INTEGER;
+     Info : ADDRESS;
+   BEGIN
+     IF NoReports THEN RETURN END;
+
+     WHILE HasError() DO
+	GetError (ErrorCode, ErrorClass, Line, Column, InfoClass, Info);
+	WriteErrorMessage (ErrorCode, ErrorClass, Line, Column, InfoClass, Info);
+	WriteNl (StdError);
+     END;
+
+     FOR i := 0 TO MaxErrorClass DO
+       IF ErrorCount [i] > 0 THEN
+	 WriteS (StdError, '  ');
+	 WriteI (StdError, ErrorCount [i], 1);
+	 WriteC (StdError, ' ');
+
+	 r := ErrorCountRef [i];
+	 IF r = NoStringRef THEN
+	   WriteS (StdError, 'in error class ');
+	   WriteI (StdError, i, 1);
+	 ELSE
+	   WriteString (StdError, r);
+	 END;
+       END;
+     END;
+     WriteNl (StdError);
+   END CloseErrors;
+
+PROCEDURE ERROR (c: ARRAY OF CHAR);
+  VAR s: tString;
+  BEGIN
+    ArrayToString (c, s);
+    ErrorMessageI (eInternal, eFatal, NoPosition, eString, ADR (s));
+  END ERROR;
+
+PROCEDURE WriteErrorMessage	(
+				ErrorCode	: INTEGER	;
+				ErrorClass	: INTEGER	;
+				Line		: INTEGER	;
+				Column		: INTEGER	;
+				InfoClass	: INTEGER	;
+				Info		: ADDRESS
+				);
+   VAR
+      r		: tStringRef;
+      s		: tString;
+      i, l	: INTEGER;
+      c		: CHAR;
+      ESC	: BOOLEAN;
+
+   BEGIN
+      IF (ReportMode # eLongListing) & (Line # 0) THEN
+	WriteI (StdError, Line, 3);
+	WriteS (StdError, ', ');
+      END;
+      IF (Column # 0) THEN
+	WriteI (StdError, Column, 2);
+	WriteS (StdError, ': ');
+      END;
+
+      IF (ErrorClass > MaxErrorClass) OR (ErrorClass < 0) THEN
+	WriteS (StdError, 'Error class: ');
+	WriteI (StdError, ErrorClass, 1);
+      ELSE
+	r := ErrorClassRef [ErrorClass];
+	IF r = NoStringRef THEN
+	  WriteS (StdError, 'Error class: ');
+	  WriteI (StdError, ErrorClass, 1);
+	ELSE
+	  WriteString (StdError, r);
+	END;
+      END;
+
+      IF (ErrorCode > MaxCode) OR (ErrorCode < 0) THEN
+	IF ErrorCode >= SysOffset THEN
+	  WriteS (StdError, ' system error code: ');
+	  WriteI (StdError, ErrorCode - SysOffset, 1);
+	ELSE
+	  WriteS (StdError, ' error code: ');
+	  WriteI (StdError, ErrorCode, 1);
+	END;
+	WriteC (StdError, ' ');
+	WriteProc (InfoClass, Info);
+      ELSE
+	r := ErrorCodeRef [ErrorCode];
+	IF r = NoStringRef THEN
+	  IF ErrorCode >= SysOffset THEN
+	    WriteS (StdError, ' system error code: ');
+	    WriteI (StdError, ErrorCode - SysOffset, 1);
+	  ELSE
+	    WriteS (StdError, ' error code: ');
+	    WriteI (StdError, ErrorCode, 1);
+	  END;
+	  WriteC (StdError, ' ');
+	  WriteProc (InfoClass, Info);
+	ELSE
+	  GetString (r, s);
+	  l := Length (s);
+	  i := 0;
+	  ESC := FALSE;
+
+	  LOOP
+	    INC (i);
+	    IF i > l THEN EXIT; END;
+	    c := Char (s, i);
+	    IF ESC THEN
+	      WriteC (StdError, c);
+	      ESC := FALSE;
+	    ELSIF c = cESC THEN
+	      ESC := TRUE;
+	    ELSIF c = cSEP THEN
+	      EXIT;
+	    ELSE
+	      WriteC (StdError, c);
+	    END;
+	  END;
+
+	  WriteProc (InfoClass, Info);
+
+	  LOOP
+	    INC (i);
+	    IF i > l THEN EXIT; END;
+	    c := Char (s, i);
+	    IF ESC THEN
+	      WriteC (StdError, c);
+	      ESC := FALSE;
+	    ELSIF c = cESC THEN
+	      ESC := TRUE;
+	    ELSE
+	      WriteC (StdError, c);
+	    END;
+	  END;
+	END;
+      END;
+   END WriteErrorMessage;
+
+PROCEDURE SplitLine (line: tString; VAR i: INTEGER; VAR s1: tString);
+  VAR
+    m, p1, p2 : INTEGER;
+    s : tString;
+  BEGIN
+    p1 := 1;
+    p2 := 1;
+    m := Length (line);
+    LOOP
+      IF p2 > m THEN EXIT; END;
+      IF Char (line, p2) = cTab THEN EXIT; END;
+      INC (p2);
+    END;
+    DEC (p2);
+    IF p1 > p2 THEN
+      i := 0;
+    ELSE
+      SubString (line, p1, p2, s);
+      i := StringToInt (s);
+    END;
+
+    p1 := p2+1;
+    LOOP
+      IF p1 > m THEN EXIT; END;
+      IF Char (line, p1) # cTab THEN EXIT; END;
+      INC (p1);
+    END;
+    p2 := p1;
+    LOOP
+      IF p2 > m THEN EXIT; END;
+      IF Char (line, p2) = cTab THEN EXIT; END;
+      INC (p2);
+    END;
+    DEC (p2);
+    IF p1 > p2 THEN
+      AssignEmpty (s1);
+    ELSE
+      SubString (line, p1, p2, s1);
+    END;
+  END SplitLine;
+
+PROCEDURE Finish;
+  BEGIN
+    CloseErrors;
+    CloseIO;
+    IF ReportMode = eDirectly THEN
+      CASE 0 OF
+      END;
+    END;
+    rExit (1);
+  END Finish;
+
+BEGIN
+  NoReports := TRUE;
+  InError := FALSE;
+  ReportMode := eShortListing;
+  ErrorTable := 'ErrorTab';
+  ReportClass := {0..MaxErrorClass};
+
+  FOR i := 0 TO MaxErrorClass DO
+    ErrorCount [i] := 0;
+  END;
+
+  FOR i := 0 TO MaxErrorClass DO
+    ErrorClassRef [i] := NoStringRef;
+  END;
+
+  FOR i := 0 TO MaxCode DO
+    ErrorCodeRef [i] := NoStringRef;
+  END;
+
+  FOR i := 0 TO MaxErrorClass DO
+    ErrorCountRef [i] := NoStringRef;
+  END;
+END Errors.

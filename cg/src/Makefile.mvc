@@ -1,0 +1,227 @@
+REUSE	= ../../reuse
+
+# Convert !...! notation to Modula Write statements.
+SED_WRITE	= sed -f cg.sed
+
+SEDC	= $(SED_WRITE)
+SED	= $(SED_WRITE)
+
+SOURCES	= Dialog.mi	\
+	  Errors.mi	\
+	  EvalC.md EvalC.mi	\
+	  EvalC2.md EvalC2.mi	\
+	  EvalC3.md EvalC3.mi	\
+	  EvalC4.md EvalC4.mi	\
+	  EvalMod.md EvalMod.mi	\
+	  EvalMod2.md EvalMod2.mi	\
+	  EvalMod3.md EvalMod3.mi	\
+	  EvalMod4.md EvalMod4.mi	\
+	  EvalJava.md EvalJava.mi	\
+	  EvalJav2.md EvalJav2.mi	\
+	  EvalJav3.md EvalJav3.mi	\
+	  EvalJav4.md EvalJav4.mi	\
+	  EvalCxx.md EvalCxx.mi	\
+	  EvalCxx2.md EvalCxx2.mi	\
+	  EvalCxx3.md EvalCxx3.mi	\
+	  EvalCxx4.md EvalCxx4.mi	\
+	  GramC.md GramC.mi	\
+	  GramMod.md GramMod.mi	\
+	  GramYacc.md GramYacc.mi	\
+	  GramAda.md GramAda.mi	\
+	  GramJava.md GramJava.mi	\
+	  Optimize.md Optimize.mi	\
+	  Order.md Order.mi	\
+	  Parser.md Parser.mi	\
+	  Scanner.md Scanner.mi	\
+	  Semantic.md Semantic.mi	\
+	  Tree.md Tree.mi	\
+	  Tree2.md Tree2.mi	\
+	  TreeC1.md TreeC1.mi	\
+	  TreeC2.md TreeC2.mi	\
+	  TreeMod1.md TreeMod1.mi	\
+	  TreeMod2.md TreeMod2.mi	\
+	  TreeJav1.md TreeJav1.mi	\
+	  TreeJav2.md TreeJav2.mi	\
+	  TreeCxx1.md TreeCxx1.mi	\
+	  TreeCxx2.md TreeCxx2.mi	\
+	  Puma0.md Puma0.mi	\
+	  cg.mi	\
+	  lpp.mi	\
+	  pumagen.mi
+
+sources:	Tree.TS $(SOURCES)
+
+Scanner.md Scanner.mi:	cg.rex
+	rex -di cg.rex
+
+Parser.md:	cg.lrk
+	@echo expect 9 shift-reduce conflicts
+	lark -di cg.lrk
+
+Parser.mi:	cg.lrk
+	@echo expect 9 shift-reduce conflicts
+	lark -iv cg.lrk
+
+Errors.mi:	Errors.0 yyconsts1 yywrites1 yyconsts2 yywrites2
+	cp Errors.0 Errors.mi
+	gcpp Errors.mi
+
+Tree.md:	cg.cg
+#	echo SELECT AstIn Ast Common Cg Ag | cat - cg.cg | ast -diqmRe
+	echo SELECT AstIn Ast Common Cg Ag | cat - cg.cg | ast -diqmR
+
+Tree.mi:	cg.cg
+#	echo SELECT AstIn Ast Common Cg Ag | cat - cg.cg | ast -iqmRe
+	echo SELECT AstIn Ast Common Cg Ag | cat - cg.cg | ast -iqmR
+
+Tree2.md:	cg.cg
+	echo SUBUNIT Tree2 SELECT AstIn Ast Tree2 | cat - cg.cg | ast -dip
+
+Tree2.mi:	cg.cg
+	echo SUBUNIT Tree2 SELECT AstIn Ast Tree2 | cat - cg.cg | ast -ip
+
+Tree.TS:	cg.cg
+	echo SELECT AstIn Ast Common Cg Ag | cat - cg.cg | ast -4
+
+GramMod.md GramMod.mi:	mod0.puma Tree.TS
+	$(SED) < mod0.puma | puma -dinw
+
+GramC.md GramC.mi:	c0.puma Tree.TS
+	$(SED) < c0.puma | puma -dinw
+
+GramYacc.md GramYacc.mi:	y0.puma Tree.TS
+	$(SED) < y0.puma | puma -dinw
+
+GramAda.md GramAda.mi:	ada0.puma Tree.TS
+	$(SED) < ada0.puma | puma -dinw
+
+GramJava.md GramJava.mi:	java0.puma Tree.TS
+	$(SEDC) < java0.puma | puma -dinw
+
+Semantic.md Semantic.mi yyconsts1 yywrites1:	sem.puma Tree.TS
+	awk -f cg.awk1 < sem.puma > yysem.puma
+	gcpp yysem.puma
+	puma -dinw yysem.puma
+	sed -f cg.sed2 < yywrites01 > yywrites1
+
+Order.md Order.mi yyconsts2 yywrites2:	oag.puma Tree.TS
+	awk -f cg.awk2 < oag.puma > yyoag.puma
+	gcpp yyoag.puma
+	puma -dinw yyoag.puma
+	sed -f cg.sed2 < yywrites02 > yywrites2
+
+Optimize.md Optimize.mi:	opt.puma Tree.TS
+	cp opt.puma yyopt.puma
+	gcpp yyopt.puma
+	puma -dinw yyopt.puma
+
+Dialog.mi:	Dialog.mi.sed cg.sed
+	$(SED) < Dialog.mi.sed > Dialog.mi
+
+TreeMod1.md TreeMod1.mi:	mod1.puma Tree.TS
+	$(SED) < mod1.puma | puma -dinw
+
+TreeMod2.md TreeMod2.mi:	mod2.puma Tree.TS
+	$(SED) < mod2.puma | puma -dinw
+
+EvalMod.md EvalMod.mi:		mod3.puma Tree.TS
+	$(SED) < mod3.puma | puma -dinw
+
+EvalMod2.md EvalMod2.mi:	mod4.puma Tree.TS
+	$(SED) < mod4.puma | puma -dinw
+
+EvalMod3.md EvalMod3.mi:	mod5.puma Tree.TS
+	$(SED) < mod5.puma | puma -dinw
+
+EvalMod4.md EvalMod4.mi:	mod6.puma Tree.TS
+	$(SED) < mod6.puma | puma -dinw
+
+TreeC1.md TreeC1.mi:	c1.puma Tree.TS
+	$(SED) < c1.puma | puma -dinw
+
+TreeC2.md TreeC2.mi:	c2.puma Tree.TS
+	$(SED) < c2.puma | puma -dinw
+
+EvalC.md EvalC.mi:	c3.puma Tree.TS
+	$(SED) < c3.puma | puma -dinw
+
+EvalC2.md EvalC2.mi:	c4.puma Tree.TS
+	$(SED) < c4.puma | puma -dinw
+
+EvalC3.md EvalC3.mi:	c5.puma Tree.TS
+	$(SED) < c5.puma | puma -dinw
+
+EvalC4.md EvalC4.mi:	c6.puma Tree.TS
+	$(SED) < c6.puma | puma -dinw
+
+TreeJav1.md TreeJav1.mi:	java1.puma Tree.TS
+	$(SEDC) < java1.puma | puma -dinw
+
+TreeJav2.md TreeJav2.mi:	java2.puma Tree.TS
+	$(SEDC) < java2.puma | puma -dinw
+
+EvalJava.md EvalJava.mi:	java3.puma Tree.TS
+	$(SEDC) < java3.puma | puma -dinw
+
+EvalJav2.md EvalJav2.mi:	java4.puma Tree.TS
+	$(SEDC) < java4.puma | puma -dinw
+
+EvalJav3.md EvalJav3.mi:	java5.puma Tree.TS
+	$(SEDC) < java5.puma | puma -dinw
+
+EvalJav4.md EvalJav4.mi:	java6.puma Tree.TS
+	$(SEDC) < java6.puma | puma -dinw
+
+TreeCxx1.md TreeCxx1.mi:	cxx1.puma Tree.TS
+	$(SEDC) < cxx1.puma | puma -dinw
+
+TreeCxx2.md TreeCxx2.mi:	cxx2.puma Tree.TS
+	$(SEDC) < cxx2.puma | puma -dinw
+
+EvalCxx.md EvalCxx.mi:		cxx3.puma Tree.TS
+	$(SEDC) < cxx3.puma | puma -dinw
+
+EvalCxx2.md EvalCxx2.mi:	cxx4.puma Tree.TS
+	$(SEDC) < cxx4.puma | puma -dinw
+
+EvalCxx3.md EvalCxx3.mi:	cxx5.puma Tree.TS
+	$(SEDC) < cxx5.puma | puma -dinw
+
+EvalCxx4.md EvalCxx4.mi:	cxx6.puma Tree.TS
+	$(SEDC) < cxx6.puma | puma -dinw
+
+Puma0.md Puma0.mi:	p0.puma Tree.TS
+	$(SED) < p0.puma | puma -dinw
+
+cg.mi:	cg.mi.sed cg.sed
+	$(SED) < cg.mi.sed > cg.mi
+
+lpp.mi:	lpp.mi.sed cg.sed
+	$(SED) < lpp.mi.sed > lpp.mi
+
+pumagen.mi: pumagen.mi.sed cg.sed
+	$(SED) < pumagen.mi.sed > pumagen.mi
+
+m2c:
+	nmake $(SOURCES) -c -f Makefile.mvc
+	copy TypeTab.* ..\m2c
+	copy Tree.tcl ..\m2c
+	nmake sources M2FLAGS="$(M2FLAGS) -d$(REUSE)/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake $(SOURCES) -c -f Makefile.mvc
+	copy TypeTab.* ..\m
+	copy Tree.tcl ..\m
+	nmake sources M2FLAGS="-c -d$(REUSE)/src -o../m" -c -f ../m/Makefile
+
+clean:
+	del *.dbg
+	del *.obj
+	del yy*
+
+CLEAN:	clean
+	del cg.exe
+	del lpp.exe
+	del pumagen.exe
+	del Tree.TS
+	del $(SOURCES)

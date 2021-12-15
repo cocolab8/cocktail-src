@@ -1,0 +1,1204 @@
+(* $Id: ScanTabs.mi,v 4.13 2013/01/15 13:54:39 grosch Exp $ *)
+
+(*
+ * $Log: ScanTabs.mi,v $
+ * Revision 4.13  2013/01/15 13:54:39  grosch
+ * allow generation of large scanners in Java
+ *
+ * Revision 4.12  2007/03/27 09:49:25  grosch
+ * fixed overflow of variable NodeCount
+ * changed some INT types to CARD
+ *
+ * Revision 4.11  2005/02/02 12:50:10  grosch
+ * improved speed of algorithm for table compression
+ *
+ * Revision 4.10  2001/01/05 12:10:57  grosch
+ * use hex notation for numbers >= 2147483648
+ *
+ * Revision 4.9  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 4.7  1999/11/16 17:52:34  grosch
+ * added generation of Java
+ *
+ * Revision 4.6  1998/04/21 10:32:05  grosch
+ * cosmetic changes
+ * improved error messages in case of missing files
+ *
+ * Revision 4.5  1996/01/16 20:51:06  grosch
+ * update to Eiffel 3 and to latest version of gnat
+ *
+ * Revision 4.4  1994/09/13  12:43:56  grosch
+ * added generation of Ada code
+ *
+ * Revision 4.3  1994/04/05  09:11:01  grosch
+ * added handling of CHARACTER_SET
+ *
+ * Revision 4.2  1994/03/23  14:49:28  grosch
+ * added generation of C++
+ * read options from environment variable REX
+ * added touching of output files only if necessary
+ *
+ * Revision 4.1  1993/08/31  14:39:46  grosch
+ * fixed runtime errors (range check)
+ *
+ * Revision 4.0  1993/08/26  16:01:21  grosch
+ * replaced table files (Scanner.Tab, Parser.Tab, ...) by initialization code
+ *
+ * Revision 3.7  1993/08/18  15:10:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 3.6  1993/05/28  14:09:53  grosch
+ * added target language Eiffel
+ *
+ * Revision 3.5  1992/08/07  15:10:26  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 3.4  1992/01/30  13:29:56  grosch
+ * redesign of interface to operating system
+ *
+ * Revision 3.3  1991/11/21  14:41:19  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.2  91/04/26  18:19:12  grosch
+ * fixed bug in computing ControlSize
+ *
+ * Revision 3.1  91/04/08  15:51:13  grosch
+ * corrected LastCh to OldLastCh
+ *
+ * Revision 3.0  91/04/04  18:07:46  grosch
+ * introduced partitioning of character set
+ *
+ * Revision 1.6  91/03/26  18:27:14  grosch
+ * improved generation time
+ * introduced options n and o to control table size and generation time
+ * increased limitation for table size from 64K to 256K
+ *
+ * Revision 1.5  91/02/13  11:34:51  grosch
+ * moved tables from file to initialization in C; reduced case size
+ *
+ * Revision 1.4  90/06/11  11:28:00  grosch
+ * extended character range to 8 bits, ChRange -> CHAR
+ *
+ * Revision 1.3  90/05/17  11:20:36  grosch
+ * extend character range to 8 bits
+ *
+ * Revision 1.2  89/12/05  18:02:05  grosch
+ * cosmetic changes
+ *
+ * Revision 1.1  89/10/18  17:49:51  grosch
+ * renamed ScanTab and ParsTab to Scan.Tab and Pars.Tab because of PCTE
+ *
+ * Revision 1.0  88/10/04  11:59:47  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Nov. 1987 *)
+
+IMPLEMENTATION MODULE ScanTabs;
+
+FROM SYSTEM	IMPORT ADR, ADDRESS, TSIZE;
+FROM Checks	IMPORT ErrorCheck;
+FROM General	IMPORT Min, Max, MinCard;
+FROM rMemory	IMPORT Alloc;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+FROM Strings	IMPORT tString, ArrayToString, Append, Concatenate, StringToArray;
+FROM Idents	IMPORT tIdent, NoIdent, MakeIdent, GetString, WriteIdent;
+FROM HugeSets	IMPORT tSet, MakeSet, IsElement, Minimum, Maximum, IsEmpty,
+			AssignEmpty, Union, Include;
+FROM rSystem	IMPORT tFile, rRead, rWrite;
+FROM IO		IMPORT StdInput, StdOutput, StdError, WriteS, WriteC, WriteI,
+			WriteN, ReadI, ReadNl, EndOfLine, WriteOpen, WriteClose,
+			WriteCard;
+FROM Layout	IMPORT WriteSpace;
+FROM Dfa	IMPORT DStateCount, DStateRange, GetFirst, GetLast, FirstCh,
+			LastCh, DNoState, GetDefault, GetTableNoDef, GetEobTrans;
+FROM GenTabs	IMPORT PatternTablePtr, PatternCount, LeafCount;
+FROM Classes	IMPORT tCharClass, ClassCount, ClassMemPtr, ToClass, ToChar,
+			LastClass, ToClassCount, ToClassRange, ToClassArraySize;
+FROM ScanGen	IMPORT Language, tLanguage, ScannerName, WriteNl, z,
+			SmallTables, prefix;
+FROM Pack	IMPORT PackHandle, BeginPackCard, PackCard, EndPack;
+FROM Tree	IMPORT CharCode;
+FROM UniCode	IMPORT UCHAR, WriteChar;
+
+IMPORT Errors, Position, Sets;
+
+CONST PartSize = 8000;
+
+VAR Tables	: tFile;
+VAR ElmtSize	: TableElmt;
+
+PROCEDURE PutComb	(File: tFile);
+VAR
+  i	: TableRange;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    BeginPackCard (p, File);
+    FOR i := 0 TO TableSize DO
+      PackCard (p, ControlPtr^[i].Check);
+      PackCard (p, ControlPtr^[i].Next);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 0 TO TableSize DO
+      WriteC (File, '{');
+      WriteI (File, ControlPtr^[i].Check, 4); WriteS (File, ', ');
+      WriteI (File, ControlPtr^[i].Next , 4); WriteS (File, '}, ');
+      INC (c); IF c = 5 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 0 TO TableSize DO
+      WriteC (File, '(');
+      WriteI (File, ControlPtr^[i].Check, 4); WriteS (File, ', ');
+      WriteI (File, ControlPtr^[i].Next , 4); WriteC (File, ')');
+      IF i # TableSize THEN WriteS (File, ', '); END;
+      INC (c); IF c = 5 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int yyCombCheck [] = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := 0 TO TableSize DO
+	WriteI (File, ControlPtr^[i].Check, 5); WriteS (File, ', ');
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File); WriteNl (File);
+      WriteS (File, "    private static final int yyCombNext [] = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := 0 TO TableSize DO
+	WriteI (File, ControlPtr^[i].Next, 5); WriteS(File, ', ');
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF TableSize >= PartSize THEN
+      WriteS (File, "    private static int yyCombCheck [] = new int [");
+      WriteI (File, TableSize + 1, 0); WriteS (File, "];"); WriteNl (File);
+      WriteS (File, "    private static int yyCombNext  [] = new int [");
+      WriteI (File, TableSize + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int yyCombCheck [] = ");
+      WriteIdent (File, prefix); WriteS (File, "_CombCheck1.yy;");
+      WriteNl (File);
+      WriteS (File, "    private static int yyCombNext  [] = ");
+      WriteIdent (File, prefix); WriteS (File, "_CombNext1.yy;");
+      WriteNl (File);
+    END;
+  END;
+END PutComb;
+
+PROCEDURE PutBase	(File: tFile);
+VAR
+  i	: CARDINAL;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, BasePtr^[i]);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteS (File, '& yyComb ['); WriteI (File, BasePtr^[i], 4); WriteS (File, '], ');
+      INC (c); IF c = 4 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, BasePtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int yyBasePtr [] = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO DStateCount DO
+	WriteI (File, BasePtr^[i], 5); WriteS (File, ', ');
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF DStateCount >= PartSize THEN
+      WriteS (File, "    private static int yyBasePtr [] = new int [");
+      WriteI (File, DStateCount + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int yyBasePtr [] = ");
+      WriteIdent (File, prefix); WriteS (File, "_BasePtr1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutBase;
+
+PROCEDURE PutDefault	(File: tFile);
+VAR
+  i	: CARDINAL;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, DefaultPtr^[i]);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, DefaultPtr^[i], 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, DefaultPtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int yyDefault [] = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO DStateCount DO
+	WriteI (File, DefaultPtr^[i], 5); WriteS (File, ', ');
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF DStateCount >= PartSize THEN
+      WriteS (File, "    private static int yyDefault [] = new int [");
+      WriteI (File, DStateCount + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int yyDefault [] = ");
+      WriteIdent (File, prefix); WriteS (File, "_Default1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutDefault;
+
+PROCEDURE PutEobTrans	(File: tFile);
+VAR
+  i	: CARDINAL;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, EobTransPtr^[i]);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, EobTransPtr^[i], 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, EobTransPtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int yyEobTrans [] = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO DStateCount DO
+	WriteI (File, EobTransPtr^[i], 5); WriteS (File, ', ');
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF DStateCount >= PartSize THEN
+      WriteS (File, "    private static int yyEobTrans [] = new int [");
+      WriteI (File, DStateCount + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int yyEobTrans [] = ");
+      WriteIdent (File, prefix); WriteS (File, "_EobTrans1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutEobTrans;
+
+PROCEDURE PutAction	(File: tFile);
+VAR
+  i	: CARDINAL;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, ActionPtr^[i]);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, ActionPtr^[i], 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, ActionPtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int yyAction [] = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO DStateCount DO
+	WriteI (File, ActionPtr^[i], 5); WriteS (File, ', ');
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF DStateCount >= PartSize THEN
+      WriteS (File, "    private static int yyAction [] = new int [");
+      WriteI (File, DStateCount + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int yyAction [] = ");
+      WriteIdent (File, prefix); WriteS (File, "_Action1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutAction;
+
+PROCEDURE PutToClassUpb (File: tFile);
+VAR
+  i	: CARDINAL;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    (*
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, ActionPtr^[i]);
+    END;
+    EndPack (p);
+    *)
+  | C, Cpp, Java:
+    c := 0;
+    FOR i := 0 TO CARDINAL (ToClassCount) DO
+      IF ToClassRange^[i].Upb < 2147483648 THEN
+        WriteCard (File, ToClassRange^[i].Upb, 5);
+      ELSE
+        WriteS (File, '0X');
+        WriteN (File, ToClassRange^[i].Upb, 8, 16);
+      END;
+      WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+  (*
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, ActionPtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  *)
+  END;
+END PutToClassUpb;
+
+PROCEDURE PutToClassClass (File: tFile);
+VAR
+  i	: INTEGER;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    (*
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, ActionPtr^[i]);
+    END;
+    EndPack (p);
+    *)
+  | C, Cpp, Java:
+    c := 0;
+    FOR i := 0 TO ToClassCount DO
+      WriteI (File, ToClassRange^[i].Class, 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+  (*
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, ActionPtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  *)
+  END;
+END PutToClassClass;
+
+PROCEDURE PutToClassArray (File: tFile);
+VAR
+  i	: CARDINAL;
+  p	: PackHandle;
+  c	: CARDINAL;
+BEGIN
+  CASE Language OF
+  | Modula:
+    (*
+    BeginPackCard (p, File);
+    FOR i := 1 TO DStateCount DO
+      PackCard (p, ActionPtr^[i]);
+    END;
+    EndPack (p);
+    *)
+  | C, Cpp, Java:
+    c := 0;
+    FOR i := 0 TO MinCard (LastCh, ToClassArraySize - 1) DO
+      WriteI (File, ToClass (i), 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+  (*
+    c := 0;
+    FOR i := 1 TO DStateCount DO
+      WriteI (File, ActionPtr^[i], 5);
+      IF i # DStateCount THEN WriteS (File, ', '); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  *)
+  END;
+END PutToClassArray;
+
+PROCEDURE PutTableParts (File: tFile; ReduceCaseSize: BOOLEAN);
+VAR
+  i, j	: TableRange;
+  part	: CARDINAL;
+  c	: CARDINAL;
+BEGIN
+  IF SmallTables THEN RETURN; END;
+
+  part := 1; i := 0;
+  WHILE i <= TableSize DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_CombCheck"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int yy [] = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= TableSize) DO
+      WriteI (File, ControlPtr^[i].Check, 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= TableSize DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_CombNext"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int yy [] = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= TableSize) DO
+      WriteI (File, ControlPtr^[i].Next, 5); WriteS (File, ', ');
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= DStateCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_BasePtr"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= DStateCount) DO
+      WriteI (File, BasePtr^[i], 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= DStateCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_Default"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= DStateCount) DO
+      WriteI (File, DefaultPtr^[i], 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= DStateCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_EobTrans"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= DStateCount) DO
+      WriteI (File, EobTransPtr^[i], 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  IF ReduceCaseSize THEN
+    part := 1; i := 0;
+    WHILE i <= DStateCount DO
+      WriteS (File, "class "); WriteIdent (File, prefix);
+      WriteS (File, "_Action"); WriteI (File, part, 0);
+      WriteS (File, " {"); WriteNl (File);
+      WriteS (File, "  static final int [] yy = {");
+      IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+      WriteNl (File);
+      c := 0; j := 1;
+      WHILE (j <= PartSize) AND (i <= DStateCount) DO
+	WriteI (File, ActionPtr^[i], 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	INC (i); INC (j);
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "  };"); WriteNl (File);
+      WriteS (File, "};"); WriteNl (File); WriteNl (File);
+      INC (part);
+    END;
+  END;
+END PutTableParts;
+
+PROCEDURE CopyTableParts (File: tFile; ReduceCaseSize: BOOLEAN);
+VAR
+  i	: TableRange;
+  part	: CARDINAL;
+BEGIN
+  IF SmallTables THEN RETURN; END;
+
+  IF TableSize >= PartSize THEN
+    part := 1; i := 0;
+    WHILE i <= TableSize DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_CombCheck");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyCombCheck, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (TableSize + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    part := 1; i := 0;
+    WHILE i <= TableSize DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_CombNext");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyCombNext, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (TableSize + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+  END;
+
+  IF DStateCount >= PartSize THEN
+    part := 1; i := 0;
+    WHILE i <= DStateCount DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_BasePtr");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyBasePtr, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (DStateCount + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    part := 1; i := 0;
+    WHILE i <= DStateCount DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_Default");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyDefault, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (DStateCount + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    part := 1; i := 0;
+    WHILE i <= DStateCount DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_EobTrans");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyEobTrans, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (DStateCount + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    IF ReduceCaseSize THEN
+      part := 1; i := 0;
+      WHILE i <= DStateCount DO
+	WriteS (File, "        System.arraycopy (");
+	WriteIdent (File, prefix); WriteS (File, "_Action");
+	WriteI (File, part, 0); WriteS (File, ".yy, 0, yyAction, ");
+	WriteI (File, i, 0); WriteS (File, ", ");
+	WriteI (File, Min (DStateCount + 1 - i, PartSize), 0);
+	WriteS (File, ");"); WriteNl (File);
+	INC (i, PartSize);
+	INC (part);
+      END;
+    END;
+  END;
+END CopyTableParts;
+
+PROCEDURE PutEiffelTables (ReduceCaseSize: BOOLEAN);
+
+   PROCEDURE PutCheck (File: tFile);
+      VAR i	: TableRange;
+      BEGIN
+	 WriteI (File, TableSize + 1, 0);
+	 WriteS (File, ' = Check');
+	 WriteNl (File);
+	 FOR i := 0 TO TableSize DO
+	    WriteI (File, ControlPtr^[i].Check, 0); WriteNl (File);
+	 END;
+      END PutCheck;
+
+   PROCEDURE PutNext (File: tFile);
+      VAR i	: TableRange;
+      BEGIN
+	 WriteI (File, TableSize + 1, 0);
+	 WriteS (File, ' = Next');
+	 WriteNl (File);
+	 FOR i := 0 TO TableSize DO
+	    WriteI (File, ControlPtr^[i].Next, 0); WriteNl (File);
+	 END;
+      END PutNext;
+
+   PROCEDURE PutBase (File: tFile);
+      VAR i	: CARDINAL;
+      BEGIN
+	 WriteI (File, DStateCount + 1, 0);
+	 WriteS (File, ' = Base');
+	 WriteNl (File);
+	 FOR i := 0 TO DStateCount DO
+	    WriteI (File, BasePtr^[i], 0); WriteNl (File);
+	 END;
+      END PutBase;
+
+   PROCEDURE PutDefault (File: tFile);
+      VAR i	: CARDINAL;
+      BEGIN
+	 WriteI (File, DStateCount + 1, 0);
+	 WriteS (File, ' = Default');
+	 WriteNl (File);
+	 FOR i := 0 TO DStateCount DO
+	    WriteI (File, DefaultPtr^[i], 0); WriteNl (File);
+	 END;
+      END PutDefault;
+
+   PROCEDURE PutEobTrans (File: tFile);
+      VAR i	: CARDINAL;
+      BEGIN
+	 WriteI (File, DStateCount + 1, 0);
+	 WriteS (File, ' = EobTrans');
+	 WriteNl (File);
+	 FOR i := 0 TO DStateCount DO
+	    WriteI (File, EobTransPtr^[i], 0); WriteNl (File);
+	 END;
+      END PutEobTrans;
+
+   PROCEDURE PutAction (File: tFile);
+      VAR i	: CARDINAL;
+      BEGIN
+	 WriteI (File, DStateCount + 1, 0);
+	 WriteS (File, ' = Action');
+	 WriteNl (File);
+	 FOR i := 0 TO DStateCount DO
+	    WriteI (File, ActionPtr^[i], 0); WriteNl (File);
+	 END;
+      END PutAction;
+
+   VAR
+      FileNameS	,
+      PathS	: tString;
+      PathA	: ARRAY [0..127] OF CHAR;
+
+   BEGIN
+      IF ScannerName = NoIdent THEN
+	 ArrayToString ("scanner", PathS);
+      ELSE
+	 GetString (ScannerName, PathS);
+      END;
+      ArrayToString	(".txt", FileNameS);
+      Concatenate	(PathS, FileNameS);
+      Append		(PathS, 0C);
+      StringToArray	(PathS, PathA);
+      Tables := WriteOpen (PathA);
+   (* ErrorCheck	("PutEiffelTables.OpenOutput", Tables); *)
+      IF Tables < 0 THEN
+	 Errors.MessageI ("can not access file", Errors.Fatal, Position.NoPosition,
+	    Errors.Array, ADR (PathA));
+      END;
+      PutBase		(Tables);
+      PutDefault	(Tables);
+      PutEobTrans	(Tables);
+      IF ReduceCaseSize THEN
+	 PutAction	(Tables);
+      END;
+      PutCheck		(Tables);
+      PutNext		(Tables);
+      WriteClose	(Tables);
+   END PutEiffelTables;
+
+PROCEDURE MakeTables	(ReduceCaseSize: BOOLEAN);
+   VAR
+      State	: DStateRange;
+      cState	: CARDINAL;
+      Pattern	: SHORTCARD;
+   BEGIN
+      DefaultSize := DStateCount + 1;
+      MakeArray (DefaultPtr , DefaultSize, TSIZE (StateRange));
+      MakeArray (EobTransPtr, DefaultSize, TSIZE (StateRange));
+      DefaultPtr ^[DNoState] := DNoState;
+      EobTransPtr^[DNoState] := DNoState;
+      FOR State := 1 TO DStateCount DO
+	 DefaultPtr ^[State] := GetDefault  (State);
+	 EobTransPtr^[State] := GetEobTrans (State);
+      END;
+      IF ReduceCaseSize THEN
+	 MakeArray (ActionPtr, DefaultSize, TSIZE (TableElmt));
+	 ActionPtr^[DNoState] := DNoState;
+	 FOR State := 1 TO DStateCount DO
+	    ActionPtr^[State] := PatternCount + 1;
+	 END;
+	 FOR Pattern := 1 TO PatternCount DO
+	    FOR cState := Sets.Minimum (PatternTablePtr^[Pattern].Finals) TO
+			  Sets.Maximum (PatternTablePtr^[Pattern].Finals) DO
+	       IF Sets.IsElement (cState, PatternTablePtr^[Pattern].Finals) THEN
+		  ActionPtr^[cState] := Pattern;
+	       END;
+	    END;
+	 END;
+      END;
+   END MakeTables;
+
+PROCEDURE CompressTables (Optimize: SHORTINT);
+   TYPE
+      tGroup		= RECORD First, Last: tCharClass; END;
+      tDiff		= tCharClass;
+      tDiffsInfoPtr	= POINTER TO tDiffsInfo;
+      tDiffsInfo	= RECORD
+			     DiffsPtr	: POINTER TO ARRAY [1..100000] OF tDiff;
+			     DiffsSize	: LONGINT	;
+			     Base	: TableRange	;
+			     Collision	: tDiffsInfoPtr	;
+			  END;
+   VAR
+      base		: TableRange;
+      lbase		: LONGINT;
+      State		: DStateRange;
+      Success		: BOOLEAN;
+      Ch, LastElmt	: UCHAR;
+      StartCh, StopCh	: tCharClass;
+      OldControlSize	: LONGINT;
+      i, j		: INTEGER;
+      Hash		: CARDINAL;
+      GroupPtr		: POINTER TO ARRAY [0 .. 100000] OF tGroup;
+      GroupSize		: LONGINT;
+      GroupCount	: INTEGER;
+      lDiffsPtr		: POINTER TO ARRAY [0 .. 100000] OF tDiff;
+      lDiffsSize	: LONGINT;
+      HashTablePtr	: POINTER TO ARRAY [0 .. 100000] OF tDiffsInfoPtr;
+      HashTableSize	: LONGINT;
+      Current		: tDiffsInfoPtr;
+      Domain		: tSet;
+      LastIndex		: LONGINT;
+   BEGIN
+      BaseSize := DStateCount + 1;
+      MakeArray (BasePtr, BaseSize, TSIZE (TableRange));
+      FOR State := 0 TO DStateCount DO
+	 BasePtr^[State] := 0;
+      END;
+
+      IF z THEN
+	 LastIndex := LastClass;
+      ELSE
+	 LastIndex := LastCh;
+      END;
+      IF Optimize = 0 THEN
+	 ControlSize := LeafCount * 60;
+      ELSIF Optimize >= 10000 THEN
+	 ControlSize := DStateCount * 5;
+      ELSE
+	 ControlSize := LeafCount * 12;
+      END;
+      ControlSize := Max (ControlSize, LastIndex + 1);
+      MakeArray (ControlPtr, ControlSize, TSIZE (ControlType));
+      FOR i := 0 TO ControlSize - 1 DO
+	 ControlPtr^[i].Check := DNoState;
+	 ControlPtr^[i].Next  := DNoState;
+      END;
+
+      GroupSize := 128;
+      MakeArray (GroupPtr, GroupSize, TSIZE (tGroup));
+      lDiffsSize := GroupSize * 2;
+      MakeArray (lDiffsPtr, lDiffsSize, TSIZE (tDiff));
+      HashTableSize := DStateCount;
+      MakeArray (HashTablePtr, HashTableSize, TSIZE (tDiffsInfoPtr));
+      FOR i := 0 TO HashTableSize - 1 DO
+	 HashTablePtr^[i] := NIL;
+      END;
+
+      MakeSet (Domain);
+      TableSize    := 0;
+      TableEntries := 0;
+
+      FOR State := 1 TO DStateCount DO
+
+	 (* SPEC Success := EXISTS base : FORALL Ch IN CHAR :
+			      (Table [State, Ch] # DNoState) AND
+			      (Check [base + Ch] # DNoState)     *)
+
+	 (* turn the row Table [State, ...] into a list of ranges (groups) *)
+
+	 AssignEmpty (Domain);
+	 Ch	    := GetFirst (State);
+	 LastElmt   := GetLast  (State);
+
+	 IF Ch <= LastElmt THEN
+	    LOOP
+	       IF GetTableNoDef (State, Ch) # DNoState THEN
+		  IF z THEN		(* use classes instead of characters *)
+		     Include (Domain, Ch);
+		  ELSE			(* map classes to characters *)
+		     IF INTEGER (Ch) <= ClassCount THEN
+			Union (Domain, ClassMemPtr^[Ch]);
+		     ELSE
+			Include (Domain, ToChar (Ch));
+		     END;
+		  END;
+	       END;
+	       IF Ch = LastElmt THEN EXIT; END;
+	       INC (Ch);
+	    END;
+	 END;
+
+	 GroupCount := 0;
+	 IF NOT IsEmpty (Domain) THEN
+	    Ch		:= Minimum (Domain);
+	    Ch		:= MinCard (Ch, LastCh);
+	    LastElmt	:= Maximum (Domain);
+	    LastElmt	:= MinCard (LastElmt, LastCh);
+
+	    IF Ch <= LastElmt THEN		(* arrange into groups *)
+	       LOOP
+		  LOOP
+		     IF Ch = LastElmt THEN EXIT; END;
+		     IF NOT IsElement (Ch, Domain) THEN INC (Ch); ELSE EXIT; END;
+		  END;
+
+		  IF IsElement (Ch, Domain) THEN
+		     INC (GroupCount);
+		     IF GroupCount >= GroupSize THEN
+			ExtendArray (GroupPtr, GroupSize, TSIZE (tGroup));
+			ExtendArray (lDiffsPtr, lDiffsSize, TSIZE (tDiff));
+		     END;
+		     GroupPtr^[GroupCount].First := Ch;
+		     LOOP
+			IF Ch = LastElmt THEN EXIT; END;
+			IF IsElement (Ch, Domain) THEN INC (Ch); ELSE EXIT; END;
+		     END;
+		     IF IsElement (Ch, Domain) THEN
+			GroupPtr^[GroupCount].Last := Ch;
+		     ELSE
+			GroupPtr^[GroupCount].Last := Ch - 1;
+		     END;
+		  END;
+		  IF Ch = LastElmt THEN EXIT; END;
+	       END;
+	    END;
+	 END;
+
+	 base := 0;
+	 IF GroupCount > 0 THEN			(* search for a usable base *)
+
+						(* compute distances of ranges *)
+	    lDiffsPtr^[2] := GroupPtr^[1].Last - GroupPtr^[1].First;
+	    Hash := lDiffsPtr^[2];
+	    FOR j := 2 TO GroupCount DO
+	       lDiffsPtr^[j + j - 1] := GroupPtr^[j].First - GroupPtr^[j-1].Last;
+	       lDiffsPtr^[j + j    ] := GroupPtr^[j].Last - GroupPtr^[j].First;
+	       INC (Hash, (lDiffsPtr^[j + j - 1] + lDiffsPtr^[j + j]) * tDiff (j));
+	    END;
+	    Hash := Hash MOD DStateCount;	(* hash distances *)
+
+	    Success := FALSE;			(* lookup format of row *)
+	    Current := HashTablePtr^[Hash];
+	    LOOP
+	       IF Current = NIL THEN EXIT; END;
+	       IF Current^.DiffsSize = GroupCount * 2 THEN
+		  Success := TRUE;
+		  j := 1;
+		  LOOP
+		     INC (j);
+		     IF Current^.DiffsPtr^[j] # lDiffsPtr^[j] THEN
+		        Success := FALSE;
+		        EXIT;
+		     END;
+		     IF j = Current^.DiffsSize THEN EXIT; END;
+		  END;
+		  IF Success THEN EXIT; END;
+	       END;
+	       Current := Current^.Collision;
+	    END;
+
+	    IF Success THEN			(* if found: start searching from previous base *)
+	       IF z THEN
+		  IF Current^.Base + Current^.DiffsPtr^[2] < GroupPtr^ [1].First THEN
+		     base := 0;
+		  ELSE
+		     base := Current^.Base - GroupPtr^ [1].First + Current^.DiffsPtr^[2] + 1;
+		  END;
+	       ELSE
+		  IF Current^.Base + Current^.DiffsPtr^[2] < ORD (CharCode [CHR (GroupPtr^ [1].First)]) THEN
+		     base := 0;
+		  ELSE
+		     base := Current^.Base - ORD (CharCode [CHR (GroupPtr^ [1].First)]) + Current^.DiffsPtr^[2] + 1;
+		  END;
+	       END;
+	    ELSE				(* if not: enter and start from zero *)
+	       Current := Alloc (TSIZE (tDiffsInfo));
+	       WITH Current^ DO
+		  Base := 0;
+		  Collision := HashTablePtr^[Hash];
+		  DiffsSize := GroupCount * 2;
+		  MakeArray (DiffsPtr, DiffsSize, TSIZE (tDiff));
+		  FOR j := 1 TO DiffsSize DO DiffsPtr^[j] := lDiffsPtr^[j]; END;
+	       END;
+	       HashTablePtr^[Hash] := Current;
+	    END;
+
+	    LOOP				(* search for a usable base *)
+	       lbase := base;
+	       IF lbase >= ControlSize - LastIndex THEN
+		  OldControlSize := ControlSize;
+		  ExtendArray (ControlPtr, ControlSize, TSIZE (ControlType));
+		  FOR i := OldControlSize TO ControlSize - 1 DO
+		     ControlPtr^[i].Check := DNoState;
+		     ControlPtr^[i].Next  := DNoState;
+		  END;
+	       END;
+
+	       Success := TRUE;
+	       j := 0;				(* FORALL j IN groups *)
+	       LOOP
+		  INC (j);
+		  StartCh := GroupPtr^[j].First;
+		  StopCh := GroupPtr^[j].Last;
+		  Ch := StartCh;	      (* FORALL Ch FROM First TO Last *)
+		  LOOP
+		     IF z THEN
+			IF (ControlPtr^[base + Ch].Check # DNoState) THEN
+			   REPEAT INC (base); UNTIL
+			    ControlPtr^[base + Ch].Check = DNoState;
+			   Success := FALSE; EXIT;
+			END;
+		     ELSE
+			IF (ControlPtr^[base + ORD (CharCode [CHR (Ch)])].Check # DNoState) THEN
+			   REPEAT INC (base); UNTIL
+			    ControlPtr^[base + ORD (CharCode [CHR (Ch)])].Check = DNoState;
+			   Success := FALSE; EXIT;
+			END;
+		     END;
+		     IF Ch = StopCh THEN EXIT; END;
+		     INC (Ch);
+		  END;
+		  IF NOT Success OR (j = GroupCount) THEN EXIT; END;
+	       END;
+	       IF Success THEN EXIT; END;
+	       (* INC (base); *)
+	    END;
+
+	    j := 0;				(* enter row into comb *)
+	    LOOP
+	       INC (j);
+	       Ch := GroupPtr^[j].First;
+	       StopCh := GroupPtr^[j].Last;
+	       LOOP
+		  IF z THEN
+		     WITH ControlPtr^[base + Ch] DO
+			Check := State;
+			Next  := GetTableNoDef (State, Ch);
+		     END;
+		  ELSE
+		     WITH ControlPtr^[base + ORD (CharCode [CHR (Ch)])] DO
+			Check := State;
+			Next  := GetTableNoDef (State, ToClass (Ch));
+		     END;
+		  END;
+		  INC (TableEntries);
+		  IF Ch = StopCh THEN EXIT; END;
+		  INC (Ch);
+	       END;
+	       IF j = GroupCount THEN EXIT; END;
+	    END;
+						(* record base of this row *)
+	    IF z THEN
+	       Current^.Base := base + GroupPtr^ [1].First;
+	    ELSE
+	       Current^.Base := base + ORD (CharCode [CHR (GroupPtr^ [1].First)]);
+	    END;
+	 END;
+	 BasePtr^[State] := base;
+	 TableSize := Max (TableSize, base);
+      END;
+      INC (TableSize, LastIndex);
+      ReleaseArray (GroupPtr, GroupSize, TSIZE (tGroup));
+      ReleaseArray (lDiffsPtr, lDiffsSize, TSIZE (tDiff));
+      ReleaseArray (HashTablePtr, HashTableSize, TSIZE (tDiffsInfoPtr));
+   END CompressTables;
+
+PROCEDURE WriteTables;
+   VAR State	: DStateRange;
+   BEGIN
+      WriteS (StdOutput, "Tables :");
+      WriteNl (StdOutput);
+      WriteNl (StdOutput);
+      FOR State := 1 TO DStateCount DO
+	 WriteState (State);
+	 WriteNl (StdOutput);
+      END;
+   END WriteTables;
+
+PROCEDURE QueryTables;
+   VAR State	: DStateRange;
+   BEGIN
+      LOOP
+	 WriteS (StdOutput, "State ? ");
+	 IF EndOfLine (StdInput) THEN ReadNl (StdInput); END;
+	 State := ReadI (StdInput);
+         IF State = 0 THEN EXIT; END;
+	 WriteState (State);
+      END;
+   END QueryTables;
+
+PROCEDURE WriteState (State: DStateRange);
+   VAR
+      NextState		: TableElmt;
+      Ch, LastIndex	: tCharClass;
+      ControlRecord	: ControlType;
+      Count		: INTEGER;
+   BEGIN
+      Count := 0;
+      WriteS (StdOutput, "State, Default =");
+      WriteI (StdOutput, State, 5);
+      WriteI (StdOutput, DefaultPtr^[State], 5);
+      WriteNl (StdOutput);
+      IF z THEN
+	 LastIndex := LastClass;
+      ELSE
+	 LastIndex := LastCh;
+      END;
+      FOR Ch := FirstCh TO LastIndex DO
+
+	 NextState := State;
+	 LOOP
+	    ControlRecord := ControlPtr^[BasePtr^[NextState] + Ch];
+	    IF ControlRecord.Check = NextState THEN
+	       NextState := ControlRecord.Next;
+	       EXIT;
+	    END;
+	    NextState := DefaultPtr^[NextState];
+	    NextState := DNoState;
+	    IF NextState = DNoState THEN EXIT; END;
+	 END;
+
+	 IF NextState # DNoState THEN
+	    IF Count = 10 THEN
+	       WriteNl (StdOutput);
+	       Count := 0;
+	    END;
+	    INC (Count);
+	    WriteChar (StdOutput, Ch);
+	    WriteSpace (StdOutput);
+	    WriteI (StdOutput, NextState, 1);
+	    WriteC (StdOutput, ',');
+	    WriteSpace (StdOutput);
+	 END;
+      END;
+      WriteNl (StdOutput);
+   END WriteState;
+
+BEGIN
+   ElmtSize := TSIZE (TableElmt);
+END ScanTabs.

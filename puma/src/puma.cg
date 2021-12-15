@@ -1,0 +1,266 @@
+/* $Id: puma.cg,v 1.16 2008/09/12 13:29:38 grosch rel $ */
+
+/*
+ * $Log: puma.cg,v $
+ * Revision 1.16  2008/09/12 13:29:38  grosch
+ * added new kinds of FOR loops for iteration over lists of tree nodes
+ * extended pattern matching in IF statements by optional conditions
+ *
+ * Revision 1.15  2004/01/05 16:40:33  grosch
+ * allow statements after RETURN statement
+ * added new statement for IMPORT of external routine declarations
+ * allow pattern matching in IF statements
+ * a FOR loop can declare its loop variable
+ * added new scopes and changed scoping rules:
+ *    THEN and ELSE parts of the IF statement and the FOR and WHILE loops
+ *
+ * Revision 1.14  2002/08/07 12:19:15  grosch
+ * added explicit initialization of attributes
+ * improved handling of files cg.cg and puma.cg
+ *
+ * Revision 1.13  2002/07/30 09:52:32  grosch
+ * added support for automatic prefixing of node types for C and C++
+ *
+ * Revision 1.12  2002/04/18 13:33:45  grosch
+ * renamed attribute Routine.IsExtern to Routine.IsPublic
+ *
+ * Revision 1.11  2002/01/10 14:21:29  grosch
+ * omit code for yyAbort (option -f) for TRIPs
+ *
+ * Revision 1.10  2001/12/17 12:05:56  grosch
+ * added GLOBAL and LOCAL declarations for variables with node types
+ * added WHILE loop
+ * added EXTERN attribute to routine declarations
+ * added TRIP as new kind of routine providing automatic tree traversal
+ *
+ * Revision 1.9  2001/09/20 14:28:38  grosch
+ * made ast definition suitable for graphic tree browser
+ * by turning children into tree-valued attributes
+ *
+ * Revision 1.8  2001/08/28 21:02:54  grosch
+ * added option and call for DrawTree
+ *
+ * Revision 1.7  2001/08/01 14:43:52  grosch
+ * delivery of Trevor Nash for generation of Java
+ *
+ * Revision 1.6  2001/02/10 10:16:37  grosch
+ * added type cast to ADR (Action) for AIX
+ * made definition of node type Module identical to cg
+ *
+ * Revision 1.5  2001/01/05 18:39:51  grosch
+ * fixed bug: node types Child and Attribute must be identical
+ *
+ * Revision 1.4  1999/06/03 08:23:36  grosch
+ * add source window
+ *
+ * Revision 1.3  1998/04/21 10:07:53  grosch
+ * truncation of file and module names to 8.3 format
+ * added many language extensions
+ *
+ * Revision 1.2  1994/07/13  09:01:52  grosch
+ * transfer changes from cg.cg
+ *
+ * Revision 1.1  1993/08/20  17:49:35  grosch
+ * removed unused variables
+ *
+ * Revision 1.0  1993/08/18  13:24:11  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 21.3.1989 */
+
+MODULE PumaIn
+
+PROPERTY INPUT
+
+RULE
+
+Spec		= [TrafoName: tIdent] TreeNames Public: Names Imports
+		  Extern: Names Codes Declarations Routines .
+
+TreeNames	= <
+   NoTreeName	= .
+   TreeName	= [Name: tIdent] [Package: tIdent] [Pos: tPosition]
+		  Next: TreeNames REV .
+>.
+Imports		= <
+   NoImport	= .
+   Import	= Next: Imports REV [Name: tIdent] [Pos: tPosition] .
+> .
+Routines	= <
+   NoRoutine	= .
+   Routine	= Next: Routines REV [Name: tIdent] [Pos: tPosition]
+		  InParams: Declarations OutParams: Declarations Extern: Names
+		  [Local: tText] [LocalLine: tPosition] Declarations
+		  Rules [IsPublic: BOOLEAN] <
+      Procedure	= .
+      Function	= ReturnParams: Declarations .
+      Predicate	= .
+      Trip	= .
+   >.
+>.
+Declarations	= <
+   NoDeclaration= .
+   Declaration	= Next: Declarations REV [Name: tIdent] [Pos: tPosition] Type <
+      ParamDecl	= [IsRef: BOOLEAN] .
+      VarDecl	= .
+      InitDecl	= Expr .
+   >.
+>.
+Type		= [Name: tIdent] [Pos: tPosition] Names .
+
+Rules		= <
+   NoRule	= .
+   Rule		= [Line: tPosition] Patterns Exprs Expr Statements
+		  Next: Rules REV .
+>.
+Patterns	= <
+   NoPattern	= [Pos: tPosition] .
+   OnePattern	= Pattern Next: Patterns REV .
+>.
+PatternsList		= <
+   NoPatternsList	= .
+   OnePatternsList	= Patterns Next: PatternsList REV .
+>.
+Pattern		= [Pos: tPosition] <
+   Decompose	= [Selector: tIdent] Expr Patterns [Widen: BOOLEAN] .
+   VarDef	= [Name: tIdent] .
+   NilTest	= [Selector: tIdent] .
+   DontCare1	= .
+   DontCare	= .
+   Value	= Expr .
+>.
+Exprs		= <
+   NoExpr	= [Pos: tPosition] .
+   OneExpr	= Expr Next: Exprs REV <
+      NamedExpr	= [Name: tIdent] .
+   >.
+>.
+Expr		= [Pos: tPosition] <
+   NoExpression	= .
+   Compose	= [Selector: tIdent] Expr Exprs [Widen: BOOLEAN] .
+   VarUse	= [Name: tIdent] .
+   AttrDesc	= [Name: tIdent] [Attribute: tIdent] .
+   Nil		= [Selector: tIdent] .
+   Call		= Expr Exprs Patterns .
+   Binary	= Lop: Expr [Operator: tIdent] Rop: Expr .
+   PreOperator	= [Operator: tIdent] Expr .
+   PostOperator	= [Operator: tIdent] Expr .
+   Index	= Expr Exprs .
+   Parents	= Expr .
+   TargetExpr	= Expr: Designators .
+   StringExpr	= [String: tStringRef] .
+   Guard	= Expr .
+>.
+Statements	= <
+   NoStatement	= .
+   Statement	= [Pos: tPosition] Next: Statements REV <
+      ProcCall	= Call: Expr .
+      Condition	= Expr .
+      Assignment= Adr: Expr Expr [Operator: tIdent] .
+      MatchStmt	= Exprs Patterns .
+      IfMatch	= Expr Exprs Patterns Then: Statements Else: Statements .
+      If	= Expr Then: Statements Else: Statements .
+      For	= Init: Statements Expr Step: Statements Statements .
+      ForEach	= Var: Statements Expr Statements .
+      Return	= Expr .
+      Reject	= .
+      Fail	= .
+      DeclStmt	= Declarations .
+      TargetStmt= Stmt: Designators .
+      Nl	= .
+      WriteStr	= [String: tStringRef] .
+   >.
+>.
+Objects		= <
+   NoObject	= .
+   Object	= Next: Objects REV [Name: tIdent] TypeDesc Path AttrOrChild .
+   DummyObject	= Next: Objects REV .
+>.
+TypeDesc	= <
+   NodeTypes	= TreeName [Types: tSet] [BaseTypes: tSet] .
+   UserType	= [Type: tIdent] [CppType: tIdent] .
+   TargetType	= Type: Designators .
+>.
+Path		= <
+   Var		= [Name: tIdent] [IsOutput: BOOLEAN] [IsRegister: BOOLEAN] .
+   ConsType	= Next: Path [Name: tIdent] Class .
+   Field	= Next: Path [Name: tIdent] Object .
+>.
+Tests		= <
+   NoTest	= .
+   OneTest	= Next: Tests REV Path <
+      TestKind	= TypeDesc: NodeTypes [Name: tIdent] .
+      TestIsType= TypeDesc: NodeTypes [Name: tIdent] .
+      TestNil	= .
+      TestNonlin= Path2: Path TypeDesc .
+      TestValue	= Expr TypeDesc .
+   >.
+>.
+Decisions	= <
+   NoDecision	= .
+   Decision	= Then: Decisions Else: Decisions REV OneTest
+		  [Cases: SHORTCARD] [IsUnchanged: BOOLEAN] .
+   Decided	= Else: Decisions Rule .
+>.
+MatchConds	= <
+   NoMatchCond	= .
+   MatchCond	= Next: MatchConds REV Expr Pattern: Expr .
+>.
+
+END PumaIn
+
+MODULE Puma
+
+TREE EXPORT {
+
+CONST
+   HasTempos		= 1;
+   HasPatterns		= 2;
+   HasExit		= 3;
+   HasAssign		= 4;
+   HasTargetCode	= 5;
+   HasRejectOrFail	= 6;
+   HasTailRecursion	= 7;
+   HasTailRecursionStmt	= 8;
+
+TYPE tIndexToClass	= POINTER TO ARRAY [0..1000000] OF tClasses;
+
+VAR iEqual, DefaultAssignOp	: tIdent;
+}
+
+DECLARE
+
+TreeName	= [Classes: Classes] [ClassCount: LONGINT] [tName: tIdent]
+		  [Prefix: tIdent] [IndexToClass: tIndexToClass] .
+
+Name Compose Decompose VarDef VarUse AttrDesc Call Assignment Designator
+		= [Object: Class] .
+Pattern Compose	= [Tempo: tIdent] [TypeDesc: TypeDesc] .
+TargetExpr TargetStmt
+		= [UsedNames: tSet] .
+
+Class		= [Objects: Objects] [TypeDesc: NodeTypes] [Index: SHORTCARD] .
+Routine		= [InObjects: Objects] [OutObjects: Objects] [ParamDecls: Objects]
+		  [Decisions: Decisions] [HasTailRecursion: BOOLEAN] .
+Procedure	= [IsTrip: BOOLEAN] .
+Trip		= [IsTrip: BOOLEAN] .
+Function	= [ReturnObjects: Objects] .
+Rule		= [Tempo: tIdent] [Index: SHORTCARD]
+		  [Tests: Tests] [Properties: BITSET] .
+Pattern		= [Path: Path] .
+DontCare	= [Tempos: Objects] .
+AttrDesc	= [Type: tIdent] [TypeDesc: TypeDesc] .
+Designator	= [Type: tIdent] .
+Ident		= [Object: Objects] .
+Declaration	= [Object: Objects] .
+Call		= [TailRecursion: BOOLEAN] .
+Guard		= [Tempo: tIdent] [Object: Objects] .
+MatchStmt	= [Tempo: tIdent] [Object: Objects] .
+IfMatch		= [Tempo: tIdent] [Object: Objects] .
+Return		= [Tempo: tIdent] [Rule: Rule] [Properties: BITSET] .
+Import		= [Spec: Spec] .
+ForEach		= [Type: tIdent] [TypeDesc: TypeDesc] [Iterator: tIdent] .
+
+END Puma

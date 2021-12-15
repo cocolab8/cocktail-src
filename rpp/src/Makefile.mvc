@@ -1,0 +1,21 @@
+SOURCES	= Scanner.md Scanner.mi
+
+sources: $(SOURCES)
+
+Scanner.md Scanner.mi:	rpp.rex
+	rex -di rpp.rex
+
+m2c:
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="-c -d../../reuse/src -o../m" -c -f ../m/Makefile
+
+clean:
+	del *.obj
+	del rpp.exe
+
+CLEAN:	clean
+	del $(SOURCES)

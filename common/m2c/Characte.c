@@ -1,0 +1,221 @@
+#include "SYSTEM_.h"
+
+#ifndef DEFINITION_Characte
+#include "Characte.h"
+#endif
+
+
+
+BOOLEAN Zgg3DDyAC_0
+# ifdef HAVE_ARGS
+(CHAR Z116[], LONGCARD O_2, CHAR Z117[], LONGCARD O_1)
+# else
+(Z116, O_2, Z117, O_1)
+CHAR Z116[];
+LONGCARD O_2;
+CHAR Z117[];
+LONGCARD O_1;
+# endif
+{
+INTEGER Z118;
+INTEGER Z119;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_1 * sizeof (CHAR) + O_2 * sizeof (CHAR), 2)
+COPY_OPEN_ARRAY (Z117, O_1, CHAR)
+COPY_OPEN_ARRAY (Z116, O_2, CHAR)
+Z118 = 0;
+Z119 = Zgg3DDyAC_1(Z116, O_2);
+if (Z119 != Zgg3DDyAC_1(Z117, O_1)) {
+FREE_OPEN_ARRAYS
+return FALSE;
+}
+Z118 = 0;
+for (;;) {
+if (Z118 >= Z119) {
+goto EXIT_1;
+}
+if (Z116[Z118] != Z117[Z118]) {
+goto EXIT_1;
+}
+INC(Z118);
+} EXIT_1:;
+FREE_OPEN_ARRAYS
+return Z118 == Z119;
+}
+
+INTEGER Zgg3DDyAC_1
+# ifdef HAVE_ARGS
+(CHAR Z121[], LONGCARD O_3)
+# else
+(Z121, O_3)
+CHAR Z121[];
+LONGCARD O_3;
+# endif
+{
+INTEGER Z119;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_3 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z121, O_3, CHAR)
+Z119 = 0;
+for (;;) {
+if (Z119 > (INTEGER)(O_3 - 1)) {
+goto EXIT_2;
+}
+if (Z121[Z119] == '\0') {
+goto EXIT_2;
+}
+INC(Z119);
+} EXIT_2:;
+FREE_OPEN_ARRAYS
+return Z119;
+}
+
+CHAR Zgg3DDyAC_2
+# ifdef HAVE_ARGS
+(CHAR Z123[], LONGCARD O_4, INTEGER Z124)
+# else
+(Z123, O_4, Z124)
+CHAR Z123[];
+LONGCARD O_4;
+INTEGER Z124;
+# endif
+{
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_4 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z123, O_4, CHAR)
+{
+CHAR R_1 = Z123[Z124 - 1];
+
+FREE_OPEN_ARRAYS
+return R_1;
+}
+}
+
+void Zgg3DDyAC_3
+# ifdef HAVE_ARGS
+(CHAR Z123[], LONGCARD O_5, CHAR Z121)
+# else
+(Z123, O_5, Z121)
+CHAR Z123[];
+LONGCARD O_5;
+CHAR Z121;
+# endif
+{
+INTEGER Z126;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_5 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z123, O_5, CHAR)
+Z126 = Zgg3DDyAC_1(Z123, O_5);
+Z123[Z126] = Z121;
+Z123[Z126 + 1] = '\0';
+FREE_OPEN_ARRAYS
+}
+
+void Zgg3DDyAC_4
+# ifdef HAVE_ARGS
+(CHAR Z128[], LONGCARD O_6, CHAR Z129[], LONGCARD O_7)
+# else
+(Z128, O_6, Z129, O_7)
+CHAR Z128[];
+LONGCARD O_6;
+CHAR Z129[];
+LONGCARD O_7;
+# endif
+{
+INTEGER Z130, Z131;
+INTEGER Z132, Z133;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_7 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z129, O_7, CHAR)
+Z130 = Zgg3DDyAC_1(Z128, O_6);
+Z131 = Zgg3DDyAC_1(Z129, O_7);
+if (Z130 + Z131 > (INTEGER)(O_6 - 1) + 1) {
+Z131 = (INTEGER)(O_6 - 1) + 1 - Z130;
+}
+Z132 = Z130;
+{
+LONGINT B_1 = 0, B_2 = Z131 - 1;
+
+if (B_1 <= B_2)
+for (Z133 = B_1;; Z133 += 1) {
+Z128[Z132] = Z129[Z133];
+INC(Z132);
+if (Z133 >= B_2) break;
+}
+}
+if (Z132 <= (INTEGER)(O_6 - 1)) {
+Z128[Z132] = '\0';
+}
+FREE_OPEN_ARRAYS
+}
+
+void Zgg3DDyAC_5
+# ifdef HAVE_ARGS
+(CHAR Z128[], LONGCARD O_9, INTEGER Z135, INTEGER Z136, CHAR Z129[], LONGCARD O_8)
+# else
+(Z128, O_9, Z135, Z136, Z129, O_8)
+CHAR Z128[];
+LONGCARD O_9;
+INTEGER Z135, Z136;
+CHAR Z129[];
+LONGCARD O_8;
+# endif
+{
+INTEGER Z124;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_9 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z128, O_9, CHAR)
+{
+LONGINT B_3 = Z135 - 1, B_4 = Z136 - 1;
+
+if (B_3 <= B_4)
+for (Z124 = B_3;; Z124 += 1) {
+Z129[Z124 - Z135 + 1] = Z128[Z124];
+if (Z124 >= B_4) break;
+}
+}
+Z129[Z136] = '\0';
+FREE_OPEN_ARRAYS
+}
+
+void Zgg3DDyAC_6
+# ifdef HAVE_ARGS
+(CHAR Z128[], LONGCARD O_10, CHAR Z129[], LONGCARD O_11)
+# else
+(Z128, O_10, Z129, O_11)
+CHAR Z128[];
+LONGCARD O_10;
+CHAR Z129[];
+LONGCARD O_11;
+# endif
+{
+INTEGER Z124;
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_11 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z129, O_11, CHAR)
+{
+LONGINT B_5 = 0, B_6 = Zgg3DDyAC_1(Z129, O_11);
+
+if (B_5 <= B_6)
+for (Z124 = B_5;; Z124 += 1) {
+Z128[Z124] = Z129[Z124];
+if (Z124 >= B_6) break;
+}
+}
+FREE_OPEN_ARRAYS
+}
+
+void BEGIN_Characte ARGS ((void))
+{
+  static BOOLEAN has_been_called = FALSE;
+  if (has_been_called) return;
+  has_been_called = TRUE;
+
+}

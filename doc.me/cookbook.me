@@ -1,0 +1,4726 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s sz
+.\}
+
+.de _
+\&\\$1\l'|0\(ul'\\$2
+..
+
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+
+.de FR
+.ft R
+.sz +2
+..
+
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+
+.de PP
+.sp 0.5
+..
+
+.de IP
+.ip \\$1 \\$2
+..
+
+.de I
+.i \\$1
+..
+
+.de TH
+..
+
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+
+.de PS
+.sp 0.5
+..
+
+.de PE
+.sp 0.5
+..
+
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.5c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+
+	DR. JOSEF GROSCH
+
+	COCOLAB - DATENVERARBEITUNG
+
+	KARLSRUHE
+
+.r
+\l'17.0c'
+..
+
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Hagsfelder Allee 16
+D-76131 Karlsruhe
+Germany
+.sp 0.5
+Tel: +49-721-697061
+Fax: +49-721-661966
+EMail: grosch@cocolab.de
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.EQ
+gsize 12
+delim off
+.EN
+.de FH
+.ne 4
+.lp
+.ft B
+\&\\$1
+.ft R
+.lp
+..
+.de FA
+.sy prepare \\*f
+.FH "Concrete Syntax"
+.sp
+.nf
+.FT
+.lf 1 /tmp/p
+PROPERTY INPUT RULE
+.sp 0.5
+Prog            = Decls .
+Decls           = <
+   NoDecl       = .
+   Decl         = <
+      Dcl       = DCL Ident ':' Class: Ident Next: Decls .
+      Class     = CLASS Ident '(' Supers ')' Features 'END' Next: Decls .
+   > .
+> .
+Supers          = <
+   NoSuper      = .
+   Super        = Ident Next: Supers .
+> .
+Features        = <
+   NoFeature    = .
+   Attribute    = Ident Next: Features .
+   Method       = PROCEDURE Ident Decls Stats 'END' Next: Features .
+> .
+Stats           = <
+   NoStat       = .
+   Stat         = USE Designator Next:Stats .
+> .
+Designator      = <
+   Var          = Ident .
+   Qualify      = Designator '.' Ident .
+> .
+.sp 0.5
+Ident           : [Ident: tIdent] { Ident       := NoIdent;                     } .
+.sp 0.5
+MODULE Tree
+.sp 0.5
+PARSER GLOBAL   {# include "Tree.h"}
+.sp 0.5
+DECLARE Decls Features Supers Stats Designator = [Tree: tTree] .
+.sp 0.5
+RULE
+.sp 0.5
+Prog    = { => { TreeRoot = mProg (Decls:Tree); };                              } .
+NoDecl  = { Tree := mNoDecl ();                                                 } .
+Dcl     = { Tree := mDcl (Ident:Ident, Ident:Position, Next:Tree, Class:Ident,
+                          Class:Position);                                      } .
+Class   = { Tree := mClass (Ident:Ident, Ident:Position, Next:Tree, Supers:Tree,
+                            Features:Tree);                                     } .
+NoSuper = { Tree := mNoSuper ();                                                } .
+Super   = { Tree := mSuper (Ident:Ident, Ident:Position, Next:Tree);            } .
+NoFeature={ Tree := mNoDecl ();                                                 } .
+Attribute={ Tree := mAttribute (Ident:Ident, Ident:Position, Next:Tree);        } .
+Method  = { Tree := mMethod (Ident:Ident, Ident:Position, Next:Tree, Decls:Tree,
+                             Stats:Tree);                                       } .
+NoStat  = { Tree := mNoStat ();                                                 } .
+Stat    = { Tree := mStat (Designator:Tree, Next:Tree);                         } .
+Var     = { Tree := mVar (Ident:Ident, Ident:Position);                         } .
+Qualify = { Tree := mQualify (Ident:Ident, Ident:Position, Designator:Tree);    } .
+.sp 0.5
+END Tree
+.lf 313 /tmp/.doc
+.FR
+.FH "Attribute Grammar"
+.sp
+.nf
+.FT
+.lf 1 /tmp/a
+TREE IMPORT {
+# include "Idents.h"
+# include "Scanner.h"
+}
+.sp 0.5
+PROPERTY INPUT RULE
+.sp 0.5
+Prog            = Decls .
+Decls           = <
+   NoDecl       = .
+   Decl         = [Ident: tIdent] [Pos: tPosition] Next: Decls <
+      Dcl       = [Class: tIdent] [ClassPos: tPosition] .
+      Class     = Supers Features: Decls .
+      Attribute = .
+      Method    = Decls Stats .
+      RefDecl   = Decl .
+   > .
+> .
+Supers          = <
+   NoSuper      = .
+   Super        = [Ident: tIdent] [Pos: tPosition] Next: Supers .
+> .
+Stats           = <
+   NoStat       = .
+   Stat         = Designator Next: Stats .
+> .
+Designator      = [Ident: tIdent] [Pos: tPosition] <
+   Var          = .
+   Qualify      = Designator .
+> .
+.sp 0.5
+MODULE DefTab
+.sp 0.5
+EVAL GLOBAL {# include "DefTab.c"}
+.sp 0.5
+DECLARE
+.sp 0.5
+Decls           = [Objects: tTree THREAD] .
+Decls Supers Stats Designator   = [Env: tTree INH] .
+Decls           = [OuterEnv: tTree] .
+Class           = [NewEnv: tTree] .
+Decl Super Designator   = [Object: tTree] .
+Qualify         = [Class: tTree] .
+Supers          = [EnvOut: tTree] .
+.sp 0.5
+RULE
+.sp 0.5
+Envs    = <
+   Env  = [Objects: tTree IN] Env: Envs IN .
+   Env2 = Env1: Envs IN Env2: Envs IN .
+> .
+Prog    = { Decls:ObjectsIn     := mNoDecl ();
+            Decls:OuterEnv      := NoTree;
+            Decls:Env           := mEnv (Decls:ObjectsOut, NoTree);             } .
+Decl    = { Next:ObjectsIn      := DEP (SELF, ObjectsIn);
+            ObjectsOut          := Next:ObjectsOut;
+            Object              := mNoDecl ();
+            CHECK IdentifyObjects (Ident, ObjectsIn)->Kind == kNoDecl
+            => Error (Pos, "identifier multiply declared", Ident);              } .
+Dcl     = { Object := IdentifyWhole (Class, Env);
+            CHECK Object->Kind != kNoDecl
+            => Error (ClassPos, "identifier not declared", Class) AND_THEN
+            CHECK Object->Kind == kClass
+            => Error (ClassPos, "class required", Class);                       } .
+Class   = {
+            Features:ObjectsIn  := mNoDecl ();
+            Features:OuterEnv   := Supers:EnvOut;
+            NewEnv := mEnv2 (mEnv (Features:ObjectsOut, Supers:EnvOut), Env);
+            Features:Env        := NewEnv;                                      } .
+Supers  = { EnvOut              := NoTree;                                      } .
+Super   = { Object              := IdentifyWhole (Ident, Env);
+            CHECK Object->Kind != kNoDecl
+            => Error (Pos, "identifier not declared", Ident) AND_THEN
+            CHECK Object->Kind == kClass
+            => Error (Pos, "class required", Ident);
+            EnvOut              := Object->Kind != kClass ? Next:EnvOut :
+               mEnv2 (REMOTE Object => Class:NewEnv, Next:EnvOut);              } .
+Attribute={ Object              := IdentifyWhole (Ident, OuterEnv);
+            CHECK Object->Kind == kNoDecl
+            => Error (Pos, "identifier already inherited", Ident);              } .
+Method  = { Object              := IdentifyWhole (Ident, OuterEnv);
+            CHECK Object->Kind == kNoDecl || Object->Kind == kMethod
+            => Error (Pos, "identifier already inherited", Ident);
+            Decls:ObjectsIn     := mNoDecl ();
+            Stats:Env           := mEnv (Decls:ObjectsOut, Env);
+            Decls:Env           := Stats:Env;                                   } .
+Designator={Object              := mNoDecl ();                                  } .
+Var     = { Object              := IdentifyWhole (Ident, Env);
+            CHECK Object->Kind != kNoDecl
+            => Error (Pos, "identifier not declared", Ident);                   } .
+Qualify = { CHECK Designator:Object->Kind == kDcl ||
+                  Designator:Object->Kind == kNoDecl
+            => Error (Pos, "object required", Ident);                   
+            Class               := Designator:Object->Kind == kDcl ?
+               REMOTE Designator:Object => Dcl:Object : mNoDecl ();
+            Object              := Class->Kind == kClass ?
+               IdentifyWhole (Ident, REMOTE Class => Class:NewEnv) : mNoDecl ();
+            CHECK Designator:Object->Kind != kDcl || Class->Kind != kClass ||
+               Object->Kind != kNoDecl
+            => Error (Pos, "identifier not declared", Ident);                   } .
+.sp 0.5
+END DefTab
+.lf 319 /tmp/.doc
+.FR
+.lf 1 /tmp/d
+.lf 1 ../multiple/l.pic
+.(b L
+.FH "Attribute Diagram"
+.sp 0.5
+.lf 4
+.PS 8.657i 4.714i
+.\" 0 -25.3 16.5 5
+.\" 0.000i 8.657i 4.714i 0.000i
+.nr 00 \n(.u
+.nf
+.nr 0x 1
+\h'4.714i'
+.sp -1
+.lf 13
+.sz 8
+\D't -1.000p'\h'1.000p'
+.sp -1
+\h'-0.000i'\v'0.286i'\D'c0.286i'
+.sp -1
+.lf 74
+\h'0.143i-(\w'Prog'u/2u)'\v'0.286i-(0v/2u)+0v+0.22m'Prog
+.sp -1
+\h'1.143i'\v'0.286i'\D'c0.286i'
+.sp -1
+.lf 76
+\h'1.286i-(\w'Env'u/2u)'\v'0.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.286i'\v'0.429i'\D'l0.000i 0.714i'
+.sp -1
+\h'1.286i'\v'0.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.286i'\v'0.000i'\D'l0.057i 0.000i'
+.sp -1
+\h'1.343i'\v'0.000i'\D'l-0.114i 0.000i'
+.sp -1
+\h'1.185i'\v'0.387i'\D'l-0.757i 0.757i'
+.sp -1
+\D'f 2000u'\h'-2000u'
+.sp -1
+\h'1.185i'\v'0.387i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'1.185i'\v'0.387i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'1.286i'\v'0.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.286i'\v'0.000i'\D'l-0.057i 0.000i'
+.sp -1
+\h'1.229i'\v'0.000i'\D'l0.114i 0.000i'
+.sp -1
+\h'0.286i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'0.143i-(\w'Out'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'0.429i-(\w'Env'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'0.714i-(\w'OI'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'1.429i'\D'c0.286i'
+.sp -1
+.lf 80
+\h'1.000i-(\w'Class'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Class
+.sp -1
+\h'1.429i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'1.286i-(\w'OO'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.143i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.143i'\v'1.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.143i'\v'1.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.429i'\v'1.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'1.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.714i'\v'1.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'1.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'1.286i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'1.286i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'1.286i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'1.571i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.286i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'1.343i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'1.343i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.714i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'1.571i-(\w'New'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'New
+.sp -1
+\h'1.714i'\v'1.429i'\D'l2.571i 0.000i'
+.sp -1
+\h'4.286i'\v'1.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.286i'\v'1.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'0.244i'\v'0.387i'\D'l0.756i 0.756i'
+.sp -1
+\h'0.286i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'0.143i-(\w'Out'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'0.429i-(\w'Env'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'0.714i-(\w'OI'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'3.143i'\D'c0.286i'
+.sp -1
+.lf 84
+\h'1.000i-(\w'Class'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Class
+.sp -1
+\h'1.429i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'1.286i-(\w'OO'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.143i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.143i'\v'3.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.143i'\v'3.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.429i'\v'3.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'3.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.714i'\v'3.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'3.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'3.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'3.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'3.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'3.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.286i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'3.057i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'3.057i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.714i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'1.571i-(\w'New'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'New
+.sp -1
+\h'1.714i'\v'3.143i'\D'l2.571i 0.000i'
+.sp -1
+\h'4.286i'\v'3.143i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.286i'\v'3.143i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'0.286i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'0.143i-(\w'Out'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'0.429i-(\w'Env'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'0.714i-(\w'OI'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'5.429i'\D'c0.286i'
+.sp -1
+.lf 87
+\h'1.000i-(\w'Class'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Class
+.sp -1
+\h'1.429i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'1.286i-(\w'OO'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.143i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.143i'\v'5.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.143i'\v'5.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.429i'\v'5.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'5.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.714i'\v'5.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'5.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'5.286i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'5.286i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'5.286i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'5.571i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.286i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'5.343i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'5.343i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.714i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'1.571i-(\w'New'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'New
+.sp -1
+\h'1.714i'\v'5.429i'\D'l2.571i 0.000i'
+.sp -1
+\h'4.286i'\v'5.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.286i'\v'5.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'0.286i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'0.143i-(\w'Out'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'0.429i-(\w'Env'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'0.714i-(\w'OI'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'8.286i'\D'c0.286i'
+.sp -1
+.lf 90
+\h'1.000i-(\w'No-'u/2u)'\v'8.286i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 90
+\h'1.000i-(\w'Decl'u/2u)'\v'8.286i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'1.429i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'1.286i-(\w'OO'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.000i'\v'8.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'8.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'8.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'8.200i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'8.200i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'8.371i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'0.714i'\v'8.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'8.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.086i'\v'1.143i'\D'l0.114i 0.000i'
+.sp -1
+\h'0.657i'\v'1.143i'\D'l0.114i 0.000i'
+.sp -1
+\h'0.143i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'0.429i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'0.714i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'1.000i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'1.286i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'0.143i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'0.429i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'0.714i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'1.000i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'1.286i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'0.143i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'0.429i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'0.714i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'1.000i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'1.286i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'1.714i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 111
+\h'1.571i-(\w'Env'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'2.571i'\D'c0.286i'
+.sp -1
+.lf 111
+\h'1.857i-(\w'No-'u/2u)'\v'2.571i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 111
+\h'1.857i-(\w'Sup'u/2u)'\v'2.571i-(1v/2u)+1v+0.22m'Sup
+.sp -1
+\h'2.286i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 111
+\h'2.143i-(\w'Out'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'2.571i'\D'l0.429i 0.000i'
+.sp -1
+\h'2.714i'\v'2.571i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'2.571i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'2.571i'\D'l0.000i -0.286i'
+.sp -1
+\h'2.714i'\v'2.286i'\D'l0.000i 0.571i'
+.sp -1
+\h'2.714i'\v'2.857i'\D'l-0.057i 0.000i'
+.sp -1
+\h'2.657i'\v'2.857i'\D'l0.114i 0.000i'
+.sp -1
+\h'1.571i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.857i'\v'2.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'2.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'2.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'2.286i'\D'l0.000i -1.143i'
+.sp -1
+\h'1.571i'\v'1.143i'\D'l-0.241i -0.722i'
+.sp -1
+\h'1.331i'\v'0.421i'\D'P0.055i 0.087i -0.047i 0.016i'
+.sp -1
+\h'1.331i'\v'0.421i'\D'p0.055i 0.087i -0.047i 0.016i'
+.sp -1
+\h'1.714i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 116
+\h'1.571i-(\w'Env'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'4.286i'\D'c0.286i'
+.sp -1
+.lf 116
+\h'1.857i-(\w'Super'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Super
+.sp -1
+\h'2.286i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 116
+\h'2.143i-(\w'Out'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'4.286i'\D'l0.286i 0.000i'
+.sp -1
+\h'2.571i'\v'4.286i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'4.286i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'4.286i'\D'c0.286i'
+.sp -1
+.lf 116
+\h'2.714i-(\w'Env2'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'1.571i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.571i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.571i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'4.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.429i'\D'l0.000i 0.143i'
+.sp -1
+\h'2.714i'\v'4.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'2.714i'\v'4.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'4.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'4.429i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.714i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 119
+\h'1.571i-(\w'Env'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'4.857i'\D'c0.286i'
+.sp -1
+.lf 119
+\h'1.857i-(\w'No-'u/2u)'\v'4.857i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 119
+\h'1.857i-(\w'Sup'u/2u)'\v'4.857i-(1v/2u)+1v+0.22m'Sup
+.sp -1
+\h'2.286i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 119
+\h'2.143i-(\w'Out'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'4.857i'\D'l0.429i 0.000i'
+.sp -1
+\h'2.714i'\v'4.857i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'4.857i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'4.857i'\D'l0.000i -0.286i'
+.sp -1
+\h'2.714i'\v'4.571i'\D'l0.000i 0.571i'
+.sp -1
+\h'2.714i'\v'5.143i'\D'l-0.057i 0.000i'
+.sp -1
+\h'2.657i'\v'5.143i'\D'l0.114i 0.000i'
+.sp -1
+\h'1.571i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.857i'\v'4.714i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'4.714i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.714i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'4.000i'\D'l0.000i -1.343i'
+.sp -1
+\h'1.571i'\v'2.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'2.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.714i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 124
+\h'1.571i-(\w'Env'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'6.571i'\D'c0.286i'
+.sp -1
+.lf 124
+\h'1.857i-(\w'Super'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Super
+.sp -1
+\h'2.286i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 124
+\h'2.143i-(\w'Out'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'6.571i'\D'l0.286i 0.000i'
+.sp -1
+\h'2.571i'\v'6.571i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'6.571i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'6.571i'\D'c0.286i'
+.sp -1
+.lf 124
+\h'2.714i-(\w'Env2'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'1.571i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.571i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.571i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'6.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'6.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'6.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'6.714i'\D'l0.000i 0.143i'
+.sp -1
+\h'2.714i'\v'6.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'2.714i'\v'6.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'6.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'6.714i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.714i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 127
+\h'1.571i-(\w'Env'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'7.143i'\D'c0.286i'
+.sp -1
+.lf 127
+\h'1.857i-(\w'Super'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Super
+.sp -1
+\h'2.286i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 127
+\h'2.143i-(\w'Out'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'7.143i'\D'l0.286i 0.000i'
+.sp -1
+\h'2.571i'\v'7.143i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'7.143i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'7.143i'\D'c0.286i'
+.sp -1
+.lf 127
+\h'2.714i-(\w'Env2'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'1.571i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.571i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.571i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'7.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'2.714i'\v'7.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'2.714i'\v'7.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'7.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'7.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.714i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 130
+\h'1.571i-(\w'Env'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'7.714i'\D'c0.286i'
+.sp -1
+.lf 130
+\h'1.857i-(\w'No-'u/2u)'\v'7.714i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 130
+\h'1.857i-(\w'Sup'u/2u)'\v'7.714i-(1v/2u)+1v+0.22m'Sup
+.sp -1
+\h'2.286i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 130
+\h'2.143i-(\w'Out'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'7.714i'\D'l0.429i 0.000i'
+.sp -1
+\h'2.714i'\v'7.714i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'7.714i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'7.714i'\D'l0.000i -0.286i'
+.sp -1
+\h'2.714i'\v'7.429i'\D'l0.000i 0.571i'
+.sp -1
+\h'2.714i'\v'8.000i'\D'l-0.057i 0.000i'
+.sp -1
+\h'2.657i'\v'8.000i'\D'l0.114i 0.000i'
+.sp -1
+\h'1.571i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.857i'\v'7.571i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'7.571i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.571i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'6.286i'\D'l0.000i -1.343i'
+.sp -1
+\h'1.571i'\v'4.943i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'4.943i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'1.429i'\D'c0.286i'
+.sp -1
+.lf 135
+\h'4.429i-(\w'Env2'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'4.571i'\v'1.429i'\D'l0.143i 0.000i'
+.sp -1
+\h'4.714i'\v'1.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.714i'\v'1.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.429i'\v'1.571i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.429i'\v'1.857i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'1.857i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'2.000i'\D'c0.286i'
+.sp -1
+.lf 135
+\h'4.429i-(\w'Env'u/2u)'\v'2.000i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.429i'\v'2.143i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.328i'\v'1.530i'\D'l-0.757i 0.757i'
+.sp -1
+\h'4.328i'\v'1.530i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.328i'\v'1.530i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.286i'\v'2.000i'\D'l-1.571i 0.000i'
+.sp -1
+\h'2.714i'\v'2.000i'\D'l0.000i 0.286i'
+.sp -1
+\h'3.429i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'3.286i-(\w'Out'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'3.571i-(\w'Env'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'3.857i-(\w'OI'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'2.571i'\D'c0.286i'
+.sp -1
+.lf 138
+\h'4.143i-(\w'No-'u/2u)'\v'2.571i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 138
+\h'4.143i-(\w'Decl'u/2u)'\v'2.571i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'4.571i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'4.429i-(\w'OO'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.143i'\v'2.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'2.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'2.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'2.486i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'2.486i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'2.657i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'3.857i'\v'2.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'2.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.800i'\v'2.286i'\D'l0.114i 0.000i'
+.sp -1
+\h'3.286i'\v'2.286i'\D'l0.000i -0.286i'
+.sp -1
+\h'3.286i'\v'2.000i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'2.000i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'3.143i'\D'c0.286i'
+.sp -1
+.lf 144
+\h'4.429i-(\w'Env2'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'4.571i'\v'3.143i'\D'l0.143i 0.000i'
+.sp -1
+\h'4.714i'\v'3.143i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.714i'\v'3.143i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.429i'\v'3.286i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.429i'\v'3.571i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'3.571i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'3.714i'\D'c0.286i'
+.sp -1
+.lf 144
+\h'4.429i-(\w'Env'u/2u)'\v'3.714i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.429i'\v'3.857i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.328i'\v'3.244i'\D'l-0.757i 0.757i'
+.sp -1
+\h'4.328i'\v'3.244i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.328i'\v'3.244i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.286i'\v'3.714i'\D'l-1.571i 0.000i'
+.sp -1
+\h'2.714i'\v'3.714i'\D'l0.000i 0.286i'
+.sp -1
+\h'3.429i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'3.286i-(\w'Out'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'3.571i-(\w'Env'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'3.857i-(\w'OI'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'4.286i'\D'c0.286i'
+.sp -1
+.lf 147
+\h'4.143i-(\w'Attr'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Attr
+.sp -1
+\h'4.571i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'4.429i-(\w'OO'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.286i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.286i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.571i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.857i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'4.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.429i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.429i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'4.200i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.200i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.429i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'3.286i-(\w'Out'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'3.571i-(\w'Env'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'3.857i-(\w'OI'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'4.857i'\D'c0.286i'
+.sp -1
+.lf 149
+\h'4.143i-(\w'No-'u/2u)'\v'4.857i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 149
+\h'4.143i-(\w'Decl'u/2u)'\v'4.857i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'4.571i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'4.429i-(\w'OO'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.143i'\v'4.714i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'4.714i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.714i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'4.771i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.771i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.943i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'3.857i'\v'4.943i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.943i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.800i'\v'4.000i'\D'l0.114i 0.000i'
+.sp -1
+\h'3.286i'\v'4.000i'\D'l0.000i -0.286i'
+.sp -1
+\h'3.286i'\v'3.714i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'3.714i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'5.429i'\D'c0.286i'
+.sp -1
+.lf 155
+\h'4.429i-(\w'Env2'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'4.571i'\v'5.429i'\D'l0.143i 0.000i'
+.sp -1
+\h'4.714i'\v'5.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.714i'\v'5.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.429i'\v'5.571i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.429i'\v'5.857i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'5.857i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'6.000i'\D'c0.286i'
+.sp -1
+.lf 155
+\h'4.429i-(\w'Env'u/2u)'\v'6.000i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.429i'\v'6.143i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.328i'\v'5.530i'\D'l-0.757i 0.757i'
+.sp -1
+\h'4.328i'\v'5.530i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.328i'\v'5.530i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.286i'\v'6.000i'\D'l-1.571i 0.000i'
+.sp -1
+\h'2.714i'\v'6.000i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.714i'\v'5.429i'\D'l0.000i -5.143i'
+.sp -1
+\h'4.714i'\v'0.286i'\D'l-3.286i 0.000i'
+.sp -1
+\h'1.429i'\v'0.286i'\D'P0.100i -0.025i 0.000i 0.050i'
+.sp -1
+\h'1.429i'\v'0.286i'\D'p0.100i -0.025i 0.000i 0.050i'
+.sp -1
+\h'3.429i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'3.286i-(\w'Out'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'3.571i-(\w'Env'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'3.857i-(\w'OI'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'6.571i'\D'c0.286i'
+.sp -1
+.lf 158
+\h'4.143i-(\w'Me-'u/2u)'\v'6.571i-(1v/2u)+0v+0.22m'Me-
+.sp -1
+.lf 158
+\h'4.143i-(\w'thod'u/2u)'\v'6.571i-(1v/2u)+1v+0.22m'thod
+.sp -1
+\h'4.571i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'4.429i-(\w'OO'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.286i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.286i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.571i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.857i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'6.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'6.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'6.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'6.714i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.429i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'6.486i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'6.486i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.429i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'3.286i-(\w'Out'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'3.571i-(\w'Env'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'3.857i-(\w'OI'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'7.143i'\D'c0.286i'
+.sp -1
+.lf 160
+\h'4.143i-(\w'Attr'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Attr
+.sp -1
+\h'4.571i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'4.429i-(\w'OO'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.286i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.286i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.571i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.857i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'7.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.429i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'7.057i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.057i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.429i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'3.286i-(\w'Out'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'3.571i-(\w'Env'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'3.857i-(\w'OI'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'7.714i'\D'c0.286i'
+.sp -1
+.lf 162
+\h'4.143i-(\w'No-'u/2u)'\v'7.714i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 162
+\h'4.143i-(\w'Decl'u/2u)'\v'7.714i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'4.571i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'4.429i-(\w'OO'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.143i'\v'7.571i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'7.571i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.571i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'7.629i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.629i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.800i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'3.857i'\v'7.800i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.800i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.800i'\v'6.286i'\D'l0.114i 0.000i'
+.sp -1
+\h'3.286i'\v'6.286i'\D'l0.000i -0.286i'
+.sp -1
+\h'3.286i'\v'6.000i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'6.000i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.101i'\v'1.530i'\D'l0.756i 0.756i'
+.sp -1
+\h'1.101i'\v'1.530i'\D'l3.042i 0.756i'
+.sp -1
+\h'1.101i'\v'3.244i'\D'l0.756i 0.756i'
+.sp -1
+\h'1.101i'\v'3.244i'\D'l3.042i 0.756i'
+.sp -1
+\h'1.101i'\v'5.530i'\D'l0.756i 0.756i'
+.sp -1
+\h'1.101i'\v'5.530i'\D'l3.042i 0.756i'
+.sp -1
+\h'2.857i'\v'4.286i'\D'l0.114i 0.000i'
+.sp -1
+\h'2.971i'\v'4.286i'\D'l0.000i -2.571i'
+.sp -1
+\h'2.971i'\v'1.714i'\D'l1.029i 0.000i'
+.sp -1
+\h'4.000i'\v'1.714i'\D'l0.328i 0.185i'
+.sp -1
+\h'4.328i'\v'1.899i'\D'P-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'4.328i'\v'1.899i'\D'p-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'2.857i'\v'6.571i'\D'l0.143i 0.000i'
+.sp -1
+\h'3.000i'\v'6.571i'\D'l0.000i -3.143i'
+.sp -1
+\h'3.000i'\v'3.429i'\D'l1.000i 0.000i'
+.sp -1
+\h'4.000i'\v'3.429i'\D'l0.328i 0.185i'
+.sp -1
+\h'4.328i'\v'3.613i'\D'P-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'4.328i'\v'3.613i'\D'p-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'2.857i'\v'7.143i'\D'l0.143i 0.000i'
+.sp -1
+\h'3.000i'\v'7.143i'\D'l0.000i -0.571i'
+.sp -1
+.sp 8.657i+1
+.if \n(00 .fi
+.br
+.nr 0x 0
+.lf 175
+.PE
+.lf 176
+.sp
+.)b
+.lf 321 /tmp/.doc
+.FH "Input"
+.sp
+.nf
+.FT
+.lf 1 /tmp/i
+CLASS a ()
+   x
+   y
+   PROCEDURE p END
+   PROCEDURE q END
+END
+
+CLASS b (a)
+   z
+   PROCEDURE q END
+   PROCEDURE r END
+END
+
+CLASS c (a)
+   z
+   PROCEDURE q END
+   PROCEDURE r END
+END
+
+CLASS d (b c)
+   y
+   z
+   u
+   PROCEDURE q END
+   PROCEDURE r END
+END
+.lf 326 /tmp/.doc
+.FR
+.FH "Messages"
+.sp
+.nf
+.FT
+.lf 1 /tmp/m
+  21,  4: Error       identifier already inherited: y
+  22,  4: Error       identifier already inherited: z
+.lf 332 /tmp/.doc
+.FR
+..
+.T0
+
+	Semantic Analysis Cookbook
+
+	Part 1: Declarations
+
+
+	J. Grosch
+
+.T1
+.T2 "" "Semantic Analysis Cookbook - Part 1: Declarations" "Josef Grosch" "Oct.  14, 1992" 29 1992
+.bp 1
+.ce 99
+.b "Semantic Analysis Cookbook"
+.b "Part 1: Declarations"
+.ce 0
+.sp
+.\" .uh Abstract
+.\" .pp
+.sh 1 Introduction
+.lp
+A compiler for a programming language usually has two parts: an analysis part and a
+synthesis part. The analysis part comprises lexical analysis, syntax analysis, and
+semantic analysis. The main task of the synthesis part is code-generation.
+For several years I am attracted by the question: "How to program semantic analysis?"
+I have asked this question to many people, but except the remark "a good question"
+I did not receive a good answer so far. In text books on compiler construction
+I never found a satisfying answer, either.
+.pp
+What do I understand by the notion semantic analysis?
+The analysis part of a language processor usually consists of two phases:
+A context-free analysis phase and a context-sensitive analysis phase.
+The context-free phase is called syntax analysis or parsing and the context-sensitive phase
+is called semantic analysis. The latter comprises the check of context conditions and the
+computation of so-called code-generation attributes. These attributes are values to be
+incorporated into an intermediate representation or the machine code to be generated by the
+language processor. The generation of an intermediate representation is not considered to
+be part of semantic analysis. Typical tasks of semantic analysis are name (or declaration)
+analysis and type checking.
+.pp
+From a logical point of view, the two phases of a language processor support the following
+scheme: Syntax analysis reconstructs a derivation tree for a program to be processed.
+Semantic analysis checks conditions in this tree and computes additional information. There
+are several possibilities to implement this general scheme:
+.pp
+First,
+Syntax analysis and semantic analysis can be performed at the same time in an interlocked
+fashion. There is no need to store the program between the two phases in an intermediate
+data structure. This approach is restricted to one-pass languages such as for example
+Pascal. Pascal follows the
+.i "declare before use"
+design principle in order to enable this kind of implementation.
+There are two constructs which are
+not really one-pass: The use of the reference type in the declaration of pointer types
+before its declaration and forward gotos. These constructs can be integrated into a
+one-pass scheme using small additional data structures. Often LL(1) parser generators with
+an
+L-attribution mechanism are used to support this kind of implementation. Semantic analysis
+is programmed by hand and attached to corresponding grammar rules.
+.pp
+Second,
+Syntax analysis and semantic analysis can be performed one after the other. This requires
+to store the program in an appropriate data structure such as a syntax tree. This approach
+removes the restriction to one-pass languages. Often LL(1) or LR(1) parser generators are
+used to carry out syntax analysis. The parsers execute action statements to build a syntax
+tree. Semantic analysis operates on the syntax tree. It can be programmed by hand,
+generated from an attribute grammar using an attribute evaluator generator tool, or
+constructed by making use of a pattern-matching tool.
+.\" For example a suitable attribute evaluator generator would be
+.\" .i ag
+.\"\*([<\*([[Groa\*(]]\*(>] and a suitable pattern-matching tool would be
+.\" .i puma
+.\"\*([<\*([[Gro92\*(],Grob\*(]]\*(>].
+.pp
+The implementation schemes mentioned represent more or less two extreme positions. Many
+other approaches are possible. One example are multipass compilers where semantic analysis
+is separated into several passes which are executed sequentially. Every pass communicates a
+representation of the program including the current results to the next pass. This
+representation could be a linearized version of the syntax tree which is stored on disk for
+example.
+.pp
+I will neither discuss all possible solutions to the problem of semantic analysis nor give
+an objective solution. Instead, I will give a subjective answer which is influenced by my
+personal background, my personal experience in compiler writing, and the tools for compiler
+construction that I prefer\*([<\*([[GrE90\*(]]\*(>].
+I assume the reader has some familiarity with these tools for compiler construction
+because the examples will be written in the input languages of these tools.
+I must admit that I am answering the
+question "How to program semantic analysis?" primarily for myself. If other people find my
+solution useful then all the better. The goal is to look for a systematic method that
+allows for an easy implementation of semantic analysis in a rather short time.
+.pp
+The basic idea is to give a collection of recipes or sample solutions for typical tasks in
+semantic analysis. The collection shall cover all tasks necessary for typical imperative
+programming languages such as Pascal, Modula-2, and C. It is important to have solutions
+for the different tasks that are as independent of one another as possible. This is a
+precondition to support the construction of a semantic analyzer by unrestricted combination
+of several partial solutions. If there are tasks or solutions that appear often they should
+be provided in a reusable fashion. Many tasks in semantic analysis are similar or even
+identical for different languages. This suggests to look for solutions that are independent
+of any programming language in particular.
+.pp
+In the following, semantic analysis will be based on the second implementation scheme
+mentioned above. A scanner and a parser construct a syntax tree. Semantic analysis operates
+on this tree by computing attributes and by checking context conditions. This approach
+allows for the formulation of all problems in semantic analysis. It avoids the restrictions
+of one-pass schemes, because a tree can be processed in as many passes as necessary and
+the subtrees of a node can be visited in any order. Nowadays, the storage consumption for
+trees is not a problem any more because enough main memory is available.
+.pp
+I will use an abstract syntax tree instead of a concrete syntax tree.
+I consider an abstract syntax not to be just a "small" abstraction of a concrete syntax.
+I prefer to say that abstract syntax has nothing to do with concrete syntax.
+It is a representation of the program that eases semantic analysis.
+Therefore it should be a small and simple representation.
+Of course, this statement is an exaggeration.
+The abstract syntax does have similarities with the concrete one,
+because it represents the same information.
+I am using this formulation in order to say that we should not stick too close to concrete
+syntax. My understanding of abstract syntax may appear a bit extreme.
+Here is not the space to argue for this opinion.
+.pp
+Currently, I am thinking about the idea of a so-called
+.i normalized
+abstract syntax. This
+notion describes an even simpler form of abstract syntax than I am using now. This idea
+is probably illustrated best by an example using the source level. The three declarations
+.(b
+.FT
+VAR x, y: INTEGER;
+.sp 0.5
+VAR x: INTEGER; y: INTEGER;
+.sp 0.5
+VAR x: INTEGER; VAR y: INTEGER;
+.)b
+would be represented in a normalized abstract syntax in the same way. The tree
+representation would reflect the structure of the last pair of declarations.
+My current style of abstract syntax also introduces as many normalizations as possible.
+The difference can be seen in the way an abstract syntax tree is constructed.
+The current mapping of concrete syntax to abstract syntax is a syntax-directed translation
+which is performed by the tree building action statements executed by a parser.
+For the construction of a normalized abstract syntax more than a syntax-directed
+translation is needed. It would either require small transformations triggered by the
+parser or even a complete transformation phase in between syntax analysis and semantic
+analysis.
+.sh 2 "Possible Implementation Techniques"
+.lp
+As already mentioned, there are primarily three ways to implement computations on a tree:
+One could use hand-written code, an attribute evaluator generated from an attribute grammar,
+or a pattern-matching tool. I will briefly characterize these possibilities and discuss the
+advantages and drawbacks of these approaches.
+.pp
+Using hand-written code one can program an arbitrary number of tree traversals that visit
+the subtrees of a node in any order and execute appropriate computations. One has explicit
+control on the order of the computations, can use global variables, and can safely produce
+any side-effects. A disadvantage is that one has to worry about the order of the traversals
+and computations. There are no checks whether the set of computations is complete.
+.pp
+While hand-written code supports an imperative style of programming, attribute grammars
+\*([[Knu68\*(],Knu71\*(]]
+advocate a functional style. They promise to overcome the problems of hand-written code by
+providing formal checks and by automatic determination of an appropriate evaluation order.
+An attribute grammar is checked for the correct use of synthesized and inherited
+attributes, whether there are computation rules for all attributes (completeness),
+and whether there are no
+cyclic dependencies. While these checks are certainly valuable, the determination of an
+evaluation order does not relieve of the burden to worry about this order. In larger
+applications there are often cyclic dependencies among the attributes if the attribute
+grammar is processed by a tool that handles the class of ordered attribute grammars
+\*([[Kas80\*(]]. In order to remove those cyclic dependencies
+it has been necessary to worry quite a lot about evaluation order and to introduce
+additional attributes along with additional computations. These steps solve the problems
+with the cycles but lead to rather complicated attribute grammars. Those grammars degrade
+from formal problem specifications to problem implementations which are hard to understand
+and to maintain.
+.pp
+The use of a pattern-matching tool is in my eyes a gradual improvement of writing code by
+hand. The underlying mechanism is again the recursive traversal of trees with explicit
+control of the number of passes and the order of the visits to the subtrees of a node.
+Pattern-matching can be seen as a comfortable way of writing conditional statements or
+branch statements, respectively. The
+advantage of this approach is the provision of a concise notation for the formulation of
+tree processing problems. However, the fundamental problems of writing code by hand remain.
+One still has to worry about the order of the traversals and computations and there is
+no check for the completeness of a specification.
+.sh 2 Proposal
+.lp
+From the drawbacks of the above implementation techniques, I conclude that substantial
+improvements are necessary. It is certainly of value to have a formal consistency check for
+the problem specification and to be freed from the determination of the order of the
+computations. Therefore my approach is based on attribute grammars. Attribute evaluation is
+done on abstract syntax trees and perhaps on normalized abstract syntax trees. I propose to
+use the class of well-defined attribute grammars, which is the largest class of attribute
+grammars. This class promises to solve the problems of the evaluation order.
+Smaller classes such as ordered attribute grammars are considered to be too
+restrictive because one has still to bother with evaluation order. Evaluators for
+well-defined attribute grammars are not as efficient as those for e. g. ordered attribute
+grammars. For ordered attribute grammars the evaluation order (visit sequence) can be
+determined statically during the generation of the evaluator. For well-defined attribute
+grammars the evaluation order must be determined dynamically during the run time of the
+evaluator. I decided this trade-off between expressive power and efficiency in favor of
+expressive power. Attribute grammar tools are available that can process well-defined
+attribute grammars\*([<\*([[Groa\*(]]\*(>]. Compared to ordered attribute grammars the increased
+consumption of memory and run time is relatively small and tolerable with today's hardware.
+.pp
+Furthermore, I will use higher-order attribute grammars
+\*([[VSK89\*(],Vog93\*(]]
+which can handle tree-valued attributes and that allow the underlying tree
+to grow dynamically during attribute evaluation. The attribution
+of trees will be extended to the attribution of graphs. While conventional attribute
+grammars base computations only on attributes local to a grammar rule, I will allow the
+access of non-local attributes. The processing of graphs and access to non-local
+attributes is of interest for handling a definition table which is discussed below.
+In order to get an automatic determination of an evaluation
+order, the computations have to be expressed in a functional style. That means all arguments
+of a computation must be explicitly mentioned and an attribute can not depend on itself. If
+possible, I will combine techniques for attribute grammars with those of pattern-matching to
+perform semantic analysis. In every case a pattern-matching tool can be used to describe
+attribute computations, especially those based on tree-valued attributes.
+.pp
+One of the main problems of semantic analysis is the administration of a definition table.
+Many people prefer to call this data structure symbol table. It
+describes the objects of a program by appropriate attributes and holds information about
+the so-called scopes. I propose not to construct a separate data structure for the
+definition table but to use certain parts of the abstract syntax tree for that purpose.
+This has the advantage that the computation of the attributes for the definition table is
+the same as any other attribute computation. The definition table can be regarded as some
+kind of spread sheet. Rules describe the relationship among the definition table entries
+(attributes) in a functional style. The existing attribute evaluator takes care that all
+entries are computed and it determines automatically an order to achieve this.
+.sh 1 Method
+.lp
+The main contribution of this work is to present a collection of recipes or sample
+solutions for typical tasks or problems in semantic analysis. I will start with solutions
+for name analysis or declaration analysis. For every problem a small language processor or
+compiler has been implemented in order to provide a clear and simple prototype solution. The
+compilers have been generated using the Cocktail Toolbox for Compiler Construction
+\*([[GrE90\*(]]. The input specifications for the tools will be reproduced
+and discussed in the following. The sample compilers use C as implementation language.
+.pp
+All solutions have some parts in common while other parts are specific to the individual
+problems. The common parts comprise the scanner, the main program, the definition table,
+and the "make" file. These are explained in chapter 3. The individual parts comprise a
+parser, an abstract syntax, and an attribute grammar.
+.pp
+The solutions for the separate problems are described in a schematic way using the
+following structure:
+.(b
+Description
+Conditions
+Remarks
+Concrete Syntax
+Attribute Grammar
+Attribute Diagram
+Input
+Messages
+.)b
+It starts with a description of the task or the problem to be solved. This may include a
+small informal definition of the used sample language. It is followed by a list of context
+conditions that have to be checked for this problem. Additional remarks might be used to
+comment any peculiarities. The section "concrete syntax" contains the input for the parser
+generator
+.i lalr
+\*([[GrV\*(]].
+This includes the context-free grammar that defines the concrete syntax of the
+sample language and the tree building action statements that map concrete to abstract
+syntax. The section "attribute grammar" contains the input for the attribute evaluator
+generator
+.i ag
+\*([[Groa\*(],Groa\*(]]. It defines the abstract syntax, the necessary attributes,
+the attribute computation rules, and checks for the context conditions.
+It is followed by so-called
+.i "attribute diagrams" .
+These diagrams support the visualization of the problem solution by giving a graphical
+representation of a sample attributed tree. The used formalism is described below. The
+description of a problem is terminated by a sample input and the corresponding messages
+resulting from the execution of the language processor.
+.sh 2 "Attribute Diagram"
+.lp
+An attribute grammar is a generative system for a set of attributed trees. It is a textual
+specification which is oriented towards grammar rules or node types of a tree, respectively.
+A rule along with the associated attribute definitions and attribute computations describes
+the relationships among the attributes local to this rule. These small, local building
+blocks have to be used to implement algorithms that concern larger tree parts such as the
+distribution of information over the tree and the check of conditions between distant
+attributes. The global relations in an attributed tree result implicitly from the
+application of the attribute grammar mechanism to the set of rules.
+.pp
+An attribute diagram is a graphical representation of an attributed tree. Its purpose is to
+overcome the drawbacks of attribute grammars that arise from the textual representation and
+the local, rule oriented view. An attribute diagram is a visual representation of a
+typical attributed tree that shows the data flow among the attributes and their global
+relationship.
+.pp
+The following symbols are used in attribute diagrams. Circles denote tree nodes.
+They are marked with the node type which is eventually abbreviated.
+Sometimes circles are used for additional data structures such as nodes of type
+.i Env
+describing scopes. Rectangles denote attributes. They are attached to tree nodes and bear
+an abbreviation of their name. The Appendices 1 and 2 explain all used
+abbreviations. Arrows serve for two purposes. Arrows from circles to circles refer from
+parent nodes to child nodes. Arrows from rectangles to rectangles or to circles represent
+attribute values (or dependencies) of tree-valued attributes.
+These attribute values are pointers referring to tree nodes.
+.pp
+The left attribute diagram of the first illustration in chapter 4 (see page 14)
+shows a simple list
+of declarations. There are two kinds of links between the list elements. The arrows among
+the circles represent the abstract syntax tree. The arrows from the threaded attribute
+.i Objects
+(actually the attribute pair
+.i ObjectsIn
+and
+.i ObjectsOut
+which are abbreviated as
+.i OI
+and
+.i OO )
+represent a set of objects as building block for a definition table. For a description of
+threaded attributes see the manual of the attribute evaluator
+.i ag
+\*([[Groa\*(]]. The first attribute diagram shows the actual targets of the pointers.
+An abstraction for threaded attributes is depicted in the second attribute diagram
+given in the middle.
+This abstraction reflects more the dependencies among the attributes and their
+corresponding evaluation order. A further abstraction can be found in the right
+attribute diagram. Unessential details such as the intrinsic attributes
+.i Ident
+(abbreviated as
+.i Id )
+and
+.i Pos
+are omitted. Sometimes, a layout that looks like a chain of attributes will be used. It
+means that all attributes point to the last element of this chain. The use of this
+construct will be clear from the context.
+.sh 1 "Common Parts"
+.lp
+This section presents the parts common to all the following problem solutions:
+the scanner, the main program, the definition table, and the "make" file.
+.sy prepare0
+.sh 2 "Scanner"
+.lp
+The scanners are quite simple and recognize identifiers and fixed tokens such as keywords
+and delimiters. They are generated from the specification given below using the scanner
+generator
+.i rex
+\*([[Grob\*(]]. The specification describes essentially only identifiers. The set of
+fixed tokens is problem specific. It is extracted automatically out of the concrete syntax
+and inserted in place of the line starting with INSERT RULES\*([<\*([[Groc\*(]]\*(>].
+.sp
+.ne 2
+.nf
+.FT
+.lf 1 /tmp/s
+EXPORT  {
+# include "Idents.h"
+# include "Position.h"
+.sp 0.5
+INSERT tScanAttribute
+}
+.sp 0.5
+GLOBAL  {
+# include "Idents.h"
+.sp 0.5
+INSERT ErrorAttribute
+}
+.sp 0.5
+DEFAULT {
+   char FileName [256];
+   GetString (Attribute.Position.Ident, FileName);
+   (void) fprintf (stderr, "\\"%s\\", %3d, %2d: Error       illegal character: %c\\n",
+      FileName, Attribute.Position.Line, Attribute.Position.Column, * TokenPtr);
+}
+.sp 0.5
+DEFINE  digit   = {0-9} .
+        letter  = {a-z A-Z} .
+.sp 0.5
+RULES
+.sp 0.5
+INSERT RULES #STD# 
+.sp 0.5
+#STD# letter (letter | digit) * : {
+   Attribute.Ident.Ident = MakeIdent (TokenPtr, TokenLength);
+   return Ident;
+}
+.lf 688 /tmp/.doc
+.sh 2 "Main Program"
+.lp
+The main program given below is rather simple. It mainly initiates the two phases of the
+language processors: The function
+.i Parse
+implements the syntax analysis phase comprising
+scanning, parsing, and the construction of the abstract syntax tree. The procedure
+.i Eval
+implements the semantic analysis phase using an attribute evaluator.
+The calls of the procedures
+.i StoreMessages
+and
+.i WriteMessages
+instruct the error handling module to emit a sorted list of error messages.
+.sp
+.ne 2
+.nf
+.FT
+.lf 1 /tmp/m
+  21,  4: Error       identifier already inherited: y
+  22,  4: Error       identifier already inherited: z
+.lf 707 /tmp/.doc
+.sh 2 "Definition Table"
+.lp
+The definition table, also called symbol table, is a data structure that is used to
+describe the objects appearing in a program. This section introduces the notions necessary
+for this area and briefly sketches a simple implementation.
+.pp
+A
+.i "definition table"
+consists of an ordered set of scopes.
+.i Scopes
+are ranges of text in a program such as nested blocks or nested procedures that regulate
+the visibility and the extent of identifiers and objects. A scope is associated with a set
+of objects. Sometimes those sets have to be ordered for example in the case of the fields
+of a record type.
+.i Objects
+are the entities appearing in a program such as variables, named constants,
+procedures, and types. An object is described by a set of appropriate
+.i attributes
+that hold suitable values. Every object has at least one attribute describing its
+identifier. Other attributes are for example the kind of the object (variable, constant,
+procedure, etc.), the type of a variable, or the value associated with a named constant.
+.pp
+An object appears in a program in two ways: It is either declared or used. A declaration
+leads to an entry in the definition table. A declaration may be either explicit or
+implicit in languages such as Fortran or Basic. In general, a declaration does not contain
+directly all the information needed to complete a description of an object. It might be
+necessary to consult other entries in the definition table or other parts of the syntax
+tree, for example in order to compute the value of a named constant.
+.pp
+At the location where an object is used, only its identifier is known, usually.
+One task of semantic analysis is to determine the object that
+is denoted by this identifier. In general, this relation is ambiguous at the first view
+and there are several strategies to unambiguously determine an object depending on the
+language definition.
+.pp
+In case of nested blocks the object in the innermost block that surrounds the using
+location is selected. There might be different name spaces for different kinds of objects
+such as for example variables, types, and labels. If at the using location the kind of the
+object is known then this information can be used to select an appropriate object. The full
+power of overloading resolution is used if the signature of a function is consulted in
+order to unambiguously select an object.
+.pp
+The data structure of a definition table will be implemented as follows: The entries for
+the object descriptions are the nodes of the abstract syntax tree standing for
+declarations. The attributes of these descriptions are treated as any other attributes. A
+set of objects is represented as a linked list of tree nodes. The links are stored in
+addition to the links already present to implement the tree structure because the tree
+structure and the set of objects do not correspond in general. A scope is represented by a
+special node which refers to a set of objects and to a surrounding scope. This node is of a
+type named
+.i Env ,
+which is short for
+.i environment .
+I will use the notion environment for the part of a definition table that is valid at a
+certain program location. The set of all nodes representing scopes constitutes the
+definition table. From the implementation point of view the definition table is not a data
+structure that is stored separately from the abstract syntax tree. It is spread over the
+abstract syntax tree. However, from the logical point of view it can be regarded as an
+abstract data type with certain operations and a hidden implementation.
+.pp
+This implementation of a definition table does not worry about efficiency. It tries to be
+as simple and clear as possible. Once definition table entries are created their
+storage space is never released during run time. This is necessary because of the functional
+nature of the computations and to provide a great deal of expressive power. It has been
+observed that one can afford this because of today's main memory capacities. I do not follow
+the stack model of scopes which worries too much about saving storage and it is oriented
+too much towards one-pass translations. I also do not bother with any kind of garbage
+collection.
+.pp
+Linked lists imply that the search for an object needs linear time. This might be too slow
+for large programs with many declared objects. In this case the linked list data structure
+can be overlaid by a hash table yielding constant time access. The implementation is
+encapsulated in the definition table module and a user of this module does not have to take
+care about the underlying internal data structure.
+.pp
+The user of the definition table needs to know the basic structure of the data
+representation and the available operations. As has been already mentioned, the data
+structure of the definition table is integrated with the abstract syntax. The
+implementation of both is supported by the generator for abstract syntax trees
+.i ast
+\*([[Groa\*(]]. The definition table provides abstract objects which have two
+attributes: an identifier and a source position. These abstract objects are described
+by the following excerpt of the specification of an abstract syntax written in the notation
+of
+.i ast .
+.(b
+.FT
+Decls           = <
+   NoDecl       = .
+   Decl         = [Ident: tIdent] [Pos: tPosition] Next: Decls <
+      Var       = ...
+      Const     = ...
+      Proc      = ...
+      RefDecl   = Decl .
+   > .
+> .
+.)b
+The node type
+.i Decls
+describes lists of objects,
+.i NoDecl
+describes an empty list, and
+.i Decl
+describes an abstract object. The child called
+.i Next
+of the latter refers to the succeeding list element with respect to the abstract syntax.
+Concrete objects types such as variable, constant, and procedure can be derived using the
+extension mechanism of
+.i ast
+\*([[Gro90\*(],Grod\*(]]. This is equivalent to the
+definition of subclasses or subtypes in object-oriented languages. The node type
+.i Decls
+is augmented by a threaded attribute called
+.i Objects :
+.(b
+.FT
+Decls = [Objects: tTree THREAD] .
+.)b
+This definition actually introduces a pair of attributes called
+.i ObjectsIn
+and
+.i ObjectsOut .
+Those attributes are used for linking objects into sets.
+.pp
+The node type
+.i RefDecl
+is not a concrete object type. It refers to another declaration and it is used for internal
+purposes of the definition table. Sometimes an object is element of more than one set of
+objects. In this case it can be linked directly into one set, only. The other sets use
+nodes of type
+.i RefDecl
+that refer to the one real object descriptor.
+.pp
+The node type
+.i Env
+describes scopes. From the logical point of view it has two children that refer to a set of
+objects and a surrounding environment:
+.(b
+.FT
+Env   = Decls IN Env IN .
+.)b
+The actual implementation uses the following definition:
+.(b
+.FT
+Env   = [Objects: tTree IN] Env IN .
+.)b
+.pp
+The fundamental operation of the definition table is a lookup function called
+.i Identify .
+Its basic signature is:
+.(b
+.FT
+Identify :  Ident \(mu Env \(-> Object
+.)b
+or
+.(b
+.FT
+Identify : tIdent \(mu Env \(-> { Decl, NoDecl }
+.)b
+Given an identifier and an environment it will search the environment for an object with
+this identifier. If such an object is found it returns the corresponding object description
+which is a node of type
+.i Decl .
+Otherwise it returns a node of type
+.i NoDecl .
+.pp
+In reality there exists a set of routines with varying functionality:
+.(b
+.FT
+IdentifyObjects   : Ident \(mu Objects          \(-> Object
+IdentifyLocal     : Ident \(mu Env              \(-> Object
+IdentifyWhole     : Ident \(mu Env              \(-> Object
+IdentifyTail      : Ident \(mu Env \(mu Pos        \(-> Object
+IdentifyLocalKind : Ident \(mu Env \(mu Kind       \(-> Object
+IdentifyWholeKind : Ident \(mu Env \(mu Kind       \(-> Object
+IdentifyTailKind  : Ident \(mu Env \(mu Pos \(mu Kind \(-> Object
+.)b
+.i IdentifyObjects
+takes an identifier and a set of objects as arguments and it
+searches only in this set of objects.
+.i IdentifyLocal
+takes an environment as argument but it searches only in the innermost scope and disregards
+all surrounding scopes.
+.i IdentifyWhole
+corresponds to the function Identify that has been used above to introduce the principles
+of the definition table operations.
+.i IdentifyTail
+works like IdentifyWhole with the difference, that the source position of the object
+returned must lie before the source position of the using location which is given by the
+additional argument named
+.i Pos .
+This routine is necessary to describe the
+.i "declare before use"
+principle.
+.i IdentifyLocalKind ,
+.i IdentifyWholeKind ,
+and
+.i IdentifyTailKind
+are similar as the previous routines. They have an additional argument named
+.i Kind
+that specifies the kind of the object to be searched for. While the routines without the
+syllable Kind in their name consider all objects to reside in one name space, the others
+can be used to handle separate name spaces. The argument
+.i Kind
+is an integer value that may refer to a single node type or to a class comprising several
+node types. In the actual implementation the mentioned routines have the following headers:
+.(b
+.FT
+tTree IdentifyObjects    (Ident, Objects)
+tTree IdentifyLocal      (Ident, Env)
+tTree IdentifyWhole      (Ident, Env)
+tTree IdentifyTail       (Ident, Env, Pos)
+tTree IdentifyLocalKind  (Ident, Env, Kind)
+tTree IdentifyWholeKind  (Ident, Env, Kind)
+tTree IdentifyTailKind   (Ident, Env, Pos, Kind)
+
+tIdent      Ident;
+tTree       Objects;
+tTree       Env;
+tPosition   Pos;
+Tree_tKind  Kind;
+.)b
+.lp
+The definition table provides two auxiliary macros which are commonly needed for
+semantic analysis:
+.(b
+.FT
+IsBefore (Pos1, Pos2)
+Error (Pos, Text, Ident)
+.)b
+The macro
+.i IsBefore
+tests two source positions with respect to their order.
+.i Error
+calls a routine to report errors found during semantic analysis.
+.pp
+The following is the implementation of the definition table module:
+.sp
+.ne 2
+.nf
+.FT
+.lf 1 /tmp/d
+.lf 1 ../multiple/l.pic
+.(b L
+.FH "Attribute Diagram"
+.sp 0.5
+.lf 4
+.PS 8.657i 4.714i
+.\" 0 -25.3 16.5 5
+.\" 0.000i 8.657i 4.714i 0.000i
+.nr 00 \n(.u
+.nf
+.nr 0x 1
+\h'4.714i'
+.sp -1
+.lf 13
+.sz 8
+\D't -1.000p'\h'1.000p'
+.sp -1
+\h'-0.000i'\v'0.286i'\D'c0.286i'
+.sp -1
+.lf 74
+\h'0.143i-(\w'Prog'u/2u)'\v'0.286i-(0v/2u)+0v+0.22m'Prog
+.sp -1
+\h'1.143i'\v'0.286i'\D'c0.286i'
+.sp -1
+.lf 76
+\h'1.286i-(\w'Env'u/2u)'\v'0.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.286i'\v'0.429i'\D'l0.000i 0.714i'
+.sp -1
+\h'1.286i'\v'0.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.286i'\v'0.000i'\D'l0.057i 0.000i'
+.sp -1
+\h'1.343i'\v'0.000i'\D'l-0.114i 0.000i'
+.sp -1
+\h'1.185i'\v'0.387i'\D'l-0.757i 0.757i'
+.sp -1
+\D'f 2000u'\h'-2000u'
+.sp -1
+\h'1.185i'\v'0.387i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'1.185i'\v'0.387i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'1.286i'\v'0.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.286i'\v'0.000i'\D'l-0.057i 0.000i'
+.sp -1
+\h'1.229i'\v'0.000i'\D'l0.114i 0.000i'
+.sp -1
+\h'0.286i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'0.143i-(\w'Out'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'0.429i-(\w'Env'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'0.714i-(\w'OI'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'1.429i'\D'c0.286i'
+.sp -1
+.lf 80
+\h'1.000i-(\w'Class'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Class
+.sp -1
+\h'1.429i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'1.286i-(\w'OO'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.143i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.143i'\v'1.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.143i'\v'1.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.429i'\v'1.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'1.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.714i'\v'1.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'1.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'1.286i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'1.286i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'1.286i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'1.571i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.286i'\v'1.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'1.343i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'1.343i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'1.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.714i'\v'1.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 80
+\h'1.571i-(\w'New'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'New
+.sp -1
+\h'1.714i'\v'1.429i'\D'l2.571i 0.000i'
+.sp -1
+\h'4.286i'\v'1.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.286i'\v'1.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'0.244i'\v'0.387i'\D'l0.756i 0.756i'
+.sp -1
+\h'0.286i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'0.143i-(\w'Out'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'0.429i-(\w'Env'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'0.714i-(\w'OI'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'3.143i'\D'c0.286i'
+.sp -1
+.lf 84
+\h'1.000i-(\w'Class'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Class
+.sp -1
+\h'1.429i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'1.286i-(\w'OO'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.143i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.143i'\v'3.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.143i'\v'3.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.429i'\v'3.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'3.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.714i'\v'3.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'3.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'3.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'3.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'3.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'3.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.286i'\v'3.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'3.057i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'3.057i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'3.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.714i'\v'3.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 84
+\h'1.571i-(\w'New'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'New
+.sp -1
+\h'1.714i'\v'3.143i'\D'l2.571i 0.000i'
+.sp -1
+\h'4.286i'\v'3.143i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.286i'\v'3.143i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'0.286i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'0.143i-(\w'Out'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'0.429i-(\w'Env'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'0.714i-(\w'OI'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'5.429i'\D'c0.286i'
+.sp -1
+.lf 87
+\h'1.000i-(\w'Class'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Class
+.sp -1
+\h'1.429i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'1.286i-(\w'OO'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.143i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.143i'\v'5.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.143i'\v'5.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.429i'\v'5.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.429i'\v'5.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'0.714i'\v'5.514i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'5.514i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'5.286i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'5.286i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'5.286i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'5.571i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.286i'\v'5.343i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'5.343i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'5.343i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'5.514i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.714i'\v'5.514i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 87
+\h'1.571i-(\w'New'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'New
+.sp -1
+\h'1.714i'\v'5.429i'\D'l2.571i 0.000i'
+.sp -1
+\h'4.286i'\v'5.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.286i'\v'5.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'0.286i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'0.143i-(\w'Out'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'0.571i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'0.429i-(\w'Env'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'0.857i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'0.714i-(\w'OI'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'0.857i'\v'8.286i'\D'c0.286i'
+.sp -1
+.lf 90
+\h'1.000i-(\w'No-'u/2u)'\v'8.286i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 90
+\h'1.000i-(\w'Decl'u/2u)'\v'8.286i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'1.429i'\v'8.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 90
+\h'1.286i-(\w'OO'u/2u)'\v'8.286i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'0.143i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.429i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'0.714i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.000i'\v'8.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.000i'\v'8.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.000i'\v'8.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'8.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.286i'\v'8.200i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.286i'\v'8.200i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'8.371i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'0.714i'\v'8.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.714i'\v'8.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'0.086i'\v'1.143i'\D'l0.114i 0.000i'
+.sp -1
+\h'0.657i'\v'1.143i'\D'l0.114i 0.000i'
+.sp -1
+\h'0.143i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'0.429i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'0.714i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'1.000i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'1.286i'\v'1.714i'\D'l0.000i 1.143i'
+.sp -1
+\h'0.143i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'0.429i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'0.714i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'1.000i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'1.286i'\v'3.429i'\D'l0.000i 1.714i'
+.sp -1
+\h'0.143i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'0.429i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'0.714i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'1.000i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'1.286i'\v'5.714i'\D'l0.000i 2.286i'
+.sp -1
+\h'1.714i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 111
+\h'1.571i-(\w'Env'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'2.571i'\D'c0.286i'
+.sp -1
+.lf 111
+\h'1.857i-(\w'No-'u/2u)'\v'2.571i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 111
+\h'1.857i-(\w'Sup'u/2u)'\v'2.571i-(1v/2u)+1v+0.22m'Sup
+.sp -1
+\h'2.286i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 111
+\h'2.143i-(\w'Out'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'2.571i'\D'l0.429i 0.000i'
+.sp -1
+\h'2.714i'\v'2.571i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'2.571i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'2.571i'\D'l0.000i -0.286i'
+.sp -1
+\h'2.714i'\v'2.286i'\D'l0.000i 0.571i'
+.sp -1
+\h'2.714i'\v'2.857i'\D'l-0.057i 0.000i'
+.sp -1
+\h'2.657i'\v'2.857i'\D'l0.114i 0.000i'
+.sp -1
+\h'1.571i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.857i'\v'2.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'2.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'2.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'2.286i'\D'l0.000i -1.143i'
+.sp -1
+\h'1.571i'\v'1.143i'\D'l-0.241i -0.722i'
+.sp -1
+\h'1.331i'\v'0.421i'\D'P0.055i 0.087i -0.047i 0.016i'
+.sp -1
+\h'1.331i'\v'0.421i'\D'p0.055i 0.087i -0.047i 0.016i'
+.sp -1
+\h'1.714i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 116
+\h'1.571i-(\w'Env'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'4.286i'\D'c0.286i'
+.sp -1
+.lf 116
+\h'1.857i-(\w'Super'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Super
+.sp -1
+\h'2.286i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 116
+\h'2.143i-(\w'Out'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'4.286i'\D'l0.286i 0.000i'
+.sp -1
+\h'2.571i'\v'4.286i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'4.286i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'4.286i'\D'c0.286i'
+.sp -1
+.lf 116
+\h'2.714i-(\w'Env2'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'1.571i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.571i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.571i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'4.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.429i'\D'l0.000i 0.143i'
+.sp -1
+\h'2.714i'\v'4.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'2.714i'\v'4.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'4.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'4.429i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.714i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 119
+\h'1.571i-(\w'Env'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'4.857i'\D'c0.286i'
+.sp -1
+.lf 119
+\h'1.857i-(\w'No-'u/2u)'\v'4.857i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 119
+\h'1.857i-(\w'Sup'u/2u)'\v'4.857i-(1v/2u)+1v+0.22m'Sup
+.sp -1
+\h'2.286i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 119
+\h'2.143i-(\w'Out'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'4.857i'\D'l0.429i 0.000i'
+.sp -1
+\h'2.714i'\v'4.857i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'4.857i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'4.857i'\D'l0.000i -0.286i'
+.sp -1
+\h'2.714i'\v'4.571i'\D'l0.000i 0.571i'
+.sp -1
+\h'2.714i'\v'5.143i'\D'l-0.057i 0.000i'
+.sp -1
+\h'2.657i'\v'5.143i'\D'l0.114i 0.000i'
+.sp -1
+\h'1.571i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.857i'\v'4.714i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'4.714i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'4.714i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'4.000i'\D'l0.000i -1.343i'
+.sp -1
+\h'1.571i'\v'2.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'2.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.714i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 124
+\h'1.571i-(\w'Env'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'6.571i'\D'c0.286i'
+.sp -1
+.lf 124
+\h'1.857i-(\w'Super'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Super
+.sp -1
+\h'2.286i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 124
+\h'2.143i-(\w'Out'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'6.571i'\D'l0.286i 0.000i'
+.sp -1
+\h'2.571i'\v'6.571i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'6.571i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'6.571i'\D'c0.286i'
+.sp -1
+.lf 124
+\h'2.714i-(\w'Env2'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'1.571i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.571i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.571i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'6.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'6.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'6.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'6.714i'\D'l0.000i 0.143i'
+.sp -1
+\h'2.714i'\v'6.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'2.714i'\v'6.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'6.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'6.714i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.714i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 127
+\h'1.571i-(\w'Env'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'7.143i'\D'c0.286i'
+.sp -1
+.lf 127
+\h'1.857i-(\w'Super'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Super
+.sp -1
+\h'2.286i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 127
+\h'2.143i-(\w'Out'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'7.143i'\D'l0.286i 0.000i'
+.sp -1
+\h'2.571i'\v'7.143i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'7.143i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.571i'\v'7.143i'\D'c0.286i'
+.sp -1
+.lf 127
+\h'2.714i-(\w'Env2'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'1.571i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.571i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'1.571i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'7.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'2.714i'\v'7.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'2.714i'\v'7.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'7.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'2.714i'\v'7.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'1.714i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 130
+\h'1.571i-(\w'Env'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'1.714i'\v'7.714i'\D'c0.286i'
+.sp -1
+.lf 130
+\h'1.857i-(\w'No-'u/2u)'\v'7.714i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 130
+\h'1.857i-(\w'Sup'u/2u)'\v'7.714i-(1v/2u)+1v+0.22m'Sup
+.sp -1
+\h'2.286i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 130
+\h'2.143i-(\w'Out'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'2.286i'\v'7.714i'\D'l0.429i 0.000i'
+.sp -1
+\h'2.714i'\v'7.714i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'7.714i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'2.714i'\v'7.714i'\D'l0.000i -0.286i'
+.sp -1
+\h'2.714i'\v'7.429i'\D'l0.000i 0.571i'
+.sp -1
+\h'2.714i'\v'8.000i'\D'l-0.057i 0.000i'
+.sp -1
+\h'2.657i'\v'8.000i'\D'l0.114i 0.000i'
+.sp -1
+\h'1.571i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'1.857i'\v'7.571i'\D'l0.000i -0.143i'
+.sp -1
+\h'1.857i'\v'7.571i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.857i'\v'7.571i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'6.286i'\D'l0.000i -1.343i'
+.sp -1
+\h'1.571i'\v'4.943i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.571i'\v'4.943i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'1.429i'\D'c0.286i'
+.sp -1
+.lf 135
+\h'4.429i-(\w'Env2'u/2u)'\v'1.429i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'4.571i'\v'1.429i'\D'l0.143i 0.000i'
+.sp -1
+\h'4.714i'\v'1.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.714i'\v'1.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.429i'\v'1.571i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.429i'\v'1.857i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'1.857i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'2.000i'\D'c0.286i'
+.sp -1
+.lf 135
+\h'4.429i-(\w'Env'u/2u)'\v'2.000i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.429i'\v'2.143i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.328i'\v'1.530i'\D'l-0.757i 0.757i'
+.sp -1
+\h'4.328i'\v'1.530i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.328i'\v'1.530i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.286i'\v'2.000i'\D'l-1.571i 0.000i'
+.sp -1
+\h'2.714i'\v'2.000i'\D'l0.000i 0.286i'
+.sp -1
+\h'3.429i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'3.286i-(\w'Out'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'3.571i-(\w'Env'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'3.857i-(\w'OI'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'2.571i'\D'c0.286i'
+.sp -1
+.lf 138
+\h'4.143i-(\w'No-'u/2u)'\v'2.571i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 138
+\h'4.143i-(\w'Decl'u/2u)'\v'2.571i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'4.571i'\v'2.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 138
+\h'4.429i-(\w'OO'u/2u)'\v'2.571i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.143i'\v'2.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'2.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'2.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'2.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'2.486i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'2.486i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'2.657i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'3.857i'\v'2.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'2.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.800i'\v'2.286i'\D'l0.114i 0.000i'
+.sp -1
+\h'3.286i'\v'2.286i'\D'l0.000i -0.286i'
+.sp -1
+\h'3.286i'\v'2.000i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'2.000i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'3.143i'\D'c0.286i'
+.sp -1
+.lf 144
+\h'4.429i-(\w'Env2'u/2u)'\v'3.143i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'4.571i'\v'3.143i'\D'l0.143i 0.000i'
+.sp -1
+\h'4.714i'\v'3.143i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.714i'\v'3.143i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.429i'\v'3.286i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.429i'\v'3.571i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'3.571i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'3.714i'\D'c0.286i'
+.sp -1
+.lf 144
+\h'4.429i-(\w'Env'u/2u)'\v'3.714i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.429i'\v'3.857i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.328i'\v'3.244i'\D'l-0.757i 0.757i'
+.sp -1
+\h'4.328i'\v'3.244i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.328i'\v'3.244i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.286i'\v'3.714i'\D'l-1.571i 0.000i'
+.sp -1
+\h'2.714i'\v'3.714i'\D'l0.000i 0.286i'
+.sp -1
+\h'3.429i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'3.286i-(\w'Out'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'3.571i-(\w'Env'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'3.857i-(\w'OI'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'4.286i'\D'c0.286i'
+.sp -1
+.lf 147
+\h'4.143i-(\w'Attr'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'Attr
+.sp -1
+\h'4.571i'\v'4.371i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 147
+\h'4.429i-(\w'OO'u/2u)'\v'4.286i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.286i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.286i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.571i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.857i'\v'4.371i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.371i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.143i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'4.143i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.143i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.429i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.429i'\v'4.200i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'4.200i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.200i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.371i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.429i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'3.286i-(\w'Out'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'3.571i-(\w'Env'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'3.857i-(\w'OI'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'4.857i'\D'c0.286i'
+.sp -1
+.lf 149
+\h'4.143i-(\w'No-'u/2u)'\v'4.857i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 149
+\h'4.143i-(\w'Decl'u/2u)'\v'4.857i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'4.571i'\v'4.943i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 149
+\h'4.429i-(\w'OO'u/2u)'\v'4.857i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.143i'\v'4.714i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'4.714i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'4.714i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.771i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'4.771i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'4.771i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.943i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'3.857i'\v'4.943i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'4.943i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.800i'\v'4.000i'\D'l0.114i 0.000i'
+.sp -1
+\h'3.286i'\v'4.000i'\D'l0.000i -0.286i'
+.sp -1
+\h'3.286i'\v'3.714i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'3.714i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'5.429i'\D'c0.286i'
+.sp -1
+.lf 155
+\h'4.429i-(\w'Env2'u/2u)'\v'5.429i-(0v/2u)+0v+0.22m'Env2
+.sp -1
+\h'4.571i'\v'5.429i'\D'l0.143i 0.000i'
+.sp -1
+\h'4.714i'\v'5.429i'\D'P-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.714i'\v'5.429i'\D'p-0.100i 0.025i 0.000i -0.050i'
+.sp -1
+\h'4.429i'\v'5.571i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.429i'\v'5.857i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'5.857i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.286i'\v'6.000i'\D'c0.286i'
+.sp -1
+.lf 155
+\h'4.429i-(\w'Env'u/2u)'\v'6.000i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.429i'\v'6.143i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.328i'\v'5.530i'\D'l-0.757i 0.757i'
+.sp -1
+\h'4.328i'\v'5.530i'\D'P-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.328i'\v'5.530i'\D'p-0.053i 0.088i -0.035i -0.035i'
+.sp -1
+\h'4.286i'\v'6.000i'\D'l-1.571i 0.000i'
+.sp -1
+\h'2.714i'\v'6.000i'\D'l0.000i 0.286i'
+.sp -1
+\h'4.714i'\v'5.429i'\D'l0.000i -5.143i'
+.sp -1
+\h'4.714i'\v'0.286i'\D'l-3.286i 0.000i'
+.sp -1
+\h'1.429i'\v'0.286i'\D'P0.100i -0.025i 0.000i 0.050i'
+.sp -1
+\h'1.429i'\v'0.286i'\D'p0.100i -0.025i 0.000i 0.050i'
+.sp -1
+\h'3.429i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'3.286i-(\w'Out'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'3.571i-(\w'Env'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'3.857i-(\w'OI'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'6.571i'\D'c0.286i'
+.sp -1
+.lf 158
+\h'4.143i-(\w'Me-'u/2u)'\v'6.571i-(1v/2u)+0v+0.22m'Me-
+.sp -1
+.lf 158
+\h'4.143i-(\w'thod'u/2u)'\v'6.571i-(1v/2u)+1v+0.22m'thod
+.sp -1
+\h'4.571i'\v'6.657i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 158
+\h'4.429i-(\w'OO'u/2u)'\v'6.571i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.286i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.286i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.571i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.857i'\v'6.657i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'6.657i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'6.429i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'6.429i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'6.429i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'6.714i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.429i'\v'6.486i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'6.486i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'6.486i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'6.657i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.429i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'3.286i-(\w'Out'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'3.571i-(\w'Env'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'3.857i-(\w'OI'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'7.143i'\D'c0.286i'
+.sp -1
+.lf 160
+\h'4.143i-(\w'Attr'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'Attr
+.sp -1
+\h'4.571i'\v'7.229i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 160
+\h'4.429i-(\w'OO'u/2u)'\v'7.143i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.286i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.286i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.571i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.571i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.857i'\v'7.229i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.229i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.000i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'7.000i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.000i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.286i'\D'l0.000i 0.143i'
+.sp -1
+\h'4.429i'\v'7.057i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'7.057i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.057i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.229i'\D'l0.000i 0.200i'
+.sp -1
+\h'3.429i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'3.286i-(\w'Out'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Out
+.sp -1
+\h'3.714i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'3.571i-(\w'Env'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'Env
+.sp -1
+\h'4.000i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'3.857i-(\w'OI'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'OI
+.sp -1
+\h'4.000i'\v'7.714i'\D'c0.286i'
+.sp -1
+.lf 162
+\h'4.143i-(\w'No-'u/2u)'\v'7.714i-(1v/2u)+0v+0.22m'No-
+.sp -1
+.lf 162
+\h'4.143i-(\w'Decl'u/2u)'\v'7.714i-(1v/2u)+1v+0.22m'Decl
+.sp -1
+\h'4.571i'\v'7.800i'\D'p0.000i -0.171i -0.286i 0.000i 0.000i 0.171i'
+.sp -1
+.lf 162
+\h'4.429i-(\w'OO'u/2u)'\v'7.714i-(0v/2u)+0v+0.22m'OO
+.sp -1
+\h'3.286i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.571i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'3.857i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.143i'\v'7.571i'\D'l0.000i -0.143i'
+.sp -1
+\h'4.143i'\v'7.571i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.143i'\v'7.571i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.629i'\D'l0.000i -0.200i'
+.sp -1
+\h'4.429i'\v'7.629i'\D'P-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'4.429i'\v'7.629i'\D'p-0.025i -0.100i 0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.800i'\D'a0.286i 0.000i 0.286i 0.000i'
+.sp -1
+\h'3.857i'\v'7.800i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.857i'\v'7.800i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.800i'\v'6.286i'\D'l0.114i 0.000i'
+.sp -1
+\h'3.286i'\v'6.286i'\D'l0.000i -0.286i'
+.sp -1
+\h'3.286i'\v'6.000i'\D'P0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'3.286i'\v'6.000i'\D'p0.025i 0.100i -0.050i 0.000i'
+.sp -1
+\h'1.101i'\v'1.530i'\D'l0.756i 0.756i'
+.sp -1
+\h'1.101i'\v'1.530i'\D'l3.042i 0.756i'
+.sp -1
+\h'1.101i'\v'3.244i'\D'l0.756i 0.756i'
+.sp -1
+\h'1.101i'\v'3.244i'\D'l3.042i 0.756i'
+.sp -1
+\h'1.101i'\v'5.530i'\D'l0.756i 0.756i'
+.sp -1
+\h'1.101i'\v'5.530i'\D'l3.042i 0.756i'
+.sp -1
+\h'2.857i'\v'4.286i'\D'l0.114i 0.000i'
+.sp -1
+\h'2.971i'\v'4.286i'\D'l0.000i -2.571i'
+.sp -1
+\h'2.971i'\v'1.714i'\D'l1.029i 0.000i'
+.sp -1
+\h'4.000i'\v'1.714i'\D'l0.328i 0.185i'
+.sp -1
+\h'4.328i'\v'1.899i'\D'P-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'4.328i'\v'1.899i'\D'p-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'2.857i'\v'6.571i'\D'l0.143i 0.000i'
+.sp -1
+\h'3.000i'\v'6.571i'\D'l0.000i -3.143i'
+.sp -1
+\h'3.000i'\v'3.429i'\D'l1.000i 0.000i'
+.sp -1
+\h'4.000i'\v'3.429i'\D'l0.328i 0.185i'
+.sp -1
+\h'4.328i'\v'3.613i'\D'P-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'4.328i'\v'3.613i'\D'p-0.099i -0.027i 0.025i -0.044i'
+.sp -1
+\h'2.857i'\v'7.143i'\D'l0.143i 0.000i'
+.sp -1
+\h'3.000i'\v'7.143i'\D'l0.000i -0.571i'
+.sp -1
+.sp 8.657i+1
+.if \n(00 .fi
+.br
+.nr 0x 0
+.lf 175
+.PE
+.lf 176
+.sp
+.)b
+.lf 949 /tmp/.doc
+.sh 2 "Makefile"
+.lp
+The Makefile controls the invocation of the tools for compiler generation, takes care
+about the compilation and linking of the compiler parts, and finally runs the
+executable compiler using a sample input. The structure of the Makefile follows the
+recommendation given in the appropriate document\*([<\*([[Groe\*(]]\*(>] of the
+Cocktail Toolbox for Compiler Construction.
+.sp
+.ne 2
+.nf
+.FT
+.lf 1 /tmp/f
+LIB     = $(HOME)/lib
+INCDIR  = $(LIB)/include
+CFLAGS  = -I$(INCDIR)
+CC      = cc -g
+.sp 0.5
+SOURCES = Scanner.h Scanner.c Parser.h Parser.c Tree.h Tree.c Eval.h Eval.c l.c
+OBJS    = Scanner.o Parser.o Tree.o Eval.o l.o
+.sp 0.5
+try:    l
+        l < in 2> o
+        diff out o
+.sp 0.5
+l:      $(OBJS)
+        $(CC) $(CFLAGS) $(OBJS) $(LIB)/libreuse.a -o l
+.sp 0.5
+Scanner.rpp Parser.lrk: l.prs
+        lpp -cxzj l.prs;
+.sp 0.5
+Scanner.h Scanner.c:    l.scn Scanner.rpp
+        rpp < l.scn | rex -cd;
+.sp 0.5
+Parser.h Parser.c:      Parser.lrk
+        lark -cdi Parser.lrk;
+.sp 0.5
+Tree.h Tree.c:  l.ag
+        cg -cdimwDIL5 l.ag;
+.sp 0.5
+Eval.h Eval.c:  l.ag
+        cg -cDIL5 l.ag;
+.sp 0.5
+Parser.o:       Parser.h Scanner.h Tree.h
+Eval.o:         Eval.h Tree.h DefTab.c
+Tree.o:         Tree.h
+l.o:            Parser.h Tree.h Eval.h
+.sp 0.5
+lint:   $(SOURCES)
+        lint $(CFLAGS) -u $(SOURCES) | fgrep -v -i Warning
+.sp 0.5
+clean:
+        rm -f Scanner.[hc] Parser.[hc] Tree.[hc] Eval.[hc]
+        rm -f Parser.lrk Scanner.rpp core* *.o *.dbg l o yy*.h
+.sp 0.5
+\&.c.o:
+        $(CC) $(CFLAGS) -c $*.c;
+.lf 961 /tmp/.doc
+.sh 1 "Declarations"
+.lp
+The first part of this work will discuss problems in connection with declarations.
+The goal is to cover most of the typical tasks in name analysis or declaration analysis.
+All examples in this chapter involve a definition table module.
+.sh 2 "Declaration of Objects"
+.FH "Description"
+The first language under consideration deals with declarations and nothing else. A program
+consists of a list of abstract declarations, only. An abstract declaration introduces just
+the identifier of an object. This problem is simple and not very sensible. Its purpose is to
+serve as introductory example, to familiarize with the used method, and to illustrate the
+abstractions behind attribute diagrams. Those abstraction have been described in a previous
+section.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.FH "Remarks"
+The threaded attribute
+.i Objects
+used for the definition table may seem as overkill compared to a simple synthesized
+attribute. There are two reasons in favor of a threaded attribute. First, in general there
+might be several subtrees that contribute objects to a scope (see next problem). Second,
+the attribution influences the quality of the semantic error messages. The presented solution
+reports multiply declared identifiers starting at the second appearance. Using a
+synthesized attribute, all multiply declared identifiers but the last one would be reported
+as errors.
+.pp
+There are no explicit computations for the attribute
+.i ObjectsOut
+at the rules
+.i Decl
+and
+.i NoDecl .
+Copy rules are generated automatically by the tool
+.i ag
+in this case:
+.(b
+.FT
+Decl   = { ObjectsOut := Next:ObjectsOut; }
+NoDecl = { ObjectsOut := ObjectsIn;       }
+.)b
+.pp
+The features SELF and DEP which are used in the computation of the attribute
+.i Next:ObjectsIn
+may need some explanation. The value SELF refers to the current tree node or in other words
+it is a pointer to the current node. The computation needed for this attribute would be
+just:
+.(b
+.FT
+Next:ObjectsIn := SELF;
+.)b
+However, this way the dependency on the attribute
+.i ObjectsIn
+is lost and therefore a dynamic attribute evaluator for well-defined attribute grammars
+would just compute the last
+.i ObjectsIn
+attribute in a list and fail to compute the other instances. This problem can be fixed by
+the introduction of a virtual dependency on the attribute
+.i ObjectsIn .
+This is achieved with the pseudo function DEP which returns its first argument.
+However, all arguments are incorporated into the dependency analysis and they are evaluated
+before DEP returns its result.
+.ds f declare
+.FA declare
+.sh 3 "Sublists"
+.FH "Description"
+This language is an abstraction where the declarations for one scope are distributed over
+several subtrees in the abstract syntax tree. The example considers lists of lists of
+declarations. The threaded attribute
+.i Objects
+is definitively necessary in this case.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.\" .FH "Remarks"
+.ds f list
+.FA list
+.sh 2 "Use of Objects"
+.FH "Description"
+This language deals with abstract uses of objects.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used identifier must be declared
+.FH "Remarks"
+The list of declarations in a program defines a set of objects. At the rule
+.i Prog
+this set is denoted by the attribute
+.i Decls:ObjectsOut .
+It is the first argument of the call to the function
+.i mEnv
+which generates a data structure for a scope. In this case the second argument
+.i NoTree
+refers to a surrounding scope that is empty. The scope information is passed to all elements
+in the statement sequence using a pointer valued attribute called
+.i Env .
+The computations for this attribute are copy rules that are generated automatically.
+.ds f use
+.FA use
+.sh 2 "Nested Blocks"
+.lp
+This group of languages considers nested blocks. Procedures without parameters are the
+language constructs serving as blocks.
+.sh 3 "Visibility from Block Begin to Block End"
+.FH "Description"
+An identifier may be used in the whole block where it is declared or in enclosed blocks
+unless there is a declaration with the same identifier. It may be used before or
+after its declaration. In other words: The
+.i "declare before use"
+principle is not enforced.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used identifier must be declared
+.FH "Remarks"
+This scope rule is comfortable because a programmer does not have to worry about the
+order of the declarations. This problem can be delegated to a compiler.
+.pp
+The realization of this scope rule is relatively simple because the definition table
+supports this kind of comfort. Scope rules such as
+.i "declare before use"
+can be realized as well (see later section) but require an increased effort.
+.pp
+The node type
+.i Decls
+has an attribute named
+.i Env
+because the declaration of a procedure (node type
+.i Proc )
+may contain uses of objects.
+.ds f block
+.FA block
+.sh 3 "Visibility from Declaration to Block End"
+.FH "Description"
+An identifier may be used in the block where it is declared in a range starting from its
+declaration and ending at the end of the block. It may be used in enclosed blocks residing
+in the mentioned range unless there is a declaration with the same identifier. If an
+identifier is used in a block before a declaration of the same identifier contained in
+this block it refers to an object in a surrounding block.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used identifier must be declared
+.FH "Remarks"
+The languages C and Ada use this scope rule. This strategy seems to be influenced from an
+implementation that does semantic analysis in one pass and that uses a stack of scopes.
+.pp
+The concrete syntax, the abstract syntax, the attribute diagram, and the test input for
+this example are the same as in section 4.3.1. In the attribute grammar only the checks at
+the rule
+.i Stat
+are different.
+.ds f tail
+.FA tail
+.sh 3 "Declare Before Use"
+.FH "Description"
+An identifier must be declared before its use. The description is similar to the previous
+one with the following exception: It is an error to use an identifier before a declaration
+of the same identifier in the same block.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used identifier must be declared
+.ip -
+The declaration of an object must lie before any use
+.FH "Remarks"
+The language Modula-2 uses this scope rule with respect to declarations.
+.pp
+The concrete syntax, the abstract syntax, the attribute diagram, and the test input for
+this example are the same as in section 4.3.1. In the attribute grammar only the checks at
+the rule
+.i Stat
+are different.
+.ds f before
+.FA before
+.sh 3 "Forward/Incomplete Declarations"
+.FH "Description"
+The regulations for
+.i "declare before use"
+are extended by forward or incomplete declarations. Again an object has to be declared
+before any use. It is sufficient if a forward declaration precedes the using location as
+long as a complete declaration follows either before or after the using location.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used identifier must be declared
+.ip -
+The declaration of an object must lie before any use
+.ip -
+A complete declaration must exist for every forward declaration
+.ip -
+The complete declaration must lie behind the forward declaration
+.FH "Remarks"
+The language Pascal uses this scope rule with one exception for the declaration of pointer
+types.
+.pp
+The implementation allows multiply declarations to a certain degree. A forward declaration
+and the corresponding complete declaration are treated internally as two separate objects
+having the same identifier.
+.ds f forward
+.FA forward
+.sh 2 "Implicit Declarations"
+.sh 3 "Local"
+.FH "Description"
+This language does not require that used identifiers are declared. For undeclared
+identifiers objects are declared implicitly. These are inserted in the local
+environment or the actual block, respectively.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.\" .FH "Remarks"
+.ds f implicit
+.FA implicit
+.sh 3 "Global"
+.FH "Description"
+This language does not require that used identifiers are declared. For undeclared
+identifiers objects are declared implicitly. These are inserted in the global
+environment or the outermost block, respectively.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.\" .FH "Remarks"
+.ds f implicit-global
+.FA implicit-global
+.sh 2 "Named Blocks"
+.lp
+There are programming languages where blocks may be named. Procedures can also be regarded
+as named blocks.
+.sh 3 "Qualified Use"
+.FH "Description"
+Usually objects declared in a surrounding block can not be accessed in an enclosed
+block if there is a redeclaration with the same identifier. A precondition to
+overcome this restriction is the existence of named blocks. Then those objects
+from surrounding blocks can be accessed by qualification.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used object must be declared
+.ip -
+The qualifying object must be declared
+.ip -
+The qualifying object must be a procedure
+.ip -
+The object accessed by qualification must exist at the time of access
+.FH "Remarks"
+The solution of this problem uses the access of a non-local attribute in the rule
+.i Qualify .
+It is necessary to look up an object in the environment of the qualifying object.
+This is achieved using the following notation:
+.(b
+.FT
+REMOTE Designator:Object => Proc:NewEnv
+.)b
+The attribute
+.i Designator:Object
+refers to the tree node describing the qualifying object. This node is of type
+.i Proc .
+The attribute
+.i NewEnv
+of this node is needed in a computation and the attribute evaluator takes
+care that this attribute is computed before its use.
+.ds f qualify-remote
+.FA qualify-remote
+.sh 2 "Kind Checking"
+.lp
+The various identifiers in a program can lie in one or in several name spaces.
+.sh 3 "One Name Space"
+.FH "Description"
+This language regards all identifiers to lie in one name space. It distinguishes
+different kinds of objects: variables, named constants, and procedures.
+There are two different locations for the use of objects. A
+.i use
+statement requires a variable or a constant identifier and a
+.i call
+statement requires a procedure identifier.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used object must be declared
+.ip -
+A use statement requires a variable or a constant identifier
+.ip -
+A call statement requires a procedure identifier
+.\" .FH "Remarks"
+.ds f kind
+.FA kind
+.sh 3 "Several Name Spaces"
+.FH "Description"
+This language regards the identifiers to lie in two name spaces.
+Variables and named constants constitute one name space and procedures constitute an other
+one. Again, there are two different locations for the use of objects. A
+.i use
+statement requires a variable or a constant identifier and a
+.i call
+statement requires a procedure identifier.
+.FH "Conditions"
+.ip -
+Identifiers in one name space may not be declared multiply
+.ip -
+Every used object must be declared
+.ip -
+A use statement requires a variable or a constant identifier
+.ip -
+A call statement requires a procedure identifier
+.FH "Remarks"
+The functions
+.i IdentifyWholeKind
+and
+.i Tree_IsType
+have an argument describing the kind of an object. This argument describes either a single
+kind of objects (e. g. 
+.i kProc )
+or a class of object kinds (e. g.
+.i kValue )
+which comprises the object kinds having a value (
+.i kVar
+and 
+.i kConst ).
+.ds f several
+.FA several
+.sh 2 "Labels"
+.lp
+There are various ways to treat labels serving as targets for goto statements.
+.sh 3 "Implicit Declaration"
+.FH "Description"
+In the simplest case the label marking a statement introduces an object into the definition
+table. It can be regarded as some kind of implicit declaration.
+.FH "Conditions"
+.ip -
+Identifiers for all kinds of objects including labels may not be declared multiply
+.ip -
+Every used object must be declared
+.ip -
+A use statement requires a variable or a constant identifier
+.ip -
+A call statement requires a procedure identifier
+.ip -
+A goto statement requires a label identifier
+.FH "Remarks"
+Labels are treated as implicit declarations and therefore corresponding object descriptors
+are inserted into the current set of objects.
+.pp
+Besides declarations statements may contribute objects to the definition table as well.
+Therefore both, the node types
+.i Decls
+and
+.i Stats
+have the threaded attribute
+.i Objects .
+.ds f label
+.FA label
+.sh 3 "Explicit Declaration"
+.FH "Description"
+In addition to the location where a label marks a statement an explicit declaration for
+that label may be required (for example in Pascal).
+.FH "Conditions"
+.ip -
+Identifiers for all kinds of objects including labels may not be declared multiply
+.ip -
+Every used object must be declared
+.ip -
+A use statement requires a variable or a constant identifier
+.ip -
+A call statement requires a procedure identifier
+.ip -
+A goto statement requires a label identifier
+.ip -
+A label definition requires a label identifier
+.ip -
+At most one label definition may exist for one declared label
+.FH "Remarks"
+The last condition is implemented using a boolean attribute called
+.i Mark
+for the node type
+.i LabelDecl .
+.ds f labeldecl
+.FA labeldecl
+.sh 3 "Jump Checking"
+.FH "Description"
+Usually it is forbidden to jump from outside into compound statements such as
+loops or branch statements.
+.FH "Conditions"
+.ip -
+Identifiers for all kinds of objects including labels may not be declared multiply
+.ip -
+Every used object must be declared
+.ip -
+A use statement requires a variable or a constant identifier
+.ip -
+A call statement requires a procedure identifier
+.ip -
+A goto statement requires a label identifier
+.FH "Remarks"
+The solution treats compound statements as nested blocks with own scopes. This way the
+labels of illegal gotos become invisible and are reported as undeclared identifiers.
+In order to keep the number of scopes small and to speed up the run time of the
+identification functions new scopes are introduced only if they are absolutely
+necessary. This is achieved by the function
+.i mENV
+from the definition table module.
+.ds f labelcheck
+.FA labelcheck
+.sh 2 "Modules"
+.sh 3 "Local Modules"
+.FH "Description"
+So-called local modules may be nested like blocks. However, objects from a surrounding
+module are not visible in enclosed modules. Such a language may not be sensible. It serves
+as introductory example for a series of languages dealing with modules.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+Every used object must be declared
+.\" .FH "Remarks"
+.ds f module
+.FA module
+.sh 4 "Import Clause"
+.FH "Description"
+This language adds import statements which explicitly allow objects from surrounding
+modules to become visible. This version of import statements specify the object to be
+imported as well as the module from which the object is to be imported. This module is
+searched for in the outer environment with respect to the import statement. All objects
+of a module may be imported by other modules.
+.FH "Conditions"
+.ip -
+Identifiers in sets of declared and imported objects may not appear multiply
+.ip -
+Every used object must be declared
+.ip -
+The first identifier in an import clause must refer to a module object
+.FH "Remarks"
+Similar to the problem of qualified access using named blocks this solution also requires
+the access of a non-local attribute. Again it is necessary to look up an object in an
+environment which is not contained in the current scope hierarchy. This example as well as
+the following ones demonstrate the comfort of the presented solutions arising from
+well-defined attribute grammars and access to non-local attributes. Even cyclic import
+relations are possible, that means one module imports from a second one and vice versa.
+There is no need to worry about the order of the computation.
+The generated attribute evaluator takes care of this problem.
+.pp
+Imported objects are included in the set of objects associated with the current block in
+the same way as are declared objects. However, those objects are linked already into the
+sets of objects at the place of their declaration. Therefore newly created
+.i "reference objects"
+are used to refer to objects from other scopes using the node type
+.i RefDecl .
+.ds f import
+.FA import
+.sh 4 "Export Clause"
+.FH "Description"
+While the previous example allowed all objects of a module to be imported by other modules,
+this language explicitly controls this. Export statements specify the objects that may be
+imported by other modules.
+.FH "Conditions"
+.ip -
+Identifiers in sets of declared and imported objects may not appear multiply
+.ip -
+Every used object must be declared
+.ip -
+The first identifier in an import clause must refer to a module object
+.ip -
+The objects appearing in export clauses must be declared
+.FH "Remarks"
+The export clauses are used to construct a subset of the declared objects again using the
+node type
+.i RefDecl .
+The import clauses consult this subset in order to check the legality of the import.
+.ds f export
+.FA export
+.sh 3 "Separately Compiled Modules"
+.lp
+In the previous examples the modules where contained in one compilation unit.
+Now every module is treated as a separate compilation unit. The modules are not allowed to
+be nested any more. Again, the existence of import and export clauses is assumed. A compiler
+has to inspect not only the source of the module to be compiled but also some information
+about the modules that are imported in order to perform a complete semantic analysis.
+.sh 4 "Without Symbol Files"
+.FH "Description"
+One solution for the separate compilation problem is to directly read and analyze
+the sources of the imported modules. The advantages of this solution are that no files are
+necessary that describe the exported objects of the modules and the modules may be compiled
+in any order.
+.FH "Conditions"
+.ip -
+Identifiers in sets of declared and imported objects may not appear multiply
+.ip -
+Every used object must be declared
+.ip -
+The first identifier in an import clause must refer to a module object
+.ip -
+The objects appearing in export clauses must be declared
+.FH "Remarks"
+The solution uses a different main program and a different scanner as described in the next
+sections.
+.ds f separate-src
+.sy prepare1 \*f
+.FH "Main Program"
+The abstract syntax tree for a compilation unit does not contain only the actual module but
+also the modules that are (transitively) imported. Therefore the abstract syntax can be
+regarded as a list of trees described by the node type
+.i Progs .
+The main program takes care that all needed modules are scanned and parsed and included in
+the abstract syntax tree. For this purpose a list starting at the variable
+.i UnitList
+with elements of the node type
+.i Unit
+is maintained. It keeps all modules to be processed. Initially it holds the module that is
+to be compiled. After one module has been read, the procedure
+.i UpdateList
+is used to extend the list with additionally necessary modules. This algorithm iterates
+until all transitively imported modules have been processed. It is assumed that the modules
+are stored in files with the same names as the modules.
+.sp
+.nf
+.FT
+.lf 1 /tmp/m
+  21,  4: Error       identifier already inherited: y
+  22,  4: Error       identifier already inherited: z
+.lf 1484 /tmp/.doc
+.FR
+.FH "Scanner"
+The scanner is distinguished from the normal ones by the definition of the type
+.i tPosition .
+This type is extended by a field that describes the source file. The DEFAULT section is
+adapted to this type. Accordingly, the module
+.i Errors
+that reports syntactic and semantic errors has been modified to include the file name into
+the source position.
+.sp
+.nf
+.FT
+.lf 1 /tmp/s
+EXPORT  {
+# include "Idents.h"
+# include "Position.h"
+.sp 0.5
+INSERT tScanAttribute
+}
+.sp 0.5
+GLOBAL  {
+# include "Idents.h"
+.sp 0.5
+INSERT ErrorAttribute
+}
+.sp 0.5
+DEFAULT {
+   char FileName [256];
+   GetString (Attribute.Position.Ident, FileName);
+   (void) fprintf (stderr, "\\"%s\\", %3d, %2d: Error       illegal character: %c\\n",
+      FileName, Attribute.Position.Line, Attribute.Position.Column, * TokenPtr);
+}
+.sp 0.5
+DEFINE  digit   = {0-9} .
+        letter  = {a-z A-Z} .
+.sp 0.5
+RULES
+.sp 0.5
+INSERT RULES #STD# 
+.sp 0.5
+#STD# letter (letter | digit) * : {
+   Attribute.Ident.Ident = MakeIdent (TokenPtr, TokenLength);
+   return Ident;
+}
+.lf 1497 /tmp/.doc
+.FR
+.FA separate-src
+.sh 4 "With Symbol Files"
+.FH "Description"
+An other solution for the separate compilation problem is to use so-called symbol files.
+Information about the exported objects of a module is written on a symbol file. If
+information about imported objects is needed it is read from the symbol files.
+The advantage of this solution is that scanning and parsing of the sources of the imported
+modules is not necessary. It is assumed that it is faster to read the symbol files.
+.FH "Conditions"
+.ip -
+Identifiers in sets of declared and imported objects may not appear multiply
+.ip -
+Every used object must be declared
+.ip -
+The first identifier in an import clause must refer to a module object
+.ip -
+The objects appearing in export clauses must be declared
+.FH "Remarks"
+The solution uses a different main program and a different scanner.
+The scanner and the error handler are the same as in the previous example.
+The main program is described in the next section.
+.pp
+The names of the symbol files are constructed by adding the suffix ".s" to the module names.
+.ds f separate-bin
+.sy prepare1 \*f
+.FH "Main Program"
+In principle the strategy is the same as in the previous example. The abstract syntax tree
+consists of a list of trees for all (transitively) imported modules. At the end of a
+compilation a symbol file is written. It contains a binary representation of the actual
+module. The statement part is omitted because only the declaration, import, and export
+parts are needed. The same iterative algorithm as in the previous example is used. The
+difference is that binary symbol files are read instead of source files using a scanner and
+parser. Reading and writing of the binary symbol files is performed with the reader and
+writer procedures
+.i GetTree
+and
+.i PutTree
+that are generated by the tool
+.i ast .
+.sp
+.nf
+.FT
+.lf 1 /tmp/m
+  21,  4: Error       identifier already inherited: y
+  22,  4: Error       identifier already inherited: z
+.lf 1541 /tmp/.doc
+.FR
+.FA separate-bin
+.sh 2 "Classes"
+.lp
+The features offered by object-oriented languages are not standardized in any way and vary
+widely. This section describes two simple abstractions of single and multiple inheritance.
+Both languages have classes consisting of attributes (instance variables) and methods.
+Subclasses inherit the entities of the superclasses and may overwrite the inherited methods
+by giving own definitions. Classes are not treated like modules that restrict the
+visibility for objects. Instead, they are considered as blocks. Therefore methods may
+access objects from outside the class similar to the access of objects in surrounding
+blocks. In this case there are two places to look for non-local objects: the superclass and
+the surrounding block. This conflict is resolved by looking in the superclass first and in
+the surrounding block next. The abstract declarations for objects other than classes are
+extended by a type that has to refer to a class.
+.sh 3 "Single Inheritance"
+.FH "Description"
+Single inheritance means that a class may at most have one superclass.
+.FH "Conditions"
+.ip -
+Identifiers may not be declared multiply
+.ip -
+The type object in a declaration must be declared
+.ip -
+The type object in a declaration must refer to a class
+.ip -
+The super class object in a class declaration must be declared
+.ip -
+The super class object in a class declaration must refer to a class
+.ip -
+Inherited objects may not be redeclared except for methods
+.ip -
+Every used object must be declared
+.FH "Remarks"
+As explained above, there are two non-local scopes an object can be searched in:
+the super class and the surrounding block. In order to describe this situation the
+definition of the node type
+.i Env
+in the definition table is extended as follows:
+.(b
+.FT
+Envs	= <
+   Env	= [Objects: tTree IN] Env: Envs IN .
+   Env2	= Env1: Envs IN Env2: Envs IN .
+> .
+.)b
+The type
+.i Env
+is as before and refers to a set of objects and a surrounding scope. The type
+.i Env2
+refers to two non-local scopes.
+.ds f single
+.FA single
+.sh 3 "Multiple Inheritance"
+.FH "Description"
+Multiple inheritance allows for an arbitrary number of superclasses.
+.FH "Conditions"
+see previous section
+.FH "Remarks"
+see previous section
+.ds f multiple
+.FA multiple
+
+.bp
+.uh "Appendix 1: Abbreviations for Node Types"
+.sp
+.TS
+;
+l l.
+Attr	Attribute
+Class	
+Compound	
+Const	
+DList	
+Dcl	
+Decl	
+Env	
+Env2	
+Export	
+Goto	
+Import	
+Label	
+LabelDecl	
+Method	
+Module	
+NoDList	
+NoDecl	
+NoEx	NoExport
+NoIm	NoImport
+NoProg	
+NoStat	
+NoSup	NoSuper
+Proc	
+Prog	
+Qualify	
+RefDecl	
+Root	
+Stat	
+Super	
+Use	
+Var	
+.TE
+.uh "Appendix 2: Abbreviations for Attribute Names"
+.sp
+.TS
+;
+l l.
+Env	Env
+Id	Ident
+Mod	Module
+New	NewEnv
+OI	ObjectsIn
+OO	ObjectsOut
+Obj	Object
+Out	OuterEnv, EnvOut
+Pos	Pos
+.TE
+.fi
+.sz 12
+.[]
+.[-
+.ds [F GrE90
+.ds [A J\*(p] Grosch
+.as [A \*(n]H\*(p] Emmelmann
+.ds [T A Tool Box for Compiler Construction
+.ds [V 477
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 106-116
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Gro90
+.ds [A J\*(p] Grosch
+.ds [T Object-Oriented Attribute Grammars
+.ds [E A\*(p]\*(a]E\*(p] Harmanci
+.as [E \*(n]E\*(p] Gelenbe
+.nr [E 2
+.ds [B Proceedings of the Fifth International Symposium on Computer and Information Sciences (ISCIS V)
+.ds [C Cappadocia, Nevsehir, Turkey
+.nr [P 1
+.ds [P 807-816
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Gro92
+.ds [A J\*(p] Grosch
+.ds [T Transformation of Attributed Trees Using Pattern Matching
+.ds [V 641
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 1-15
+.ds [D Oct. 1992
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Puma - A Generator for the Transformation of Attributed Trees
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 26
+.ds [N 26
+.][
+.[-
+.ds [F GrV
+.ds [A J\*(p] Grosch
+.as [A \*(n]B\*(p] Vielsack
+.ds [T The Parser Generators Lalr and Ell
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 8
+.ds [N 8
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Ast - A Generator for Abstract Syntax Trees
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 15
+.ds [N 15
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Rex - A Scanner Generator
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 5
+.ds [N 5
+.][
+.[-
+.ds [F Groc
+.ds [A J\*(p] Grosch
+.ds [T Preprocessors
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 24
+.ds [N 24
+.][
+.[-
+.ds [F Grod
+.ds [A J\*(p] Grosch
+.ds [T Multiple Inheritance in Object-Oriented Attribute Grammars
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 28
+.ds [N 28
+.][
+.[-
+.ds [F Groe
+.ds [A J\*(p] Grosch
+.ds [T Toolbox Introduction
+.ds [I CoCoLab Karlsruhe
+.ds [R Cocktail Document No. 25
+.ds [N 25
+.][
+.[-
+.ds [F Kas80
+.ds [A U\*(p] Kastens
+.ds [T Ordered Attribute Grammars
+.nr [P 1
+.ds [P 229-256
+.ds [J Acta Inf.
+.ds [V 13
+.ds [D 1980
+.ds [N 3
+.][
+.[-
+.ds [F Knu68
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-Free Languages
+.nr [P 1
+.ds [P 127-146
+.ds [J Mathematical Systems Theory
+.ds [V 2
+.ds [D June 1968
+.ds [N 2
+.][
+.[-
+.ds [F Knu71
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-free Languages: Correction
+.nr [P 1
+.ds [P 95-96
+.ds [J Mathematical Systems Theory
+.ds [V 5
+.ds [D Mar. 1971
+.][
+.[-
+.ds [F VSK89
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.as [A \*(c]S\*(p]\*(a]D\*(p] Swierstra
+.as [A \*(m]M\*(p]\*(a]F\*(p] Kuiper
+.ds [T Higher Order Attribute Grammars
+.ds [J SI\&GPLAN Notices
+.ds [V 24
+.ds [N 7
+.nr [P 1
+.ds [P 131-145
+.ds [D July 1989
+.][
+.[-
+.ds [F Vog93
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.ds [T Higher Order Attribute Grammars
+.ds [I PhD Thesis, University of Utrecht
+.ds [D Feb. 1993
+.][
+.bp 1
+.lp
+.b Contents
+.sp
+.xp

@@ -1,0 +1,134 @@
+(* $Id: DefTable.mi,v 3.4 2006/08/01 14:12:37 grosch rel $ *)
+
+(*
+ * $Log: DefTable.mi,v $
+ * Revision 3.4  2006/08/01 14:12:37  grosch
+ * introduced separate name spaces for start states and definitions
+ *
+ * Revision 3.3  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 3.2  1998/04/21 10:26:07  grosch
+ * cosmetic changes
+ *
+ * Revision 3.1  1991/11/21 14:41:19  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.0  91/04/04  18:06:45  grosch
+ * introduced partitioning of character set
+ *
+ * Revision 1.1  91/03/26  18:26:40  grosch
+ * improved generation time
+ * introduced options n and o to control table size and generation time
+ * increased limitation for table size from 64K to 256K
+ *
+ * Revision 1.0  88/10/04  11:59:30  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Nov. 1987 *)
+
+IMPLEMENTATION MODULE DefTable;
+
+FROM SYSTEM	IMPORT TSIZE	;
+FROM DynArray	IMPORT MakeArray, ExtendArray	;
+FROM Idents	IMPORT tIdent	;
+FROM Tree	IMPORT tTree	;
+
+CONST InitialDefTableSize	= 32;
+
+TYPE
+   DefType	= RECORD
+				Ident		: tIdent	;
+		     CASE	Kind		: tKind		OF
+		     |  Define:	Tree		: tTree		;
+		     |  Start :	Number		: LONGCARD	;
+		     END;
+		  END;
+
+   DefTable	= ARRAY [0 .. 100000] OF DefType;
+
+VAR
+   DefTablePtr	: POINTER TO DefTable;
+   DefTableSize	: LONGINT;
+
+PROCEDURE MakeDefineDef	(
+	  pIdent	: tIdent	;
+	  pTree		: tTree		);
+   BEGIN
+      INC (DefCount);
+      IF DefCount = DefTableSize THEN
+	 ExtendArray (DefTablePtr, DefTableSize, TSIZE (DefType));
+      END;
+      WITH DefTablePtr^[DefCount] DO
+	 Ident		:= pIdent	;
+	 Kind		:= Define	;
+	 Tree		:= pTree	;
+      END;
+   END MakeDefineDef;
+
+PROCEDURE MakeStartDef	(
+          pIdent	: tIdent	;
+          pNumber	: LONGCARD	);
+   BEGIN
+      INC (DefCount);
+      IF DefCount = DefTableSize THEN
+	 ExtendArray (DefTablePtr, DefTableSize, TSIZE (DefType));
+      END;
+      WITH DefTablePtr^[DefCount] DO
+	 Ident		:= pIdent	;
+	 Kind		:= Start	;
+	 Number		:= pNumber	;
+      END;
+   END MakeStartDef;
+
+PROCEDURE GetDef	(
+          pIdent	: tIdent	;
+	  pKind		: tKind		): DefRange;
+   VAR Def		: DefRange;
+   BEGIN
+      FOR Def := 1 TO DefCount DO
+	 WITH DefTablePtr^[Def] DO
+	   IF (Ident = pIdent) AND (Kind = pKind) THEN
+	     RETURN Def;
+	   END;
+	 END;
+      END;
+      RETURN NoDef;
+   END GetDef;
+
+PROCEDURE GetKind	(
+          pDef		: DefRange	): tKind;
+   BEGIN
+      RETURN DefTablePtr^[pDef].Kind;
+   END GetKind;
+
+PROCEDURE GetDefineDef	(
+          pDef		: DefRange	;
+      VAR pIdent	: tIdent	;
+      VAR pTree		: tTree		);
+   BEGIN
+      WITH DefTablePtr^[pDef] DO
+	 pIdent		:= Ident	;
+	 pTree		:= Tree		;
+      END;
+   END GetDefineDef;
+
+PROCEDURE GetStartDef	(
+          pDef		: DefRange	;
+      VAR pIdent	: tIdent	;
+      VAR pNumber	: LONGCARD	);
+   BEGIN
+      WITH DefTablePtr^[pDef] DO
+	 pIdent		:= Ident	;
+	 pNumber	:= Number	;
+      END;
+   END GetStartDef;
+
+BEGIN
+   DefTableSize	:= InitialDefTableSize;
+   MakeArray (DefTablePtr, DefTableSize, TSIZE (DefType));
+   DefCount	:= 0;
+END DefTable.

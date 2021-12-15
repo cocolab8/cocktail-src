@@ -1,0 +1,38 @@
+DEFS	= ArgCheck.md Automaton.md CodeM2.md Complete.md	\
+	  Environs.md Grammar.md Info.md Match.md Patterns.md	\
+	  Reduced.md Semantics.md Test.md Types.md
+IMPS	= ArgCheck.mi Automaton.mi CodeM2.mi Complete.mi	\
+	  Environs.mi Grammar.mi Info.mi Match.mi Patterns.mi	\
+	  Reduced.mi Semantics.mi Test.mi Types.mi
+
+GENDEFS	= Parser.md Scanner.md Tree.md 
+GENIMPS	= Parser.mi Scanner.mi Tree.mi 
+
+SOURCES	= CodeM2.mi $(GENDEFS) $(GENIMPS)
+
+sources: $(SOURCES)
+
+Tree.md Tree.mi:	Tree.ast
+	cg -diwmR Tree.ast
+
+Parser.md Parser.mi:	Estral.lalr
+	lark -di Estral.lalr
+
+Scanner.md Scanner.mi:	Estral.rex
+	rex -di Estral.rex
+
+CodeM2.mi:	CodeM2.mi.mpp
+	mpp < CodeM2.mi.mpp > CodeM2.mi
+
+m2c:
+	nmake sources -c -f Makefile.mvc
+	chmod u+w ErrorTab
+	copy ErrorTab ..\m2c
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../common/src -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+clean:
+	del *.obj
+
+CLEAN:	clean
+	del $(SOURCES)
+	del estra.exe

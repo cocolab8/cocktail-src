@@ -1,0 +1,1063 @@
+(* $Id: Explain.mi,v 1.11 2005/05/23 13:05:44 grosch rel $ *)
+
+(*
+ * $Log: Explain.mi,v $
+ * Revision 1.11  2005/05/23 13:05:44  grosch
+ * improved handling of options for conflict explanation
+ *
+ * Revision 1.10  2001/01/28 23:32:17  grosch
+ * added type casts to function arguments in order to satisfy MS VC++
+ *
+ * Revision 1.9  1999/06/03 07:55:17  grosch
+ * bug fixes
+ *
+ * Revision 1.8  1998/08/30 17:35:42  grosch
+ * bug fix in WriteExampleReduce, avoid multiple generation of phrases
+ *
+ * Revision 1.7  1998/04/21 10:46:44  grosch
+ * truncation of file and module names to 8.3 format
+ * turned {ABC}Store into flexible arrays
+ * added generation of example programs for conflicts
+ * several bug fixes
+ *
+ * Revision 1.6  1995/11/07  09:17:37  grosch
+ * removed read reduce reduce conflicts
+ * bug fix because of the above
+ *
+ * Revision 1.5  1995/02/06  08:44:45  grosch
+ * increased size of CStore from 100 to 1000
+ *
+ * Revision 1.4  1994/11/13  12:39:30  grosch
+ * increased TraceSize from 100 to 500
+ *
+ * Revision 1.3  1994/08/30  12:05:57  grosch
+ * fixed error concerning overflow of CStore
+ *
+ * Revision 1.2  1994/07/14  12:20:01  grosch
+ * print external as well as internal state numbers
+ * print 'as above' for reduce reduce conflicts with same set of items
+ * fixed bug in TraceC
+ * compute lookahead sets on demand: GetLookahead
+ *
+ * Revision 1.1  1994/03/17  22:16:28  grosch
+ * removed unused objects
+ *
+ * Revision 1.0  1994/02/01  14:05:44  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Jan. 1994 *)
+
+IMPLEMENTATION MODULE Explain;
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+FROM IO		IMPORT WriteS, WriteI, WriteC, WriteNl, StdOutput, CloseIO,
+			WriteFlush;
+FROM Idents	IMPORT WriteIdent, GetString;
+FROM Strings	IMPORT tString, Char, Length;
+FROM Relation	IMPORT IsRelated;
+FROM Texts	IMPORT WriteText;
+FROM Position	IMPORT NoPosition;
+FROM Errors	IMPORT MessageI, Message, Fatal, Error, Note, Ident, Short, Long;
+FROM Semantic	IMPORT RootCount, RuleCount;
+FROM Conflict	IMPORT ConditionPtr;
+FROM GenLRk	IMPORT WriteLook;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, AssignEmpty	,
+   IsElement	, Include	, Extract	, Union		,
+   Select	, Difference	, Complement	, ForallDo	,
+   IsSubset	, Minimum	, Maximum	, Assign	,
+   IsEmpty	, Exclude	, Intersection	, WriteSet	,
+   AssignElmt	, Card		;
+
+FROM Tree	IMPORT
+   tTree	, LS		, FirstNonterm	, LastNonterm	,
+   Epsilon	, ToSymbolPtr	, ToRulePtr	, Nullable	,
+   Options	, IsType	;
+
+FROM LR1	IMPORT
+   tStateRange	, GetLookahead	,
+   WorkingSet	, StateCount	, StatePtr	, ItemCount	,
+   ItemPtr	, KernelItemPtr	, SeqFirst	, ToItemListPtr	,
+   ItemListPtr	, RuleBase	;
+
+FROM Conflict	IMPORT
+   cReadReduce			,
+   cReduceReduce		,
+   cExplRepReadReduce		,
+   cExplRepReduceReduce		,
+   cImplRepReadReduce		,
+   cImplRepReduceReduce		,
+   cDynaRepReadReduce		,
+   cDynaRepReduceReduce		,
+   cLRkRepReadReduce		,
+   cLRkRepReduceReduce		;
+
+IMPORT Tree;
+
+CONST
+   InitTraceSize	= 100;
+   InitBSize		= 100;
+   InitCSize		= 100;
+
+TYPE
+   tBStore		= RECORD fRule, fDot, Prev: SHORTCARD; END;
+   tTStore		= RECORD fRule, fDot: SHORTCARD; END;
+   tTStorePtr		= POINTER TO ARRAY [0..10000000] OF tTStore;
+
+VAR
+   TraceMemory1		,
+   TraceMemory2		,
+   TraceStore		,
+   PrevTraceStore	: tTStorePtr;
+   BSize		,
+   CSize		,
+   TraceSize		,
+   TraceCount		,
+   PrevTraceCount	: LONGINT;
+
+   Memo1State, Memo2State	: CARDINAL;
+   Memo1LHS  , Memo2LHS		: SHORTCARD;
+   Memo1Size , Memo2Size	: SHORTCARD;
+   LastMemo			: SHORTCARD;
+
+(* Reference:
+
+   F. DeRemer, T. Pennello:
+   Efficient Computation of LALR(1) Look-Ahead Sets
+   TOPLAS 4, 4 (Oct. 1982), 615-649.
+*)
+
+PROCEDURE Explain (State: CARDINAL; ConflictDesc: BITSET; ConflictSet: tSet);
+   VAR
+      State2, Item2, B, C, TableEntry, cItem	: CARDINAL;
+      Item					: SHORTINT;
+      x, sRuleBase, Condition, PrevCondition, PrevX	: SHORTCARD;
+      IsFirstX					: BOOLEAN;
+      temp					: tTStorePtr;
+
+   PROCEDURE PrintKind (Kind: CARDINAL; Text: ARRAY OF CHAR);
+      BEGIN
+	 IF Kind IN ConflictDesc THEN
+	    WriteS  (ExplainFile, Text); WriteNl (ExplainFile);
+	 END;
+      END PrintKind;
+
+   PROCEDURE IsEqual (x, y: SHORTCARD): BOOLEAN;
+      VAR i, j	: SHORTINT;
+      BEGIN
+	 i := ToItemListPtr^ [x].First;
+	 j := ToItemListPtr^ [y].First;
+	 WHILE (i >= 0) AND (j >= 0) DO
+	    IF ItemListPtr^ [i].lItem # ItemListPtr^ [j].lItem THEN RETURN FALSE; END;
+	    i := ItemListPtr^ [i].Next;
+	    j := ItemListPtr^ [j].Next;
+	 END;
+	 RETURN i = j;
+      END IsEqual;
+
+   BEGIN
+      WriteS (ExplainFile, "State "); WriteI (ExplainFile, StatePtr^ [State].ReadIndex, 4);
+      WriteS (ExplainFile, " ("); WriteI (ExplainFile, State, 4);
+      WriteS (ExplainFile, "): derivation trees"); WriteNl (ExplainFile);
+      WriteS (ExplainFile, "-----------------------------------"); WriteNl (ExplainFile);
+      WriteNl (ExplainFile);
+PrintKind (cReadReduce		, "	shift reduce conflict"				);
+PrintKind (cReduceReduce	, "	reduce reduce conflict"				);
+      IF IsElement (ORD ('U'), Options) THEN
+PrintKind (cExplRepReadReduce	, "	shift reduce conflict explicitly repaired"	);
+PrintKind (cExplRepReduceReduce	, "	reduce reduce conflict explicitly repaired"	);
+      END;
+      IF IsElement (ORD ('V'), Options) THEN
+PrintKind (cImplRepReadReduce	, "	shift reduce conflict implicitly repaired"	);
+PrintKind (cImplRepReduceReduce	, "	reduce reduce conflict implicitly repaired"	);
+      END;
+      IF IsElement (ORD ('W'), Options) THEN
+PrintKind (cLRkRepReadReduce	, "	shift reduce conflict solved using LALR(2)"	);
+PrintKind (cLRkRepReduceReduce	, "	reduce reduce conflict solved using LALR(2)"	);
+      END;
+      IF IsElement (ORD ('X'), Options) THEN
+PrintKind (cDynaRepReadReduce	, "	shift reduce conflict dynamically repaired"	);
+PrintKind (cDynaRepReduceReduce	, "	reduce reduce conflict dynamically repaired"	);
+      END;
+      WriteNl (ExplainFile);
+      PrevTraceCount := 0;
+      FOR x := Minimum (ConflictSet) TO Maximum (ConflictSet) DO
+	 IF IsElement (x, ConflictSet) THEN
+	    Item := ToItemListPtr^ [x].First;
+	    WHILE Item >= 0 DO
+	       WITH ItemListPtr^ [Item] DO
+		  WITH ItemPtr^ [lItem] DO
+		     WITH ToRulePtr^ [Rule]^.Rule DO
+			IF Dot < Length THEN
+			   TraceCount := 0;
+			   TraceA	(State, lItem);
+			   WriteTrace	(0, 0);
+			   WriteNl	(ExplainFile);
+			   WriteS	(ExplainFile, "shift  ");
+			   WriteI	(ExplainFile, RulePos.Line, 4);
+			   WriteS	(ExplainFile, "  ");
+			   WriteIdent	(ExplainFile, LHS^.Nonterminal.Name);
+			   WriteS	(ExplainFile, ": ");
+			   WriteRHS	(Rule, Dot);
+			   WriteC	(ExplainFile, "?");
+			   WriteNl	(ExplainFile); WriteNl (ExplainFile);
+			   WriteS	(ExplainFile, "example   s  ");
+			   WriteExampleShift (TraceCount);
+			   WriteNl	(ExplainFile); WriteNl (ExplainFile);
+			ELSE
+			   TraceCount := 0;
+			   TraceC (State, lItem, x, State2, Item2);
+			   C := TraceCount;
+			   TraceB (Item2, x);
+			   B := TraceCount;
+			   TraceA (State2, Item2);
+			   WriteTrace	(B, C);
+			   WriteNl	(ExplainFile);
+			   WriteS	(ExplainFile, "reduce ");
+			   WriteI	(ExplainFile, RulePos.Line, 4);
+			   WriteS	(ExplainFile, "  ");
+			   WriteIdent	(ExplainFile, LHS^.Nonterminal.Name);
+			   WriteS	(ExplainFile, ": ");
+			   WriteRHS	(Rule, Dot);
+			   WriteS	(ExplainFile, " {");
+			   WriteIdent	(ExplainFile, ToSymbolPtr^ [x]^.Terminal.Name);
+			   WriteS	(ExplainFile, "} ?");
+			   WriteNl	(ExplainFile); WriteNl (ExplainFile);
+			   WriteS	(ExplainFile, "example   r  ");
+			   WriteExampleReduce (B, C, TraceCount);
+			   WriteNl	(ExplainFile); WriteNl (ExplainFile);
+			END;
+			temp		:= PrevTraceStore;
+			PrevTraceStore	:= TraceStore;
+			TraceStore	:= temp;
+			PrevTraceCount	:= TraceCount;
+		     END;
+		  END;
+		  Item := Next;
+	       END;
+	    END;
+	 END;
+      END;
+
+      sRuleBase := RuleBase;
+      PrevCondition := 0;
+      IsFirstX := TRUE;
+      WriteS (ExplainFile, "State "); WriteI (ExplainFile, StatePtr^ [State].ReadIndex, 4);
+      WriteS (ExplainFile, " ("); WriteI (ExplainFile, State, 4);
+      WriteS (ExplainFile, "): summary"); WriteNl (ExplainFile);
+      WriteS (ExplainFile, "--------------------------"); WriteNl (ExplainFile); WriteNl (ExplainFile);
+      WITH StatePtr^ [State] DO
+	 FOR x := Minimum (ConflictSet) TO Maximum (ConflictSet) DO
+	    IF IsElement (x, ConflictSet) THEN
+	       TableEntry := TablePtr^ [x - MinSym];
+	       IF TableEntry > RuleBase + RuleCount THEN
+		  Condition := TableEntry - RuleBase - RuleCount;
+		  IF ConditionPtr^ [Condition].TheK # 0 THEN
+		     Item := ToItemListPtr^ [x].First;
+		     WHILE Item >= 0 DO
+			WITH ItemListPtr^ [Item] DO
+			   WITH ItemPtr^ [lItem] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 WriteS	(ExplainFile, "LR(2) ");
+				 IF Dot < Length THEN
+				    WriteS	(ExplainFile, " shift  ");
+				    WriteI	(ExplainFile, RulePos.Line, 4);
+				    WriteS	(ExplainFile, "  ");
+				    WriteIdent	(ExplainFile, LHS^.Nonterminal.Name);
+				    WriteS	(ExplainFile, ": ");
+				    WriteRHS	(Rule, Dot);
+				    WriteLook	(ExplainFile, Condition, lItem);
+				 ELSE
+				    WriteS	(ExplainFile, " reduce ");
+				    WriteI	(ExplainFile, RulePos.Line, 4);
+				    WriteS	(ExplainFile, "  ");
+				    WriteIdent	(ExplainFile, LHS^.Nonterminal.Name);
+				    WriteS	(ExplainFile, ": ");
+				    WriteRHS	(Rule, Dot);
+				    WriteS	(ExplainFile, " {");
+				    WriteIdent	(ExplainFile, ToSymbolPtr^ [x]^.Terminal.Name);
+				    WriteC	(ExplainFile, "}");
+				    WriteLook	(ExplainFile, Condition, lItem);
+				 END;
+				 WriteNl	(ExplainFile);
+			      END;
+			   END;
+			   Item := Next;
+			END;
+		     END;
+		  ELSE
+		     WriteS	(ExplainFile, "dynamic decision ");
+		     WriteI	(ExplainFile, Condition, 0);
+		     WriteS	(ExplainFile, " on lookahead ");
+		     WriteIdent	(ExplainFile, ToSymbolPtr^ [x]^.Terminal.Name);
+		     WriteS	(ExplainFile, ":");
+		     IF Condition # PrevCondition THEN
+			WITH ConditionPtr^ [Condition] DO
+			   WriteNl	(ExplainFile);
+			   WITH StatePtr ^[dState] DO
+			      FOR cItem := Kernel TO Kernel + KernelSize + ClosureSize DO
+				 WITH ItemPtr^ [cItem] DO
+				    IF (Dot = ToRulePtr^ [Rule]^.Rule.Length) AND IsElement (Rule, RuleSet) THEN
+				       WriteS (ExplainFile, "check predicate in line ");
+				       IF ToRulePtr^ [Rule]^.Kind = Tree.Cond THEN
+					  WITH ToRulePtr^ [Rule]^.Cond DO
+					     WriteI	(ExplainFile, CondPos.Line, 0);
+					     IF Not THEN
+						WriteS	(ExplainFile, ": ? - {");
+					     ELSE
+						WriteS	(ExplainFile, ": ? {");
+					     END;
+					     WriteText	(ExplainFile, Cond);
+					     WriteS	(ExplainFile, "}");
+					  END;
+				       ELSE
+					  WITH ToRulePtr^ [Rule]^.Look DO
+					     WriteI	(ExplainFile, NamePos.Line, 0);
+					     WriteS	(ExplainFile, ": ? ");
+					     IF Not THEN
+						WriteS	(ExplainFile, "- ");
+					     END;
+					     WriteIdent	(ExplainFile, Object^.Terminal.Name);
+					  END;
+				       END;
+				       WriteNl (ExplainFile);
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+			TableEntry := ConditionPtr^ [Condition].Implicit;
+			WriteS	(ExplainFile, "default:");
+			WriteNl	(ExplainFile);
+		     ELSE
+			WriteS	(ExplainFile, " as above");
+			WriteNl	(ExplainFile);
+		     END;
+		  END;
+	       ELSE
+		  Condition := 0;
+	       END;
+	       IF (Condition = 0) OR (Condition # PrevCondition) AND
+		  (ConditionPtr^ [Condition].TheK = 0) THEN
+		  IF IsFirstX OR (Condition # PrevCondition) OR NOT IsEqual (PrevX, x) THEN
+		     IsFirstX := FALSE;
+		     Item := ToItemListPtr^ [x].First;
+		     WHILE Item >= 0 DO
+			WITH ItemListPtr^ [Item] DO
+			   WITH ItemPtr^ [lItem] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 IF Dot < Length THEN
+				    IF TableEntry <= sRuleBase THEN
+				       WriteS	(ExplainFile, "retain");
+				    ELSE
+				       WriteS	(ExplainFile, "ignore");
+				    END;
+				    WriteS	(ExplainFile, " shift  ");
+				    WriteI	(ExplainFile, RulePos.Line, 4);
+				    WriteS	(ExplainFile, "  ");
+				    WriteIdent	(ExplainFile, LHS^.Nonterminal.Name);
+				    WriteS	(ExplainFile, ": ");
+				    WriteRHS	(Rule, Dot);
+				    WriteNl	(ExplainFile);
+				 ELSE
+				    IF TableEntry = RuleBase + Rule THEN
+				       WriteS	(ExplainFile, "retain");
+				    ELSE
+				       WriteS	(ExplainFile, "ignore");
+				    END;
+				    WriteS	(ExplainFile, " reduce ");
+				    WriteI	(ExplainFile, RulePos.Line, 4);
+				    WriteS	(ExplainFile, "  ");
+				    WriteIdent	(ExplainFile, LHS^.Nonterminal.Name);
+				    WriteS	(ExplainFile, ": ");
+				    WriteRHS	(Rule, Dot);
+				    WriteS	(ExplainFile, " {");
+				    WriteIdent	(ExplainFile, ToSymbolPtr^ [x]^.Terminal.Name);
+				    WriteC	(ExplainFile, "}");
+				    WriteNl	(ExplainFile);
+				 END;
+			      END;
+			   END;
+			   Item := Next;
+			END;
+		     END;
+		  ELSE
+		     WriteS	(ExplainFile, "on lookahead ");
+		     WriteIdent	(ExplainFile, ToSymbolPtr^ [x]^.Terminal.Name);
+		     WriteS	(ExplainFile, ":");
+		     WriteS	(ExplainFile, " as above");
+		     WriteNl	(ExplainFile);
+		  END;
+	       END;
+	       WriteNl (ExplainFile);
+	       PrevCondition := Condition;
+	       PrevX := x;
+	    END;
+	 END;
+      END;
+   END Explain;
+
+PROCEDURE TraceC (State1, Item1, x: CARDINAL; VAR State2, Item2: CARDINAL);
+   TYPE
+      tCStore	= RECORD fState, Prev: SHORTCARD; fItem: CARDINAL; END;
+   VAR
+      State, Item, Pred, A, B, CurrentEntry	: CARDINAL;
+      ItemSet, Set	: tSet;
+      CStore	: POINTER TO ARRAY [0..10000000] OF tCStore;
+      CCount	: LONGINT;
+
+   PROCEDURE ExpandTraceC (CurrentEntry: CARDINAL);
+      BEGIN
+	 WITH CStore^ [CurrentEntry] DO
+	    IF CurrentEntry = 1 THEN
+	       WITH ItemPtr^ [Item1] DO
+		  INC (TraceCount);
+		  IF TraceCount >= TraceSize THEN ExtendTraceStore; END;
+		  TraceStore^ [TraceCount].fRule := Rule;
+		  TraceStore^ [TraceCount].fDot	:= Dot;
+	       END;
+	    ELSE
+	       ExpandTraceC (Prev);
+	       WITH ItemPtr^ [CStore^ [Prev].fItem] DO
+		  A := ToRulePtr^ [Rule]^.Rule.LHS^.Nonterminal.Index;
+	       END;
+	       TraceState (fItem, A, TRUE);
+	    END;
+	 END;
+      END ExpandTraceC;
+
+   BEGIN
+      MakeSet (ItemSet	, ItemCount);
+      MakeSet (Set	, Epsilon);
+      MakeArray (CStore, CSize, TSIZE (tCStore));
+      WITH CStore^ [1] DO
+	 fState	:= State1;
+	 fItem	:= Item1;
+	 Prev	:= 0;
+      END;
+      CCount		:= 1;
+      CurrentEntry	:= 1;
+      Include (ItemSet, Item1);
+
+      (* search for state containing the item that contributes conflicting lookahead x *)
+
+      WITH ItemPtr^ [Item1] DO
+	 IF Dot = 0 THEN		(* is conflicting item a closure item ? *)
+	    LOOP			(* then search within this state	*)
+	       State := State1;		(* for kernel item that contributes LA	*)
+	       WITH StatePtr^ [State] DO
+		  A := ToRulePtr^ [Rule]^.Rule.LHS^.Nonterminal.Index - FirstNonterm;
+		  FOR Item := Kernel TO Kernel + KernelSize DO
+		     WITH ItemPtr^ [Item] DO
+			WITH ToRulePtr^ [Rule]^.Rule DO
+			   IF Dot < Length THEN
+			      B := ElmtsPtr^ [Dot + 1];
+			      IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+				 WITH ToSymbolPtr^ [B]^.Nonterminal DO
+				    IF IsElement (x, PathPtr^ [A - MinPath]^) THEN
+				       EXIT;
+				    ELSIF IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+				       AssignEmpty (Set);
+				       SeqFirst (Rule, SHORTCARD (Dot + 2), Set);
+				       IF IsElement (x, Set) THEN
+					  EXIT;
+				       ELSIF IsElement (Epsilon, Set) THEN
+					  IF LHS^.Nonterminal.Index = FirstNonterm THEN
+					     EXIT;
+					  ELSE
+					     GetLookahead (State, Item, Set);
+					  END;
+					  IF IsElement (x, Set) AND NOT
+					     IsElement (Item, ItemSet) THEN
+					     INC (CCount);
+					     IF CCount >= CSize THEN
+						ExtendArray (CStore, CSize, TSIZE (tCStore));
+					     END;
+					     WITH CStore^ [CCount] DO
+						fState	:= State;
+						fItem	:= Item;
+						Prev	:= CurrentEntry;
+					     END;
+					     Include (ItemSet, Item);
+					  END;
+				       END;
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	       CurrentEntry := 2;
+	       EXIT;
+	    END;
+	 END;
+      END;
+
+      (* there are 2 possible results from above section:
+	 this state contributes the conflicting lookahead:
+	    Dot = 0, CurrentEntry = 1
+	 it does not:
+	    Dot = 0, CurrentEntry = 2, CStore^ [2] holds kernel item OR
+	    Dot > 0, CurrentEntry = 1, CStore^ [1] holds kernel item
+      *)
+
+   IF (ItemPtr^ [Item1].Dot # 0) OR (CurrentEntry # 1) THEN
+      LOOP
+	 WITH CStore^ [CurrentEntry] DO
+	    WITH ItemPtr^ [fItem] DO
+	       WITH StatePtr^ [fState] DO
+		  WITH KernelItemPtr^ [fItem - Kernel + KernelInfo] DO
+		     A := ToRulePtr^ [Rule]^.Rule.LHS^.Nonterminal.Index - FirstNonterm;
+		     FOR Pred := 1 TO PredCount DO
+			State := PredPtr^ [Pred];
+			WITH StatePtr^ [State] DO
+			   FOR Item := Kernel TO Kernel + KernelSize DO
+			      WITH ItemPtr^ [Item] DO
+				 WITH ToRulePtr^ [Rule]^.Rule DO
+				    IF Dot < Length THEN
+				       B := ElmtsPtr^ [Dot + 1];
+				       IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+					  WITH ToSymbolPtr^ [B]^.Nonterminal DO
+					     IF IsElement (x, PathPtr^ [A - MinPath]^) THEN
+						EXIT;
+					     ELSIF IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+						AssignEmpty (Set);
+						SeqFirst (Rule, SHORTCARD (Dot + 2), Set);
+						IF IsElement (x, Set) THEN
+						   EXIT;
+						ELSIF IsElement (Epsilon, Set) THEN
+						   IF LHS^.Nonterminal.Index = FirstNonterm THEN
+						      EXIT;
+						   ELSE
+						      GetLookahead (State, Item, Set);
+						   END;
+						   IF IsElement (x, Set) AND NOT
+						      IsElement (Item, ItemSet) THEN
+						      INC (CCount);
+						      IF CCount >= CSize THEN
+							 ExtendArray (CStore, CSize, TSIZE (tCStore));
+						      END;
+						      WITH CStore^ [CCount] DO
+							 fState	:= State;
+							 fItem	:= Item;
+							 Prev	:= CurrentEntry;
+						      END;
+						      Include (ItemSet, Item);
+						   END;
+						END;
+					     END;
+					  END;
+				       END;
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+	 INC (CurrentEntry);
+      END;
+   END;
+
+   (* Invariant: for Item holds:
+
+      Item = C -> a.B b
+      C -> a.B b AND   x IN PATH (B, A) OR
+      C -> a.B b AND eps IN PATH (B, A) AND   x IN FIRST (b) OR
+      C -> a.B b AND eps IN PATH (B, A) AND eps IN FIRST (b) AND A = 0_intern
+
+   *)
+
+   (* search the item that contributes the conflicting lookahead x in state *)
+
+      LOOP
+	 WITH ItemPtr^ [Item] DO
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+	       IF Dot < Length THEN
+		  B := ElmtsPtr^ [Dot + 1];
+		  WITH ToSymbolPtr^ [B]^.Nonterminal DO
+		     IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) AND
+			IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+			IF (LHS^.Nonterminal.Index = FirstNonterm) AND (Length = 1)
+			THEN EXIT;
+			END;
+			AssignEmpty (Set);
+			SeqFirst (Rule, SHORTCARD (Dot + 2), Set);
+			IF IsElement (x, Set) THEN EXIT; END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+	 INC (Item);
+      END;
+
+      INC (CCount);
+      IF CCount >= CSize THEN
+	 ExtendArray (CStore, CSize, TSIZE (tCStore));
+      END;
+      WITH CStore^ [CCount] DO
+	 fState	:= State;
+	 fItem	:= Item;
+	 Prev	:= CurrentEntry;
+      END;
+
+      ExpandTraceC (CCount);
+      DEC (TraceCount);
+      State2 := State; Item2 := Item;
+      ReleaseArray (CStore, CSize, TSIZE (tCStore));
+      ReleaseSet (Set);
+      ReleaseSet (ItemSet);
+   END TraceC;
+
+PROCEDURE TraceB (Item, x: CARDINAL);
+   VAR
+      y			: CARDINAL;
+      CurrentEntry	: LONGINT;
+      Result, Busy, Set	: tSet;
+      r			: tTree;
+      BStore		: POINTER TO ARRAY [0..10000000] OF tBStore;
+      BCount		: LONGINT;
+BEGIN
+   IF ToRulePtr^ [ItemPtr^ [Item].Rule]^.Rule.LHS^.Nonterminal.Index # FirstNonterm THEN
+      (* MakeSet (Result	, BSize); *)
+      MakeSet (Busy	, LastNonterm);
+      MakeSet (Set	, Epsilon);
+      MakeArray (BStore, BSize, TSIZE (tBStore));
+      WITH ItemPtr^ [Item] DO
+	 WITH BStore^ [1] DO
+	    fRule	:= Rule;
+	    fDot	:= Dot + 1;
+	    Prev	:= 0;
+	 END;
+      END;
+      BCount		:= 1;
+      CurrentEntry	:= 1;
+
+      (* WHILE CurrentEntry <= BCount DO for full search *)
+      LOOP
+	 IF CurrentEntry > BCount THEN EXIT; END;	(* ??? *)
+	 WITH BStore^ [CurrentEntry] DO
+	    y := ToRulePtr^ [fRule]^.Rule.ElmtsPtr^ [fDot + 1];
+	    IF y < Epsilon THEN
+	       (* Include (Result, CurrentEntry); *)
+	       EXIT;
+	    ELSE
+	       WITH ToSymbolPtr^ [y]^.Nonterminal DO
+		  IF Nullable IN Properties THEN
+		     AssignEmpty (Set);
+		     SeqFirst (fRule, SHORTCARD (fDot + 2), Set);
+		     IF IsElement (x, Set) THEN
+			INC (BCount);
+			IF BCount >= BSize THEN
+			   ExtendArray (BStore, BSize, TSIZE (tBStore));
+			END;
+			BStore^ [BCount].fRule	:= fRule;
+			BStore^ [BCount].fDot	:= fDot + 1;
+			BStore^ [BCount].Prev	:= CurrentEntry;
+		     END;
+		  END;
+		  IF NOT IsElement (y, Busy) AND IsElement (x, First) THEN
+		     Include (Busy, y);
+		     r := Rules;
+		     WHILE IsType (r, Tree.Rule) DO
+			WITH r^.Rule DO
+			   AssignEmpty (Set);
+			   SeqFirst (Index, 1, Set);
+			   IF IsElement (x, Set) THEN
+			      INC (BCount);
+			      IF BCount >= BSize THEN
+				 ExtendArray (BStore, BSize, TSIZE (tBStore));
+			      END;
+			      WITH BStore^ [BCount] DO
+				 fRule	:= Index;
+				 fDot	:= 0;
+				 Prev	:= CurrentEntry;
+			      END;
+			   END;
+			   r := Next;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+	 INC (CurrentEntry);
+      END;
+
+   (* WHILE NOT IsEmpty (Result) DO
+	 CurrentEntry := Extract (Result);
+      AssignEmpty (Result); *)
+	 WITH BStore^ [CurrentEntry] DO
+	    INC (TraceCount);
+	    IF TraceCount >= TraceSize THEN ExtendTraceStore; END;
+	    TraceStore^ [TraceCount].fRule	:= fRule;
+	    TraceStore^ [TraceCount].fDot	:= fDot;
+	    CurrentEntry	:= Prev;
+	 END;
+
+	 WHILE CurrentEntry # 0 DO
+	    WITH BStore^ [CurrentEntry] DO
+	       INC (TraceCount);
+	       IF TraceCount >= TraceSize THEN ExtendTraceStore; END;
+	       TraceStore^ [TraceCount].fRule	:= fRule;
+	       TraceStore^ [TraceCount].fDot	:= fDot;
+	       CurrentEntry	:= Prev;
+	    END;
+	 END;
+   (* END;
+      ReleaseSet (Result	); *)
+      ReleaseArray (BStore, BSize, TSIZE (tBStore));
+      ReleaseSet (Busy		);
+      ReleaseSet (Set		);
+   ELSE
+      WITH ItemPtr^ [Item] DO
+	 INC (TraceCount);
+	 IF TraceCount >= TraceSize THEN ExtendTraceStore; END;
+	 TraceStore^ [TraceCount].fRule	:= Rule;
+	 TraceStore^ [TraceCount].fDot	:= Dot + 1;
+      END;
+   END;
+END TraceB;
+
+PROCEDURE TraceA (State, Item: CARDINAL);
+   VAR
+      LHS, i		: CARDINAL;
+      StartTrace	: LONGINT;
+   BEGIN
+      WITH ItemPtr^ [Item] DO
+	 INC (TraceCount);
+	 TraceStore^ [TraceCount].fRule	:= Rule;
+	 TraceStore^ [TraceCount].fDot	:= Dot;
+	 LHS := ToRulePtr^ [Rule]^.Rule.LHS^.Nonterminal.Index;
+      END;
+
+      IF (State = Memo1State) AND (LHS = Memo1LHS) THEN
+	 FOR i := 1 TO Memo1Size DO
+	    INC (TraceCount); TraceStore^ [TraceCount] := TraceMemory1^ [i];
+	 END;
+	 LastMemo := 1;
+	 RETURN;
+      END;
+      IF (State = Memo2State) AND (LHS = Memo2LHS) THEN
+	 FOR i := 1 TO Memo2Size DO
+	    INC (TraceCount); TraceStore^ [TraceCount] := TraceMemory2^ [i];
+	 END;
+	 LastMemo := 2;
+	 RETURN;
+      END;
+
+      IF LastMemo = 1 THEN
+	 Memo2State	:= State;
+	 Memo2LHS	:= LHS;
+      ELSE
+	 Memo1State	:= State;
+	 Memo1LHS	:= LHS;
+      END;
+      StartTrace := TraceCount;
+
+      WHILE LHS # FirstNonterm DO
+	 WITH ToSymbolPtr^ [LHS]^.Nonterminal DO
+	    INC (TraceCount);
+	    IF TraceCount >= TraceSize THEN ExtendTraceStore; END;
+	    TraceStore^ [TraceCount].fRule	:= gRule;
+	    TraceStore^ [TraceCount].fDot	:= gDot;
+	    LHS := ToRulePtr^ [gRule]^.Rule.LHS^.Nonterminal.Index;
+	 END;
+      END;
+
+      IF LastMemo = 1 THEN
+	 Memo2Size := TraceCount - StartTrace;
+	 FOR i := 1 TO Memo2Size DO
+	    INC (StartTrace); TraceMemory2^ [i] := TraceStore^ [StartTrace];
+	 END;
+	 LastMemo := 2;
+      ELSE
+	 Memo1Size := TraceCount - StartTrace;
+	 FOR i := 1 TO Memo1Size DO
+	    INC (StartTrace); TraceMemory1^ [i] := TraceStore^ [StartTrace];
+	 END;
+	 LastMemo := 1;
+      END;
+   END TraceA;
+
+PROCEDURE TraceState (Item, x: CARDINAL; IsTraceC: BOOLEAN);
+   VAR
+      CurrentEntry, y	: CARDINAL;
+      Busy, Set	: tSet;
+      r		: tTree;
+      BStore	: POINTER TO ARRAY [0..10000000] OF tBStore;
+      BCount	: LONGINT;
+   BEGIN
+      MakeArray (BStore, BSize, TSIZE (tBStore));
+      WITH ItemPtr^ [Item] DO
+	 WITH BStore^ [1] DO
+	    fRule	:= Rule;
+	    fDot	:= Dot;
+	    Prev	:= 0;
+	 END;
+         BCount		:= 1;
+	 CurrentEntry	:= 1;
+
+	 IF ToRulePtr^ [Rule]^.Rule.ElmtsPtr^ [Dot + 1] # x THEN
+	    MakeSet (Busy, LastNonterm);
+	    MakeSet (Set, Epsilon);
+	    LOOP
+	       WITH BStore^ [CurrentEntry] DO
+		  y := ToRulePtr^ [fRule]^.Rule.ElmtsPtr^ [fDot + 1];
+	       END;
+	       IF NOT IsElement (y, Busy) THEN
+		  Include (Busy, y);
+		  r := ToSymbolPtr^ [y]^.Nonterminal.Rules;
+		  WHILE IsType (r, Tree.Rule) DO
+		     WITH r^.Rule DO
+			IF (Length > 0) AND (ElmtsPtr^ [1] > Epsilon) THEN
+			   IF IsTraceC THEN
+			      AssignEmpty (Set);
+			      SeqFirst (Index, 2, Set);
+			   END;
+			   IF NOT IsTraceC OR IsElement (Epsilon, Set) THEN
+			      INC (BCount);
+			      IF BCount >= BSize THEN
+				 ExtendArray (BStore, BSize, TSIZE (tBStore));
+			      END;
+			      WITH BStore^ [BCount] DO
+				 fRule	:= Index;
+				 fDot	:= 0;
+				 Prev	:= CurrentEntry;
+			      END;
+			      IF ElmtsPtr^ [1] = x THEN EXIT; END;
+			   END;
+			END;
+			r := Next;
+		     END;
+		  END;
+	       END;
+	       INC (CurrentEntry);
+	       IF CurrentEntry > CARDINAL (BCount) THEN
+		  Message ("internal error: out of B entries", Fatal, NoPosition);
+	       END;
+	    END;
+	    ReleaseSet (Busy);
+	    ReleaseSet (Set);
+	 END;
+
+	 CurrentEntry := BCount;
+	 WHILE CurrentEntry # 0 DO
+	    WITH BStore^ [CurrentEntry] DO
+	       INC (TraceCount);
+	       IF TraceCount >= TraceSize THEN ExtendTraceStore; END;
+	       TraceStore^ [TraceCount].fRule	:= fRule;
+	       TraceStore^ [TraceCount].fDot	:= fDot;
+	       CurrentEntry := Prev;
+	    END;
+	 END;
+      END;
+      ReleaseArray (BStore, BSize, TSIZE (tBStore));
+   END TraceState;
+
+PROCEDURE WriteTrace (B, C: LONGINT);
+   VAR
+      NewTraceCount, i	: LONGINT;
+   BEGIN
+      NewTraceCount := TraceCount;
+      WHILE (PrevTraceCount > 0) AND (NewTraceCount > 0) AND
+	 (PrevTraceStore^ [PrevTraceCount].fRule = TraceStore^ [NewTraceCount].fRule) AND
+	 (PrevTraceStore^ [PrevTraceCount].fDot  = TraceStore^ [NewTraceCount].fDot ) DO
+	 DEC (NewTraceCount);
+	 DEC (PrevTraceCount);
+      END;
+      IF TraceCount - NewTraceCount >= 3 THEN
+	 INC (NewTraceCount);
+	 WriteS (ExplainFile, " ..."); WriteNl (ExplainFile);
+      ELSE
+	 NewTraceCount := TraceCount;
+      END;
+      FOR i := NewTraceCount TO 1 BY -1 DO
+	 IF (C < i) AND (i <= B) THEN WriteS (ExplainFile, "| "); END;
+	 WriteRHS (TraceStore^ [i].fRule, TraceStore^ [i].fDot); WriteNl (ExplainFile);
+      END;
+   END WriteTrace;
+
+PROCEDURE WriteRHS (Rule, Dot: CARDINAL);
+   VAR
+      i		: CARDINAL;
+      x		: tTree;
+   BEGIN
+      WITH ToRulePtr^ [Rule]^.Rule DO
+	 IF Dot = 0 THEN WriteS (ExplainFile, "."); ELSE WriteS (ExplainFile, " "); END;
+	 FOR i := 1 TO Length DO
+	    x := ToSymbolPtr^ [ElmtsPtr^ [i]];
+	    IF x^.Kind = Tree.Terminal THEN
+	       WriteIdent (ExplainFile, x^.Terminal.Name);
+	    ELSE
+	       WriteIdent (ExplainFile, x^.Nonterminal.Name);
+	    END;
+	    IF i = Dot THEN WriteS (ExplainFile, "."); ELSE WriteS (ExplainFile, " "); END;
+	 END;
+      END;
+   END WriteRHS;
+
+PROCEDURE WriteExampleShift (Item: CARDINAL);
+   VAR
+      i, Dot	: CARDINAL;
+   BEGIN
+      Dot := TraceStore^ [Item].fDot + 1;
+      WITH ToRulePtr^ [TraceStore^ [Item].fRule]^.Rule DO
+	 FOR i := 1 TO Length DO
+	    IF Dot = i THEN
+	       IF Item > 1 THEN
+		  WriteExampleShift (Item - 1);
+	       ELSE
+		  WriteC (ExplainFile, '.');
+		  WriteSymbol (ElmtsPtr^ [i]);
+	       END;
+	    ELSE
+	       WriteSymbol (ElmtsPtr^ [i]);
+	    END;
+	 END;
+      END;
+   END WriteExampleShift;
+
+PROCEDURE WriteExampleReduce (B, C, Item: CARDINAL);
+   VAR
+      i, Dot	: CARDINAL;
+   BEGIN
+      Dot := TraceStore^ [Item].fDot + 1;
+      WITH ToRulePtr^ [TraceStore^ [Item].fRule]^.Rule DO
+	 IF Item > B + 1 THEN
+	    FOR i := 1 TO Length DO
+	       IF Dot = i THEN
+		  WriteExampleReduce (B, C, Item - 1);
+	       ELSE
+		  WriteSymbol (ElmtsPtr^ [i]);
+	       END;
+	    END;
+	 ELSE	(* Item = B + 1 *)
+	    i := 1;
+	    LOOP
+	       IF i > Length THEN EXIT; END;
+	       IF Dot = i THEN
+		  WriteExampleShift (C);
+		  i := TraceStore^ [B].fDot + 1;
+		  IF ElmtsPtr^ [i] < Epsilon THEN
+		     WriteC (ExplainFile, '.');
+		     WriteSymbol (ElmtsPtr^ [i]);
+		  ELSE
+		     WriteExampleReduce2 (B - 1);
+		  END;
+	       ELSE
+		  WriteSymbol (ElmtsPtr^ [i]);
+	       END;
+	       INC (i);
+	    END;
+	 END;
+      END;
+   END WriteExampleReduce;
+
+PROCEDURE WriteExampleReduce2 (Item: CARDINAL);
+   VAR
+      i, Dot	: CARDINAL;
+   BEGIN
+      Dot := TraceStore^ [Item].fDot + 1;
+      WITH ToRulePtr^ [TraceStore^ [Item].fRule]^.Rule DO
+	 FOR i := 1 TO Length DO
+	    IF Dot = i THEN
+	       IF ElmtsPtr^ [i] < Epsilon THEN
+		  WriteC (ExplainFile, '.');
+		  WriteSymbol (ElmtsPtr^ [i]);
+	       ELSE
+		  WriteExampleReduce2 (Item - 1);
+	       END;
+	    ELSE
+	       WriteSymbol (ElmtsPtr^ [i]);
+	    END;
+	 END;
+      END;
+   END WriteExampleReduce2;
+
+PROCEDURE WriteSymbol (Symbol: CARDINAL);
+   VAR
+      String	: tString;
+      i		: CARDINAL;
+      ch	: CHAR;
+   BEGIN
+      IF Symbol < Epsilon THEN
+	 IF Symbol = 0 THEN RETURN; END;
+	 GetString (ToSymbolPtr^[Symbol]^.Terminal.Repr, String);
+	 ch := Char (String, 1);
+	 IF (ch = '"') OR (ch = "'") THEN
+	    FOR i := 2 TO Length (String) - 1 DO
+	       WriteC (ExplainFile, Char (String, i));
+	    END;
+	 ELSE
+	    FOR i := 1 TO Length (String) DO
+	       WriteC (ExplainFile, Char (String, i));
+	    END;
+	 END;
+	 WriteC (ExplainFile, ' ');
+      ELSE
+	 WITH ToSymbolPtr^[Symbol]^.Nonterminal.Rules^.Rule DO
+	    FOR i := 1 TO Length DO WriteSymbol (ElmtsPtr^ [i]); END;
+	 END;
+      END;
+   END WriteSymbol;
+
+PROCEDURE ExtendTraceStore;
+   VAR ts	: LONGINT;
+   BEGIN
+      ts := TraceSize;
+      ExtendArray (TraceMemory1	, TraceSize, TSIZE (tTStore));
+      TraceSize := ts;
+      ExtendArray (TraceMemory2	, TraceSize, TSIZE (tTStore));
+      TraceSize := ts;
+      ExtendArray (TraceStore	, TraceSize, TSIZE (tTStore));
+      TraceSize := ts;
+      ExtendArray (PrevTraceStore,TraceSize, TSIZE (tTStore));
+   END ExtendTraceStore;
+
+(*
+PROCEDURE WriteRule (Rule, Dot: CARDINAL);
+   VAR
+      i		: CARDINAL;
+      x		: tTree;
+   BEGIN
+      WITH ToRulePtr^ [Rule]^.Rule DO
+	 WriteS (StdOutput, " ");
+	 WriteIdent (StdOutput, LHS^.Nonterminal.Name);
+	 WriteS (StdOutput, ":");
+	 IF Dot = 0 THEN WriteS (StdOutput, "."); ELSE WriteS (StdOutput, " "); END;
+	 FOR i := 1 TO Length DO
+	    x := ToSymbolPtr^ [ElmtsPtr^ [i]];
+	    IF x^.Kind = Tree.Terminal THEN
+	       WriteIdent (StdOutput, x^.Terminal.Name);
+	    ELSE
+	       WriteIdent (StdOutput, x^.Nonterminal.Name);
+	    END;
+	    IF i = Dot THEN WriteS (StdOutput, "."); ELSE WriteS (StdOutput, " "); END;
+	 END;
+      END;
+   END WriteRule;
+*)
+
+BEGIN
+   LastMemo	:= 0;
+   Memo1State	:= 0;
+   Memo2State	:= 0;
+   BSize	:= InitBSize;
+   CSize	:= InitCSize;
+   TraceSize	:= InitTraceSize;
+   MakeArray (TraceMemory1	, TraceSize, TSIZE (tTStore));
+   MakeArray (TraceMemory2	, TraceSize, TSIZE (tTStore));
+   MakeArray (TraceStore	, TraceSize, TSIZE (tTStore));
+   MakeArray (PrevTraceStore	, TraceSize, TSIZE (tTStore));
+END Explain.

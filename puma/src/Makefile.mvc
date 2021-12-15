@@ -1,0 +1,108 @@
+PUMA	= puma
+CG_AST	= ../../cg/src/cg.cg
+
+# Convert !...! notation to Modula Write statements.
+SED_WRITE = sed -f puma.sed
+
+SEDC	= $(SED_WRITE)
+SED	= $(SED_WRITE)
+
+SOURCES	= Scanner.md Scanner.mi Parser.md Parser.mi Tree.md Tree.mi \
+	  Tree2.md Tree2.mi Semantic.md Semantic.mi Optimize.md Optimize.mi \
+	  Eval.md Eval.mi \
+	  Mod.md Mod.mi C.md C.mi Cxx.md Cxx.mi Java.md Java.mi puma.mi pumal.mi
+
+sources: $(SOURCES) Tree.TS puma.rex Parser.lrk Scanner.rpp
+
+Scanner.rpp Parser.lrk:	puma.pars
+	lpp -xzj puma.pars
+
+puma.rex:	puma.scan Scanner.rpp
+	rpp < puma.scan > puma.rex
+
+Scanner.md Scanner.mi:	puma.rex
+	@echo expect 4 'default action' warning and 7 'pattern will never match' warnings
+	rex -di puma.rex
+
+Parser.md:	Parser.lrk
+	@echo expect 11 conflict messages
+	lark -divsD -k2 Parser.lrk
+
+Parser.mi:	Parser.lrk
+	@echo expect 11 conflict messages
+	lark -ivsD -k2 Parser.lrk
+
+Parser.dlt Parser.dbg:	Parser.lrk
+	@echo expect 11 conflict messages
+	lark -vsD -k2 Parser.lrk
+
+Tree.md:	$(CG_AST) puma.cg puma.ag
+	echo SELECT AstIn Ast Common PumaIn Puma PumaCF PumaDecls | \
+	cat - $(CG_AST) puma.cg puma.ag | ast -dimRyqe4
+
+Tree.mi:	$(CG_AST) puma.cg puma.ag
+	echo SELECT AstIn Ast Common PumaIn Puma PumaCF PumaDecls | \
+	cat - $(CG_AST) puma.cg puma.ag | ast -imRyqe
+
+Tree2.md:	$(CG_AST)
+	echo SUBUNIT Tree2 SELECT AstIn Ast Tree2 | cat - $(CG_AST) | ast -dig
+
+Tree2.mi:	$(CG_AST)
+	echo SUBUNIT Tree2 SELECT AstIn Ast Tree2 | cat - $(CG_AST) | ast -ig
+
+Tree.TS:	$(CG_AST) puma.cg puma.ag
+	echo SELECT AstIn Ast PumaIn Puma PumaCF PumaDecls | \
+	cat - $(CG_AST) puma.cg puma.ag | ast -4
+
+Semantic.md Semantic.mi patterns: sem.puma Tree.TS
+	$(PUMA) -dinwr sem.puma > patterns
+
+Eval.md Eval.mi:	$(CG_AST) puma.cg puma.ag
+	echo SELECT PumaIn PumaCF PumaDecls | \
+	cat - $(CG_AST) puma.cg puma.ag | ag -DIW
+
+Optimize.md Optimize.mi:	opt.puma Tree.TS
+	$(PUMA) -diwk opt.puma
+
+Mod.md Mod.mi:	mod.puma Tree.TS
+	$(SED) < mod.puma | $(PUMA) -dinw
+
+C.md C.mi:	c.puma Tree.TS
+	$(SED) < c.puma | $(PUMA) -dinw
+
+Cxx.md Cxx.mi:	cxx.puma Tree.TS
+	$(SED) < cxx.puma | $(PUMA) -dinw
+
+Java.md Java.mi: java.puma Tree.TS
+	$(SEDC) < java.puma | $(PUMA) -dinw
+
+puma.mi:	puma.mi.sed
+	$(SED) < puma.mi.sed > puma.mi
+
+pumal.mi:	pumal.mi.sed
+	$(SED) < pumal.mi.sed > pumal.mi
+
+m2c:
+	nmake $(SOURCES) -c -f Makefile.mvc
+	copy TypeTab.* ..\m2c
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake $(SOURCES) -c -f Makefile.mvc
+	copy TypeTab.* ..\m
+	nmake sources M2FLAGS="-c -d../../reuse/src -o../m" -c -f ../m/Makefile
+
+clean:
+	del Parser.dbg
+	del Parser.dlt
+	del Parser.cft
+	del *.obj
+
+CLEAN:	clean
+	del puma.exe
+	del pumal.exe
+	del $(SOURCES)
+	del Tree.TS
+	del Scanner.rpp
+	del puma.rex
+	del Parser.lrk

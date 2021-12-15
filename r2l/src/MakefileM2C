@@ -1,0 +1,64 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+DefTable$(ES)	: DefTable$(ED)	; $(MD) DefTable$(SD)
+
+DefTable$(EO)	: DefTable$(EI)	; $(MI) DefTable$(SI)
+DefTable$(EO)	: DefTable$(ES)
+
+Errors$(ES)	: Errors$(ED)	; $(MD) Errors$(SD)
+
+Errors$(EO)	: Errors$(EI)	; $(MI) Errors$(SI)
+Errors$(EO)	: Errors$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: DefTable$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Errors$(ES)
+
+all	: r2l
+r2l$(EO)	: r2l$(EP)	; $(MP) r2l$(SP)
+r2l$(EO)	: Scanner$(ES)
+r2l$(EO)	: Parser$(ES)
+
+r2l	: r2l$(EO) Parser$(EO) DefTable$(EO) Errors$(EO) Scanner$(EO)	; $(ML) r2l $(OUT) r2l
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

@@ -1,0 +1,69 @@
+(* $Id: Scanner.mi,v 1.4 1991/03/08 18:47:44 grosch rel $ *)
+
+IMPLEMENTATION MODULE Scanner;
+
+FROM IO	IMPORT StdInput, ReadC;
+
+CONST
+  cEof = 0C;
+  cTab = 11C;
+  cEol = 12C;
+
+VAR
+  next, ch: CHAR;
+
+PROCEDURE BeginScanner;
+  BEGIN
+    next := ReadC (StdInput);
+    ch := cEol;
+  END BeginScanner;
+
+PROCEDURE CloseScanner;
+  END CloseScanner;
+
+PROCEDURE GetToken (): CARDINAL;
+  BEGIN
+    LOOP
+      IF ch = cEof THEN
+	RETURN 0;
+      ELSIF ch = cEol THEN
+	INC (Attribute.Position.Line);
+	Attribute.Position.Column := 0;
+      ELSIF ch = cTab THEN
+	Attribute.Position.Column := (Attribute.Position.Column DIV 8 + 1) * 8
+      END;
+      INC (Attribute.Position.Column);
+      ch := next;
+      next := ReadC (StdInput);
+      CASE ch OF
+      | cEof:		RETURN 0;
+      | ' ':		RETURN 1;
+      | '^':		RETURN 2;
+      | '%':		RETURN 3;
+      | '$':		RETURN 4;
+      | '.':		RETURN 5;
+      | '\':		IF next = cEol THEN
+			  ch := next;
+			  next := ReadC (StdInput);
+			  RETURN 10;
+			ELSE
+			  RETURN 6;
+			END;
+      | '{':		RETURN 7;
+      | '}':		RETURN 8;
+      | cEol:		RETURN 9;
+      | cTab:		RETURN 12;
+      ELSE		Attribute.Ch := ch; RETURN 11;
+      END;
+    END;
+  END GetToken;
+
+PROCEDURE ErrorAttribute (Symbol: CARDINAL; VAR Attribute: tScanAttribute);
+  BEGIN
+    Attribute.Ch := ' ';
+  END ErrorAttribute;
+
+BEGIN
+  Attribute.Position.Line := 0;
+  Attribute.Position.Column := 0;
+END Scanner.

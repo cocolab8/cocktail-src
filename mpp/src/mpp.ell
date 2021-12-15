@@ -1,0 +1,139 @@
+(* $Id: mpp.ell,v 1.6 1992/01/30 14:27:32 grosch rel $ *)
+
+EXPORT {
+FROM Strings	IMPORT	tString;
+
+TYPE tParsAttribute = tString;
+}
+
+GLOBAL	{
+FROM StdIO	IMPORT	WriteC;
+FROM Scanner	IMPORT	BeginScanner, CloseScanner;
+FROM Strings	IMPORT	AssignEmpty, Append;
+FROM Table	IMPORT	BeginLine, CloseLine, NewLine, Define, Translate, WriteLine;
+
+CONST cTab	= 11C;
+}
+
+BEGIN	{ BeginScanner; }
+
+CLOSE	{ CloseScanner; }
+
+TOKEN
+  ' '
+  '^'
+  '%'
+  '$'
+  '.'
+  '\'
+  '{'
+  '}'
+  nl
+  bnl
+  char
+  tab
+
+RULE
+
+input:				/* the whole input */
+  line *
+.
+
+line: 				/* one line */
+  '.' ( definition
+      | usage
+      )
+| normal
+.
+
+definition: 			/* definition */
+
+  '.' bl ( char
+	 | '^'			{ char1.Ch := '^';		}
+	 | '%'			{ char1.Ch := '%';		}
+	 | '$'			{ char1.Ch := '$';		}
+	 | '{'			{ char1.Ch := '{';		}
+	 | '}'			{ char1.Ch := '}';		}
+	 | '\'			{ char1.Ch := '\';		}
+	 ) bl			{ AssignEmpty (text1);		}
+	 [ text ] nl 		{ Define (char1.Ch, text1);	}
+				{ NewLine;			}
+.
+
+usage:				/* usage */
+
+  (			  	{ AssignEmpty (text1);		}
+    ( char
+    | '^'			{ char1.Ch := '^';		}
+    | '%'			{ char1.Ch := '%';		}
+    | '$'			{ char1.Ch := '$';		}
+    | '{'			{ char1.Ch := '{';		}
+    | '}'			{ char1.Ch := '}';		}
+    ) [text] nl			{ Translate (char1.Ch, text1);	}
+  |				{ BeginLine;			}
+    bl use * ( nl		{ CloseLine;			}
+	  | bnl
+	  )
+  )				{ NewLine;			}
+.
+
+normal:
+
+  [ any 			{ WriteLine (any1);		}
+	]
+	( nl 
+	| bnl			{ WriteC ('\');			}
+	)			{ NewLine;			}
+.
+
+bl:				/* skip blanks and tabs		*/
+
+  ( ' ' | tab ) *
+.
+
+use:				/* usage			*/
+
+  '{' ( char
+      | '^'			{ char1.Ch := '^';		}
+      | '%'			{ char1.Ch := '%';		}
+      | '$'			{ char1.Ch := '$';		}
+      | '{'			{ char1.Ch := '{';		}
+      | '}'			{ char1.Ch := '}';		}
+      | '\'			{ char1.Ch := '\';		}
+      ) 			{ AssignEmpty (text1);		}
+        bl [text] '}'		{ Translate (char1.Ch, text1);	}
+| text				{ Translate ('%', text1);	}
+.
+
+text:				/* collect text			*/
+				{ AssignEmpty (text0);		}
+  ( ' '				{ Append (text0, ' ');		}
+  | '^'				{ Append (text0, '^');		}
+  | '%'				{ Append (text0, '%');		}
+  | '$'				{ Append (text0, '$');		}
+  | '.'				{ Append (text0, '.');		}
+  | char			{ Append (text0, char1.Ch);	}
+  | tab				{ Append (text0, cTab);		}
+  | '\'  			{ Append (text0, '\');		}
+	 ( '\'			{ Append (text0, '\');		}
+	 | '{'			{ Append (text0, '{');		}
+	 | '}'			{ Append (text0, '}');		}
+	 | ' '			{ Append (text0, ' ');		}
+	 | tab			{ Append (text0, cTab);		}
+	 )
+  ) +
+.
+
+any:				{ AssignEmpty (any0);		}
+  ( ' '				{ Append (any0, ' ');		}
+  | '^'				{ Append (any0, '^');		}
+  | '%'				{ Append (any0, '%');		}
+  | '$'				{ Append (any0, '$');		}
+  | '.'				{ Append (any0, '.');		}
+  | '\'				{ Append (any0, '\');		}
+  | '{'				{ Append (any0, '{');		}
+  | '}'				{ Append (any0, '}');		}
+  | char			{ Append (any0, char1.Ch);	}
+  | tab				{ Append (any0, cTab);		}
+  ) +
+.

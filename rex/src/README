@@ -1,0 +1,15 @@
+Scanner Generator Rex
+=====================
+
+Rex makes use of a library of reusable Modula-2 modules (MLIB=reuse).
+This library must be compiled before Rex itself.
+
+To generate Rex the first time use:
+
+   make <configuration>_boot MLIB=...
+   make install BIN=... LIB=...
+
+When Rex and Lark are operational the following should suffice:
+
+   make <configuration> MLIB=...
+   make install BIN=... LIB=...

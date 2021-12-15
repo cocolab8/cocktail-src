@@ -1,0 +1,55 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+Reader$(ES)	: Reader$(ED)	; $(MD) Reader$(SD)
+Reader$(ES)	: ReaderSource$(ES)
+
+Reader$(EO)	: Reader$(EI)	; $(MI) Reader$(SI)
+Reader$(EO)	: Reader$(ES)
+Reader$(EO)	: ReaderSource$(ES)
+
+Writer$(ES)	: Writer$(ED)	; $(MD) Writer$(SD)
+Writer$(ES)	: WriterSource$(ES)
+
+Writer$(EO)	: Writer$(EI)	; $(MI) Writer$(SI)
+Writer$(EO)	: Writer$(ES)
+Writer$(EO)	: WriterSource$(ES)
+
+all	: tidy
+tidy$(EO)	: tidy$(EP)	; $(MP) tidy$(SP)
+tidy$(EO)	: Reader$(ES)
+tidy$(EO)	: ReaderSource$(ES)
+tidy$(EO)	: Writer$(ES)
+tidy$(EO)	: WriterSource$(ES)
+
+tidy	: tidy$(EO) Reader$(EO) Writer$(EO) ReaderSource$(EO) WriterSource$(EO)	; $(ML) tidy $(OUT) tidy
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

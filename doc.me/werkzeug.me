@@ -1,0 +1,1452 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.de []		\" start to display collected references
+.uh Literatur
+..
+.ds ], , 
+.EQ
+gsize 12
+delim $$
+.EN
+.T0
+
+
+	Werkzeuge f\*ur den
+	\*Ubersetzerbau
+
+	J. Grosch
+	H. Emmelmann
+
+.T1
+.T2 "" "Werkzeuge f\*ur den \*Ubersetzerbau" "Josef Grosch, Helmut Emmelmann" "Feb. 7, 1995" 21 1995
+.hc ~
+.bp 1
+.ce 99
+.b "Werkzeuge f\*ur den \*Ubersetzerbau"
+.ce 0
+.sp
+.uh \*Ubersicht
+.pp
+Mit \*Ubersetzerbau-Werkzeugen lassen sich \*Ubersetzer f\*ur Programmiersprachen weitgehend
+automatisch generieren. Wir stellen einen Werkzeugkasten vor, welcher die Konstruktion
+nahezu aller Phasen eines \*Ubersetzers unterst\*utzt. Die Entwurfsziele f\*ur diesen
+Werkzeugkasten waren praktische Brauchbarkeit, deutlich reduzierter Erstellungsaufwand f\*ur
+\*Ubersetzer und hohe Qualit\*at der generierten \*Ubersetzer. Besonders hinsichtlich
+Effizienz sind die Werkzeuge konkurrenzf\*ahig zur Programmierung von Hand.
+Zur Zeit k\*onnen mit den Werkzeugen \*Ubersetzermodule in den Zielsprachen
+C, C++ und Modula-2 sowie teilweise Ada und Eiffel
+erzeugt werden. Viele rea~listische Anwendungen demonstrieren die ausgezeichnete
+Leistungsf\*ahigkeit der Werkzeuge und zeigen, da\*s die Werkzeuge die Konstruktion von
+\*Ubersetzern mit Produktionsqualit\*at erlauben.
+.sh 1 "Aufbau eines \*Ubersetzers"
+.pp
+Ein wichtiges Hilfsmittel zur Programmierung eines Computers ist ein \*Ubersetzer (compiler).
+Ein \*Ubersetzer ist ein Programm, welches ein in einer Programmiersprache geschriebenes
+Programm in eine Maschinensprache \*ubersetzt. Die Hardware versteht genaugenommen nur
+aus Nullen und Einsen zusammengesetzte Maschinensprach-Programme. Um einem Computer auch eine
+f\*ur den menschlichen Programmierer besser geeignete h\*ohere Programmiersprache
+verst\*andlich zu machen, ist eine \*Ubersetzung n\*otig.
+.pp
+Die Konstruktion eines \*Ubersetzers ist eine anspruchsvolle und  
+aufwendige Aufgabe. Der Bedarf an \*Ubersetzern ist relativ gro\*s, da
+f\*ur jede Programmiersprache und jeden Computer ein eigener \*Ubersetzer notwendig ist.
+Es lohnt sich daher, nach Methoden zu suchen, die die Erstellung von Compilern zu vereinfachen.
+Doch bevor wir zu unserem eigentlichen Thema kommen, n\*amlich
+der automatischen Generierung von \*Ubersetzern mit \*Ubersetzerbau-Werkzeugen, m\*ochten wir
+kurz den Aufbau und die prinzipielle Funktionsweise eines \*Ubersetzers erl\*autern.
+Die rechte Spalte in Abb. 1 zeigt die Phasen bzw. Module eines \*Ubersetzers.
+.pp
+Die lexikalische Analyse liest das Quellprogramm zeichenweise. Sie fa\*st die Zeichenfolgen
+f\*ur Bezeichner, Zahlen und Schl\*usselw\*orter zu Grundsymbolen (tokens)
+zusammen und \*uberliest Zwi~schenr\*aume und Kommentare.
+.pp
+Die syntaktische Analyse hat als Eingabe eine Folge von Grundsymbolen. Sie \*uberpr\*uft das
+Quellprogramm auf syntaktische Fehler und rekonstruiert die Struktur des Programms, d. h. sie
+erkennt den Aufbau der Ausdr\*ucke und Anweisungen sowie deren Zusammenhang. Diese Struktur
+wird oft in Form eines Syntaxbaums gespeichert.
+.pp
+Die semantische Analyse \*uberpr\*uft die Kontextbedingungen bzw. die Regeln der statischen
+Semantik und berechnet f\*ur die Codegenerierung n\*otige Eigenschaften. Ein Beispiel f\*ur
+eine Kontextbedingung ist die Vorschrift, da\*s alle Variablen deklariert sein m\*ussen.
+Zur statischen Semantik z\*ahlen die Analyse der G\*ultigkeitsbereiche, die Namensanalyse, d.
+h. die Feststellung der zu einem Bezeichner geh\*orenden Deklaration, und die
+Typ\*uberpr\*ufung.
+.pp
+Zur Vereinfachung der gesamten \*Ubersetzungsaufgabe wird diese h\*aufig in zwei Schritte
+unterteilt. Der Syntaxbaum wird zun\*achst von einer Transformationsphase in eine
+Zwischensprache umgewandelt. Diese Zwischensprache ist meist maschinenorientiert jedoch
+noch maschinenunabh\*angig. Das niedrige Niveau der Zwischensprache erleichtert dem
+Codegenerator die Erzeugung der Maschinensprache.
+.pp
+Zu den Aufgaben des Codegenerators z\*ahlen die Befehlsauswahl, d. h. die Abbildung der
+Zwischensprachanweisungen auf Maschinenbefehle, sowie die Speicher- und Registerzuteilung.
+Die Ausgabe ist schlie\*slich ein bin\*ar-codiertes Maschinenprogramm.
+.pp
+Der folgende Abschnitt beschreibt die Vorteile, die Entwurfsziele und den Inhalt des Werkzeugkastens.
+Abschnitt 3 stellt die gemeinsamen Eigenschaften der Werkzeuge dar.
+Im Abschnitt 4 wird das von uns bevorzugte \*Ubersetzermodell beschrieben.
+Der Abschnitt 5 enth\*alt eine kurze Darstellung der einzelnen Werkzeuge.
+Ab~schnitt 6 berichtet von den Erfahrungen des Einsatzes der Werkzeuge in einer realistischen Anwendungen.
+Abschnitt 7 enth\*alt eine Zusammenfassung und beschreibt weiterf\*uhrende Arbeiten.
+.sh 1 Werkzeugkasten
+.pp
+Die Erstellung eines \*Ubersetzers von Hand ist eine sehr anspruchsvolle  und
+aufwendige Aufgabe.
+Durch den Einsatz von \*Ubersetzerbau-Werkzeugen l\*a\*st sich dieser Aufwand re~du~zie~ren.
+Im folgenden stellen wir einen Werkzeugkasten zur \*Ubersetzer-Generierung vor,
+welcher f\*ur nahezu jede \*Ubersetzerphase Werkzeuge enth\*alt.
+Diese sind f\*ur den Einsatz in realistischen \*Ubersetzerprojekten konzipiert.
+.pp
+Im allgemeinen akzeptieren die Werkzeuge als Eingabe eine Spezifikation, die in einer
+werkzeug-spezifischen Sprache geschrieben ist. Sie produzieren als Ausgabe ein
+Programm-Modul in einer Zielsprache (C, C++ oder Modula-2 und teilweise
+Ada oder Eiffel). Deshalb kann ein Werkzeug als
+ge~ne~ri~sche L\*osung eines Teilproblems in einem \*Ubersetzer gesehen werden, wobei mit
+Hilfe einer Spezifikation eine konkrete L\*osung gewonnen wird.
+.pp
+Die Benutzung von Werkzeugen hat gegen\*uber der Programmierung von Hand mehrere Vorteile:
+Der zur Konstruktion eines \*Ubersetzers notwendige Aufwand wird wesentlich verringert. An
+Stelle eines Programms wird eine viel k\*urzere Spezifikation entwickelt. Die Werkzeuge
+k\*onnen eine Spezifikation in vielfacher Weise auf Konsistenz \*uberpr\*ufen. Das Schreiben
+automatisch pr\*ufbarer Spezifikationen verringert die Anzahl m\*oglicher Fehler und erh\*oht
+so die Zuverl\*assigkeit des resultierenden \*Ubersetzers.
+.pp
+Die wichtigsten Entwurfsziele f\*ur den Werkzeugkasten waren:
+.ip -
+praktische Brauchbarkeit f\*ur realistische Programmiersprachen
+.ip -
+automatische Generierung von \*Ubersetzern mit Produktionsqualit\*at
+.ip -
+wesentliche Steigerung der \*Ubersetzerbau-Produktivit\*at
+.ip -
+mit Handprogrammierung vergleichbare Qualit\*at der erzeugten \*Ubersetzer
+.pp
+Mit dieser Zielsetzung  sollte die praktische Einsatzf\*ahigkeit
+des Werkzeugkastens in rea~li~sti~schen \*Ubersetzerbauprojekten
+erreicht werden. Daher wurde auch die Konkurrenzf\*ahigkeit
+zur Handprogrammierung betont. Wir meinen, da\*s die hohe
+Produktivit\*at und Zuverl\*assigkeit nicht durch eine
+geringere Codequalit\*at oder Effizienz des resultierenden Compilers
+erkauft werden mu\*s.
+.pp
+Der Werkzeugkasten enth\*alt folgende Werkzeuge:
+.(b
+.ta 2c
+Rex	Generator f\*ur lexikalische Analysatoren
+Lark	LR(1) Parser-Generator mit Backtracking
+Ell	LL(1) Parser-Generator
+Ast	Generator f\*ur abstrakte Syntaxb\*aume
+Ag	Generator f\*ur Attributauswerter
+Puma	Transformation attributierter Syntaxb\*aume
+Reuse	Bibliothek wiederverwendbarer Module
+.)b
+.pp
+Alle Werkzeuge wurden urspr\*unglich in Modula-2 programmiert und laufen unter dem
+Betriebssystem UNIX. Unter Verwendung des Modula-2 nach C \*Ubersetzers
+.i Mtc
+\*([[Mar90\*(]] (siehe Abschnitt 6), konnte von den Programmen automatisch eine
+C-Version erstellt werden. Zur Zeit erzeugen die Werkzeuge Module in den
+Zielsprachen C, C++ oder Modula-2 und teilweise auch Ada oder Eiffel.
+.sh 1 "Gemeinsame Eigenschaften"
+.pp
+Unsere Entwurfsziele f\*uhrten zu einigen f\*ur alle Werkzeuge gemeinsamen
+Entwurfsentscheidungen. Nahezu jedes Werkzeug ben\*otigt eine Programmiersprache, mit der der
+Benutzer gewi\*se Aktionen, Bedingungen oder Berechnungen spezifizieren kann. Das trifft
+offensichtlich f\*ur Attributgrammatiken zu, aber auch der Transformations-Generator mu\*s
+Attribute und Bedingungen auswerten. Sogar die Parser-Generatoren brauchen eine solche
+Sprache zur Spezifikation semanti~scher Aktionen.
+.pp
+Wir entschieden uns daf\*ur, direkt die Zielsprache (n\*amlich C, C++ oder Modula-2
+usw.) zu verwenden.
+Deshalb k\*onnen Spezifikationen Abschnitte mit Zielsprachanweisungen enthalten. Abgesehen von
+geringf\*ugigen Ersetzungen wird dieser Text unver\*andert in die erzeugten Module kopiert.
+Der Nachteil dieser Methode ist, da\*s die in der Zielsprache geschriebenen Teile nicht
+vollst\*andig von den Werkzeugen \*uberpr\*uft werden k\*onnen. Zum Beispiel kann das
+Attri~but~gram~matik-Werkzeug nicht \*uberpr\*ufen, ob Attributberechnungen keine Seiteneffekte
+haben. Andererseits wird damit eine sehr gro\*se Flexibilit\*at erreicht, da die volle
+Ausdruckskraft der Zielsprache zur Verf\*ugung steht. Ebenso wird die praktische
+Brauchbarkeit drastisch erh\*oht, da die Einbeziehung anderer, eventuell handgeschriebener
+Komponenten leicht m\*oglich ist. Schlie\*slich f\*uhrt es zu einfachen Werkzeugen und
+einfachen Spezifikationssprachen.
+.pp
+Unsere Erfahrung mit fr\*uheren Werkzeugen zeigte, da\*s w\*ahrend der Konstruktion
+rea~li~sti~scher \*Ubersetzer eine Reihe kleiner Sonderprobleme auftritt, die nicht mit den
+Werkzeugen gel\*ost werden k\*onnen. Deswegen sind Schlupfl\*ocher n\*otig, also
+M\*oglichkeiten, die es dem Werkzeugbenutzer erlauben, leicht handgeschriebene Teile
+einzuf\*ugen. Diese Schlupfl\*ocher tragen auch dazu bei, die Werkzeuge zu vereinfachen, da
+man nicht gezwungen ist, f\*ur jedes Problem sofort eine L\*osung bereitzustellen. Das
+Schlupfloch kann benutzt werden solange bis eine wirklich gute L\*osung gefunden wird, welche
+man in ein Werkzeug einbauen kann.
+.pp
+Die Werkzeuge sind gr\*o\*stenteils von einander unabh\*angig. Dies wird dadurch erzielt,
+da\*s keiner der erzeugten Module eine festgelegte Ausgabe besitzt. Stattdessen wird diese
+Ausgabe mittels Anweisungen der Zielsprache spezifiziert und kann somit beliebig gew\*ahlt
+werden. Die Unabh\*angigkeit der Werkzeuge sorgt f\*ur gro\*se Freiheiten beim
+\*Ubersetzerentwurf. Eine Ausnahme bilden die Werkzeuge
+.i Ag
+und
+.i Puma ,
+denn sie basieren auf den mit
+.i Ast
+spezifizierten Syntaxb\*aumen. Deshalb h\*angen diese Werkzeuge von
+.i Ast
+ab, und alle drei Werkzeuge sind f\*ur \*Ubersetzer zugeschnitten, die einen attributierten
+abstrakten Syntaxbaum benutzen.
+.(z
+.PS
+linewid	= linewid * 1.2
+boxwid	= boxwid * 1.7
+boxht	= boxht * 1.2
+circlerad = circlerad * 1.2
+bh	= boxht * 1.7
+bw	= boxwid * 0.5
+
+	right
+
+S1:	box wid bw height bh invis
+SP:	box wid boxwid * 1.6 "regul\*are Ausdr\*ucke"
+	arrow
+T:	circle "rex"
+	arrow
+I1:	box "lexikalische" "Analyse"
+
+S2:	box at S1 - (0, bh) wid bw height bh invis
+P:	box wid boxwid * 1.6 "konkrete Syntax" "(Grammatik)" "Abb.: konkret \(-> abstrakt"
+	arrow
+	circle "lark" "ell"
+	arrow
+I2:	box "syntaktische" "Analyse"
+
+S3:	box at S2 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "abstrakte Syntax" "(Grammatik)"
+	arrow
+	circle "ast"
+	arrow
+I3:	box "Syntaxbaum"
+
+S4:	box at S3 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Attribut-Grammatik"
+	arrow
+	circle "ag"
+	arrow
+I4:	box "semantische" "Analyse"
+
+S5:	box at S4 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Abb.:" "abstrakt \(-> Zwischensprache"
+	arrow
+	circle "puma"
+	arrow
+I5:	box "Transformation"
+
+S6:	box at S5 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Zwischensprache" "(Grammatik)"
+	arrow
+	circle "ast"
+	arrow
+I6:	box "Zwischensprache"
+
+S7:	box at S6 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Abb.:" "Zwischensprache \(->" "Maschinensprache"
+	arrow
+	circle "puma"
+	arrow
+I7:	box "Codegenerator"
+
+	box invis "Spezifikation" at SP + (0, bh)
+	box invis "Werkzeug" at T + (0, bh)
+	box invis "\*Ubersetzer-Modul" at I1 + (0, bh)
+
+	line from I1.n up boxht * 0.9 <-
+	arrow from I1.s to I2.n
+	arrow from I2.s to I3.n
+	arrow from I3.s to I4.n <->
+	arc from I3.se to I5.ne at I4 -> cw
+	arrow from I5.s to I6.n
+	arrow from I6.s to I7.n
+	arrow from I7.s down boxht * 0.9
+.PE
+.sp 0.5
+.ce
+Abb. 1: \*Ubersetzer-Modell
+.)z
+.bp
+.sh 1 "\*Ubersetzer-Modell"
+.pp
+Obwohl die Werkzeuge kein bestimmtes \*Ubersetzer-Modell erzwingen, m\*ochten wir das von uns
+bevorzugte Modell vorstellen. Wir meinen, da\*s dieses am besten von den Werkzeugen
+unterst\*utzt wird. Wir betrachten die semantische Analyse nach wie vor als den schwierigsten
+Teil eines \*Ubersetzers. Deshalb gehen wir f\*ur die semantische Analyse und die Erzeugung
+einer Zwi~schensprache von der abstrakten Syntax aus. Wir bauen den abstrakten Syntaxbaum
+explizit auf, welcher w\*ahrend der semantischen Analyse eventuell mit Attributen erg\*anzt
+wird. Neben der abstrakten Syntax, welche als erste, hohe Zwischensprache betrachtet werden
+kann, bevorzugen wir die Verwendung einer zweiten, niederen Zwischensprache als Schnittstelle
+zum Codegenerator. Dies bringt Vorteile in der Optimierung und der mustergesteuerten
+Codeauswahl mit sich.
+.pp
+Abbildung 1 zeigt das von uns bevorzugte \*Ubersetzermodell. Die rechte Spalte enth\*alt die
+wichtigsten Module eines \*Ubersetzers. Die linke Spalte zeigt die dazu notwendigen
+Spezifikationen. Die dazwischen liegenden Werkzeuge werden von den Spezifikationen gesteuert
+und erzeugen die einzelnen Module. Die Pfeile stellen den Datenflu\*s dar, teils zur
+Generierungszeit und teils zur \*Ubersetzungszeit.
+.\" .pp
+.\" Im Prinzip arbeitet das \*Ubersetzermodell folgenderma\*sen: Die lexikalische und
+.\" syntaktische Analyse lesen die Quelle, pr\*ufen die konkrete Syntax und bauen einen
+.\" abstrakten Syntaxbaum auf. Sie k\*onnen verschiedene Normalisierungen, Vereinfachungen und
+.\" Transformationen durchf\*uhren, um die abstrakte Syntax relativ einfach zu halten. Auf dem
+.\" abstrakten Syntaxbaum findet dann die semantische Analyse statt. M\*oglicherweise werden
+.\" Attribute zur Codeerzeugung berechnet. Danach wird der abstrakte Syntaxbaum in eine
+.\" niedere Zwischensprache transformiert. Diese ist Eingabe f\*ur den Codegenerator, welcher
+.\" schlie\*slich den Maschinencode erzeugt.
+.sh 1 "Die Werkzeuge"
+.pp
+Die folgenden Abschnitte stellen kurz die einzelnen Werkzeuge des Werkzeugkastens vor. Wir
+beschreiben nur die Eigenschaften der Werkzeuge. F\*ur weitere Einzelheiten, die
+Spezifikationstechniken oder f\*ur Beispiele sei der Leser auf die existierenden,
+werkzeug-spezifischen Dokumente verwiesen.
+.sh 2 Rex
+.pp
+.i Rex
+(\fIr\fPegular \fIex\fPpression tool) ist ein Generator f\*ur lexikalische Analysatoren
+\*([[Gro88\*(],Gro89\*(],Groa\*(]].
+Seine Spezifikationen basieren auf regul\*aren Ausdr\*ucken und beliebigen
+semantischen Aktionen, die in einer der Zielsprachen C, C++, Modula-2, Ada oder
+Eiffel geschrieben werden.
+Immer wenn in der Eingabe des erzeugten lexikalischen Analysators eine einem regul\*aren
+Ausdruck entsprechende Zeichenkette erkannt wurde, werden die zugeh\*origem Aktionen
+ausgef\*uhrt. Falls zur eindeutigen Erkennung der Symbole der Kontext
+betrachtet werden mu\*s, so kann der rechte Kontext durch einen
+zus\*atzlichen regul\*aren Ausdruck spezifiziert werden, und der linke
+Kontext wird mit sogenannten Start-Zust\*anden behandelt.
+Falls mehrere regul\*are Ausdr\*ucke auf die aktuelle Eingabe zutreffen, so wird der Ausdruck
+mit der l\*angsten Zeichenkette bevorzugt. Falls es immer noch mehrere M\*oglichkeiten gibt,
+so wird der zuerst in der Spezifikation stehende Ausdruck gew\*ahlt.
+.pp
+Die erzeugten lexikalischen Analysatoren berechnen automatisch Zeile und Spalte
+f\*ur jedes erkannte Symbol und enthalten einen Mechanismus f\*ur Include-Dateien.
+Bezeichner und Schl\*usselw\*orter k\*onnen effizient in Gro\*s- oder
+Kleinbuchstaben normalisiert werden. Es gibt vordefinierte Regeln, um Leerstellen,
+Tabulatoren und Zeilenwechsel zu \*uberlesen.
+Die ge~ne~rier~ten lexikalischen Analysatoren sind tabellengesteuerte, deterministische
+endliche Automaten. Die Tabellen werden mit der sogenannten Kammvektortechnik komprimiert
+\*([[ASU86\*(]].
+.pp
+Die herausragende Eigenschaft von \fIRex\fP ist seine Geschwindigkeit.
+Die lexikalischen Analysatoren verarbeiten etwa 2 Millionen Symbole (tokens) pro
+Minute ohne Hashing von
+Be~zeich~nern und 1,5 Millionen Symbole pro Minute mit Hashing (auf einer SPARC
+station ELC). Dies ist die vierfache Geschwindigkeit
+gegen\*uber mit \fILex\fP\*([<\*([[Les75\*(]]\*(>] generierten lexikalischen Analysatoren.
+In typischen F\*allen besitzen mit \fIRex\fP ge~ne~rier~te Analysatoren ein Viertel
+der Gr\*o\*se derer von \fILex\fP. Normalerweise ben\*otigt \fIRex\fP nur 1/10
+der Zeit von \fILex\fP zum Generieren eines lexikalischen Analysators.
+.sh 2 Lark
+.pp
+.i Lark
+ist ein Parser-Generator der prim\*ar LALR(1)- und LR(1)-Grammatiken verarbeitet
+\*([[Gro88\*(],Grob\*(]].
+Mit der vorhandenen Backtracking-Einrichtung k\*onnen auch Parser f\*ur wesentlich
+m\*achtigere Grammatikklassen generiert werden.
+Die Grammatikregeln k\*onnen mit semantischen Aktionen versehen werden,
+die direkt in einer Zielsprache formuliert sind.
+Immer wenn der erzeugte Parser eine Grammatikregel erkennt, wird die zugeh\*orige
+semantische Aktion ausgef\*uhrt.
+Der Generator stellt einen Mechanismus zur S-Attributierung zur Verf\*ugung,
+d. h. synthetisierte Attribute k\*onnen w\*ahrend der Zerteilung berechnet werden.
+Als Testhilfen gibt es eine Protokollierung der Parserschritte und eine graphische
+Visualisierung auf der Basis von X-Windows.
+.pp
+Im Falle von LR-Konflikten liefert \fILark\fP nicht wie andere
+Generatoren nur Information \*uber aus Mengen von Situationen bestehende
+Zust\*ande, sondern druckt einen Ableitungsbaum, der wesentlich n\*utzlicher
+zur Analyse des Konflikts ist. Konflikte k\*onnen durch die Angabe von
+Priorit\*at und Assoziativit\*at f\*ur Operatoren und Produktionen oder durch die
+Angabe von sogenannten syntaktischen und semantischen Pr\*adikaten gel\*ost
+werden. Die generierten Parser beinhalten eine automatische
+Fehlerbehandlung mit Fehlermeldungen und -reparatur.
+Zur Fehlerbehandlung wird die vollst\*andige,
+r\*ucksetzungsfreie Methode von R\*ohrich
+\*([[R\*oh76\*(],R\*oh80\*(],R\*oh82\*(]]
+verwendet. Die Parser sind
+tabellengesteuert und wie im Falle von \fIRex\fP werden die Tabellen mit der
+Kammvektortechnik komprimiert. Der Generator verwendet den in\*([<\*([[DeP82\*(]]\*(>]
+beschriebenen Algorithmus zur Berechnung der Vorschaumengen.
+Zur Zeit k\*onnen Zerteiler in den Zielsprachen C, C++, Modula-2, Ada und Eiffel
+erzeugt werden.
+.pp
+Mit \fILark\fP erzeugte Parser sind zwei bis drei mal schneller als mit \fIYacc\fP
+\*([[Joh75\*(]] erzeugte. Sie erreichen eine Geschwindigkeit von 2 Millionen Zeilen
+pro Minute ohne Ber\*ucksichtigung der lexikalischen Analyse. Die Gr\*o\*se der
+Parser ist gegen\*uber \fIYacc\fP leicht erh\*oht, denn die Geschwindigkeit
+und die komfortable Fehlerbehandlung sind nicht ganz umsonst.
+.pp
+Die Eingabesprachen von
+.i Rex
+und
+.i Lark
+sind hinsichtlich der Syntax gegen\*uber
+.i Lex
+und
+.i Yacc
+lesbarer gestaltet. Mit Hilfe zweier, hier nicht n\*aher beschriebener Pr\*aprozessoren
+k\*onnen
+.i Rex
+und
+.i Lark
+auch Eingaben f\*ur
+.i Lex
+und
+.i Yacc
+verarbeiten. Dadurch sind unsere Werkzeuge in Bezug auf die Benutzerschnittstelle
+kompatibel mit den UNIX-Werkzeugen.
+.sh 2 Ell
+.pp
+.i Ell
+ist ein LL(1) Parser-Generator, der Grammatiken, die in extended BNF geschrieben
+sind, verarbeitet
+\*([[Gro88\*(],Gro90a\*(],GrV\*(]].
+W\*ahrend der Zerteilung kann eine
+L-Attributierung ausge~wertet werden. Die erzeugten Parser beinhalten
+eine automatische Fehlerbehandlung mit Fehlermeldungen und -reparatur wie
+\fILark\fP. Die Parser sind nach dem Verfahren des rekursiven Abstiegs
+implementiert und erzielen ebenfalls eine Geschwindigkeit von 2 Millionen Zeilen pro
+Minute auf einer SPARC station ELC. Die m\*oglichen Zielsprachen sind C, C++ und Modula-2.
+.sh 2 Ast
+.pp
+.i Ast
+ist ein Generator f\*ur abstrakte Syntaxb\*aume
+\*([[Gro91\*(],Groa\*(]].
+Er generiert Programm-Module oder abstrakte Datentypen zur Bearbeitung attributierter
+B\*aume. Neben B\*aumen k\*onnen auch attributierte Graphen bearbeitet werden. Den Knoten
+dieser Datenstrukturen k\*onnen beliebig viele Attribute von beliebigem Typ zugeordnet
+werden. Die Spezifikationen f\*ur dieses Werkzeug basieren auf erweiterten kontextfreien Grammatiken.
+Sie k\*onnen als gemeinsame Notation sowohl f\*ur konkrete und abstrakte Syntax
+als auch f\*ur attributierte B\*aume und Graphen betrachtet werden. Ein Erweiterungsmechanismus
+stellt einfache und mehrfache Vererbung zur Verf\*ugung. Intern werden die B\*aume durch verzeigerte
+Verbunde gespeichert. Zahlreiche Operationen f\*ur B\*aume und Graphen k\*onnen auf
+Anforderung von
+.i Ast
+erzeugt werden: Sogenannte Knotenkonstruktoren kombinieren Aggregatschreibweise mit
+Speicherverwaltung. Lese- und Schreibeprozeduren \*ubertragen Graphen aus/in Dateien in
+lesbarem ASCII- oder internem Bin\*arformat. Die Reihenfolge von Teilb\*aumen in einer Liste
+kann umgekehrt werden. Es werden Prozeduren f\*ur h\*aufig benutzte Traversierungsstrategien
+wie
+.i "top down"
+oder
+.i "bottom up"
+zur Verf\*ugung gestellt. Ein interaktiver
+.i "Graph-Browser"
+erlaubt die Inspektion von Graphen in lesbarer Weise und unterst\*utzt so den Programmtest.
+.sh 2 Ag
+.pp
+.i Ag
+ist ein Generator f\*ur Attributauswerter
+\*([[Gro90b\*(],Grob\*(],Groc\*(]].
+Er verarbeitet geordnete Attributgrammatiken (OAGs)\*([<\*([[Kas80\*(]]\*(>],
+wohl-definierte Attributgrammatiken (WAGs) und sogenannte
+.i "higher order"
+Attributgrammatiken (HAGs)\*([<\*([[VSK89\*(],Vog93\*(]]\*(>].
+Er basiert auf der abstrakten Syntax oder genauer gesagt auf den von
+.i Ast
+erzeugten Baummodulen. Deshalb ist die Baumstruktur v\*ollig bekannt. Den Terminalen und
+Nichtterminalen k\*onnen beliebig viele Attribute zugeordnet werden. Diese werden mit den
+Typen der Zielsprache getypt. Dabei sind auch baumwertige Attribute m\*oglich.
+.i Ag
+erlaubt regellokale Attribute und bietet einen Erweiterungsmechanismus an, welcher einfache
+und mehrfache Vererbung f\*ur Attribute und Attributberechnungen zur Verf\*ugung stellt. Dieser gestattet
+ebenfalls die Elimination von Kettenregeln. Die Attributberechnungen werden in der
+Zielsprache formuliert und sollten in einem funktionalen Stil gehalten sein. Es ist
+m\*oglich externe Funktionen von getrennt \*ubersetzten Modulen aufzurufen. Die Verwendung
+nicht-funktionaler Anweisungen und von Seiteneffekten ist m\*oglich, verlangt aller~dings
+sorgf\*altige \*Uberlegung. Die Syntax der Spezifikationssprache ist im Hinblick auf die
+Unterst\*utzung kompakter, modularer und lesbarer Dokumente entworfen worden. Eine
+Attributgrammatik kann aus mehreren Modulen bestehen, wobei die kontextfreie Grammatik nur
+einmal spezifiziert wird.
+Es gibt Kurzschreibweisen f\*ur Kopierregeln und gef\*adelte Attribute womit viele triviale
+Attribut-Berechnungen weggelassen werden k\*onnen.
+Die erzeugten Attributauswerter sind sehr effizient, da sie unter
+Verwendung von rekursiven Prozeduren direkt codiert sind.
+Die Spei~che~rung der Attribute wird optimiert indem Attribute als
+lokale Variable und Prozedurparameter implementiert werden,
+wenn ihre Lebenszeit innerhalb eines Besuches liegt.
+.sh 2 Puma
+.pp
+.i Puma
+ist ein Werkzeug zur Transformation und Manipulation von attributierten
+Syntaxb\*aumen\*([<\*([[Gro92\*(],Grod\*(]]\*(>].
+Es basiert auf Pattern-Matching und rekursiven Prozeduren.
+Die erzeugten Transformations-Module haben als Eingabe einen attributierten Baum.
+Eine reine Transformation bildet diesen auf eine Ausgabe beliebiger Art ab.
+Die Ausgabe kann ein neuer Baum sein, eine li~ne~are Zwischensprache wie z. B.
+P-Code, ein Quellprogramm z. B. in Pascal, Assemblercode, Bin\*arcode
+oder eine Folge von Prozeduraufrufen.
+Bei einer Modifikation wird der Eingabebaum ver\*andert, wobei die M\*oglichkeiten
+von der Berechnung und Speicherung von Attributen bis hin zur \*Anderung der Baumstruktur reichen.
+Anwendungs~ge~bie~te f\*ur Transformationen sind die semanti~sche Analyse,
+die Erzeugung von Zwischensprachen aus abstrakten Syntaxb\*aumen,
+Optimierer f\*ur interne Baumstrukturen jeden Niveaus,
+Quelle-Quelle-\*Ubersetzung und Code-Generierung.
+.i Puma
+arbeitet mit dem Werkzeug
+.i Ast
+zusammen, wodurch bereits die Definition, Erzeugung und Spei~che~rung von B\*aumen
+unterst\*utzt werden.
+.i Puma
+f\*ugt eine kompakte Schreibweise f\*ur die Ana~ly~se und Synthese von B\*aumen hinzu.
+Das Pattern-Matching kann als die Beschreibung von Entscheidungstabellen angesehen werden.
+.pp
+Die Spezifikation einer Transformation ist regelbasiert.
+Eine Regel besteht im wesentlichen aus einem oder mehreren Mustern,
+welche Baumfragmente beschreiben, Bedingungen und einer Folge von Anweisungen.
+Wenn die Muster mit den als Parameter \*ubergebenen B\*aumen zusammenpassen und die
+Bedingungen erf\*ullt sind, dann werden die zugeh\*origen Anweisungen ausgef\*uhrt.
+Es k\*onnen mehrere Transformationen spezifiziert werden.
+Die Teilb\*aume eines Musters k\*onnen in beliebiger Reihenfolge transformiert werden.
+Sie k\*onnen mehrmals mit der selben oder mit verschiedenen Transformationen bearbeitet werden.
+.pp
+Puma erlaubt die implizite Deklaration von Variablen, f\*uhrt eine Typpr\*ufung in
+Bezug auf B\*aume durch und \*uberpr\*uft die "single assignment"-Beschr\*ankung
+f\*ur Variablen. Die Ausgabe ist der Quellcode eines Programm-Moduls in einer der
+Zielsprachen C, C++, oder Modula-2. Dieses Modul implementiert die spezifizierten
+Transformations-Routinen. Es kann leicht in beliebigen Programm-Code integiert
+werden. Die erzeugten Routinen sind optimiert durch Elimination von gemeinsamen
+Teilausdr\*ucken und Elimination von "tail"-Rekursion. Das Pattern-Matching ist
+durch direkten Code implementiert und dadurch effizient realisiert.
+.sh 2 Reuse
+.pp
+.i Reuse
+ist eine Bibliothek wiederverwendbarer Module haupts\*achlich f\*ur den Einsatz im
+\*Ubersetzerbau\*([<\*([[Groe\*(],Grof\*(]]\*(>].
+Sie enth\*alt Module oder abstrakte Datentypen, die fast
+in jedem \*Ubersetzer gebraucht werden:
+.ip -
+eine dynamische Speicherverwaltung
+.ip -
+ein Modul f\*ur dynamische und flexible Felder
+.ip -
+ein Modul zur Speicherung variabel langer Zeichenketten
+.ip -
+ein Modul zur Zeichenkettenbearbeitung
+.ip -
+eine Bezeichnertabelle, welche Zeichenketten unter Verwendung eines Hashverfahrens
+eindeutig auf ganze Zahlen abbildet
+.ip -
+Module f\*ur oft verwendete Datenstrukturen wie Mengen von ganzen Zahlen oder bin\*are
+Relationen zwischen ganzen Zahlen ohne Beschr\*ankung des Definitionsbereichs.
+.sh 1 "Erfahrungsbericht"
+.pp
+Eine erste gro\*se und realistische Anwendung des Werkzeugkastens war die
+Generierung eines Modula-2 nach C \*Ubersetzers\*([<\*([[Mar90\*(]]\*(>]. Das
+.i Mtc
+genannte Programm \*ubersetzt Modula-2 Programme in lesbaren C Code ohne Einschr\*ankung
+(sogar geschachtelte Prozeduren und Module). Es ist weitgehend automatisch generiert und
+folgt dem in Abschnitt 4 vorgeschlagenen \*Ubersetzer-Modell. Anstelle einer
+Zwischensprache erzeugt das Programm C Code und
+ben\*otigt deshalb keinen Code~ge~ne~ra~tor zur Ausgabe von Maschinencode. Es
+enth\*alt so viel von der semantischen Analyse wie f\*ur die Aufgabe gebraucht wird. Die
+semantische Analyse ist relativ vollst\*andig und enth\*alt die Behandlung der
+G\*ultigkeitsbereiche, Namensanalyse und Typbestimmung. Es fehlt die \*Uberpr\*ufung von
+Kontextbedingungen, da davon ausgegangen wird, da\*s nur korrekte Programme \*ubersetzt
+werden. Tabelle 1 enth\*alt die Gr\*o\*sen der Spezifikationen und der generierten
+Quell-Module. Der Entwurf und die Implementierung von
+.i Mtc
+wurden im Rahmen einer Diplomarbeit mit einem Aufwand von 6 Mannmonaten durchgef\*uhrt.
+Das Programm ist stabil und es \*ubersetzt regelm\*a\*sig mehr als 100.000 Zeilen Modula-2 nach C.
+.(b L
+.sp 0.5
+.TS
+center box;
+l2 |2 c2 s2 s2 |2 c2 s2 s2 |2 c1 s
+l2 |2 l2 l2 l2 |2 l2 l2 l2 |2 l1 l
+l2 |2 n2 n2 n2 |2 n2 n2 n2 |2 l1 l
+.
+Phase	Spezifikation	Quell-Modul	Werkzeug
+_
+	formal	Code	Summe	Def.	Impl.	Summe	Name	Referenzen
+_
+Lex. Analyse 	392	133	525	56	1320	1376	Rex	\*([[Gro88\*(],Groa\*(]]
+Syntaxanalyse	951	88	1039	81	3007	3088	Ell	\*([[Gro88\*(],GrV\*(]]
+Syntaxbaum    	189	51	240	579	2992	3571	Ast	\*([[Groa\*(]]
+Symboltabelle  	115	938	1053	413	1475	1888	Ast	\*([[Groa\*(]]
+Sem. Analyse	1886	151	2037	9	3288	3297	Ag	\*([[Grob\*(]]
+Codegenerator	2793	969	3762	47	7309	7356	Puma	\*([[Gro92\*(]]
+Wiederverw.	-	-	-	819	2722	3541	Reuse	\*([[Groe\*(],Grof\*(]]
+Sonstiges	-	-	-	698	3153	3851
+_
+Summe   	6326	2330	8656	2702	25266	27968
+.TE
+.sp 0.5
+.ce
+Tabelle 1: Umfang der Spezifikationen und der Quellmodule von \fIMtc
+.)b
+.pp
+Die Gr\*o\*se des Bin\*arprogramms betr\*agt 585 K Bytes.
+Es l\*auft mit einer Geschwindigkeit von etwa 2900 Grundsymbolen (\fItokens\fP) pro Sekunde oder
+715 Zeilen pro Sekunde auf einem SUN SPARC station ELC. Diese Zahlen
+ber\*ucksichtigen nur die Gr\*o\*se der \*ubersetzten Module. Wenn man zus\*atzlich die
+(transitiv) importierten Definitionsmodule ber\*ucksichtigt, die ebenfalls lexikalisch,
+syntaktisch und semantisch analysiert werden, so erreicht man 4700 Grundsymbole pro Sekunde
+oder 1790 Zeilen pro Sekunde. Zum Vergleich die Zahlen f\*ur zwei \*Ubersetzer des
+Rechner-Herstellers: Der C-\*Ubersetzer l\*auft mit einer Geschwindigkeit von
+390 Zeilen pro Sekunde (ohne \fIHeader\fP-Dateien) bzw. 
+650 Zeilen pro Sekunde (mit \fIHeader\fP-Dateien) und der Modula-2-\*Ubersetzer mit
+190 Zeilen pro Sekunde. Die Laufzeit von
+.i Mtc
+ist folgenderma\*sen verteilt:
+.(b
+.TS
+center;
+l l.
+lex. + syn. Analyse + Baumaufbau	42 %
+semantische Analyse	33 %
+C Codegenerierung 	25 %
+.TE
+.)b
+Die semantische Analyse verbringt 95% der Zeit mit der Berechnung von Attributen mittels vom
+Benutzer spezifizierten Anweisungen und nur 5% f\*ur die Baumtraversierung bzw. f\*ur
+Besuchs~aktionen. F\*ur 11 Knotentypen sind f\*unf Besuche notwendig.
+.pp
+.i Mtc
+braucht ungef\*ahr 300 K Bytes dynamischen Speicher pro 1000 Quellzeilen zur Spei~che~rung des
+abstrakten Syntaxbaums, der Attribute und der Symboltabelle ohne Optimierung der
+Attributspeicherung. Dies ist bei den heutigen Speicherkapazit\*aten problemlos
+m\*oglich. Es zeigt, da\*s es im Gegensatz zu der in der Literatur vertretenen
+Meinung m\*oglich ist, alle Attribute im Baum zu speichern. Wir tun dies sogar
+mit dem sogenannten Umgebungsattribut. Dies wird m\*oglich, indem wir die
+Symboltabelle als abstrakten Datentyp in der Zielsprache programmieren. Die
+Implementierung ist zeit- und speichereffizient durch die Ausnutzung von
+Zeigersemantik und
+.i "structure sharing" .
+.sh 1 "Zusammenfassung und Ausblick"
+.pp
+Wir haben einen Werkzeugkasten mit \*Ubersetzerbau-Werkzeugen vorgestellt, womit sich
+\*Ubersetzer f\*ur Programmiersprachen weitgehend automatisch generieren lassen.
+Die \*Ubersetzerbau-Werkzeuge unterst\*utzen die Konstruktion nahezu aller \*Ubersetzerphasen.
+Die Werkzeuge sind sehr m\*achtig, flexibel und weitgehend unabh\*angig von einander.
+Besonders hervorzuheben sind die praktische Brauchbarkeit der Werkzeuge, der deutlich
+reduzierte Erstellungsaufwand f\*ur \*Ubersetzer und die hohe Qualit\*at der generierten
+\*Ubersetzer.
+Von der Effizienz her sind die Werkzeuge konkurrenzf\*ahig zur Programmierung von Hand.
+Sie unterst\*utzen einen breiten Bereich von \*Ubersetzerstrukturen und erlauben die
+Konstruktion von \*Ubersetzern mit Produktionsqualit\*at.
+Viele realistische Anwendungen zeigen die ausgezeichnete Leistungsf\*ahigkeit der Werkzeuge.
+.pp
+Die \*Ubersetzerbau-Werkzeuge eignen sich f\*ur viele Aufgabenstellungen, die \*uber die
+Konstruktion von reinen \*Ubersetzern hinausgehen. Sie gestatten beispielsweise die
+Implementierung von Pr\*aprozessoren, die Spracherweiterungen und Sprachdialekte auf
+Standardsprachen abbilden. Wie es das Anwendungsbeispiel zeigt, lassen sich Umsetzer
+von einer Quellsprache in eine andere erstellen. Weiterhin ist etwa die Generierung
+von Pr\*ufprogrammen f\*ur Programmierkonventionen m\*oglich.
+.pp
+Die Werkzeuge lassen sich immer wieder verbessern und vervollst\*andigen:
+.\" Die Optimierung der Attributspeicherung des Werkzeugs
+.\" .i Ag
+.\" werden wir verbessern, damit Attribute gegebenenfalls auch als globale
+.\" Variable und globale Keller implementiert werden k\*onnen.
+.\" Au\*serdem sollte die Transformation von Grammatiken, die nicht die
+.\" OAG-Eigenschaft besitzen, in OAG-Grammatiken automatisiert werden.
+Zur Zeit wird beispielsweise der Parser-Generator
+.i Lark
+um die Verarbeitung von LR(k) Grammatiken erweitert.
+Der Generator f\*ur abstrakte Syntaxb\*aume
+.i Ast
+wird um einen graphischen Browser f\*ur B\*aume und Graphen erg\*anzt.
+Die Optimierungsphase eines \*Ubersetzers sollte selbstverst\*andlich auch unterst\*utzt
+werden. Dies kann entweder durch einen wiederverwendbaren sprachunabh\*angigen Optimierer,
+durch einen parameterisierbaren Optimierer oder durch einen Optimierergenerator geschehen.
+.\" Weiterhin fehlt zur Zeit noch ein Werkzeug zur Generierung von Codegeneratoren.
+.uh Danksagung
+.pp
+Wir danken allen die zur Entstehung des Werkeugkastens und dieses Aufsatzes durch aktive
+Mitarbeit oder durch ihre Ideen beigetragen haben:
+Michael Besser,
+Carsten Gerlhof,
+Bob Gray,
+Eduard Klein,
+Rudolf Landwehr,
+Matthias Martin,
+Thomas M\*uller,
+F. W. Schr\*oer,
+Dirk Schwartz-Hertzner,
+Doris Vielsack,
+Bertram Vielsack und
+William M. Waite.
+.fi
+.sz 12
+.[]
+.[-
+.ds [F ASU86
+.ds [A A\*(p]\*(a]V\*(p] Aho
+.as [A \*(c]R\*(p] Sethi
+.as [A \*(m]J\*(p]\*(a]D\*(p] Ullman
+.ds [T Compilers: Principles, Techniques, and Tools
+.ds [I Addison Wesley
+.ds [C Reading, M\&A
+.ds [D 1986
+.][
+.[-
+.ds [F DeP82
+.ds [A F\*(p] DeRemer
+.as [A \*(n]T\*(p]\*(a]J\*(p] Pennello
+.ds [T Efficient Computation of LALR(1) Look-Ahead Sets
+.ds [J ACM Trans. Prog. Lang. and Systems
+.ds [V 4
+.nr [P 1
+.ds [P 615-649
+.ds [N 4
+.ds [D Oct. 1982
+.][
+.[-
+.ds [F Gro88
+.ds [A J\*(p] Grosch
+.ds [T Generators for High-Speed Front-Ends
+.ds [V 371
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 81-92
+.ds [D Oct. 1988
+.][
+.[-
+.ds [F Gro89
+.ds [A J\*(p] Grosch
+.ds [T Efficient Generation of Lexical Analysers
+.ds [J Software\(emPractice & Experience
+.ds [V 19
+.ds [N 11
+.nr [P 1
+.ds [P 1089-1103
+.ds [D Nov. 1989
+.][
+.[-
+.ds [F Gro90a
+.ds [A J\*(p] Grosch
+.ds [T Efficient and Comfortable Error Recovery in Recursive Descent Parsers
+.ds [J Structured Programming
+.ds [V 11
+.nr [P 1
+.ds [P 129-140
+.ds [D 1990
+.][
+.[-
+.ds [F Gro90b
+.ds [A J\*(p] Grosch
+.ds [T Object-Oriented Attribute Grammars
+.ds [E A\*(p]\*(a]E\*(p] Harmanci
+.as [E \*(n]E\*(p] Gelenbe
+.nr [E 2
+.ds [B Proceedings of the Fifth International Symposium on Computer and Information Sciences (ISCIS V)
+.ds [C Cappadocia, Nevsehir, Turkey
+.nr [P 1
+.ds [P 807-816
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Gro91
+.ds [A J\*(p] Grosch
+.ds [T Tool Support for Data Structures
+.ds [J Structured Programming
+.ds [V 12
+.nr [P 1
+.ds [P 31-38
+.ds [D 1991
+.][
+.[-
+.ds [F Gro92
+.ds [A J\*(p] Grosch
+.ds [T Transformation of Attributed Trees Using Pattern Matching
+.ds [V 641
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 1-15
+.ds [D Oct. 1992
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Rex - A Scanner Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 5
+.ds [N 5
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Lark - An LR(1) Parser Generator With Backtracking
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 32
+.ds [N 32
+.][
+.[-
+.ds [F GrV
+.ds [A J\*(p] Grosch
+.as [A \*(n]B\*(p] Vielsack
+.ds [T The Parser Generators Lalr and Ell
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 8
+.ds [N 8
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Ast - A Generator for Abstract Syntax Trees
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 15
+.ds [N 15
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F Groc
+.ds [A J\*(p] Grosch
+.ds [T Multiple Inheritance in Object-Oriented Attribute Grammars
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 28
+.ds [N 28
+.][
+.[-
+.ds [F Grod
+.ds [A J\*(p] Grosch
+.ds [T Puma - A Generator for the Transformation of Attributed Trees
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 26
+.ds [N 26
+.][
+.[-
+.ds [F Groe
+.ds [A J\*(p] Grosch
+.ds [T Reusable Software - A Collection of Modula-Modules
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 4
+.ds [N 4
+.][
+.[-
+.ds [F Grof
+.ds [A J\*(p] Grosch
+.ds [T Reusable Software - A Collection of C-Modules
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 30
+.ds [N 30
+.][
+.[-
+.ds [F Joh75
+.ds [A S\*(p]\*(a]C\*(p] Johnson
+.ds [T Yacc \(em  Yet Another Compiler-Compiler
+.ds [R Computer Science Technical Report 32
+.ds [I Bell Telephone Laboratories
+.ds [C Murray Hill, NJ
+.ds [D July 1975
+.][
+.[-
+.ds [F Kas80
+.ds [A U\*(p] Kastens
+.ds [T Ordered Attribute Grammars
+.nr [P 1
+.ds [P 229-256
+.ds [J Acta Inf.
+.ds [V 13
+.ds [D 1980
+.ds [N 3
+.][
+.[-
+.ds [F Les75
+.ds [A M\*(p]\*(a]E\*(p] Lesk
+.ds [T LEX \(em A Lexical Analyzer Generator
+.ds [R Computing Science Technical Report 39
+.ds [I Bell Telephone Laboratories
+.ds [C Murray Hill, NJ
+.ds [D 1975
+.][
+.[-
+.ds [F Mar90
+.ds [A M\*(p] Martin
+.ds [T Entwurf und Implementierung eines \\*Ubersetzers von Modula-2 nach C
+.ds [R Diplomarbeit
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Feb. 1990
+.][
+.[-
+.ds [F R\*oh76
+.ds [A J\*(p] R\\*ohrich
+.ds [T Syntax-Error Recovery in LR-Parsers
+.ds [E H\*(p] Schneider
+.ds [E H.-J\*(p] Schneider
+.as [E \*(n]M\*(p] Nagl
+.nr [E 2
+.ds [S Programmiersprachen, 4. Fachtagung der GI, Erlangen
+.ds [B Informatik-Fachberichte
+.ds [V 1
+.nr [P 1
+.ds [P 175-184
+.ds [C Berlin
+.ds [I Springer Verlag
+.ds [D 1976
+.][
+.[-
+.ds [F R\*oh80
+.ds [A J\*(p] R\\*ohrich
+.ds [T Methods for the Automatic Construction of Error Correcting Parsers
+.ds [J Acta Inf.
+.ds [V 13
+.ds [N 2
+.nr [P 1
+.ds [P 115-139
+.ds [D 1980
+.][
+.[-
+.ds [F R\*oh82
+.ds [A J\*(p] R\\*ohrich
+.ds [T Behandlung syntaktischer Fehler
+.ds [J Informatik Spektrum
+.ds [V 5
+.ds [N 3
+.nr [P 1
+.ds [P 171-184
+.ds [D 1982
+.][
+.[-
+.ds [F VSK89
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.as [A \*(c]S\*(p]\*(a]D\*(p] Swierstra
+.as [A \*(m]M\*(p]\*(a]F\*(p] Kuiper
+.ds [T Higher Order Attribute Grammars
+.ds [J SI\&GPLAN Notices
+.ds [V 24
+.ds [N 7
+.nr [P 1
+.ds [P 131-145
+.ds [D July 1989
+.][
+.[-
+.ds [F Vog93
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.ds [T Higher Order Attribute Grammars
+.ds [I PhD Thesis, University of Utrecht
+.ds [D Feb. 1993
+.][
+.bp 1
+.lp
+.b Inhalt
+.sp
+.xp

@@ -1,0 +1,324 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Follow.mi,v $
+ *	
+ *	purpose:	compute follow sets
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+IMPLEMENTATION MODULE Follow;
+
+FROM DynArray	IMPORT	MakeArray, ReleaseArray;
+FROM Idents	IMPORT	tIdent;
+FROM Scanner	IMPORT	Epsilon, EndOfToken;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsEmpty, Extract, Assign,
+			IsElement, Exclude, Union, AssignElmt, Intersection,
+			Include;
+FROM Stack	IMPORT	tStack, MakeStack, ReleaseStack, Push, Pop, Depth;
+FROM SYSTEM	IMPORT	TSIZE, ADDRESS;
+FROM Table	IMPORT	Expr, ExtendFollow, SetFollow, Follow, MaxId;
+FROM Tree	IMPORT	tTree, Option, Times, Plus, List, Action, Leaf,
+			Alternative0, Alternative, Sequence0, Sequence;
+FROM Types	IMPORT	Nonterminals, Terminals, IsNonterm;
+
+PROCEDURE Start (start: tIdent);
+  VAR
+    F: tSet;
+  BEGIN
+    MakeSet (F, MaxId);
+    AssignElmt (F, EndOfToken);
+    ExtendFollow (start, F);
+    ReleaseSet (F);
+  END Start;
+
+PROCEDURE LocalFollow (t: tTree; follow: tSet);
+  VAR
+    s: tSet;
+  BEGIN
+    CASE t^.Kind OF
+    | Option:
+	LocalFollow (t^.Option.expr, follow);
+    | Times:
+	MakeSet (s, MaxId);
+	Assign (s, follow);
+	Union (s, t^.Times.first);
+	Exclude (s, Epsilon);
+	LocalFollow (t^.Times.expr, s);
+	ReleaseSet (s);
+    | Plus:
+	MakeSet (s, MaxId);
+	Assign (s, follow);
+	Union (s, t^.Plus.first);
+	Exclude (s, Epsilon);
+	LocalFollow (t^.Plus.expr, s);
+	ReleaseSet (s);
+    | List:
+	MakeSet (s, MaxId);
+
+	Assign (s, t^.List.sep^.expr.first);	
+	IF IsElement (Epsilon, s) THEN
+	  Exclude (s, Epsilon);
+	  Union (s, t^.List.body^.expr.first);
+	  IF IsElement (Epsilon, s) THEN
+	    Union (s, t^.List.sep^.expr.first);
+	    Exclude (s, Epsilon);
+	  END;
+	END;
+	Union (s, follow);
+	LocalFollow (t^.List.body, s);
+
+	Assign (s, t^.List.body^.expr.first);
+	IF IsElement (Epsilon, s) THEN
+	  Union (s, t^.List.sep^.expr.first);
+	  Union (s, follow);
+	  Exclude (s, Epsilon);
+	END;
+	LocalFollow (t^.List.sep, s);
+
+	ReleaseSet (s);
+    | Action:
+	;
+    | Leaf: WITH t^.Leaf.id^.Id DO
+	IF IsNonterm (ident) THEN
+	  ExtendFollow (ident, follow);
+	END;
+      END;
+    | Alternative0:
+	;
+    | Alternative:
+	LocalFollow (t^.Alternative.expr, follow);
+	LocalFollow (t^.Alternative.alternative, follow);
+    | Sequence0:
+	;
+    | Sequence:
+	MakeSet (s, MaxId);
+	Assign (s, t^.Sequence.sequence^.expr.first);
+	IF IsElement (Epsilon, s) THEN
+	  Exclude (s, Epsilon);
+	  Union (s, follow);
+	END;
+	LocalFollow (t^.Sequence.expr, s);
+	ReleaseSet (s);
+
+	LocalFollow (t^.Sequence.sequence, follow);
+    END;
+  END LocalFollow;
+
+PROCEDURE LocalFollows;
+  VAR
+    N: tSet;
+    F: tSet;
+    n: tIdent;
+  BEGIN
+    MakeSet (N, MaxId);
+    MakeSet (F, MaxId);
+
+    Nonterminals (N);
+    WHILE NOT IsEmpty (N) DO
+      n := Extract (N);
+      AssignElmt (F, n);
+      LocalFollow (Expr (n), F);
+    END;
+    ReleaseSet (N);
+    ReleaseSet (F);
+  END LocalFollows;
+
+PROCEDURE GlobalFollows;
+
+  VAR
+    S: tStack;
+    N: POINTER TO ARRAY [0..1000] OF INTEGER;
+    X: tSet;
+    Terms, Nonterms: tSet;
+    infinite: INTEGER;
+  
+  PROCEDURE Traverse (x: tIdent);
+    VAR
+      d: INTEGER;
+      Y: tSet;
+      y: tIdent;
+      Fx, Fy: tSet;
+    BEGIN
+      MakeSet (Fx, MaxId);
+      MakeSet (Fy, MaxId);
+      MakeSet (Y, MaxId);
+
+      Push (S, x);
+      d := Depth (S);
+      N^[x] := d;
+
+      Follow (x, Fx);			(* Terms in local FOLLOW (x)	*)
+      Intersection (Fx, Terms);
+
+      Follow (x, Y);			(* Nonterms in local FOLLOW (x) *)
+      Intersection (Y, Nonterms);
+
+      WHILE NOT IsEmpty (Y) DO
+	y := Extract (Y);
+	IF IsElement (y, X) THEN	(* yet NOT handled		*)
+	  Exclude (X, y);
+	  Traverse (y);
+	END;
+	IF N^[y] < N^[x] THEN
+	  N^[x] := N^[y];
+	END;
+
+	Follow (y, Fy);			(* terms in local FOLLOW (y)	*)
+	Intersection (Fy, Terms);
+
+	Union (Fx, Fy);
+      END;
+
+      SetFollow (x, Fx);
+
+      IF N^[x] = d THEN
+	REPEAT
+	  y := Pop (S);
+	  N^[y] := infinite;
+	  SetFollow (y, Fx);
+	UNTIL y = x;
+      END;
+
+      ReleaseSet (Fx);
+      ReleaseSet (Fy);
+      ReleaseSet (Y);
+    END Traverse;
+  
+  VAR
+    s: LONGINT;
+    x: tIdent;
+
+  BEGIN
+    infinite := MaxId + 1;
+    MakeStack (S);
+    s := MaxId + 1;
+    MakeArray (N, s, TSIZE (INTEGER));
+    FOR x := 0 TO MaxId DO
+      N^[x] := 0;
+    END;
+    MakeSet (Terms, MaxId);
+    Terminals (Terms);
+    MakeSet (Nonterms, MaxId);
+    Nonterminals (Nonterms);
+    MakeSet (X, MaxId);
+    Nonterminals (X);
+    WHILE NOT IsEmpty (X) DO
+      x := Extract (X);
+      Traverse (x);
+    END;
+    ReleaseSet (Terms);
+    ReleaseSet (Nonterms);
+    ReleaseSet (X);
+    ReleaseArray (N, s, TSIZE (INTEGER));
+    ReleaseStack (S);
+  END GlobalFollows;
+
+PROCEDURE TreeFollow (t: tTree; follow: tSet);
+  VAR
+    s: tSet;
+  BEGIN
+    MakeSet (t^.expr.follow, MaxId);
+    Assign (t^.expr.follow, follow);
+    MakeSet (t^.expr.fifo, MaxId);
+    Assign (t^.expr.fifo, t^.expr.first);
+    IF IsElement (Epsilon, t^.expr.fifo) THEN
+      Exclude (t^.expr.fifo, Epsilon);
+      Union (t^.expr.fifo, t^.expr.follow);
+    END;
+    CASE t^.Kind OF
+    | Option:
+	TreeFollow (t^.Option.expr, follow);
+    | Times:
+	MakeSet (s, MaxId);
+	Assign (s, follow);
+	Union (s, t^.Times.first);
+	Exclude (s, Epsilon);
+	TreeFollow (t^.Times.expr, s);
+	ReleaseSet (s);
+    | Plus:
+	MakeSet (s, MaxId);
+	Assign (s, follow);
+	Union (s, t^.Times.first);
+	Exclude (s, Epsilon);
+	TreeFollow (t^.Plus.expr, s);
+	ReleaseSet (s);
+    | List:
+	MakeSet (s, MaxId);
+
+	Assign (s, t^.List.sep^.expr.first);	
+	IF IsElement (Epsilon, s) THEN
+	  Exclude (s, Epsilon);
+	  Union (s, t^.List.body^.expr.first);
+	  IF IsElement (Epsilon, s) THEN
+	    Union (s, t^.List.sep^.expr.first);
+	    Exclude (s, Epsilon);
+	  END;
+	END;
+	Union (s, follow);
+	TreeFollow (t^.List.body, s);
+
+	Assign (s, t^.List.body^.expr.first);
+	IF IsElement (Epsilon, s) THEN
+	  Union (s, t^.List.sep^.expr.first);
+	  Union (s, follow);
+	  Exclude (s, Epsilon);
+	END;
+	TreeFollow (t^.List.sep, s);
+
+	ReleaseSet (s);
+    | Action:
+	;
+    | Leaf:
+	;
+    | Alternative0:
+	;
+    | Alternative:
+	TreeFollow (t^.Alternative.expr, follow);
+	TreeFollow (t^.Alternative.alternative, follow);
+    | Sequence0:
+	;
+    | Sequence:
+	MakeSet (s, MaxId);
+	Assign (s, t^.Sequence.sequence^.expr.first);
+	IF IsElement (Epsilon, s) THEN
+	  Exclude (s, Epsilon);
+	  Union (s, follow);
+	END;
+	TreeFollow (t^.Sequence.expr, s);
+	ReleaseSet (s);
+
+	TreeFollow (t^.Sequence.sequence, follow);
+    END;
+  END TreeFollow;
+
+PROCEDURE TreeFollows;
+  VAR
+    N: tSet;
+    F: tSet;
+    n: tIdent;
+  BEGIN
+    MakeSet (N, MaxId);
+    MakeSet (F, MaxId);
+
+    Nonterminals (N);
+    WHILE NOT IsEmpty (N) DO
+      n := Extract (N);
+      Follow (n, F);
+      TreeFollow (Expr (n), F);
+    END;
+    ReleaseSet (N);
+    ReleaseSet (F);
+  END TreeFollows;
+
+PROCEDURE Follows (start: tIdent);
+  BEGIN
+    Start (start);
+    LocalFollows;
+    GlobalFollows;
+    TreeFollows;
+  END Follows;
+
+END Follow.

@@ -1,0 +1,67 @@
+*************************************************************************
+*									*
+*  Mtc									*
+*									*
+*  Modula-2 to C Translator						*
+*									*
+*  Authors: Matthias Martin, Anders Blomdell, Josef Grosch		*
+*									*
+*  Copyright 2021 Dr. Josef Grosch, CoCoLab
+*  
+*  Licensed under the Apache License, Version 2.0 (the "License");
+*  you may not use this file except in compliance with the License.
+*  
+*  You may obtain a copy of the License at
+*  
+*    http://www.apache.org/licenses/LICENSE-2.0
+*  
+*  Unless required by applicable law or agreed to in writing, software
+*  distributed under the License is distributed on an "AS IS" BASIS,
+*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+*  implied.
+*  
+*  See the License for the specific language governing permissions and
+*  limitations under the License.
+*									*
+*  Dr. Josef Grosch							*
+*  CoCoLab - Datenverarbeitung						*
+*  Germany								*
+*									*
+*  Email   : grosch@cocolab.com						*
+*  Internet: www.cocolab.com						*
+*									*
+*************************************************************************
+
+Direct requests, comments, questions, and error reports to the address above.
+
+
+Subject: New version of mtc available
+
+Now, there is a new version of mtc available with the following changes:
+
+   1. Changing the global pointer scheme into a static link/frame scheme.
+   2. Introduced a new syntax for bitfields into the compiler.
+   3. Introduced a new syntax for variables at fixed memory addresses.
+
+Points 2 & 3 are best illustrated by an example:
+
+   hardware [ 0FFFF0080H ] : RECORD
+      reg1	   [ 4:3 ] : CARDINAL;
+      enable	   [ 7:1 ] : BOOLEAN;
+   END;
+
+
+Credits go to:
+
+------------------------------------------------------------------------------
+ Anders Blomdell			Internet: andersb@Control.LTH.Se
+ Dept. of Automatic Control		
+ Lund Institute of Technology		Phone:	  +46 46 104625
+ P.O. Box 118				Fax:	  +46 46 138118
+ S-221 00 Lund, Sweden
+------------------------------------------------------------------------------
+ Anders Blomdell			Internet: andersb@Control.LTH.Se
+ Inst. för Reglerteknik			
+ Lunds Tekniska Högskola		Telefon:  046-104625
+ Box 118				Telefax:  046-138118
+ 221 00 Lund

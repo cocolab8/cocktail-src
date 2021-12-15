@@ -1,0 +1,21 @@
+DEFS	= Parser.md Scanner.md Table.md
+IMPS	= Parser.mi Scanner.mi Table.mi
+
+SOURCES	= Parser.md Parser.mi
+
+sources: $(SOURCES)
+
+Parser.mi Parser.md:	mpp.ell
+	ell -di mpp.ell
+
+m2c:
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../common/src -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+clean:
+	del *.obj
+
+CLEAN:	clean
+	del Parser.md
+	del Parser.mi
+	mpp.exe

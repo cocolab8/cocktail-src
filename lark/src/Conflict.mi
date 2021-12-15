@@ -1,0 +1,705 @@
+(* $Id: Conflict.mi,v 1.9 2005/05/23 13:05:44 grosch rel $ *)
+
+(*
+ * $Log: Conflict.mi,v $
+ * Revision 1.9  2005/05/23 13:05:44  grosch
+ * improved handling of options for conflict explanation
+ *
+ * Revision 1.8  2002/08/07 12:36:11  grosch
+ * extended strategy for repair of LR conflicts: when explicit repair using
+ * precedence and associativity fails try dynamic repair, if applicable
+ *
+ * Revision 1.7  1999/10/01 14:56:19  grosch
+ * fixed bug in CompContinuation
+ *
+ * Revision 1.6  1999/06/03 07:53:49  grosch
+ * cosmetic change
+ *
+ * Revision 1.5  1998/04/21 10:43:49  grosch
+ * truncation of file and module names to 8.3 format
+ * cosmetic changes
+ * bug fix at IsReallyDynamic
+ *
+ * Revision 1.4  1995/11/07  09:15:09  grosch
+ * removed read reduce reduce conflicts
+ * added handling of LALR(2) grammars
+ *
+ * Revision 1.3  1995/08/22  20:32:16  grosch
+ * improved FOR loops over items
+ * added conflict manager (delta)
+ *
+ * Revision 1.2  1994/11/13  12:38:57  grosch
+ * added detailed counts of conflict repairs
+ * fixed bug in conflict resolution
+ *
+ * Revision 1.1  1994/08/30  12:06:26  grosch
+ * improved layout of messages
+ *
+ * Revision 1.0  1994/07/14  12:15:30  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, June 1994 *)
+
+IMPLEMENTATION MODULE Conflict;
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM rMemory	IMPORT Alloc;
+FROM Strings	IMPORT tString, Concatenate, Append, SubString, Length, cMaxStrLength;
+FROM DynArray	IMPORT MakeArray, ExtendArray;
+FROM IO		IMPORT StdOutput, WriteS, WriteI, WriteNl;
+FROM Idents	IMPORT GetString, WriteIdent;
+FROM Semantic	IMPORT RuleCount;
+FROM Position	IMPORT NoPosition;
+FROM Explain	IMPORT Explain;
+FROM Errors	IMPORT MessageI, NoText, Ident, Short, Long,
+			Fatal, Error, Warning, Information, Note, NoClass;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, AssignEmpty	,
+   IsElement	, Include	, Extract	, Union		,
+   Select	, Difference	, Complement	, ForallDo	,
+   IsSubset	, Minimum	, Maximum	, Assign	,
+   IsEmpty	, Exclude	, Intersection	, WriteSet	,
+   IsEqual	, Card		, ResizeSet	;
+
+FROM Tree	IMPORT
+   NoTree	, Epsilon	, Options	, ToSymbolPtr	,
+   ToRulePtr	, NoAssoc	, IsType	, TrialParse	,
+   Left		, Right		, None		, Check		,
+   Cond		, Look		, WarningCount	, ErrorCount	;
+
+FROM LR1	IMPORT
+   StatePtr	, StateSize	, StateCount	, RuleBase	,
+   ItemListPtr	, ItemListSize	, ItemListCount	, tItemList	,
+   ItemPtr	, ToItemListPtr	, GetLookahead	,
+   KernelItemPtr, ExplicitRepair, Repair	, TableCount	,
+   StopList	, Reduce	, ReadReduce	, HasConflict	,
+   ReadReduceConflict	,
+   ReduceReduceConflict	;
+
+FROM LRk	IMPORT CheckLRk, MaxK;
+
+FROM Delta	IMPORT WriteConflict, IsNewConflict;
+
+IMPORT Strings, Tree, Errors;
+
+VAR
+   StatesWithConflict	: tSet;
+   i			: INTEGER;
+   RetrieveIndex	: LONGINT;
+
+PROCEDURE CompConflictSet (State: CARDINAL; VAR ConflictSet: tSet);
+   VAR
+      AllReads, AllReduces, Reduces, Set	: tSet;
+      Item, x	: CARDINAL;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 AssignEmpty (ConflictSet);
+	 WITH ItemPtr^ [Kernel] DO
+	    IF (KernelSize = 0) AND (Dot = ToRulePtr^ [Rule]^.Rule.Length) AND
+	       NOT IsElement (ORD ('r'), Options) THEN RETURN END;
+	 END;
+	 MakeSet (AllReads	, Epsilon);
+	 MakeSet (AllReduces	, Epsilon);
+	 MakeSet (Reduces	, Epsilon);
+	 MakeSet (Set		, Epsilon);
+	 FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+	    WITH ItemPtr^ [Item] DO
+	       WITH ToRulePtr^ [Rule]^.Rule DO
+		  IF Dot < Length THEN
+		     IF ElmtsPtr^ [Dot + 1] < Epsilon THEN
+			Include (AllReads, ElmtsPtr^ [Dot + 1]);
+		     END;
+		  ELSIF Dot = Length THEN
+		     GetLookahead (State, Item, Reduces);
+		     Assign (Set, Reduces);
+		     WHILE NOT IsEmpty (Set) DO
+			x := Extract (Set);
+			IF TablePtr^ [x - MinSym] = 0 THEN
+			   TablePtr^ [x - MinSym] := RuleBase + Rule;
+			   INC (TableCount);
+			END;
+		     END;
+		     Assign (Set, AllReduces);
+		     Intersection (Set, Reduces);
+		     Union (ConflictSet, Set);
+		     Union (AllReduces, Reduces);
+		  END;
+	       END;
+	    END;
+	 END;
+	 Assign (Set, AllReduces);
+	 Intersection (Set, AllReads);
+	 Union (ConflictSet, Set);
+      END;
+      ReleaseSet (AllReads	);
+      ReleaseSet (AllReduces	);
+      ReleaseSet (Reduces	);
+      ReleaseSet (Set		);
+   END CompConflictSet;
+
+(* check all states for conflicts *)
+
+PROCEDURE CheckConflicts1;
+   VAR
+      State		: LONGINT;
+      ConflictSet	: tSet;
+   BEGIN
+      MakeSet (ConflictSet		, Epsilon);
+      MakeSet (StatesWithConflict	, StateSize);
+      ConditionCount := 0;
+      ConditionSize := 10;
+      MakeArray (ConditionPtr, ConditionSize, TSIZE (tCondition));
+      MakeSet (DynRuleSet, RuleCount);
+
+      RuleBase := CARDINAL (StateCount) + RuleCount;
+      WHILE StopList # NoTree DO
+	 WITH StopList^.Stop DO
+	    StatePtr^ [State].TablePtr^ [0] := RuleBase + Rule;
+	    StopList := Next;
+	 END;
+      END;
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF (Class = Reduce) OR (Class = ReadReduce) THEN
+	       CompConflictSet (State, ConflictSet);
+	       IF NOT IsEmpty (ConflictSet) THEN
+		  Include (StatesWithConflict, State);
+		  RepairConflict (State, ConflictSet, FALSE);
+	       END;
+	       IF NOT IsEmpty (ConflictSet) THEN HasConflict := TRUE; END;
+	    END;
+	 END;
+      END;
+      ReleaseSet (ConflictSet);
+   END CheckConflicts1;
+
+PROCEDURE CheckConflicts2;
+   VAR
+      State		: LONGINT;
+      ConflictSet	: tSet;
+   BEGIN
+      MakeSet (ConflictSet, Epsilon);
+      WHILE NOT IsEmpty (StatesWithConflict) DO
+	 State := Extract (StatesWithConflict);
+	 CompConflictSet (State, ConflictSet);
+	 RepairConflict (State, ConflictSet, TRUE);
+      END;
+      ReleaseSet (ConflictSet		);
+      ReleaseSet (StatesWithConflict	);
+   END CheckConflicts2;
+
+PROCEDURE RepairConflict (State: CARDINAL; VAR ConflictSet: tSet; IsExplain: BOOLEAN);
+   VAR
+      LASet, ReadReduce, ReduceReduce,
+      ExplRepReadReduce, ExplRepReduceReduce,
+      ImplRepReadReduce, ImplRepReduceReduce,
+      DynaRepReadReduce, DynaRepReduceReduce,
+      LRkRepReadReduce, LRkRepReduceReduce,
+      WorkingSet					: tSet;
+      Precedence, ReducePrec, ReadPrec			,
+      Associativity, ReduceAssoc, ReadAssoc		,
+      Item, x, MinRule, MinRuleWithoutPredicate, i	,
+      ReduceCount, ReadCount, ReduceRest, ReadRest	,
+      ElseItem						: CARDINAL;
+      Explicit, Dynamic, ConflictFree, Found, IsNew	: BOOLEAN;
+      ConflictDesc					: BITSET;
+      iItem, k, rule					: SHORTINT;
+
+   PROCEDURE Report (Set: tSet; Text: ARRAY OF CHAR; Class: CARDINAL);
+      VAR String	: tString;
+      BEGIN
+	 IF NOT IsEmpty (Set) AND ((Class = Error) OR NOT IsElement (ORD ('s'), Options)) THEN
+	    MessageI (Text, Class, NoPosition, Long, ADR (State));
+	    Set2String (Set, String);
+	    MessageI ("on lookahead", NoClass, NoPosition, Errors.String, ADR (String));
+	    IF Class = Error	THEN INC (ErrorCount	); END;
+	    IF Class = Warning	THEN INC (WarningCount	); END;
+	 END;
+	 ReleaseSet (Set);
+      END Report;
+
+   PROCEDURE AddToItemList (Item, x: CARDINAL);
+      BEGIN
+	 IF ItemListSize <= ItemListCount THEN
+	    ExtendArray (ItemListPtr, ItemListSize, TSIZE (tItemList));
+(* MessageI ("extend ItemList", Warning, NoPosition, Long, ADR (ItemListSize)); *)
+	 END;
+	 WITH ItemListPtr^ [ItemListCount] DO
+	    WITH ToItemListPtr^ [x] DO
+	       lItem := Item;
+	       IF First = -1 THEN
+		  First := ItemListCount;
+	       ELSE
+		  ItemListPtr^ [Last].Next := ItemListCount;
+	       END;
+	       Next := -1;
+	       Last := ItemListCount;
+	       INC (ItemListCount);
+	    END;
+	 END;
+      END AddToItemList;
+
+   BEGIN
+      MakeSet (ReadReduce		, Epsilon);
+      MakeSet (ReduceReduce		, Epsilon);
+      MakeSet (ExplRepReadReduce	, Epsilon);
+      MakeSet (ExplRepReduceReduce	, Epsilon);
+      MakeSet (ImplRepReadReduce	, Epsilon);
+      MakeSet (ImplRepReduceReduce	, Epsilon);
+      MakeSet (DynaRepReadReduce	, Epsilon);
+      MakeSet (DynaRepReduceReduce	, Epsilon);
+      MakeSet (LRkRepReadReduce		, Epsilon);
+      MakeSet (LRkRepReduceReduce	, Epsilon);
+      MakeSet (WorkingSet		, Epsilon);
+      MakeSet (LASet			, Epsilon);
+
+      WITH StatePtr^ [State] DO
+	 ConflictDesc  := {};
+	 ItemListCount := 0;
+	 Assign (WorkingSet, ConflictSet);
+
+	 WHILE NOT IsEmpty (WorkingSet) DO	(* for all tokens x in conflict set *)
+	    x := Extract (WorkingSet);
+
+	    Explicit	:= TRUE;
+	    Dynamic	:= FALSE;
+	    ReduceCount	:= 0;
+	    ReadCount	:= 0;
+	    ReduceRest	:= 0;
+	    ReadRest	:= 0;
+	    ReducePrec	:= 0;
+	    ReduceAssoc	:= NoAssoc;
+	    ReadPrec	:= 0;
+	    ReadAssoc	:= NoAssoc;
+	    MinRule	:= 50000;
+	    MinRuleWithoutPredicate := 50000;
+	    k		:= 0;
+
+    (* determine whether all items involved in the conflict have explicit prec and assoc.
+       determine prec and assoc of reduce item with highest precedence.
+       determine first rule to be reduced.				*)
+
+	    ToItemListPtr^ [x].First := -1;
+
+	    FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+	       WITH ItemPtr^ [Item] DO
+		  WITH ToRulePtr^ [Rule]^.Rule DO
+		     IF Dot < Length THEN		(* read item *)
+			IF ElmtsPtr^ [Dot + 1] = x THEN
+			   INC (ReadCount);
+			   AddToItemList (Item, x);
+			END;
+		     ELSE				(* reduce item *)
+			GetLookahead (State, Item, LASet);
+			IF IsElement (x, LASet) THEN
+			   INC (ReduceCount);
+			   AddToItemList (Item, x);
+			   IF Prec = 0 THEN
+			      Explicit		:= FALSE;
+			   ELSIF Prec > ReducePrec THEN
+			      ReducePrec	:= Prec;
+			      ReduceAssoc	:= Assoc;
+			   END;
+			   IF Index < MinRule THEN MinRule := Index; END;
+			   IF IsType (ToRulePtr^ [Rule], Check) THEN
+			      Dynamic := TRUE;
+			   ELSE
+			      IF Index < MinRuleWithoutPredicate THEN MinRuleWithoutPredicate := Index; END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+
+	    WITH ToSymbolPtr^ [x]^.Terminal DO		(* prec and assoc of token *)
+	       IF ReadCount > 0 THEN
+		  IF Prec = 0 THEN Explicit := FALSE; END;
+		  ReadPrec	:= Prec;
+		  ReadAssoc	:= Assoc;
+	       END;
+	    END;
+
+	    IF Explicit THEN	(* all items involved have explicit prec and assoc *)
+	       MinRule := 50000;
+
+	       IF ReducePrec > ReadPrec THEN		(* determine highest prec *)
+		  Precedence	:= ReducePrec;
+		  Associativity	:= ReduceAssoc;
+	       ELSE
+		  Precedence	:= ReadPrec;
+		  Associativity	:= ReadAssoc;
+	       END;
+
+	       iItem := ToItemListPtr^ [x].First;
+	       WHILE iItem >= 0 DO
+		  WITH ItemListPtr^ [iItem] DO
+		     WITH ItemPtr^ [lItem] DO
+			WITH ToRulePtr^ [Rule]^.Rule DO
+			   IF Dot < Length THEN		(* read item *)
+			      IF (ReadPrec = Precedence) AND
+				 ((ReducePrec < Precedence) OR (Associativity = Right)) THEN
+				 INC (ReadRest);
+			      END;
+			   ELSE				(* reduce item *)
+			      IF (Prec = Precedence) AND ((ReadPrec < Precedence) OR
+				 (Associativity # Right)) THEN
+				 INC (ReduceRest);
+				 IF NOT IsExplain THEN
+				    TablePtr^ [x - MinSym] := RuleBase + Index;
+				 END;
+				 IF Index < MinRule THEN MinRule := Index; END;
+			      END;
+			   END;
+			END;
+		     END;
+		     iItem := Next;
+		  END;
+	       END;
+
+	       IF ((ReadRest > 0) AND (ReduceRest > 0)) OR (ReduceRest > 1) THEN
+		  (* explicit strategy failed *)
+		  IF Dynamic THEN	(* try LR(k) and dynamic strategies *)
+		     Explicit := FALSE;
+		     ReadRest := 0;
+		     ReduceRest := 0;
+		  END;
+	       ELSE
+		  (* explicit strategy succeeded *)
+		  Dynamic := FALSE;
+	       END;
+	    END;
+
+	    IF NOT Explicit AND (MaxK > 1) THEN		(* try LR(k) *)
+	       IF NOT IsExplain THEN
+		  k := CheckLRk (State, x, ConflictSet, ElseItem);
+		     (* k > 0 means it is LR1(k), k < 0 means it is LR(-k) *)
+	       ELSE
+		  k := 0;
+		  LOOP
+		     IF RetrieveIndex > ConditionCount THEN; EXIT; END;
+		     WITH ConditionPtr^ [RetrieveIndex] DO
+			IF (dState > State) OR
+			   (dState = State) AND (TheX > x) THEN; EXIT; END;
+			IF (dState = State) AND (TheX = x) THEN; k := TheK; EXIT; END;
+		     END;
+		     INC (RetrieveIndex);
+		  END;
+	       END;
+	       IF k # 0 THEN		(* LR(k) strategy succeeded *)
+		  Dynamic := FALSE;
+		  Include (Options, ORD ('&'));
+	       END;
+	    END;
+
+	    IF NOT Explicit AND (k = 0) THEN		(* implicit repair *)
+
+	       IF ReadCount > 0 THEN			(* prefer read *)
+
+		  iItem := ToItemListPtr^ [x].First;
+		  WHILE iItem >= 0 DO
+		     WITH ItemListPtr^ [iItem] DO
+			WITH ItemPtr^ [lItem] DO
+			   WITH ToRulePtr^ [Rule]^.Rule DO
+			      IF Dot < Length THEN INC (ReadRest); END;
+			   END;
+			END;
+			iItem := Next;
+		     END;
+		  END;
+
+	       ELSE					(* prefer first reduce *)
+
+		  iItem := ToItemListPtr^ [x].First;
+		  WHILE iItem >= 0 DO
+		     WITH ItemListPtr^ [iItem] DO
+			WITH ItemPtr^ [lItem] DO
+			   WITH ToRulePtr^ [Rule]^.Rule DO
+			      IF Dot = Length THEN	(* reduce item *)
+				 IF Index = MinRule THEN
+				    IF NOT IsExplain THEN
+				       TablePtr^ [x - MinSym] := RuleBase + MinRule;
+				    END;
+				    INC (ReduceRest);
+				 END;
+			      END;
+			   END;
+			END;
+			iItem := Next;
+		     END;
+		  END;
+	       END;
+	    END;
+
+	    IF Dynamic THEN
+	       rule := IsReallyDynamic (x);
+	       IF rule # 0 THEN Dynamic := FALSE; END;
+	       IF rule > 0 THEN
+		  TablePtr^ [x - MinSym] := RuleBase + SHORTCARD (rule);
+	       END;
+	    END;
+
+	    IF (Dynamic OR (k # 0)) AND NOT IsExplain THEN
+			   (* there are items with conditions or
+			      conflict can be solved with k lookahead tokens *)
+	       INC (ConditionCount);
+	       IF ConditionCount = ConditionSize THEN
+		  ExtendArray (ConditionPtr, ConditionSize, TSIZE (tCondition));
+	       END;
+	       WITH ConditionPtr^ [ConditionCount] DO
+		  MakeSet (RuleSet, RuleCount);
+		  dState	:= State;
+		  Implicit	:= TablePtr^ [x - MinSym];
+		  IF (Implicit = RuleBase + MinRule) AND (MinRuleWithoutPredicate < 50000) THEN
+		     Implicit	:= RuleBase + MinRuleWithoutPredicate;
+		  END;
+		  Repair	:= Implicit;
+		  TableEntry	:= RuleBase + RuleCount + CARDINAL (ConditionCount);
+		  TheK		:= k;
+		  TheX		:= x;
+		  dElseItem	:= ElseItem;
+		  TablePtr^ [x - MinSym] := TableEntry;
+
+		  iItem := ToItemListPtr^ [x].First;
+		  WHILE iItem >= 0 DO
+		     WITH ItemListPtr^ [iItem] DO
+			WITH ItemPtr^ [lItem] DO
+			   WITH ToRulePtr^ [Rule]^.Rule DO
+			      IF Dot = Length THEN	(* reduce item *)
+				 IF Dynamic AND IsType (ToRulePtr^ [Rule], Check) THEN
+				    Include (RuleSet, Rule);
+				    ToRulePtr^ [Rule]^.Check.Used := TRUE;
+				    IF ToRulePtr^ [Rule]^.Kind = TrialParse THEN
+				       Include (Options, ORD (','));
+				    END;
+				 ELSIF k # 0 THEN
+				    Include (RuleSet, Rule);
+				 END;
+			      END;
+			   END;
+			END;
+			iItem := Next;
+		     END;
+		  END;
+
+		  i := 0;
+		  LOOP
+		     INC (i);
+		     IF i = CARDINAL (ConditionCount) THEN Found := FALSE; EXIT; END;
+		     IF (State	  = ConditionPtr^ [i].dState	) AND
+			(Implicit = ConditionPtr^ [i].Implicit	) AND
+			(TheK	  = ConditionPtr^ [i].TheK	) AND
+			IsEqual (RuleSet, ConditionPtr^ [i].RuleSet) THEN
+			Found := TRUE; EXIT;
+		     END;
+		  END;
+		  IF Found THEN
+		     TablePtr^ [x - MinSym] := RuleBase + RuleCount + i;
+		     ReleaseSet (RuleSet);
+		     DEC (ConditionCount);
+		  ELSE
+		     Union (DynRuleSet, RuleSet);
+		     IF Implicit >= RuleBase THEN	(* reduce *)
+			Include (DynRuleSet, Implicit - RuleBase);
+		     END;
+		  END;
+	       END;
+	    END;
+
+	    ConflictFree := TRUE;
+	    IF (ReadRest > 0) AND (ReduceRest > 0) THEN
+	       ConflictFree := FALSE;
+	       Include (ReadReduce, x);
+	       INCL (ConflictDesc, cReadReduce);
+	    END;
+	    IF ReduceRest > 1 THEN
+	       ConflictFree := FALSE;
+	       Include (ReduceReduce, x);
+	       INCL (ConflictDesc, cReduceReduce);
+	       IF ReadRest = 0 THEN
+		  TablePtr^ [x - MinSym] := RuleBase + MinRule;
+	       END;
+	    END;
+
+	    IF ConflictFree THEN
+	       IF (ReduceCount > 0) AND (ReadCount > 0) THEN
+		  IF Explicit THEN
+		     Include (ExplRepReadReduce, x);
+		     INCL (ConflictDesc, cExplRepReadReduce);
+		  ELSIF Dynamic THEN
+		     Include (DynaRepReadReduce, x);
+		     INCL (ConflictDesc, cDynaRepReadReduce);
+		  ELSIF k # 0 THEN
+		     Include (LRkRepReadReduce, x);
+		     INCL (ConflictDesc, cLRkRepReadReduce);
+		  ELSE
+		     Include (ImplRepReadReduce, x);
+		     INCL (ConflictDesc, cImplRepReadReduce);
+		  END;
+	       END;
+	       IF ReduceCount > 1 THEN
+		  IF Explicit THEN
+		     Include (ExplRepReduceReduce, x);
+		     INCL (ConflictDesc, cExplRepReduceReduce);
+		  ELSIF Dynamic THEN
+		     Include (DynaRepReduceReduce, x);
+		     INCL (ConflictDesc, cDynaRepReduceReduce);
+		  ELSIF k # 0 THEN
+		     Include (LRkRepReduceReduce, x);
+		     INCL (ConflictDesc, cLRkRepReduceReduce);
+		  ELSE
+		     Include (ImplRepReduceReduce, x);
+		     INCL (ConflictDesc, cImplRepReduceReduce);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+
+      IF IsExplain THEN
+	 IF IsElement (ORD ('D'), Options) THEN
+	    WriteConflict (State, ConflictDesc, ConflictSet);
+	    IsNew := IsNewConflict (State, ConflictDesc, ConflictSet);
+	 ELSE
+	    IsNew := TRUE;
+	 END;
+	 AssignEmpty (LASet);
+	 IF IsElement (ORD ('v'), Options) THEN
+	    Assign (LASet, ConflictSet);
+	 ELSE
+	    Union (LASet, ReadReduce		);
+	    Union (LASet, ReduceReduce		);
+	    IF IsElement (ORD ('U'), Options) THEN
+	      Union (LASet, ExplRepReadReduce	);
+	      Union (LASet, ExplRepReduceReduce	);
+	    END;
+	    IF IsElement (ORD ('V'), Options) THEN
+	      Union (LASet, ImplRepReadReduce	);
+	      Union (LASet, ImplRepReduceReduce	);
+	    END;
+	    IF IsElement (ORD ('W'), Options) THEN
+	      Union (LASet, LRkRepReadReduce	);
+	      Union (LASet, LRkRepReduceReduce	);
+	    END;
+	    IF IsElement (ORD ('X'), Options) THEN
+	      Union (LASet, DynaRepReadReduce	);
+	      Union (LASet, DynaRepReduceReduce	);
+	    END;
+	 END;
+	 IF NOT IsEmpty (LASet) AND IsNew THEN
+	    Explain (State, ConflictDesc, LASet);
+	 END;
+      ELSE
+
+	 IF ConflictDesc * {cExplRepReadReduce, cExplRepReduceReduce} # {} THEN
+	    Repair := ExplicitRepair;
+	 END;
+
+IF cReadReduce			IN ConflictDesc THEN INC (ReadReduceConflict	  ); END;
+IF cReduceReduce		IN ConflictDesc THEN INC (ReduceReduceConflict	  ); END;
+IF cExplRepReadReduce		IN ConflictDesc THEN INC (ReadReduceConflict	  ); END;
+IF cExplRepReduceReduce		IN ConflictDesc THEN INC (ReduceReduceConflict	  ); END;
+IF cImplRepReadReduce		IN ConflictDesc THEN INC (ReadReduceConflict	  ); END;
+IF cImplRepReduceReduce		IN ConflictDesc THEN INC (ReduceReduceConflict	  ); END;
+IF cDynaRepReadReduce		IN ConflictDesc THEN INC (ReadReduceConflict	  ); END;
+IF cDynaRepReduceReduce		IN ConflictDesc THEN INC (ReduceReduceConflict	  ); END;
+IF cLRkRepReadReduce		IN ConflictDesc THEN INC (ReadReduceConflict	  ); END;
+IF cLRkRepReduceReduce		IN ConflictDesc THEN INC (ReduceReduceConflict	  ); END;
+
+	 FOR i := cReadReduce TO cLRkRepReduceReduce DO
+	    IF i IN ConflictDesc THEN INC (RepairCount [i]); END;
+	 END;
+
+	 Difference (ConflictSet, ExplRepReadReduce	);
+	 Difference (ConflictSet, ExplRepReduceReduce	);
+
+Report (ExplRepReadReduce	, "shift reduce conflict explicitly repaired at state"		, Information);
+Report (ExplRepReduceReduce	, "reduce reduce conflict explicitly repaired at state"		, Information);
+Report (DynaRepReadReduce	, "shift reduce conflict dynamically repaired at state"		, Information);
+Report (DynaRepReduceReduce	, "reduce reduce conflict dynamically repaired at state"	, Information);
+Report (LRkRepReadReduce	, "shift reduce conflict solved using LALR(2) at state"		, Note);
+Report (LRkRepReduceReduce	, "reduce reduce conflict solved using LALR(2) at state"	, Note);
+Report (ImplRepReadReduce	, "shift reduce conflict implicitly repaired at state"		, Warning);
+Report (ImplRepReduceReduce	, "reduce reduce conflict implicitly repaired at state"		, Warning);
+Report (ReadReduce		, "shift reduce conflict at state"	, Error);
+Report (ReduceReduce		, "reduce reduce conflict at state"	, Error);
+      END;
+
+      ReleaseSet (WorkingSet	);
+      ReleaseSet (LASet		);
+   END RepairConflict;
+
+PROCEDURE IsReallyDynamic (x: CARDINAL): SHORTINT;
+   VAR iItem	: SHORTINT;
+   BEGIN
+      iItem := ToItemListPtr^ [x].First;
+      WHILE iItem >= 0 DO
+	 WITH ItemListPtr^ [iItem] DO
+	    WITH ItemPtr^ [lItem] DO
+	       WITH ToRulePtr^ [Rule]^.Rule DO
+		  IF Dot = Length THEN			(* reduce item *)
+		     CASE ToRulePtr^ [Rule]^.Kind OF
+		     | Cond	: RETURN 0;		(* yes, it is dynamic *)
+		     | Look	: WITH ToRulePtr^ [Rule]^.Look DO
+				     IF (x = Object^.Terminal.Index) AND NOT Not OR
+					(x # Object^.Terminal.Index) AND Not THEN
+				        ToRulePtr^ [Rule]^.Check.Used := TRUE;
+					RETURN Rule;	(* static *)
+				     END;
+				  END;
+		     | TrialParse: WITH ToRulePtr^ [Rule]^.TrialParse DO
+				     IF IsElement (x, Object^.Nonterminal.First) THEN
+					RETURN 0;	(* yes, it is dynamic *)
+				     ELSIF Not THEN
+				        ToRulePtr^ [Rule]^.Check.Used := TRUE;
+					RETURN Rule;	(* static *)
+				     ELSE
+					(* TrialParse is superfluous and will
+					   fail, however we have to inspect the
+					   following items for more predicates
+					*)
+				     END;
+				  END;
+		     ELSE
+		     END;
+		  END;
+	       END;
+	    END;
+	    iItem := Next;
+	 END;
+      END;
+      RETURN -1;		(* not dynamic (so it is static): implicit *)
+   END IsReallyDynamic;
+
+PROCEDURE Set2String (Set: tSet; VAR String: tString);
+   VAR
+      i		: CARDINAL;
+      Name	: tString;
+      IsString	: BOOLEAN;
+   BEGIN
+      Strings.AssignEmpty (String);
+      FOR i := Minimum (Set) TO Maximum (Set) DO
+	 IF IsElement (i, Set) THEN
+	    IF i < Epsilon THEN
+	       GetString (ToSymbolPtr^ [i]^.Terminal.Name, Name);
+	       IsString := Tree.String IN ToSymbolPtr^ [i]^.Terminal.Properties;
+	    ELSE
+	       GetString (ToSymbolPtr^ [i]^.Nonterminal.Name, Name);
+	       IsString := Tree.String IN ToSymbolPtr^ [i]^.Nonterminal.Properties;
+	    END;
+	    IF IsString THEN SubString (Name, 2, Length (Name) - 1, Name); END;
+	    IF Length (String) + Length (Name) < cMaxStrLength THEN
+	       Concatenate (String, Name);
+	       Append (String, ' ');
+	    END;
+	 END;
+      END;
+   END Set2String;
+
+BEGIN
+   FOR i := cReadReduce TO cLRkRepReduceReduce DO RepairCount [i] := 0; END;
+   RetrieveIndex := 1;
+END Conflict.

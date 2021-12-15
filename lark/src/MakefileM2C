@@ -1,0 +1,182 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+Compress$(ES)	: Compress$(ED)	; $(MD) Compress$(SD)
+Compress$(ES)	: LR1$(ES)
+
+Compress$(EO)	: Compress$(EI)	; $(MI) Compress$(SI)
+Compress$(EO)	: Compress$(ES)
+Compress$(EO)	: Tree$(ES)
+Compress$(EO)	: Semantic$(ES)
+Compress$(EO)	: LR1$(ES)
+Compress$(EO)	: Conflict$(ES)
+Compress$(EO)	: LarkTime$(ES)
+
+Conflict$(ES)	: Conflict$(ED)	; $(MD) Conflict$(SD)
+Conflict$(ES)	: LR1$(ES)
+
+Conflict$(EO)	: Conflict$(EI)	; $(MI) Conflict$(SI)
+Conflict$(EO)	: Conflict$(ES)
+Conflict$(EO)	: Semantic$(ES)
+Conflict$(EO)	: Explain$(ES)
+Conflict$(EO)	: Tree$(ES)
+Conflict$(EO)	: LR1$(ES)
+Conflict$(EO)	: LRk$(ES)
+Conflict$(EO)	: Delta$(ES)
+Conflict$(EO)	: Tree$(ES)
+
+Delta$(ES)	: Delta$(ED)	; $(MD) Delta$(SD)
+Delta$(ES)	: Tree$(ES)
+
+Delta$(EO)	: Delta$(EI)	; $(MI) Delta$(SI)
+Delta$(EO)	: Delta$(ES)
+Delta$(EO)	: Tree$(ES)
+Delta$(EO)	: Tree$(ES)
+Delta$(EO)	: Semantic$(ES)
+Delta$(EO)	: LR1$(ES)
+
+Explain$(ES)	: Explain$(ED)	; $(MD) Explain$(SD)
+
+Explain$(EO)	: Explain$(EI)	; $(MI) Explain$(SI)
+Explain$(EO)	: Explain$(ES)
+Explain$(EO)	: Semantic$(ES)
+Explain$(EO)	: Conflict$(ES)
+Explain$(EO)	: Tree$(ES)
+Explain$(EO)	: LR1$(ES)
+Explain$(EO)	: Conflict$(ES)
+Explain$(EO)	: Tree$(ES)
+
+GenLRk$(ES)	: GenLRk$(ED)	; $(MD) GenLRk$(SD)
+
+GenLRk$(EO)	: GenLRk$(EI)	; $(MI) GenLRk$(SI)
+GenLRk$(EO)	: GenLRk$(ES)
+GenLRk$(EO)	: Tree$(ES)
+GenLRk$(EO)	: Semantic$(ES)
+GenLRk$(EO)	: LR1$(ES)
+GenLRk$(EO)	: LRk$(ES)
+GenLRk$(EO)	: Conflict$(ES)
+GenLRk$(EO)	: Compress$(ES)
+GenLRk$(EO)	: Generate$(ES)
+GenLRk$(EO)	: Tree$(ES)
+
+Generate$(ES)	: Generate$(ED)	; $(MD) Generate$(SD)
+
+Generate$(EO)	: Generate$(EI)	; $(MI) Generate$(SI)
+Generate$(EO)	: Generate$(ES)
+Generate$(EO)	: Tree$(ES)
+Generate$(EO)	: Semantic$(ES)
+Generate$(EO)	: LR1$(ES)
+Generate$(EO)	: Conflict$(ES)
+Generate$(EO)	: Compress$(ES)
+Generate$(EO)	: GenLRk$(ES)
+Generate$(EO)	: Tree$(ES)
+
+LR1$(ES)	: LR1$(ED)	; $(MD) LR1$(SD)
+LR1$(ES)	: Tree$(ES)
+
+LR1$(EO)	: LR1$(EI)	; $(MI) LR1$(SI)
+LR1$(EO)	: LR1$(ES)
+LR1$(EO)	: Conflict$(ES)
+LR1$(EO)	: Compress$(ES)
+LR1$(EO)	: Tree$(ES)
+LR1$(EO)	: Semantic$(ES)
+LR1$(EO)	: Tree$(ES)
+
+LRk$(ES)	: LRk$(ED)	; $(MD) LRk$(SD)
+LRk$(ES)	: Tree$(ES)
+
+LRk$(EO)	: LRk$(EI)	; $(MI) LRk$(SI)
+LRk$(EO)	: LRk$(ES)
+LRk$(EO)	: Tree$(ES)
+LRk$(EO)	: Semantic$(ES)
+LRk$(EO)	: LR1$(ES)
+LRk$(EO)	: Tree$(ES)
+
+LarkTime$(ES)	: LarkTime$(ED)	; $(MD) LarkTime$(SD)
+
+LarkTime$(EO)	: LarkTime$(EI)	; $(MI) LarkTime$(SI)
+LarkTime$(EO)	: LarkTime$(ES)
+LarkTime$(EO)	: Tree$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Tree$(ES)
+
+Queue$(ES)	: Queue$(ED)	; $(MD) Queue$(SD)
+
+Queue$(EO)	: Queue$(EI)	; $(MI) Queue$(SI)
+Queue$(EO)	: Queue$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Tree$(ES)
+
+Semantic$(ES)	: Semantic$(ED)	; $(MD) Semantic$(SD)
+Semantic$(ES)	: Tree$(ES)
+Semantic$(ES)	: Tree$(ES)
+
+Semantic$(EO)	: Semantic$(EI)	; $(MI) Semantic$(SI)
+Semantic$(EO)	: Semantic$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: LarkTime$(ES)
+Semantic$(EO)	: Parser$(ES)
+Semantic$(EO)	: Queue$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Queue$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+
+all	: lark
+lark$(EO)	: lark$(EP)	; $(MP) lark$(SP)
+lark$(EO)	: Scanner$(ES)
+lark$(EO)	: Parser$(ES)
+lark$(EO)	: Tree$(ES)
+lark$(EO)	: Semantic$(ES)
+lark$(EO)	: LR1$(ES)
+lark$(EO)	: LRk$(ES)
+lark$(EO)	: Conflict$(ES)
+lark$(EO)	: Explain$(ES)
+lark$(EO)	: Compress$(ES)
+lark$(EO)	: Generate$(ES)
+lark$(EO)	: LarkTime$(ES)
+lark$(EO)	: Delta$(ES)
+
+lark	: lark$(EO) Delta$(EO) LR1$(EO) Tree$(EO) Semantic$(EO) Queue$(EO) Parser$(EO) Scanner$(EO) LarkTime$(EO) Compress$(EO) Conflict$(EO) LRk$(EO) Explain$(EO) Generate$(EO) GenLRk$(EO)	; $(ML) lark $(OUT) lark
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

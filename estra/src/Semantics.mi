@@ -1,0 +1,1175 @@
+(* $Id: Semantics.mi,v 2.3 1998/05/27 15:23:55 grosch rel $ *)
+
+IMPLEMENTATION MODULE Semantics;
+
+FROM	Convert		IMPORT	IdToAdr;
+
+FROM	Complete	IMPORT	FunctionComplete;
+
+FROM	Errors		IMPORT	eError, eWarning, eIdent, eIdentSet, eInteger,
+				ErrorMessage, ErrorMessageI;
+
+FROM	Position	IMPORT	tPosition;
+
+FROM	Environs	IMPORT	tFunction, MakeDirective,
+				MaxDirective, HeadCalled, IsHead,
+				MakeFunctEnv, InDomain,
+				DefineAccess, DefineSelPat, Defined,
+				CallFunction, SetPattern, SetCondPattern,
+				SelPattern;
+
+FROM	Grammar		IMPORT	tLayout,
+				BeginGrammar,
+				SetSuperClass, Connect,
+				SetNodeIdent,
+				CompleteSubclasses, FixMainClasses,
+				NodesOfClass, SuperClass, IsSubclass,
+				DirectSubclasses, MainClass,
+				SetArity, SetSonName, CreateLayout,
+				SetSonClass,
+				Arity,
+				SonClass, SonName, Layout, NodeIdent,
+				ClassesOfNode,
+				MakePatNumbers,
+				AddPatNumber, Subclasses;
+				
+
+FROM	Idents		IMPORT	tIdent, GetString;
+
+FROM	Parser		IMPORT	AST;
+
+FROM	Patterns	IMPORT	tPattern, MakePattern, SetPatternSon,
+				NormPattern, CopyPattern, PatternClasses;
+
+FROM	Queues		IMPORT	tQueue, MakeQueue, ReleaseQueue, Append,
+				ClearLast;
+
+FROM	Reduced		IMPORT	TestReduced, UnReachable, UnDerivable;
+
+FROM	Scanner		IMPORT	NoIdent, NoValue, MaxValue, MaxIdent;
+
+FROM	Sets		IMPORT	tSet, MakeSet, ReleaseSet, Include, IsElement,
+				IsSubset, Difference, IsEmpty, Exclude,
+				Extract, Union, Intersection;
+
+FROM	Strings		IMPORT	tString, Char;
+
+FROM	SYSTEM		IMPORT	ADR;
+
+FROM	Tree		IMPORT	tTree,
+				Spec, Class0, Class, Node0, Node, Son0, Son,
+				Function0, Function,
+				NoResult, Ident0, Ident, Directive0,
+				Directive, Pattern1, Pattern, Patterns0,
+				Patterns, CondD, CondF, CostD, CostN, CostF,
+				CdStr, CdId, CdDot, CdLPar, CdRPar, CdLBra,
+				CdRBra, CdSpa, CdCom, CdRst, CdEnd, CdComma,
+				code, condition,
+				tSelMode;
+
+FROM	Types		IMPORT	tType, BeginTypes, Type, MakeTransformation,
+				MakeFunction, MakeClass, MakeNode, MakeNodeId,
+				AllNodes, UnionEssential, SetEssential,
+				Essential;
+
+CONST
+  eAlreadyDeclared	= 31;
+  eNotDeclared		= 32;
+  eNoClass		= 33;
+  eNoNode		= 34;
+  eCodingUsed		= 35;
+  eCodeUnexpected	= 36;
+  eNodeNameUnexpected	= 37;
+  eNoMainClass		= 39;
+  eCyclicClass		= 40;
+  eTooFewSons		= 42;
+  eTooManySons		= 43;
+  eNoSubClass		= 44;
+  eLParExpected		= 45;
+  eIdOrStrExpected	= 46;
+  eDoNotCallCond	= 47;
+  eDoNotCallCost	= 48;
+  eNoSelector		= 49;
+  eExtended		= 50;
+  eUnReachable		= 51;
+  eUnDerivable		= 52;
+  eNoFunction		= 53;
+  eNotInDomain		= 54;
+  eIdentExpected	= 55;
+  eIllegalPattern	= 56;
+  eAlreadyInClass	= 57;
+  eNotInFDomain		= 58;
+
+PROCEDURE Semantic;
+  BEGIN
+    BeginTypes;
+    Spec1 (AST);
+    IF Correct THEN
+      BeginGrammar;
+      Spec2 (AST);
+    END;
+    IF Correct THEN
+      CompleteSubclasses;
+      FixMainClasses;
+      UnionEssential (AST^.Spec.functions^.Function.domainset);
+      Spec3 (AST);
+    END;
+    IF Correct THEN
+      Spec4 (AST);
+    END;
+    IF Correct THEN
+      MakePatNumbers (MaxDirective ());
+      TestReduced (AST^.Spec.functions^.Function.domainset);
+      Spec5 (AST);
+    END;
+
+  END Semantic;
+
+PROCEDURE IsString (name: tIdent): BOOLEAN;
+  VAR s: tString; c: CHAR;
+  BEGIN
+    GetString (name, s);
+    c := Char (s, 1);
+    RETURN (c = '"') OR (c = "'");
+  END IsString;
+
+(* ---------- first pass --------- 
+ *
+ *	declare idents which denotes:
+ *	the transformation,
+ *	the classes,
+ *	the nodes,
+ *	and the functions
+ *	
+ *	possible errors:
+ *	class is already declared			-> eAlreadyDeclared
+ *	node is already declared but not as a node	-> eNoNode
+ *	function is already delcared			-> eAlreadyDeclared
+ *)
+
+PROCEDURE Spec1 (t: tTree);
+  BEGIN
+    WITH t^.Spec DO
+      MakeTransformation (name);
+      Classes1 (classes);
+      IF functions^.Kind = Function0 THEN
+	Correct := FALSE;
+	ErrorMessageI (eNoFunction, eError, pos, eIdent, ADR (name));
+      END;
+      Functions1 (functions);
+    END;
+  END Spec1;
+
+PROCEDURE Classes1 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Class DO
+      WITH t^.Class DO
+	IF Type (clid) # cNoType THEN
+	  Correct := FALSE;
+	  ErrorMessageI (eAlreadyDeclared, eError, clpos, eIdent, ADR (clid));
+	  correct := FALSE;
+	ELSE
+	  MakeClass (clid);
+	END;
+	Nodes1 (nodes);
+	t := classes;
+      END;
+    END;
+  END Classes1;
+
+PROCEDURE Nodes1 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Node DO
+      WITH t^.Node DO
+	CASE Type (name) OF
+	| cNoType: MakeNode (name);
+	| cNode: ;
+	ELSE
+	  Correct := FALSE;
+	  ErrorMessageI (eNoNode, eError, napos, eIdent, ADR (name));
+	  correct := FALSE;
+	END;
+	t := nodes;
+      END;
+    END;
+  END Nodes1;
+
+PROCEDURE Functions1 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	IF Type (name) # cNoType THEN
+	  Correct := FALSE;
+	  ErrorMessageI (eAlreadyDeclared, eError, napos, eIdent, ADR (name));
+	ELSE
+	  MakeFunction (name);
+	END;
+	t := functions;
+      END;
+    END;
+  END Functions1;
+
+(* ---------- second pass ---------
+ *
+ *	set superclasses and
+ *	connection between classes and nodes
+ *	check the types of idents within patterns
+ *	check the types of idents within domains
+ *
+ *	possible errors:
+ *	ident of a super class is not declared 		-> eNotDeclared
+ *	ident of a super class is not declared as class	-> eNoClass
+ *	node within a pattern is not declared		-> eNotDeclared
+ *	node within a pattern is not a node		-> eNoNode
+ *	class within a pattern is not declared		-> eNotDeclared
+ *	class within a pattern is not a class		-> eNoClass
+ *
+ *)
+
+PROCEDURE Spec2 (t: tTree);
+  BEGIN
+    WITH t^.Spec DO
+      Classes2 (classes);
+      Functions2 (functions);
+    END;
+  END Spec2;
+
+PROCEDURE Classes2 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Class DO
+      WITH t^.Class DO
+	IF correct THEN
+	  CASE Type (suid) OF
+	  | cClass:
+	      SetSuperClass (clid, suid);
+	  | cNoType:
+	      IF suid # NoIdent THEN
+		Correct := FALSE;
+		ErrorMessageI (eNotDeclared, eError, supos, eIdent, ADR (suid));
+		correct := FALSE;
+	      END;
+	  ELSE
+	    Correct := FALSE;
+	    ErrorMessageI (eNoClass, eError, supos, eIdent, ADR (suid));
+	    correct := FALSE;
+	  END;
+	  Nodes2 (nodes, clid);
+	END;
+	t := classes;
+      END;
+    END;
+  END Classes2;
+
+PROCEDURE Nodes2 (t: tTree; clid: tIdent);
+  VAR Nodes: tSet;
+  BEGIN
+    WHILE t^.Kind = Node DO
+      WITH t^.Node DO
+        IF correct THEN
+	  MakeSet (Nodes, MaxIdent);
+	  NodesOfClass (clid, Nodes);
+	  IF IsElement (name, Nodes) THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eAlreadyInClass, eError, napos, eIdent, ADR (name));
+	    correct := FALSE;
+	  ELSE
+	    Connect (name, clid);
+	  END;
+	  ReleaseSet (Nodes);
+	END;
+	t := nodes;
+      END;
+    END;
+  END Nodes2;
+
+PROCEDURE Functions2 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	Directives2 (directives);
+	MakeSet (domainset, MaxIdent);
+	Domain2 (domain, domainset);
+	t := functions;
+      END;
+    END;
+  END Functions2;
+
+PROCEDURE Directives2 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Directive DO
+      WITH t^.Directive DO
+	Pattern2 (pattern);
+	t := directives;
+      END;
+    END;
+  END Directives2;
+
+PROCEDURE Pattern2 (t: tTree);
+  BEGIN
+    IF t^.Kind = Pattern THEN
+      WITH t^.Pattern DO
+	CASE Type (ident) OF
+	| cNode:
+	    ;
+	| cNoType:
+	    IF ident # NoIdent THEN
+	      ErrorMessageI (eNotDeclared, eError, idpos, eIdent, ADR (ident));
+	    END;
+	    Correct := FALSE;
+	    correct := FALSE;
+	ELSE
+	  Correct := FALSE;
+	  ErrorMessageI (eNoNode, eError, idpos, eIdent, ADR (ident));
+	  correct := FALSE;
+	END;
+	Patterns2 (patterns);
+      END;
+    ELSE
+      WITH t^.Pattern1 DO
+	CASE Type (ident) OF
+	| cClass:
+	    ;
+	| cNoType:
+	    IF ident # NoIdent THEN
+	      Correct := FALSE;
+	      ErrorMessageI (eNotDeclared, eError, idpos, eIdent, ADR (ident));
+	      correct := FALSE;
+	    END;
+	ELSE
+	  Correct := FALSE;
+	  ErrorMessageI (eNoClass, eError, idpos, eIdent, ADR (ident));
+	  correct := FALSE;
+	END;
+      END;
+    END;
+  END Pattern2;
+
+PROCEDURE Patterns2 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Patterns DO
+      WITH t^.Patterns DO
+	Pattern2 (pattern);
+	t := patterns;
+      END;
+    END;
+  END Patterns2;
+
+PROCEDURE Domain2 (t: tTree; VAR domainset: tSet);
+  BEGIN
+    WHILE t^.Kind = Ident DO
+      WITH t^.Ident DO
+	CASE Type (ident) OF
+	| cNoType:
+	    Correct := FALSE;
+	    ErrorMessageI (eNotDeclared, eError, idpos, eIdent, ADR (ident));
+	| cClass:
+	    Include (domainset, ident);
+	| cNode, cFunction:
+	    Correct := FALSE;
+	    ErrorMessageI (eNoClass, eError, idpos, eIdent, ADR (ident));
+	END;
+	t := domain;
+      END;
+    END;
+  END Domain2;
+
+(* ---------- third pass ---------
+ *
+ *	check the precense of a mainclass for each node
+ *	analyse the node description within its main class:
+ *	- store coding (if it is present)
+ *	- make and store node ident
+ *	- store class of each son
+ *	- mark the son classes as essential
+ *	- store names of each son
+ *	check the arity within the patterns
+ *
+ *	possible errors:
+ *	node has no main class				-> eNoMainClass
+ *	coding has been used already			-> eCodingUsed
+ *	node ident has been used already		-> eAlreadyDeclared
+ *	not the main class but coding is present 	-> eCodeUnexpected
+ *	not the main class but node ident is present	-> eNodeIdUnexpected
+ *	class of a son is not declared			-> eNotDeclared
+ *	class of a son is not declared as a class	-> eNoClass
+ *	a node has more sons than in the grammar	-> eTooManySons
+ *	a node has less sons than in the grammar	-> eTooFewSons
+ * 
+ *)
+
+PROCEDURE Spec3 (t: tTree);
+  BEGIN
+    WITH t^.Spec DO
+      Classes3 (classes);
+      Functions3 (functions);
+    END;
+  END Spec3;
+
+PROCEDURE Classes3 (t: tTree);
+  VAR codes: tSet; 
+  BEGIN
+    MakeSet (codes, MaxValue);
+    WHILE t^.Kind = Class DO
+      WITH t^.Class DO
+	IF correct THEN
+	  Nodes3 (nodes, clid, codes);
+	END;
+	t := classes;
+      END;
+    END;
+    ReleaseSet (codes);
+  END Classes3;
+
+PROCEDURE Nodes3 (t: tTree; clid: tIdent; VAR codes: tSet);
+  BEGIN
+    WHILE t^.Kind = Node DO
+      WITH t^.Node DO
+        IF correct THEN
+
+	  IF MainClass (name) = NoIdent THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eNoMainClass, eError, napos, eIdent, ADR (name));
+	    correct := FALSE;
+	  ELSIF MainClass (name) = clid THEN
+
+	    (* node ident *)
+	    IF Type (ident) # cNoType THEN
+	      Correct := FALSE;
+	      ErrorMessageI (eAlreadyDeclared, eError, napos, eIdent, ADR (name));
+	      correct := FALSE;
+	    ELSE
+	      IF ident # NoIdent THEN
+		MakeNodeId (ident);
+		SetNodeIdent (name, ident);
+	      ELSIF IsString (name) THEN
+		Correct := FALSE;
+		ErrorMessage (eIdentExpected, eError, napos);
+		correct := FALSE;
+	      END;
+	    END;
+
+
+	    (* sons *)
+	    Sons3 (sons, clid, name);
+
+	  ELSE		(* not the main class *)
+
+	    (* node ident *)
+	    IF ident # NoIdent THEN
+	      Correct := FALSE;
+	      ErrorMessageI (eNodeNameUnexpected, eError, idpos, eIdent, ADR (ident));
+	    END;
+
+	  END;
+
+	END;
+	t := nodes;
+      END;
+    END;
+  END Nodes3;
+
+PROCEDURE Sons3 (t: tTree; class, node: tIdent);
+  VAR tt : tTree; a: INTEGER; layout: tLayout;
+  BEGIN
+    tt := t;
+    a := 0;
+    WHILE tt^.Kind = Son DO
+      INC (a);
+      tt := tt^.Son.sons;
+    END;
+    SetArity (node, a);
+    layout := CreateLayout (node, class);
+    a := 0;
+    WHILE t^.Kind = Son DO
+      WITH t^.Son DO
+	INC (a);
+	CASE Type (ident) OF
+	| cClass:
+	    SetSonClass (layout, a, ident);
+	    SetEssential (ident);
+	| cNoType:
+	    Correct := FALSE;
+	    ErrorMessageI (eNotDeclared, eError, idpos, eIdent, ADR (ident));
+	    correct := FALSE;
+	ELSE
+	  Correct := FALSE;
+	  ErrorMessageI (eNoClass, eError, idpos, eIdent, ADR (ident));
+	  correct := FALSE;
+	END;
+
+	IF name = NoIdent THEN
+	  correct := FALSE;
+	ELSE
+	  SetSonName (node, a, name);
+	END;
+	t := sons;
+      END;
+    END;
+  END Sons3;
+
+PROCEDURE Functions3 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	funct := MakeFunctEnv (name, domainset);
+	Directives3 (directives);
+	t := functions;
+      END;
+    END;
+  END Functions3;
+
+PROCEDURE Directives3 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Directive DO
+      WITH t^.Directive DO
+	Pattern3 (pattern, correct);
+	t := directives;
+      END;
+    END;
+  END Directives3;
+
+PROCEDURE Pattern3 (t: tTree; VAR ok: BOOLEAN);
+  BEGIN
+    IF t^.Kind = Pattern THEN
+      WITH t^.Pattern DO
+	IF correct THEN
+	  Patterns3 (patterns, ident, idpos, correct);
+	END;
+	ok := correct;
+      END;
+    ELSE
+      WITH t^.Pattern1 DO
+	ok := correct;
+      END;
+    END;
+  END Pattern3;
+
+PROCEDURE Patterns3 (t: tTree; node: tIdent; nopos: tPosition; VAR ok: BOOLEAN);
+  VAR p: INTEGER; correct: BOOLEAN;
+  BEGIN
+    ok := TRUE;
+    p := 0;
+    WHILE t^.Kind = Patterns DO
+      WITH t^.Patterns DO
+	INC (p);
+	Pattern3 (pattern, correct);
+	ok := ok & correct;
+	t := patterns;
+      END;
+    END;
+    IF p # Arity (node) THEN
+      IF Arity (node) = NoValue THEN
+	;
+      ELSIF p < Arity (node) THEN
+	Correct := FALSE;
+	ErrorMessageI (eTooFewSons, eError, nopos, eIdent, ADR (node));
+      ELSE
+	Correct := FALSE;
+	ErrorMessageI (eTooManySons, eError, nopos, eIdent, ADR (node));
+      END;
+      ok := FALSE;
+    END;
+  END Patterns3;
+
+(* ---------- fourth pass ---------
+ *
+ *	the node descriptions which are no main descriptions
+ *	are analyzed
+ *	the belonging class and the classes of each son are
+ *	stored
+ *	the coding of the nodes is completed
+ *	for each (correct) directive
+ *	- the pattern is converted in the internal form
+ *	- the selector list is build
+ *	- a uniq number is stored
+ *
+ *
+ *	possible errors:
+ *	a class is its own subclass i.e. it is cyclic	-> eCyclicClass
+ *	the class of a son is not declared		-> eNotDeclared
+ *	the class of a son is not declared as a class	-> eNoClass
+ *	a node has more sons than in the main desc.	-> eTooManySons
+ *	a node has less sons than in the main desc.	-> eTooFewSons
+ *	the class of a son is never the same nor a
+ *	subclass of the according class in the main
+ *	description					-> eNoSubClass
+ *)
+
+PROCEDURE Spec4 (t: tTree);
+  BEGIN
+    WITH t^.Spec DO
+      Classes4 (classes);
+      Functions4 (functions);
+    END;
+  END Spec4;
+
+PROCEDURE Classes4 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Class DO
+      WITH t^.Class DO
+	IF correct THEN
+	  IF IsSubclass (clid, clid) THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eCyclicClass, eError, clpos, eIdent, ADR (clid));
+	  END;
+	  Nodes4 (nodes, clid);
+	END;
+	t := classes;
+      END;
+    END;
+  END Classes4;
+
+PROCEDURE Nodes4 (t: tTree; clid: tIdent);
+  VAR mainclass: tIdent; cl: tIdent; 
+  BEGIN
+    WHILE t^.Kind = Node DO
+      WITH t^.Node DO
+        IF correct THEN
+	  mainclass := MainClass (name);
+	  IF mainclass = NoIdent THEN
+
+	  ELSIF clid # mainclass THEN
+	    
+	    cl := clid;
+	    LOOP
+	      IF Essential (cl) THEN
+		Correct := FALSE;
+		ErrorMessageI (eExtended, eError, napos, eIdent, ADR (name));
+		EXIT;
+	      END;
+	      cl := SuperClass (cl);
+	      IF cl = mainclass THEN EXIT END;
+	    END;
+
+	    Sons4 (sons, clid, name, napos);
+	  END;
+	END;
+	t := nodes;
+      END;
+    END;
+  END Nodes4;
+
+PROCEDURE Sons4 (t: tTree; class, node: tIdent; nopos: tPosition);
+  VAR tt: tTree; a: INTEGER; mainclass, sonclass: tIdent;
+      mainlayout, layout: tLayout;
+  BEGIN
+    tt := t;
+    a := 0;
+    WHILE tt^.Kind = Son DO
+      WITH tt^.Son DO
+	INC (a);
+	CASE Type (ident) OF
+	| cClass: ;
+	| cNoType:
+	    Correct := FALSE;
+	    ErrorMessageI (eNotDeclared, eError, idpos, eIdent, ADR (ident));
+	    correct := FALSE;
+	ELSE
+	  Correct := FALSE;
+	  ErrorMessageI (eNoClass, eError, idpos, eIdent, ADR (ident));
+	  correct := FALSE;
+	END;
+	tt := sons;
+      END;
+    END;
+    IF a # Arity (node) THEN
+      IF a > Arity (node) THEN
+	Correct := FALSE;
+	ErrorMessageI (eTooManySons, eError, nopos, eIdent, ADR (node));
+      ELSE
+	Correct := FALSE;
+	ErrorMessageI (eTooFewSons, eError, nopos, eIdent, ADR (node));
+      END;
+    ELSE
+      mainclass := MainClass (node);
+      IF mainclass # NoIdent THEN
+	mainlayout := Layout (node, mainclass);
+	layout := CreateLayout (node, class);
+	a := 0;
+	WHILE t^.Kind = Son DO
+	  WITH t^.Son DO
+	    INC (a);
+	    sonclass := SonClass (mainlayout, a);
+	    IF correct & (sonclass # NoIdent) THEN
+	      IF (ident = sonclass) OR IsSubclass (ident, sonclass) THEN
+		SetSonClass (layout, a, ident);
+	      ELSE
+		Correct := FALSE;
+		ErrorMessageI (eNoSubClass, eError, idpos, eIdent, ADR (mainclass));
+		SetSonClass (layout, a, sonclass);
+	      END;
+	    END;
+	    t := sons;
+	  END;
+	END;
+      END;
+    END;
+  END Sons4;
+
+PROCEDURE Functions4 (t: tTree);
+  VAR path: tQueue;
+  BEGIN
+    MakeQueue (path);
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	Directives4 (directives, path, funct);
+	t := functions;
+      END;
+    END;
+    ReleaseQueue (path);
+  END Functions4;
+
+PROCEDURE Directives4 (t: tTree; VAR path: tQueue; f: tFunction);
+  BEGIN
+    WHILE t^.Kind = Directive DO
+      WITH t^.Directive DO
+	IF correct THEN
+	  number := MakeDirective (f);
+	  Pattern4 (pattern, number, NoIdent, path, pat);
+	  pat := NormPattern (pat);
+	  Condition4 (condition, number);
+	  Costs4 (costs, number);
+	  Instr4 (instr, number);
+	  iter := HeadCalled (number);
+	END;
+	t := directives;
+      END;
+    END;
+  END Directives4;
+
+PROCEDURE Pattern4 (t: tTree; no: INTEGER;
+		    class: tIdent; VAR path: tQueue; VAR pat: tPattern);
+  BEGIN
+    IF t^.Kind = Pattern THEN
+      WITH t^.Pattern DO
+	IF ident = NoIdent THEN
+	  IF class # NoIdent THEN
+	    Append (path, IdToAdr (class));
+	  END;
+	ELSE
+	  Append (path, IdToAdr (NodeIdent (ident)));
+	END;
+	pat := MakePattern (ident);
+	IF sel # NoIdent THEN
+	  IF Defined (no, sel) THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eAlreadyDeclared, eError, sepos, eIdent, ADR (sel));
+	  END;
+	END;
+	DefineAccess (no, path, sel, ident, FALSE);
+	Patterns4 (patterns, no, path, ident, pat);
+	IF sel # NoIdent THEN
+	  DefineSelPat (no, sel, NormPattern (CopyPattern (pat)));
+	END;
+	ClearLast (path);
+      END;
+    ELSE
+      WITH t^.Pattern1 DO
+	IF ident = NoIdent THEN
+	  Append (path, IdToAdr (class));
+	  pat := MakePattern (class);
+	ELSE
+	  Append (path, IdToAdr (ident));
+	  pat := MakePattern (ident);
+	  IF NOT ( (class = NoIdent) OR (class = ident) OR
+		   IsSubclass (ident, class)) THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eNoSubClass, eError, idpos, eIdent, ADR (class));
+	  END;
+	END;
+	IF sel # NoIdent THEN
+	  IF Defined (no, sel) THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eAlreadyDeclared, eError, sepos, eIdent, ADR (sel));
+	  END;
+	END;
+	DefineAccess (no, path, sel, ident, ident=class);
+	IF sel # NoIdent THEN
+	  DefineSelPat (no, sel, NormPattern (CopyPattern (pat)));
+	END;
+	ClearLast (path);
+      END;
+    END;
+  END Pattern4;
+
+PROCEDURE Patterns4 (t: tTree; no: INTEGER;
+		     VAR path: tQueue; node: tIdent; VAR pat: tPattern);
+  VAR p: INTEGER; layout: tLayout; sonpat: tPattern;
+  BEGIN
+    p := 0;
+    layout := Layout (node, MainClass (node));
+    WHILE t^.Kind = Patterns DO
+      WITH t^.Patterns DO
+	INC (p);
+	Append (path, IdToAdr (SonName (node, p)));
+	Pattern4 (pattern, no, SonClass (layout, p), path, sonpat);
+	SetPatternSon (pat, p, sonpat);
+	t := patterns;
+	ClearLast (path);
+      END;
+    END;
+  END Patterns4;
+
+PROCEDURE Condition4 (t: tTree; no: INTEGER);
+  VAR sel: tIdent;
+  BEGIN
+    IF t^.Kind # CondF THEN RETURN END;
+    t := t^.CondF.code;
+    LOOP
+      CASE t^.Kind OF
+      | CdStr:
+	  IF Defined (no, t^.CdStr.ident) THEN
+	    t^.CdStr.mode := SelMode (t^.CdStr.code);
+	  ELSE
+	    t^.CdStr.mode := cNoSel;
+	  END;
+	  t := t^.CdStr.code
+      | CdId:
+	  IF Defined (no, t^.CdId.ident) THEN
+	    t^.CdId.mode := SelMode (t^.CdId.code);
+	  ELSE
+	    t^.CdId.mode := cNoSel;
+	  END;
+	  IF Type (t^.CdId.ident) = cFunction THEN
+	    sel := FunctionSelector (t^.CdId.code, no, condition);
+	    IF sel # NoIdent THEN
+	      IF IsHead (no, sel) THEN
+		Correct := FALSE;
+		ErrorMessageI (eDoNotCallCond, eError, t^.CdId.pos, eIdent, ADR (t^.CdId.ident));
+	      ELSE
+		CallFunction (no, sel, t^.CdId.ident);
+	      END;
+	    END;
+	  END;
+	  t := t^.CdId.code
+      | CdDot: t := t^.CdDot.code
+      | CdLPar: t := t^.CdLPar.code
+      | CdRPar: t := t^.CdRPar.code
+      | CdLBra: t := t^.CdLBra.code
+      | CdRBra: t := t^.CdRBra.code
+      | CdSpa: t := t^.CdSpa.code
+      | CdCom: t := t^.CdCom.code
+      | CdComma: t := t^.CdComma.code
+      | CdRst: t := t^.CdRst.code
+      | CdEnd: EXIT
+      END;
+    END;
+  END Condition4;
+
+PROCEDURE Costs4 (t: tTree; no: INTEGER);
+  VAR sel: tIdent;
+  BEGIN
+    IF t^.Kind # CostF THEN RETURN END;
+    t := t^.CostF.code;
+    LOOP
+      CASE t^.Kind OF
+      | CdStr:
+	  IF Defined (no, t^.CdStr.ident) THEN
+	    t^.CdStr.mode := SelMode (t^.CdStr.code);
+	  ELSE
+	    t^.CdStr.mode := cNoSel;
+	  END;
+	  t := t^.CdStr.code
+      | CdId:
+	  IF Defined (no, t^.CdId.ident) THEN
+	    t^.CdId.mode := SelMode (t^.CdId.code);
+	  ELSE
+	    t^.CdId.mode := cNoSel;
+	  END;
+	  IF Type (t^.CdId.ident) = cFunction THEN
+	    Correct := FALSE;
+	    ErrorMessageI (eDoNotCallCost, eError, t^.CdId.pos, eIdent, ADR (t^.CdId.ident));
+	  END;
+	  t := t^.CdId.code
+      | CdDot: t := t^.CdDot.code
+      | CdLPar: t := t^.CdLPar.code
+      | CdRPar: t := t^.CdRPar.code
+      | CdLBra: t := t^.CdLBra.code
+      | CdRBra: t := t^.CdRBra.code
+      | CdSpa: t := t^.CdSpa.code
+      | CdCom: t := t^.CdCom.code
+      | CdComma: t := t^.CdComma.code
+      | CdRst: t := t^.CdRst.code
+      | CdEnd: EXIT
+      END;
+    END;
+  END Costs4;
+
+PROCEDURE Instr4 (t: tTree; no: INTEGER);
+  VAR sel: tIdent;
+  BEGIN
+    LOOP
+      CASE t^.Kind OF
+      | CdStr:
+	  IF Defined (no, t^.CdStr.ident) THEN
+	    t^.CdStr.mode := SelMode (t^.CdStr.code);
+	  ELSE
+	    t^.CdStr.mode := cNoSel;
+	  END;
+	  t := t^.CdStr.code
+      | CdId:
+	  IF Defined (no, t^.CdId.ident) THEN
+	    t^.CdId.mode := SelMode (t^.CdId.code);
+	  ELSE
+	    t^.CdId.mode := cNoSel;
+	  END;
+	  IF Type (t^.CdId.ident) = cFunction THEN
+	    sel := FunctionSelector (t^.CdId.code, no, code);
+	    IF sel # NoIdent THEN
+	      IF NOT InDomain (t^.CdId.ident, SelPattern (no, sel)) THEN
+		Correct := FALSE;
+		ErrorMessageI (eNotInFDomain, eError, t^.CdId.pos, eIdent, ADR (sel));
+	      END;
+	      CallFunction (no, sel, t^.CdId.ident);
+	    END;
+	  END;
+	  t := t^.CdId.code
+      | CdDot: t := t^.CdDot.code
+      | CdLPar: t := t^.CdLPar.code
+      | CdRPar: t := t^.CdRPar.code
+      | CdLBra: t := t^.CdLBra.code
+      | CdRBra: t := t^.CdRBra.code
+      | CdSpa: t := t^.CdSpa.code
+      | CdCom: t := t^.CdCom.code
+      | CdComma: t := t^.CdComma.code
+      | CdRst: t := t^.CdRst.code
+      | CdEnd: EXIT
+      END;
+    END;
+  END Instr4;
+
+PROCEDURE SelMode (t: tTree): tSelMode;
+  BEGIN
+    LOOP
+      CASE t^.Kind OF
+      | CdStr, CdId: RETURN cTreeSel;
+      | CdDot: RETURN cSel
+      | CdLPar, CdRPar, CdLBra, CdRBra: RETURN cTreeSel;
+      | CdSpa: t := t^.CdSpa.code
+      | CdCom: t := t^.CdCom.code
+      | CdComma: RETURN cTreeSel;
+      | CdRst: RETURN cTreeSel;
+      | CdEnd: RETURN cTreeSel;
+      END;
+    END;
+  END SelMode;
+
+PROCEDURE FunctionSelector (t: tTree; no: INTEGER; kind: INTEGER): tIdent;
+  BEGIN
+    LOOP	(* find '(' - blanks and comments are skipped *)
+      CASE t^.Kind OF
+      | CdSpa: t := t^.CdSpa.code
+      | CdCom: t := t^.CdCom.code
+      | CdLPar: t := t^.CdLPar.code; EXIT;
+      | CdStr: ErrorMessage (eLParExpected, eError, t^.CdStr.pos); EXIT;
+      | CdId: ErrorMessage (eLParExpected, eError, t^.CdId.pos); EXIT;
+      | CdDot: ErrorMessage (eLParExpected, eError, t^.CdDot.pos); EXIT;
+      | CdRPar: ErrorMessage (eLParExpected, eError, t^.CdRPar.pos); EXIT;
+      | CdLBra: ErrorMessage (eLParExpected, eError, t^.CdLBra.pos); EXIT;
+      | CdRBra: ErrorMessage (eLParExpected, eError, t^.CdRBra.pos); EXIT;
+      | CdComma: ErrorMessage (eLParExpected, eError, t^.CdComma.pos); EXIT;
+      | CdRst: ErrorMessage (eLParExpected, eError, t^.CdRst.pos); EXIT;
+      | CdEnd: EXIT;
+      END;
+    END;
+    LOOP	(* find string or ident - blanks and comments are skipped *)
+      CASE t^.Kind OF
+      | CdSpa:
+	  t := t^.CdSpa.code
+      | CdCom:
+	  t := t^.CdCom.code
+      | CdStr:
+	  IF NOT Defined (no, t^.CdStr.ident)
+	     OR NOT RParOrComma (t^.CdStr.code) THEN
+	    Correct := FALSE;
+	    ErrorMessage (eNoSelector, eError, t^.CdStr.pos);
+	    RETURN NoIdent;
+	  ELSE
+	    RETURN t^.CdStr.ident;
+	  END;
+      | CdId:
+	  IF NOT Defined (no, t^.CdId.ident)
+	     OR NOT RParOrComma (t^.CdId.code) THEN
+	    IF kind = condition THEN
+	      Correct := FALSE;
+	      ErrorMessage (eNoSelector, eError, t^.CdId.pos);
+	      RETURN NoIdent;
+            ELSE (* kind = code *)
+	      ErrorMessage (eNoSelector, eWarning, t^.CdId.pos);
+	      RETURN NoIdent;
+	    END;
+	  ELSE
+	    RETURN t^.CdId.ident;
+	  END;
+      | CdDot:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdDot.pos);
+	  RETURN NoIdent;
+      | CdLPar:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdLPar.pos);
+	  RETURN NoIdent;
+      | CdRPar:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdRPar.pos);
+	  RETURN NoIdent;
+      | CdLBra:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdLBra.pos);
+	  RETURN NoIdent;
+      | CdRBra:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdRBra.pos);
+	  RETURN NoIdent;
+      | CdComma:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdComma.pos);
+	  RETURN NoIdent;
+      | CdRst:
+	  Correct := FALSE;
+	  ErrorMessage (eIdOrStrExpected, eError, t^.CdRst.pos);
+	  RETURN NoIdent;
+      | CdEnd:
+	  RETURN NoIdent;
+      END;
+    END;
+  END FunctionSelector;
+
+
+PROCEDURE RParOrComma (t: tTree): BOOLEAN;
+  BEGIN
+    LOOP
+      CASE t^.Kind OF
+      | CdRPar, CdComma: RETURN TRUE;
+      | CdStr, CdId, CdLPar, CdLBra, CdRBra, CdRst, CdEnd, CdDot: RETURN FALSE;
+      | CdSpa: t := t^.CdSpa.code
+      | CdCom: t := t^.CdCom.code
+      END;
+    END;
+  END RParOrComma;
+
+
+(* ---------- fifth pass ---------
+ *
+ *	add pattern numbers to the nodes 
+ *	report classes which are unreachable or underivable
+ *	test completeness
+ *)
+
+PROCEDURE Spec5 (t: tTree);
+  BEGIN
+    WITH t^.Spec DO
+      Classes5 (classes);
+      Functions5 (functions);
+    END;
+  END Spec5;
+
+PROCEDURE Classes5 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Class DO
+      WITH t^.Class DO
+	IF IsElement (clid, UnReachable) THEN
+	  ErrorMessageI (eUnReachable, eError, clpos, eIdent, ADR (clid));
+	END;
+	IF IsElement (clid, UnDerivable) THEN
+	  ErrorMessageI (eUnDerivable, eError, clpos, eIdent, ADR (clid));
+	END;
+	t := classes;
+      END;
+    END;
+  END Classes5;
+
+PROCEDURE Functions5 (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	Directives5 (directives, domainset, name);
+	Domain5 (domain, funct);
+	t := functions;
+      END;
+    END;
+  END Functions5;
+
+PROCEDURE Domain5 (t: tTree; f: tFunction);
+  BEGIN
+    WHILE t^.Kind = Ident DO
+      WITH t^.Ident DO
+	IF Type (ident) = cClass THEN
+	  FunctionComplete (f, ident, idpos);
+	END;
+	t := domain;
+      END;
+    END;
+  END Domain5;
+
+PROCEDURE Directives5 (t: tTree; domain: tSet; name: tIdent);
+  VAR
+    classes: tSet;
+  BEGIN
+    MakeSet (classes, MaxIdent);
+    WHILE t^.Kind = Directive DO
+      WITH t^.Directive DO
+	IF correct THEN
+	  Pattern5 (pattern, number);
+          PatternClasses (pat, classes);
+	  IF IsEmpty (classes) THEN
+	    correct := FALSE;
+	    Correct := FALSE;
+	    ErrorMessage (eIllegalPattern, eError, pattern^.pattern.pos);
+	  ELSE
+	    Intersection (classes, domain);
+	    IF IsEmpty (classes) THEN
+	      correct := FALSE;
+	      Correct := FALSE;
+	      ErrorMessageI (eNotInDomain, eError, pattern^.pattern.pos,
+			     eIdent, ADR (name));
+	    END;
+	  END;
+          IF condition^.Kind = CondF THEN
+	    SetCondPattern (number, pat);
+	  ELSE
+	    SetPattern (number, pat);
+	  END;
+	END;
+	t := directives;
+      END;
+    END;
+    ReleaseSet (classes);
+  END Directives5;
+
+PROCEDURE Pattern5 (t: tTree; number: INTEGER);
+  VAR nodes, classes, add: tSet;
+  BEGIN
+    IF t^.Kind = Pattern1 THEN
+      WITH t^.Pattern1 DO
+	MakeSet (nodes, MaxIdent);
+	MakeSet (classes, MaxIdent);
+	MakeSet (add, MaxIdent);
+	CASE Type (ident) OF
+	| cNoType:  
+	    AllNodes (nodes);
+	| cClass:
+	    Subclasses (ident, classes);
+	    NodesOfClass (ident, nodes);
+	    WHILE NOT IsEmpty (classes) DO
+	      NodesOfClass (Extract (classes), add);
+	      Union (nodes, add);
+	    END;
+	END;
+	WHILE NOT IsEmpty (nodes) DO
+	  AddPatNumber (Extract (nodes), number);
+	END;
+	ReleaseSet (nodes);
+	ReleaseSet (classes);
+	ReleaseSet (add);
+      END;
+    ELSE
+      WITH t^.Pattern DO
+	AddPatNumber (ident, number);
+      END;
+    END;
+  END Pattern5;
+
+BEGIN
+  Correct := TRUE;
+END Semantics.

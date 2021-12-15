@@ -1,0 +1,32 @@
+SOURCES	= Scanner.md Scanner.mi Parser.md Parser.mi \
+	  Tree0.md Tree0.mi Eval.md Eval.mi
+
+sources: $(SOURCES)
+
+Scanner.mi Scanner.md:	rex.rex
+	@echo expect 2 warnings
+	rex -di rex.rex
+
+Parser.mi Parser.md:	rex.lrk
+	lark -di rex.lrk
+
+Tree0.md Tree0.mi:	rex.cg
+	cg -dimtwFDIe rex.cg
+
+Eval.md Eval.mi:	rex.cg
+	ag -DI rex.cg
+
+m2c:
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="-c -d../../reuse/src -o../m" -c -f ../m/Makefile
+
+clean:
+	del *.obj
+	del rex.exe
+
+CLEAN:	clean
+	del $(SOURCES)

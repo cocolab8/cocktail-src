@@ -1,0 +1,1222 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.EQ
+gsize 12
+delim $$
+.EN
+.nf
+.ce 99
+.\" uh "Using Attribute Grammars in Industry"
+.uh "Are Attribute Grammars Used in Industry?"
+.sp 2
+Josef Grosch
+.sp 0.5
+CoCoLab - Datenverarbeitung
+H\*ohenweg 6
+77855 Achern
+Germany
+.sp 0.5
+Phone +49-7841-669144
+Fax +49-7841-669145
+Email grosch@cocolab.de
+Web www.cocolab.de
+.sp 2
+.he ''- % -''
+.ce 0
+.uh "Are Attribute Grammars Used in Industry?"
+.lp
+Are attribute grammars used in industrial applications?
+Or are attribute grammars just an academic playground?
+I would like to answer these two questions based on my personal experience.
+I have been working with attribute grammars for around 17 years now.
+Around 10 years ago I started creating the Cocktail Toolbox which contains
+among other tools for compiler construction the attribute grammar tool
+.i ag .
+Five years ago I founded a company named
+.i CoCoLab
+which stands for compiler compiler laboratory.
+The company develops and markets the Cocktail Toolbox as well as parsers
+generated with Cocktail. We also do project work in the area of compiler
+construction and programming languages.
+.lp
+My first and very spontaneous answers to the above two questions are: Yes, in
+both cases.
+Attribute grammars are used in industry and at the same time they can be
+regarded as academic playground. This does seem contradictory, doesn't it?
+Therefore let me explain in more detail why I am giving the above answers.
+.uh "Why Attribute Grammars are not Used"
+.lp
+I am observing a lack of education and knowledge about compiler construction in
+industry. When I am asking the participants of our trainings or the employees we
+met in our projects then only few people have learned about compiler
+construction during their education. For many of them compiler construction has
+a bad reputation because of what and how they have learned about this topic.
+Even fewer people have a usable knowledge about compilers.
+Even fewer people know about the theory of attribute grammars.
+And even fewer people know how to use attribute grammars for solving practical
+problems.
+.lp
+Nevertheless, attribute grammars are used in industry.
+However, in many cases the people in industry do not know about this fact.
+They are running prefabricated subsystems constructed by external companies such
+as ours.
+These subsystems are for example parsers which use attribute grammar technology.
+.uh "Attribute Grammars are Used in Industry"
+.lp
+On the other hand, attribute grammars are used in industry because at least our
+company uses attribute grammar technology for solving compiler problems.
+Let me describe where and how we are using attribute grammars.
+.lp
+Our main area of business are parsers or front-ends for all languages such as
+for example COBOL, PL/I, C, C++, Java, etc. . Currently, these parsers are used
+for program analysis in re-engineering projects (year 2000, EURO) and in
+programming environments (e. g. SNiFF, Source Navigator).
+.lp
+In these parsers, attribute grammars are used for mainly two tasks:
+First, for tree construction and similar tasks during parsing.
+Second, for name analysis within semantic analysis which is performed on the
+abstract syntax tree.
+.EQ
+delim @@
+.EN
+.lp
+Attribute grammars during parsing used for tree construction might seem rather
+trivial. In fact it is a simple technology. Nevertheless it is of great benefit.
+In the Cocktail Toolbox we use the same notation for attribute grammars
+evaluated during parsing and those evaluated based on syntax trees.
+The attributes have to be declared and they have names
+(as opposed to the notation $1, $2, $3 known from Yacc). Therefore, the
+tools can check the computation rules for completeness which is of high value.
+It decreases development time and it increases the reliability of the products.
+There is not much to argue about this fact - this is something one has to
+experience (look and feel).
+.uh "Overview of Using Attribute Grammars"
+.lp
+The following sections give an overview of our use of attribute grammars.
+.uh "Tree Construction"
+.lp
+In all our parsers we use an attribute grammar for tree construction.
+This attribute grammar is evaluated during parsing. In simple cases there is
+only one synthesized attribute per symbol referring to the subtree corresponding
+to the symbol.
+Sometimes additional attributes are used if some constructs are not mapped to
+tree nodes but to attributes of tree nodes or for additional tasks.
+Examples are parsers for
+Ada, C, C++, Fortran 90, JCL, HTML, XML, Delphi, Powerbuilder, etc. .
+The development of these attribute grammars takes between one day and one or two
+months. The time depends on the size and the complexity of the concrete grammar.
+Our largest grammar for COBOL for example has around 3000 grammar rules.
+.lp
+Especially valuable proved this technique lately during the development of our
+ANSI C++ parser in particular because of the complexity of the grammar.
+Then it is advantageous to use a tool that reports missing computations
+as well as superfluous computations.
+In other words, such a technique keeps the code clean and increases its
+reliability.
+.(z
+.FT
+postfix_expression = <
+        = primary_expression .
+.sp 0.5
+        = p:postfix_expression '[' e:expression ']'
+        { type := type_op (p:type, karray);
+          tree := msubscript_expr ('[':Position, p:tree, e:tree); } .
+.sp 0.5
+        = postfix_expression '(' expression_list ')'
+        { type := type_op (postfix_expression:type, kfunction);
+          tree := mcall_expr ('(':Position, postfix_expression:tree,
+                ReverseTree (expression_list:tree)); } .
+.sp 0.5
+        = s:simple_type_specifier '(' expression_list ')'
+        { type := get_type (s:tree);
+          tree := (s:tree->specifier.next = mnospecifier (),
+                mconstruct_expr ('(':Position, s:tree,
+                ReverseTree (expression_list:tree))); } .
+.sp 0.5
+        = ...
+.)z
+.lp
+The following example presents a small excerpt from our C++ grammar.
+Two attributes are computed in these rules: The attribute
+.i tree
+is used for tree construction. The attribute
+.i type
+determines the type of every expression. This has to be done during parsing
+because at a class member access (e.m, e->m) the name of the member m has to be
+looked up in the class of the expression e.
+.uh "Name Analysis"
+.lp
+In some of our parser we do name analysis with an attribute grammar.
+Examples are
+COBOL, OO-COBOL, PL/I, Java, Tcl/Tk, CICS, SQL.
+Most of the time we use a combination of techniques as sketched elsewhere.
+Typically, the implementation of name analysis takes one day even for huge
+languages such as COBOL or PL/I.
+We will go into more details later.
+.lp
+We observe that we often use attribute grammars for the distribution of context
+information in the syntax tree. Examples are:
+.ip -
+the scope valid at the use of a name
+.ip -
+the kind of access of a variable (read or write)
+.ip -
+the section name for every paragraph (in COBOL).
+.lp
+In most of these cases the attribute computation is trivial because a certain
+value is just copied along the tree structure. The implementation using an
+attribute grammar
+tool is even more trivial if one can make use of so-called copy rules,
+which do not need to be written down. At a few rules you assign values to an
+inherited attribute and perhaps hundreds of copy rules are inserted
+automatically by the tool. This saves writing down a huge number of rules
+and it leads to concise notation which concentrates on the essential
+computations.
+.uh "Unconventional Use of Attribute Grammars"
+.lp
+So far we have described conventional applications of attribute grammars in the
+area of
+compiler construction. Some unconventional applications are the following:
+.uh "Tree Transformation in PL/I"
+.lp
+For PL/I the so-called F(X) problem has to solved.
+F(X) can denote a function call or an
+array subscription depending on the declaration of F. PL/I allows "use before
+declare" and therefore the parser might not know the declaration of F while
+building the tree node for F(X). Therefore, the parser maps this syntactic
+construct to a single tree node in the first place. Later, a tree
+transformation is applied which uses the results of name analysis and
+which transforms the concerned tree nodes. This transformation has been
+implemented with an attribute grammar in combination with a few routines written
+for the tree processor tool
+.i puma .
+.uh "Validation of XML Documents"
+.lp
+Another example is the validation of XML documents according to the so-called
+document type definition (DTD).
+The DTD is a restricted form of a context free grammar.
+The validation is based on the syntax tree which results from parsing.
+We compute the FIRST sets or director sets of the grammar rules
+using an attribute grammar.
+The validation of the document is again performed by a combination
+of an attribute grammar and a tree processor tool (puma).
+.(z
+.FT
+RULE
+.sp 0.5
+root    = tree .
+.sp 0.5
+tree    = <
+   node = child1:tree   child2:tree child3:tree .   /* node with 3 children */
+   list = next:tree REV child2:tree child3:tree .   /* list node */
+   leaf = .                                         /* leaf node */
+> .
+.sp 0.5
+MODULE compute_layout
+.sp 0.5
+DECLARE tree = [xin INHERITED]   [yin INHERITED]
+               [x   OUTPUT]      [y   OUTPUT]
+               [w   SYNTHESIZED] [h   SYNTHESIZED] .   /* width and height */
+.sp 0.5
+RULE
+.sp 0.5
+root    = { tree:xin := 0; tree:yin := 0; } .
+.sp 0.5
+tree    = { x := xin; y := yin; w := 0; h := 0; } .
+.sp 0.5
+leaf    = { x := xin; y := yin; w := 1; h := 1; } .
+.sp 0.5
+node    = { x := (child1:x + child3:x) / 2; y := yin;
+            w := child1:w + child2:w + child3:w;
+            h := Max (Max (child1:h, child2:h), child3:h) + 1;
+            child1:yin := yin + 1; child1:xin := xin;
+            child2:yin := yin + 1; child2:xin := xin + child1:w;
+            child3:yin := yin + 1; child3:xin := xin + child1:w + child2:w;
+          } .
+.sp 0.5
+list    = { x := xin; y := yin;
+            w := Max (1 + child2:w + child3:w, next:w);
+            h := Max (child2:h, child3:h) + next:h;
+            next:yin := yin + Max (child2:h, child3:h); next:xin := xin;
+            child2:yin := yin + 1; child2:xin := xin + 1;
+            child3:yin := yin + 1; child3:xin := xin + 1 + child2:w;
+          } .
+.sp 0.5
+END compute_layout
+.)z
+.uh "Layout Algorithm"
+.lp
+For a last example let me mention the use of an attribute grammar for the
+development of an layout algorithm. The tree management tool
+.i ast
+of the Cocktail Toolbox offers a graphical browser for trees and graphs.
+This browser determines a layout for the tree and displays nodes and edges as
+everybody would expect.
+The contents of the nodes consisting of its attributes can be inspected as
+well. It offers zooming and scrolling and so on. And it can efficiently handle
+huge trees with thousands of tree nodes. While the layout algorithm is generated
+specifically for every tree definition by the tool
+.i ast
+the graphical user interface is fixed. The graphical user interface is
+implemented with the Tcl/Tk package and therefore the browser is portable and
+available under Unix and Windows.
+.lp
+The layout algorithm is oriented towards syntax trees and therefore rather
+simple, although it can handle arbitrary graphs as well. We used an attribute
+grammar for the specification and for prototyping of the layout algorithm.
+For a simplified version of the problem an attribute grammar was written (see
+example). Only trees with a fixed number of children have been considered:
+The node type
+.i node
+has three children called child1, child2, and child3. The node type
+.i list
+has three children, too. One of its children called next has the property
+REVERSE (REV) specifying that this node is element of a list. The elements of
+lists shall be displayed one underneath the other.
+The attribute grammar uses six attributes:
+The width (w) and height (h) of a subtree and its x and y coordinates.
+The attributes xin and yin are the coordinates which are propagated from the
+parent to the child nodes.
+This grammar has been checked by a tool for completeness and wellformedness.
+Once we did gain trust in it it was used as the base of the real
+implementation. In the real world a similar attribute computation is performed
+by an attribute evaluator that is generated specifically for every tree
+definition. Also, the
+prototype algorithm has been extended to handle an arbitrary number of node
+types with arbitrary many children as well as graphs, even cyclic ones.
+.uh "We Should Have Used an Attribute Grammar"
+.lp
+We can also report a case were we regret not having used attribute grammars.
+The project implemented a translator (to C) and an interpreter for a customer
+specific language. With the intention to gain experience in the implementation
+of semantic analysis without attribute grammars
+and to save the customer from learning about attribute grammars
+we used just the tree processor tool
+.i puma
+for semantic analysis. Looking back I have to say this decision was wrong.
+The use of an attribute grammar would have been better.
+First, it clearly structures the computations.
+Every attribute is a request for a computation and indicates its location.
+Additionally, the tool checks for completeness and the absence of cycles.
+This would have led to a clearer implementation as well as to a shorter
+development time.
+.uh "The Cocktail Toolbox"
+.lp
+We make heavy use of attribute grammars in our parsers which are used in
+industry all over the world. We consider this technology to be very valuable
+and we use it frequently. Former problems such as lack of run time efficiency or
+insufficient memory for attribute storage do not exist any more,
+because today we have hardware with fast processors and plenty of main memory.
+Also, the time spent in parsing and attribute evaluation is often negligible
+compared to the time spent in database access.
+.lp
+Our approach for compiler construction is of course the use of the Cocktail
+Toolbox which contains the following tools:
+.(b
+.ta 2c
+Rex	generator for lexical analyzers
+Lark	LR(1) and LALR(2) parser generator with backtracking and predicates
+Ell	LL(1) parser generator
+Ast	generator for abstract syntax trees
+Ag	generator for attribute evaluators
+Puma	transformation of attributed trees using pattern matching
+Reuse	library of reusable modules
+.)b
+.lp
+The attribute grammar tool
+.i ag
+handles the following classes of attribute grammars:
+.(b
+.ta 2c
+OAG	ordered attribute grammars
+WAG	well-formed attribute grammars
+HAG	higher order attribute grammars
+.)b
+It supports tree-valued attributes and offers an extension mechanism which
+provides single inheritance as well as multiple inheritance for attributes and
+for attribute computations. Also, non-local attributes can be computed and it is
+possible to evaluate attributes of graphs (with some restrictions).
+The generated evaluators are very run-time
+efficient because they are directly coded using recursive procedures.
+While the Cocktail Toolbox supports the generation of compilers in C, C++, and
+Modula-2 we use C as implementation language in most of the cases because of
+portability reasons.
+.uh "Name Analysis in PL/I"
+.lp
+The following sections will discuss our approach to name analysis in some
+more detail. During many projects we have developed some kind of a standardized
+approach for name analysis. Name analysis uses a symbol table which is an
+ordered set of scopes. A scope describes a set of declared objects. Most of the
+time we implement the symbol table with the tree manager tool
+.i ast .
+In simple cases sets of objects are implemented by linked lists.
+If efficiency is necessary then the linked lists can be overlaid by hash-tables.
+The symbol table is constructed using the tree processor tool
+.i puma .
+The scope information is distributed in the syntax tree by an attribute grammar.
+The attribute grammar also triggers the calls of the functions
+.i Identify...
+which are written in C and which perform the lookup in the symbol table.
+.lp
+The approach uses a combination of attribute grammars and other techniques.
+We often combine the following tools in order to solve the various subtasks
+of name analysis:
+.sp 0.5
+.TS
+center;
+l l l l.
+#	subtask	tool	name
+_
+1	define and manage data structure for symbol table	tree manager	ast
+2	build symbol table	tree processor	puma
+3	distribute scope information in the syntax tree	attribute grammar	ag
+4	lookup in symbol table	search algorithm	C
+.TE
+.sp 0.5
+Note, the subtasks 2 and 4 are controlled or triggered by the attribute grammar,
+too.
+However, the real computation is performed outside the attribute grammar.
+.lp
+The question is as follows: How do we know which tool or technique to use for
+which subtask and how to find out about the right combination?
+.lp
+The following case study is taken from our PL/I system.
+.uh "Source Program"
+.lp
+The language PL/I has nested scopes as shown by the following example program:
+.(b
+.FT
+ P: PROC;
+.sp 0.5
+    DCL VAR1 PIC '99', VAR2 PIC CHAR(2);
+    DCL 1 VAR3(60)EXT,
+      2 FIELD1 FIXED DEC(9,2),
+      2 FIELD2 FIXED DEC(9,2) INIT (0),
+      2 FIELD3 FIXED DEC(5,3);
+.sp 0.5
+    BEGIN;
+       DCL (VAR2, VAR3, VAR4) PIC '99';
+.sp 0.5
+       VAR1 = VAR3 + VAR4;
+    END;
+ END;
+.)b
+The procedure P establishes a block and declares the variables VAR1, VAR2, and
+VAR3. The variable VAR3 is a record variable with the fields FIELD1, FIELD2, and
+FIELD3. The procedure P contains a BEGIN-END block which forms a nested scope.
+This nested scope declares the variables VAR2, VAR3, and VAR4 thus hiding some
+declarations from the surrounding scope.
+.uh "Syntax Tree"
+.lp
+The parser of the PL/I system translates the source program to an abstract
+syntax tree. The graphical representation of syntax trees, even for small
+examples, is always larger than a sheet of paper or a computer screen.
+Therefore the following picture displays just the tree for the BEGIN-END block.
+The subwindow shows the attributes of the highlighted node.
+The first line contains the type of the node.
+The other lines describe the children and attributes of the node by listing
+name-value pairs.
+.PSPIC tree.ps
+.uh "Symbol Table"
+.lp
+A symbol table or definition table stores information about all objects declared
+in a program. The relevant aspects are a data structure and algorithms for
+building and accessing it. We prefer to use the tree manager tool
+.i ast
+for the description and administration of the data structure. The following
+example specifies the symbol table for PL/I.
+.(b L
+.FT
+MODULE definition_table
+
+DECLARE         /* the attribute 'env' gives access to the definition table */
+
+allocation_list
+argument_list
+...
+unit_list
+when_list
+                = [env   : tTree   INH].
+
+declaration     = [parent: declaration]./* pointer to "parent declaration"      */
+                                        /* for access of factored out attributes*/
+declaration_id  = [attributes: tset  ]  /* bit_set describing all explicitly    */
+                                        /* associated attributes,               */
+                  [fields    : Tree  ]  /* list of fields of structures (env)   */
+                  [lower     : declaration]/* pointer to lower (enclosing) level*/
+                  .
+RULE                    /* node types for the definition table (symbol table)   */
+
+                                        /* a scope (or block) contains:         */
+env             = objects          IN   /* a set (list) of objects              */
+                  env              IN   /* a reference to a surrounding scope   */
+                  [object   : Tree IN]  /* a node in the abstract syntax tree   */
+                  [HashTable: tHashTable IN] /* pointer to hash table           */
+                  [HashSize : int  IN]  /* size of hash table                   */
+                  [Set      : tSet   ]
+                  .
+objects         = <                     /* an object is described by:           */
+   object       = [object: Tree    IN]  /* a node in the abstract syntax tree   */
+                  [ident : tIdent  IN]  /* an identifier                        */
+                  [is_formal:rbool IN]  /* whether it is a formal parameter     */
+                  next   : objects IN REV /* a next object                      */
+                  [collision: object ]  /* collision chain for hash structure   */
+                  <
+      object_implicit   =               /* for implicitly declared objects      */
+                  [Attribute: tkeyword] /* implicit attribute           */
+                  .
+   > .
+   noobject     = .                     /* the end of a list of objects         */
+> .
+                        /* attribute grammar to construct the definition table  */
+
+root            = { procedure:env := mEnv (get_objects (procedure, nnoobject),
+                                           NoTree, SELF);   } .
+procedure       = { unit_list:env := mEnv (get_objects (unit_list, nnoobject),
+                                           env, SELF);
+                    procedure_statement:env := unit_list:env; } .
+begin_block     = { unit_list:env := mEnv (get_objects (unit_list, nnoobject),
+                                           env, SELF);      } .
+
+END definition_table
+.)b
+.lp
+For every scope a node of type
+.i env
+is created. Its three most relevant components are
+.i objects ,
+.i env ,
+and
+.i object .
+The child objects points to a list of objects declared in this scope.
+The "child" env contains a reference to a node of type env describing the
+surrounding scope.
+The attribute object refers to the node in the abstract syntax tree which
+represents the scope (e. g. block or procedure).
+The other components implement a hashtable which is used for fast access in the
+list of objects instead of linear search.
+.lp
+For every declared object a node of type
+.i object
+is created and linked to its env node. Its three most relevant components are
+.i object ,
+.i ident ,
+and
+.i next .
+The attribute object refers to the node in the abstract syntax tree which
+represents the declared object.
+The attribute ident specifies the name of the declared object.
+The child next refers to the next declared object.
+.lp
+The following picture displays the symbol table for the example source program.
+The top-most node of type env describes the inner-most scope of the BEGIN-END
+block. The next node of type env describes the procedure scope. The last node of
+type env describes the global scope containing the declaratio of the procedure
+P. The upper attribute window shows the contents of the top-most node of type
+env. The lower attribute window shows the contents of the node of type object
+describing the first declarde object in the inner-most scope.
+The references from the symbol table to the syntax tree or vice versa are not
+displayed in the graphical browser because they are specified to be attributes
+instead of children. Nevertheless the corresponding information can be
+displayed in a separate window by clicking on the attributes marked with the
+character +.
+.PSPIC symtab.ps
+.lp
+In order to be able to access the symbol table the attribute
+.i env
+is distributed to almost all nodes of the syntax. This attribute is declared
+in the first list of the module definition_table. The last three lines of this
+module specify the computation of this attribute at the nodes that describe
+scopes. All all other nodes this attribute is copied by automatically inserted
+copy rules.
+.lp
+For PL/I we build the symbol table by traversing the relevant parts of the
+syntax tree with routines such as
+.i get_objects
+which are implemented using the tree processor tool
+.i puma .
+During the traversal the nodes of type object are created and added to the
+lists of objects. We do not show these routines because this is outside of our
+topic.
+.lp
+The function
+.i mEnv
+creates a node of type
+.i env
+and adds a hash-table to the linear list of objects.
+.uh "Lookup"
+.lp
+The lookup in the symbol table is accomplished by a few functions written in C.
+The following function
+.i IdentifyVar
+is an example:
+.(b
+.FT
+tTree IdentifyVar (register tIdent Ident, tTree Env)
+{
+   while (Env != NoTree) {
+      register tTree Object = Env->env.HashTable [Ident % Env->env.HashSize];
+
+      if (IsElement (Ident, & Env->env.Set)) {
+         while (Object != NoTree)       /* pass 1: search on current level */
+            if (Object->object.ident == Ident) return Object;
+            else Object = Object->object.collision;
+                                        /* pass 2: search on all levels */
+         Object = IdentifyUnqualified (Ident, Env);
+         if (Object != nnoobject) return Object;
+      }
+      Env = Env->env.env;               /* search in surrounding block */
+   }
+   return nnoobject;
+}
+.)b
+It takes two arguments specifying a name (Ident) and a scope (Env) and returns
+either a pointer to a node of type object describing the object found or the
+value nnoobject in case of failure. The function uses hashing for fast lookup.
+In PL/I names of fields do not have to be fully qualified. This is taken into
+account by the function
+.i IdentifyUnqualified .
+.uh "Name Analysis"
+.lp
+The result of name analysis is the computation of an attribute called
+.i object
+at every node of type identifier, structure_qualification, or subscription.
+This attribute is declared at the beginning of the module name_analysis
+for the super class of the mentioned node types. In the simplest case the
+following computation suffices:
+.(b
+.FT
+identifier              = { object      := IdentifyVar (ident, env);
+.)b
+The language PL/I is not simple and therefore the real computations are more
+complicated as shown by the following excerpt of the attribute grammar which
+will not be explained in all details.
+.(b L
+.FT
+MODULE name_analysis
+
+DECLARE
+
+value_reference = [object       : object] . /* pointer to definition table  */
+value_reference = [dimension    : short ] . /* number of dimensions         */
+argument_list   = [dimension    : short ] . /* number of dimensions         */
+
+RULE
+
+/* compute object and dimension attributes */
+
+value_reference         = { object      := nnoobject;
+                            dimension   := 0; } .
+
+function_reference      = { object      := nnoobject; /* result is unknown */
+                            dimension   := 0; } .
+
+locator_qualification   = { object      := IdentifyVar (ident, env);
+                            dimension   := no_of_dimensions (object); } .
+
+subscription            = { object
+                            dimension   := {
+                               if (value_reference:dimension == 0 &&
+                                   is_entry (value_reference:object)) {
+                                  object    = nnoobject; /* result is unknown */
+                                  dimension = 0;
+                                  trafo_to_function_ref (SELF);
+                               } else if (value_reference->Kind == kidentifier &&
+                                   value_reference:object->Kind == kobject &&
+                                   has_builtin (value_reference:object)) {
+                                  object = nnoobject; /* result is unknown */
+                                  dimension = 0;
+                                  trafo_to_builtin_ref (SELF);
+                               } else if (value_reference:dimension > 0 &&
+                                          subscript_list:dimension  > 0) {
+                                  object    = value_reference:object;
+                                  dimension = value_reference:dimension -
+                                              subscript_list:dimension;
+                               } else if (value_reference->Kind == kidentifier &&
+                                  is_builtin (value_reference->identifier.ident)){
+                                  object = nnoobject; /* result is unknown */
+                                  dimension = 0;
+                                  trafo_to_builtin_ref (SELF);
+                                  value_reference:object = nnoobject;
+                               } else {
+                                  object    = value_reference:object;
+                                  dimension = value_reference:dimension -
+                                              subscript_list:dimension;
+                               }
+                            };
+                          } .
+
+structure_qualification = { object      := value_reference:object != nnoobject &&
+                                        value_reference:object->\\object.\\object->
+                                        Kind == kdeclaration_id &&
+                                        value_reference:object->\\object.\\object->
+                                        declaration_id.fields != NoTree ?
+                               IdentifyField (ident, value_reference:object->
+                               \\object.\\object->declaration_id.fields) : nnoobject;
+
+                            dimension   := no_of_dimensions (object);
+
+                            => { if (value_reference:dimension == 0 &&
+                                     is_entry (value_reference:object))
+                               value_reference = DEP (
+                                  trafo_to_function_ref_of_no_args
+                                     (value_reference), dimension); };
+                          } .
+
+identifier              = { object      := IdentifyVar (ident, env);
+                            dimension   := no_of_dimensions (object);
+                            CHECK object != nnoobject ||
+                                  is_subscripted && is_builtin (ident) => {
+                               tTree e = get_ext_procedure (env);
+                               object = mobject_implicit (SELF, ident, rfalse,
+                                                          NoTree);
+                               if (is_subscripted)
+                                  object->object_implicit.Attribute = k_entry;
+                               if (e) ExtendEnv (object, e->procedure.\\env);
+                            };
+                          } .
+
+END name_analysis
+.)b
+.lp
+If a name is not declared at the node type identifier then it is declared
+implicitly using the functions mobject_implicit and ExtendEnv.
+At the node types subscription and structure_qualification the F(X) problem is
+solved. Depending on the specific case the functions
+.i trafo_to_function_ref
+or
+.i trafo_to_builtin_ref
+are called which modify the tree by replacing nodes of the types subscription or
+identifier by nodes of type function_reference or builtin_function_reference.
+.uh "How to Improve the Use of Attribute Grammars"
+.lp
+What is needed in order to increase the dissemination of attribute grammars in
+industry? In my humble opinion the following could be improved:
+.ip -
+more education in compiler construction with emphasis on practical application
+.ip -
+simple and practical tools for attribute grammars
+.ip -
+education about the practical use of attribute grammars
+.ip -
+tutorials, user's guides, and other documentation that present the matter in a 
+didactic style and which are easy to understand
+.ip -
+simple examples
+.ip -
+knowledge about what attribute grammars can do and what they can not do
+.ip -
+knowledge about the right combination of attribute grammar tools and other tools

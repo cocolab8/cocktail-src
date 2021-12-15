@@ -1,0 +1,64 @@
+(* $Id: estra.mi,v 4.0 1993/08/26 16:06:46 grosch rel $ *)
+
+MODULE	estra;
+
+FROM ArgCheck	IMPORT	CheckArgs, TEST;
+FROM CodeM2	IMPORT	MakeCodeM2;
+FROM Errors	IMPORT	ErrorTable, SaveProc, WriteProc,
+				InError, BeginErrors, CloseErrors;
+FROM Info	IMPORT	SaveInfo, WriteInfo;
+FROM IO		IMPORT	StdOutput, CloseIO;
+FROM Match	IMPORT	MakeTables;
+FROM Parser	IMPORT	Parser, CloseParser;
+FROM Path	IMPORT	InsertPath;
+FROM Semantics	IMPORT	Semantic, Correct;
+FROM rSystem	IMPORT	rExit;
+FROM Test	IMPORT	WriteTest;
+
+(* ESTRA_ *)
+FROM ArgCheck	IMPORT	TREE, GRAM;
+FROM Grammar	IMPORT	WriteGrammar;
+FROM Parser	IMPORT	AST;
+FROM Test	IMPORT	WriteStepTime;
+FROM Tree	IMPORT	WriteTree;
+(* _ESTRA *)
+
+VAR
+  errors : INTEGER;
+
+BEGIN
+  SaveProc := SaveInfo;
+  WriteProc := WriteInfo;
+  InsertPath (ErrorTable);
+  BeginErrors;
+  CheckArgs;
+  (* ESTRA_ *) WriteStepTime ('initialize'); (* _ESTRA *)
+  errors := Parser (); CloseParser;
+  (* ESTRA_ *) WriteStepTime ('Parser'); (* _ESTRA *)
+  Semantic;
+  (* ESTRA_ *) WriteStepTime ('Semantics'); (* _ESTRA *)
+  IF Correct THEN
+    MakeTables;
+    (* ESTRA_ *) WriteStepTime ('MakeTables'); (* _ESTRA *)
+    MakeCodeM2;
+    (* ESTRA_ *) WriteStepTime ('MakeCodeM2'); (* _ESTRA *)
+  END;
+  CloseErrors;
+
+  (* ESTRA_ *)
+  IF TREE THEN WriteTree (StdOutput, AST); END;
+  IF GRAM THEN WriteGrammar (StdOutput); END;
+  (* _ESTRA *)
+
+  IF TEST THEN
+    WriteTest;
+  END;
+
+  CloseIO;
+
+  IF InError THEN
+    rExit (1);
+  ELSE
+    rExit (0);
+  END;
+END estra.

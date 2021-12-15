@@ -1,0 +1,2116 @@
+(* $Id: LRk.mi,v 1.9 2008/08/25 08:53:40 grosch rel $ *)
+
+(*
+ * $Log: LRk.mi,v $
+ * Revision 1.9  2008/08/25 08:53:40  grosch
+ * fixed some calls of MakeArray and ExtendArray for 64 bit platforms
+ *
+ * Revision 1.8  2006/07/21 17:09:36  grosch
+ * fixed problem with computation order at LATreePtr^ [GetLATree (lItem)]
+ * where GetLATree calls ExtendArray and changes the value of LATreePtr
+ *
+ * Revision 1.7  2005/05/23 13:07:32  grosch
+ * fixed bug (limitation) in LALR (2) analysis
+ *
+ * Revision 1.6  2001/12/17 11:21:59  grosch
+ * fixed bug in procedure CompLookConstr
+ *
+ * Revision 1.5  2000/08/09 15:58:05  grosch
+ * fixed bug at Make/ReleaseArray regarding modification of FirstSize
+ *
+ * Revision 1.4  1999/06/03 07:57:54  grosch
+ * added checks for: too many states
+ *
+ * Revision 1.3  1998/04/21 13:00:41  grosch
+ * truncation of file and module names to 8.3 format
+ * introduced procedure GetLATreeIndex
+ * several bug fixes
+ *
+ * Revision 1.2  1995/11/07  09:22:48  grosch
+ * major redesign for handling of LALR(2) grammars
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Dez. 1995 *)
+
+IMPLEMENTATION MODULE LRk;
+
+FROM SYSTEM	IMPORT TSIZE, ADR, ADDRESS;
+FROM General	IMPORT Min, Max;
+FROM rMemory	IMPORT Alloc, Free;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+FROM IO		IMPORT StdOutput, tFile;
+FROM StdIO	IMPORT WriteN, WriteS, WriteI, WriteNl, WriteB;
+FROM Idents	IMPORT WriteIdent;
+(* FROM Sort	IMPORT Sort; *)
+FROM Position	IMPORT NoPosition;
+FROM Errors	IMPORT Message, MessageI, Short, Long, Warning, Fatal;
+FROM Relation	IMPORT IsRelated;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, AssignEmpty	,
+   IsElement	, Include	, Exclude	, Extract	,
+   Union	, Intersection	, IsEmpty	, Assign	,
+   AssignElmt	, Select	, Card		, Complement	,
+   IsSubset	, Difference	, Minimum	, Maximum	,
+   Size		, WriteSet	;
+
+FROM Tree	IMPORT
+   tTree	, ToRulePtr	, ToSymbolPtr	, Epsilon	,
+   IsType	, FirstNonterm	, LastNonterm	, LastTerm	,
+   Rule		, tpSet		, Options	, Nullable	,
+   LS		;
+
+FROM Semantic	IMPORT
+   WriteSymSet	, TermCount	, NontermCount	, RootCount	;
+
+FROM LR1	IMPORT
+   tStateRange	, StatePtr	, ItemPtr	, ItemCount	,
+   GetLookahead	, SeqFirst	, KernelItemPtr	, AllocLookahead,
+   ToItemListPtr, ItemListPtr	, KernelItemCount;
+
+IMPORT Tree;
+
+CONST
+   Infinite	= MAX (SHORTCARD);
+
+TYPE
+   tLAKNT	= RECORD
+		     Look1	: POINTER TO ARRAY [2..MaxK] OF tpSet;
+		     N1		: POINTER TO ARRAY [2..MaxK] OF SHORTCARD;
+		     HasEpsilon	: BITSET;
+		     Look	: tNode;
+		     N		: POINTER TO ARRAY [2..MaxK] OF SHORTCARD;
+		  END;
+
+VAR
+   Look1Size	: LONGINT;
+   Look1SizeSet	: LONGINT;
+   IsInit	: BOOLEAN;
+   FirstPtr	: POINTER TO ARRAY [0..100000] OF tLAKNT;
+   FirstSize	: LONGINT;
+   BusyItemPtr	: POINTER TO ARRAY [0..100000] OF CARDINAL;
+   BusyItemSize	: LONGINT;
+   BusyItemCount: LONGINT;
+   AllReads, AllReduces, Reduces, TempSet, ConflictSet, AllTokens	: tSet;
+
+   StateStackPtr: ARRAY [2..MaxK] OF POINTER TO ARRAY [0..1000000] OF tStateRange;
+   ItemStackPtr	: ARRAY [2..MaxK] OF POINTER TO ARRAY [0..1000000] OF CARDINAL;
+   ItemStackSize: ARRAY [2..MaxK] OF LONGINT;
+   ItemStackTop	: ARRAY [2..MaxK] OF SHORTCARD;
+   StackPtr	: ARRAY [2..MaxK] OF POINTER TO ARRAY [0..1000000] OF SHORTCARD;
+   StackTop	: ARRAY [2..MaxK] OF SHORTCARD;
+   Constraint	: ARRAY [0..MaxK - 1] OF tSet;
+
+   ConstrSize		: CARDINAL;
+   PrevLATreeCount	: LONGINT;
+   CanClear		,
+   UnConstrained	: BOOLEAN;
+   LATreeSet		: tSet;
+
+   LAKCount		,
+   FirstCount		,
+   NodeCount		,
+   N1Count		,
+   NCount		,
+   Look1Count		,
+   Look1SetCount	,
+   ArrayCount		,
+   TokenCount		,
+   LKCount		,
+   NTCount		,
+   LTCount		,
+   FrontCount		,
+   UncompressedCount	,
+   CompressedCount	,
+   LKTreeCount		,
+   NTTreeCount		,
+   LTTreeCount		: CARDINAL;
+
+PROCEDURE CompLook (State, Item, Position, k: CARDINAL; VAR LASet: tSet);
+   VAR
+      State2, size		: LONGINT;
+      Item2, A, KernelItem, j	: CARDINAL;
+      Depth, PrevTop, i		: SHORTCARD;
+      Pred			: tStateRange;
+      HasEpsilon		: BITSET;
+      save			: BOOLEAN;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 WITH ItemPtr^ [Item] DO
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+(*
+WriteS ("Look 1"); WriteI (State, 5); WriteI (Item, 6); WriteI (Position, 6); WriteI (k, 5);
+WriteS (" "); PrintItem (StdOutput, Item); WriteNl;
+*)
+	       IF Position <= Length THEN		(* read item	*)
+		  HasEpsilon := {};
+		  CompLookRule (ToRulePtr^ [Rule], Position, k, 0, HasEpsilon, LASet);
+		  FOR j := 0 TO k - 1 DO
+		     IF j IN HasEpsilon THEN
+			CompLook (State, Item, Infinite, k - j, LASet);
+		     END;
+		  END;
+	       ELSIF Rule <= RootCount THEN		(* start rule	*)
+		  AssignEmpty (TempSet);
+		  Complement (TempSet);
+		  Exclude (TempSet, Epsilon);
+		  Union (LASet, TempSet);
+	       ELSE					(* reduce item	*)
+		  IF k = 1 THEN
+		     GetLookahead (State, Item, TempSet);
+		     IF NOT UnConstrained THEN
+			Intersection (TempSet, Constraint [ConstrSize - 1]);
+		     END;
+		     Union (LASet, TempSet);
+		  ELSE
+		     A := LHS^.Nonterminal.Index;
+		     IF Dot = 0 THEN			(* Closure	*)
+			i := BusyItemCount;
+			WHILE BusyItemPtr^ [i] # 0 DO
+			   IF BusyItemPtr^ [i] = Item THEN RETURN; END;
+			   DEC (i);
+			END;
+			INC (BusyItemCount);
+			IF BusyItemCount = BusyItemSize THEN
+			   ExtendArray (BusyItemPtr, BusyItemSize, TSIZE (CARDINAL));
+			   CheckMemory (BusyItemPtr, State);
+(* MessageI ("extend BusyItemPtr", Warning, NoPosition, Long, ADR (BusyItemSize)); *)
+			END;
+			BusyItemPtr^ [BusyItemCount] := Item;
+			FOR Item2 := Kernel TO Kernel + KernelSize + ClosureSize DO
+			   WITH ItemPtr^ [Item2] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 IF (Dot < Length) AND (A = ElmtsPtr^ [Dot + 1]) THEN
+				    CompLook (State, Item2, Dot + 2, k, LASet);
+				 END;
+			      END;
+			   END;
+			END;
+			DEC (BusyItemCount);
+		     ELSE				(* Kernel	*)
+			WITH LAKPtr^ [Item - Kernel + KernelInfo] DO
+			   IF NOT UnConstrained THEN
+			      GetLookahead (State, Item, TempSet);
+			      Intersection (TempSet, Constraint [ConstrSize - k]);
+			   END;
+			   IF UnConstrained OR NOT IsEmpty (TempSet) THEN
+			      IF LAK = NIL THEN
+				 LAK := Alloc (TSIZE (tLAK)); INC (LAKCount);
+				 WITH LAK^ DO
+				    MakeArray   (Look1, Look1SizeSet, TSIZE (tpSet));
+				    CheckMemory (Look1, State); INC (Look1Count);
+				    MakeArray   (N1, Look1Size, TSIZE (SHORTCARD));
+				    CheckMemory (N1, State); INC (N1Count);
+				    FOR i := 2 TO LimitK DO N1^ [i] := 0; END;
+				    N := NIL;
+				 END;
+			      END;
+			      WITH LAK^ DO
+				 save := UnConstrained; UnConstrained := TRUE;
+				 PrevTop := ItemStackTop [k];
+				 IF N1^ [k] = 0 THEN
+				    Look1^ [k] := AllocLookahead ();
+				    MakeSet (Look1^ [k]^, Epsilon);
+				    IF Size (Look1^ [k]^) = 0 THEN
+				       MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (State));
+				    END;
+				    INC (Look1SetCount);
+				    INC (ItemStackTop [k]);	(* Digraph *)
+				    Depth := ItemStackTop [k];
+				    IF Depth >= CARDINAL (ItemStackSize [k]) THEN
+				       size := ItemStackSize [k];
+				       ExtendArray (StateStackPtr [k], size, TSIZE (tStateRange));
+				       CheckMemory (StateStackPtr [k], State);
+				       ExtendArray (ItemStackPtr  [k], ItemStackSize [k], TSIZE (CARDINAL));
+				       CheckMemory (ItemStackPtr  [k], State);
+(* MessageI ("extend ItemStackPtr", Warning, NoPosition, Long, ADR (ItemStackSize [k])); *)
+				    END;
+				    ItemStackPtr  [k]^ [Depth] := Item;
+				    StateStackPtr [k]^ [Depth] := State;
+				    N1^ [k] := Depth;
+				    WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+				       INC (BusyItemCount);
+				       IF BusyItemCount = BusyItemSize THEN
+					  ExtendArray (BusyItemPtr, BusyItemSize, TSIZE (CARDINAL));
+					  CheckMemory (BusyItemPtr, State);
+(* MessageI ("extend BusyItemPtr", Warning, NoPosition, Long, ADR (BusyItemSize)); *)
+				       END;
+				       BusyItemPtr^ [BusyItemCount] := 0;
+				       FOR Pred := 1 TO PredCount DO
+					  State2 := PredPtr^ [Pred];
+					  WITH StatePtr^ [State2] DO
+					     FOR Item2 := Kernel TO Kernel + KernelSize + ClosureSize DO
+						WITH ItemPtr^ [Item2] DO
+						   WITH ToRulePtr^ [Rule]^.Rule DO
+						      IF (Dot < Length) AND (A = ElmtsPtr^ [Dot + 1]) THEN
+							 CompLook (State2, Item2, Dot + 2, k, Look1^ [k]^);
+						      END;
+						   END;
+						END;
+					     END;
+					  END;
+				       END;
+				       DEC (BusyItemCount);
+				    END;
+				    IF N1^ [k] = Depth THEN
+				       LOOP
+					  Item2  := ItemStackPtr  [k]^ [ItemStackTop [k]];
+					  State2 := StateStackPtr [k]^ [ItemStackTop [k]];
+					  DEC (ItemStackTop [k]);
+					  WITH StatePtr^ [State2] DO
+					     KernelItem := Item2 - Kernel + KernelInfo;
+					     LAKPtr^ [KernelItem].LAK^.N1^ [k] := Infinite;
+					  END;
+					  IF Item2 = Item THEN EXIT; END;
+					  Assign (LAKPtr^ [KernelItem].LAK^.Look1^ [k]^, Look1^ [k]^);
+				       END;
+				    END;
+				 ELSE
+				 END;
+				 IF PrevTop > 0 THEN
+				    Item2  := ItemStackPtr  [k]^ [PrevTop];
+				    State2 := StateStackPtr [k]^ [PrevTop];
+				    WITH StatePtr^ [State2] DO
+				       KernelItem := Item2 - Kernel + KernelInfo;
+				       LAKPtr^ [KernelItem].LAK^.N1^ [k] := Min
+				       (LAKPtr^ [KernelItem].LAK^.N1^ [k], N1^ [k]);
+				    END;
+				 END;
+				 UnConstrained := save;
+				 Union (LASet, Look1^ [k]^);
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END CompLook;
+
+PROCEDURE CompLookRule (rule: tTree; Position, k, len: CARDINAL; VAR pHasEpsilon: BITSET; VAR LASet: tSet);
+   VAR
+      x, j	: CARDINAL;
+      save	: BOOLEAN;
+   BEGIN
+      WITH rule^.Rule DO
+      LOOP LOOP
+(*
+WriteS ("LookR 1"); WriteI (Position, 6); WriteI (k, 5);
+WriteS (" "); PrintRule (StdOutput, rule); WriteNl;
+*)
+	 IF Position <= Length THEN
+	    x := ElmtsPtr^ [Position];
+	    IF x < Epsilon THEN				(* terminal	*)
+	       IF UnConstrained OR IsElement (x, Constraint [ConstrSize - k]) THEN
+		  IF k = 1 THEN
+		     Include (LASet, x);
+		  ELSE
+		     IF x # 0 THEN
+		     (* CompLookRule (rule, Position + 1, k - 1, len + 1, pHasEpsilon, LASet); *)
+			INC (Position); DEC (k); INC (len); EXIT;
+		     ELSE
+		     (* CompLookRule (rule, Position, k - 1, len + 1, pHasEpsilon, LASet); *)
+			DEC (k); INC (len); EXIT;
+		     END;
+		  END;
+	       END;
+	    ELSE					(* nonterminal	*)
+	       IF k = 1 THEN
+		  SeqFirst (Index, Position, LASet);
+		  IF IsElement (Epsilon, LASet) THEN
+		     Exclude (LASet, Epsilon);
+		     INCL (pHasEpsilon, len);
+		  END;
+	       ELSE
+		  WITH ToSymbolPtr^ [x]^.Nonterminal DO
+		     IF NOT UnConstrained THEN
+			Assign (TempSet, Constraint [ConstrSize - k]);
+			Intersection (TempSet, First);
+		     END;
+		     IF UnConstrained OR NOT IsEmpty (TempSet) THEN
+			WITH FirstPtr^ [x - FirstNonterm] DO
+			   save := UnConstrained; UnConstrained := TRUE;
+			   CompLookNonterm (x, k);
+			   UnConstrained := save;
+			   Union (LASet, Look1^ [k]^);
+			   FOR j := 1 TO k - 1 DO
+			      IF j IN HasEpsilon THEN
+				 CompLookRule (rule, Position + 1, k - j, len + j, pHasEpsilon, LASet);
+			      END;
+			   END;
+			END;
+		     END;
+		     IF Nullable IN Properties THEN
+			(* CompLookRule (rule, Position + 1, k, len, pHasEpsilon, LASet); *)
+			INC (Position); EXIT;
+		     END;
+		  END;
+	       END;
+	    END;
+	 ELSIF Index <= RootCount THEN			(* start rule	*)
+   Message ("LRk internal problem 2: Rule <= RootCount", Warning, NoPosition);
+	 ELSE
+	    INCL (pHasEpsilon, len);
+	 END;
+      RETURN;
+      END; END;
+      END;
+   END CompLookRule;
+
+PROCEDURE CompLookNonterm (x, k: CARDINAL);
+   VAR
+      y, z, Depth	: SHORTCARD;
+      rule		: tTree;
+      Position, i, j	: CARDINAL;
+   BEGIN						(* Digraph *)
+      WITH ToSymbolPtr^ [x]^.Nonterminal DO
+	 WITH FirstPtr^ [x - FirstNonterm] DO
+	    IF N1 = NIL THEN
+	       MakeArray   (Look1, Look1SizeSet, TSIZE (tpSet));
+	       CheckMemory (Look1, 0); INC (Look1Count);
+	       HasEpsilon := {};
+	       MakeArray   (N1, Look1Size, TSIZE (SHORTCARD));
+	       CheckMemory (N1, 0); INC (N1Count);
+	       FOR i := 2 TO LimitK DO N1^ [i] := 0; END;
+	    END;
+	    IF k = 1 THEN
+	       IF Nullable IN Properties THEN INCL (HasEpsilon, 0); END;
+	       RETURN;
+	    END;
+	    IF N1^ [k] = 0 THEN
+(*
+WriteS ("NT 1 START	"); WriteIdent (StdOutput, Name);
+WriteI (k, 5); WriteNl;
+*)
+	       Look1^ [k] := AllocLookahead ();
+	       MakeSet (Look1^ [k]^, Epsilon);
+	       IF Size (Look1^ [k]^) = 0 THEN
+		  Message ("out of memory", Fatal, NoPosition);
+	       END;
+	       INC (Look1SetCount);
+	       INC (StackTop [k]);
+	       Depth := StackTop [k];
+	       StackPtr [k]^ [Depth] := x;
+	       N1^ [k] := Depth;
+
+	       rule := Rules;	(* pass 1: compute epsilon on level k *)
+	       WHILE IsType (rule, Tree.Rule) DO
+		  WITH rule^.Rule DO
+		     Position := 1;
+		     LOOP
+			IF Position > Length THEN
+			   IF Index <= RootCount THEN
+   Message ("LRk internal problem 3: Rule <= RootCount", Warning, NoPosition);
+			   ELSE
+			      INCL (HasEpsilon, 0); EXIT;
+			   END;
+			END;
+			y := ElmtsPtr^ [Position];
+			IF y < Epsilon THEN		(* terminal	*)
+			   CompLookRule (rule, Position + 1, k - 1, 1, HasEpsilon, Look1^ [k]^);
+			   EXIT;
+			ELSE				(* nonterminal	*)
+			   CompLookNonterm (y, k - 1);
+			   FOR j := 1 TO k - 2 DO
+			      IF j IN FirstPtr^ [y - FirstNonterm].HasEpsilon THEN
+				 CompLookRule (rule, Position + 1, k - j, j, HasEpsilon, Look1^ [k]^);
+			      END;
+			   END;
+			   IF 0 IN FirstPtr^ [y - FirstNonterm].HasEpsilon THEN
+			      INC (Position);
+			   ELSE
+			      EXIT;
+			   END;
+			END;
+		     END;
+		     rule := Next;
+		  END;
+	       END;
+
+	       rule := Rules;	(* pass 2: compute lookahead on level k *)
+	       WHILE IsType (rule, Tree.Rule) DO
+		  WITH rule^.Rule DO
+		     Position := 1;
+		     LOOP
+			IF Position > Length THEN
+			   IF Index <= RootCount THEN
+   Message ("LRk internal problem 4: Rule <= RootCount", Warning, NoPosition);
+			   ELSE
+			      EXIT;
+			   END;
+			END;
+			y := ElmtsPtr^ [Position];
+			IF y < Epsilon THEN		(* terminal	*)
+			   EXIT;
+			ELSE				(* nonterminal	*)
+			   CompLookNonterm (y, k);
+			   N1^ [k] := Min (N1^ [k], FirstPtr^ [y - FirstNonterm].N1^ [k]);
+			   Union (Look1^ [k]^, FirstPtr^ [y - FirstNonterm].Look1^ [k]^);
+			   FOR j := 1 TO k - 1 DO
+			      IF j IN FirstPtr^ [y - FirstNonterm].HasEpsilon THEN
+				 CompLookRule (rule, Position + 1, k - j, j, HasEpsilon, Look1^ [k]^);
+			      END;
+			   END;
+			   IF 0 IN FirstPtr^ [y - FirstNonterm].HasEpsilon THEN
+			      INC (Position);
+			   ELSE
+			      EXIT;
+			   END;
+			END;
+		     END;
+		     rule := Next;
+		  END;
+	       END;
+
+	       IF N1^ [k] = Depth THEN
+		  LOOP
+		     y := StackPtr [k]^ [StackTop [k]];
+		     DEC (StackTop [k]);
+		     WITH FirstPtr^ [y - FirstNonterm] DO
+			N1^ [k] := Infinite;
+			IF y = x THEN EXIT; END;
+			rule := ToSymbolPtr^ [y]^.Nonterminal.Rules;
+			WHILE IsType (rule, Tree.Rule) DO
+			   WITH rule^.Rule DO
+			      IF Length > 0 THEN
+				 z := ElmtsPtr^ [1];
+				 IF z > Epsilon THEN	(* nonterminal	*)
+				    Union (Look1^ [k]^, FirstPtr^ [z - FirstNonterm].Look1^ [k]^);
+				    IF Length = 1 THEN
+				       HasEpsilon := HasEpsilon + FirstPtr^ [z - FirstNonterm].HasEpsilon;
+				    ELSE
+				       FOR j := 0 TO k - 1 DO
+					  IF j IN FirstPtr^ [z - FirstNonterm].HasEpsilon THEN
+					     CompLookRule (rule, 2, k - j, j, HasEpsilon, Look1^ [k]^);
+					  END;
+				       END;
+				    END;
+				 END;
+			      END;
+			      rule := Next;
+			   END;
+			END;
+(*
+WriteS ("NT 1	"); WriteI (k, 0); WriteS (" "); WriteIdent (StdOutput, ToSymbolPtr^ [y]^.Nonterminal.Name);
+FOR i := 0 TO MaxK - 1 DO IF i IN HasEpsilon THEN
+WriteS (" "); WriteI (i, 0); WriteS (" ");
+END; END;
+WriteSymSet (StdOutput, Look1^ [k]^); WriteNl;
+*)
+		     END;
+		  END;
+	       END;
+(*
+WriteS ("NT 1	"); WriteI (k, 0); WriteS (" "); WriteIdent (StdOutput, Name);
+FOR i := 0 TO MaxK - 1 DO IF i IN HasEpsilon THEN
+WriteS (" "); WriteI (i, 0); WriteS (" ");
+END; END;
+WriteSymSet (StdOutput, Look1^ [k]^); WriteNl;
+*)
+	    END;
+	 END;
+      END;
+   END CompLookNonterm;
+
+PROCEDURE CompLookConstr (State, Item, Position, k: CARDINAL; VAR Node: tNode);
+   VAR
+      State2, Size		: LONGINT;
+      Item2, A, B, KernelItem	: CARDINAL;
+      Depth, PrevTop, i		: SHORTCARD;
+      Pred			: tStateRange;
+      save, isfirst, shortcut, return	: BOOLEAN;
+
+   PROCEDURE Concat (VAR Node: tNode; k: CARDINAL);
+      VAR i	: CARDINAL;
+      BEGIN
+	 WITH Node DO
+	    IF (Array # NIL) AND (k > 1) THEN
+	       FOR i := 0 TO MaxToken - MinToken DO
+		  IF Array^ [i] # NIL THEN
+		     Concat (Array^ [i]^, k - 1);
+		  END;
+	       END;
+	    END;
+	    IF IsElement (Epsilon, Set) THEN
+	       Exclude (Set, Epsilon);
+	       CompLookConstr (State, Item, Infinite, k, Node);
+	    END;
+	 END;
+      END Concat;
+
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 WITH ItemPtr^ [Item] DO
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+(*
+WriteS ("Look"); WriteI (State, 5); WriteI (Item, 6); WriteI (Position, 6); WriteI (k, 5);
+WriteS (" "); PrintItem (StdOutput, Item); WriteNl;
+*)
+	       IF Position <= Length THEN		(* read item	*)
+		  CompLookRuleConstr (ToRulePtr^ [Rule], Position, k, Node);
+		  Concat (Node, k);
+	       ELSIF Rule <= RootCount THEN		(* start rule	*)
+		  AssignEmpty (TempSet);
+		  Complement (TempSet);
+		  Exclude (TempSet, Epsilon);
+		  IF k = 1 THEN
+		     Union (Node.Set, TempSet);
+		  ELSE
+		     WITH Node DO
+			IF Array = NIL THEN
+			   InitArray (Node);
+			ELSIF Token # NIL THEN
+			   UnCompressTree (Node);
+			END;
+			FOR i := 0 TO MaxToken - MinToken DO
+			   IF Array^ [i] = NIL THEN MakeTree (Array^ [i]); END;
+			   Union (Array^ [i]^.Set, TempSet);
+			   CompLookConstr (State, Item, Position, k - 1, Array^ [i]^);
+			END;
+		     END;
+		  END;
+	       ELSE					(* reduce item	*)
+		  IF k = 1 THEN
+		     GetLookahead (State, Item, TempSet);
+		     IF NOT UnConstrained THEN
+			Intersection (TempSet, Constraint [ConstrSize - 1]);
+		     END;
+		     Union (Node.Set, TempSet);
+		  ELSE
+		     A := LHS^.Nonterminal.Index;
+		     IF Dot = 0 THEN			(* Closure	*)
+
+			i := BusyItemCount;		(* check for cycles *)
+			WHILE BusyItemPtr^ [i] # 0 DO
+			   IF BusyItemPtr^ [i] = Item THEN RETURN; END;
+			   DEC (i);
+			END;
+
+(*
+			IF BusyItemPtr^ [BusyItemCount] = 0 THEN
+			   DEC (A, FirstNonterm);
+			   shortcut := TRUE;
+			   return := TRUE;
+			   FOR Item2 := Kernel TO Kernel + KernelSize DO
+			      WITH ItemPtr^ [Item2] DO
+				 WITH ToRulePtr^ [Rule]^.Rule DO
+				    IF shortcut AND (Dot < Length) THEN
+				       B := ElmtsPtr^ [Dot + 1];
+				       IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+					  WITH ToSymbolPtr^ [B]^.Nonterminal DO
+					     IF NOT UnConstrained THEN
+						Assign (TempSet, PathPtr^ [A - MinPath]^);
+						Intersection (TempSet, Constraint [ConstrSize - k]);
+						IF NOT IsEmpty (TempSet) THEN
+						   shortcut := FALSE;
+						   return := FALSE;
+						END;
+					     ELSIF Minimum (PathPtr^ [A - MinPath]^) # Epsilon THEN
+						shortcut := FALSE;
+						return := FALSE;
+					     END;
+					     IF return AND IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+						return := FALSE;
+					     END;
+					  END;
+				       END;
+				    END;
+				 END;
+			      END;
+			   END;
+
+			   IF return THEN RETURN; END;
+			   IF shortcut THEN
+			      FOR Item2 := Kernel TO Kernel + KernelSize DO
+				 WITH ItemPtr^ [Item2] DO
+				    WITH ToRulePtr^ [Rule]^.Rule DO
+				       IF Dot < Length THEN
+					  B := ElmtsPtr^ [Dot + 1];
+					  IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+					     CompLookConstr (State, Item2, Dot + 2, k, Node);
+					  END;
+				       END;
+				    END;
+				 END;
+			      END;
+			      RETURN;
+			   END;
+			   INC (A, FirstNonterm);
+			END;
+*)
+
+			INC (BusyItemCount);
+			IF BusyItemCount = BusyItemSize THEN
+			   ExtendArray (BusyItemPtr, BusyItemSize, TSIZE (CARDINAL));
+			   CheckMemory (BusyItemPtr, State);
+(* MessageI ("extend BusyItemPtr", Warning, NoPosition, Long, ADR (BusyItemSize)); *)
+			END;
+			BusyItemPtr^ [BusyItemCount] := Item;
+			FOR Item2 := Kernel TO Kernel + KernelSize + ClosureSize DO
+			   WITH ItemPtr^ [Item2] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 IF (Dot < Length) AND (A = ElmtsPtr^ [Dot + 1]) THEN
+				    CompLookConstr (State, Item2, Dot + 2, k, Node);
+				 END;
+			      END;
+			   END;
+			END;
+			DEC (BusyItemCount);
+		     ELSE				(* Kernel	*)
+			WITH LAKPtr^ [Item - Kernel + KernelInfo] DO
+			   IF NOT UnConstrained THEN
+			      GetLookahead (State, Item, TempSet);
+			      Intersection (TempSet, Constraint [ConstrSize - k]);
+			   END;
+			   IF UnConstrained OR NOT IsEmpty (TempSet) THEN
+			      IF LAK = NIL THEN
+				 LAK := Alloc (TSIZE (tLAK)); INC (LAKCount);
+				 WITH LAK^ DO
+				    N1 := NIL;
+				    N := NIL;
+				 END;
+			      END;
+			      WITH LAK^ DO
+				 IF N = NIL THEN
+				    MakeArray   (N, Look1Size, TSIZE (SHORTCARD));
+				    CheckMemory (N, State); INC (NCount);
+				    FOR i := 2 TO LimitK DO N^ [i] := 0; END;
+				    MakeTree (Look);
+				    GetLookahead (State, Item, Look^.Set);
+				    InitArray (Look^);
+				 END;
+				 save := UnConstrained; UnConstrained := TRUE;
+				 PrevTop := ItemStackTop [k];
+				 IF N^ [k] = 0 THEN
+(*
+WriteS ("STORE	"); WriteI (State, 5); WriteI (Item, 7); WriteNl;
+*)
+				    INC (ItemStackTop [k]);	(* Digraph *)
+				    Depth := ItemStackTop [k];
+				    IF Depth >= CARDINAL (ItemStackSize [k]) THEN
+				       Size := ItemStackSize [k];
+				       ExtendArray (StateStackPtr [k], Size, TSIZE (tStateRange));
+				       CheckMemory (StateStackPtr [k], State);
+				       ExtendArray (ItemStackPtr  [k], ItemStackSize [k], TSIZE (CARDINAL));
+				       CheckMemory (ItemStackPtr  [k], State);
+(* MessageI ("extend ItemStackPtr", Warning, NoPosition, Long, ADR (ItemStackSize [k])); *)
+				    END;
+				    ItemStackPtr  [k]^ [Depth] := Item;
+				    StateStackPtr [k]^ [Depth] := State;
+				    N^ [k] := Depth;
+				    WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+				       INC (BusyItemCount);
+				       IF BusyItemCount = BusyItemSize THEN
+					  ExtendArray (BusyItemPtr, BusyItemSize, TSIZE (CARDINAL));
+					  CheckMemory (BusyItemPtr, State);
+(* MessageI ("extend BusyItemPtr", Warning, NoPosition, Long, ADR (BusyItemSize)); *)
+				       END;
+				       BusyItemPtr^ [BusyItemCount] := 0;
+				       FOR Pred := 1 TO PredCount DO
+					  State2 := PredPtr^ [Pred];
+					  WITH StatePtr^ [State2] DO
+					     FOR Item2 := Kernel TO Kernel + KernelSize + ClosureSize DO
+						WITH ItemPtr^ [Item2] DO
+						   WITH ToRulePtr^ [Rule]^.Rule DO
+						      IF (Dot < Length) AND (A = ElmtsPtr^ [Dot + 1]) THEN
+							 CompLookConstr (State2, Item2, Dot + 2, k, Look^);
+						      END;
+						   END;
+						END;
+					     END;
+					  END;
+				       END;
+				       DEC (BusyItemCount);
+				    END;
+				    IF N^ [k] = Depth THEN
+				       CompressTree (Look^);
+				       INC (LKCount, CountTree (Look^));
+				       INC (LKTreeCount);
+				       LOOP
+					  Item2  := ItemStackPtr  [k]^ [ItemStackTop [k]];
+					  State2 := StateStackPtr [k]^ [ItemStackTop [k]];
+					  DEC (ItemStackTop [k]);
+					  WITH StatePtr^ [State2] DO
+					     KernelItem := Item2 - Kernel + KernelInfo;
+					     LAKPtr^ [KernelItem].LAK^.N^ [k] := Infinite;
+					  END;
+					  IF Item2 = Item THEN EXIT; END;
+					  UnionTree (LAKPtr^ [KernelItem].LAK^.Look^, Look^, k);
+					  CompressTree (LAKPtr^ [KernelItem].LAK^.Look^);
+					  INC (LKCount, CountTree (LAKPtr^ [KernelItem].LAK^.Look^));
+					  INC (LKTreeCount);
+				       END;
+				    END;
+				 ELSE
+(*
+WriteS ("REUSE	"); WriteI (State, 5); WriteI (Item, 7); WriteNl;
+*)
+				 END;
+				 IF PrevTop > 0 THEN
+				    Item2  := ItemStackPtr  [k]^ [PrevTop];
+				    State2 := StateStackPtr [k]^ [PrevTop];
+				    WITH StatePtr^ [State2] DO
+				       KernelItem := Item2 - Kernel + KernelInfo;
+				       LAKPtr^ [KernelItem].LAK^.N^ [k] := Min
+				       (LAKPtr^ [KernelItem].LAK^.N^ [k], N^ [k]);
+				    END;
+				 END;
+				 UnConstrained := save;
+				 UnionTree (Node, Look^, k);
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END CompLookConstr;
+
+PROCEDURE CompLookRuleConstr (rule: tTree; Position, k: CARDINAL; VAR Node: tNode);
+
+   PROCEDURE Concat (VAR Node: tNode; k: CARDINAL);
+      VAR i, j		: CARDINAL;
+      BEGIN
+	 WITH Node DO
+	    IF (Array # NIL) AND (k > 1) THEN
+	       IF Token = NIL THEN			(* uncompressed *)
+		  FOR i := 0 TO MaxToken - MinToken DO
+		     IF (Array^ [i] # NIL) AND
+			(UnConstrained OR IsElement (i + MinToken, Constraint [ConstrSize - k])) THEN
+			Concat (Array^ [i]^, k - 1);
+		     END;
+		  END;
+	       ELSE					(* compressed	*)
+		  i := 0;
+		  REPEAT
+		     j := Token^ [i];
+		     IF (UnConstrained OR IsElement (j, Constraint [ConstrSize - k])) THEN
+			Concat (Array^ [i]^, k - 1);
+		     END;
+		     INC (i);
+		  UNTIL j = MaxToken;
+	       END;
+	    END;
+	    IF IsElement (Epsilon, Set) THEN
+	       Exclude (Set, Epsilon);
+	       CompLookRuleConstr (rule, Position + 1, k, Node);
+	    END;
+	 END;
+      END Concat;
+
+   VAR
+      x		: CARDINAL;
+      save	: BOOLEAN;
+      TempTree	: tNode;
+      HasEpsilon: BOOLEAN;
+
+   BEGIN
+      WITH rule^.Rule DO
+	 WITH Node DO
+(*
+WriteS ("LookR"); WriteI (Position, 6); WriteI (k, 5);
+WriteS (" "); PrintRule (StdOutput, rule); WriteNl;
+*)
+	    IF Position <= Length THEN
+	       x := ElmtsPtr^ [Position];
+	       IF x < Epsilon THEN			(* terminal	*)
+		  IF UnConstrained OR IsElement (x, Constraint [ConstrSize - k]) THEN
+		     Include (Set, x);
+		     IF k > 1 THEN
+			IF Array = NIL THEN
+			   InitArray (Node);
+			ELSE
+			   IF Token # NIL THEN UnCompressTree (Node); END;
+			   IF (x < Node.MinToken) OR (Node.MaxToken < x) THEN
+			      ResizeArray (Node);
+			   END;
+			END;
+			IF Array^ [x - MinToken] = NIL THEN MakeTree (Array^ [x - MinToken]); END;
+			IF x # 0 THEN
+			   CompLookRuleConstr (rule, Position + 1, k - 1, Array^ [x - MinToken]^);
+			ELSE
+			   CompLookRuleConstr (rule, Position, k - 1, Array^ [x - MinToken]^);
+			END;
+		     END;
+		  END;
+	       ELSE					(* nonterminal	*)
+		  IF k = 1 THEN
+		     SeqFirst (Index, Position, Set);
+		  ELSE
+		     IF NOT UnConstrained THEN
+			AssignEmpty (TempSet);
+			SeqFirst (Index, Position, TempSet);
+			HasEpsilon := IsElement (Epsilon, TempSet);
+			Intersection (TempSet, Constraint [ConstrSize - k]);
+		     END;
+		     IF UnConstrained OR NOT IsEmpty (TempSet) THEN
+			save := UnConstrained; UnConstrained := TRUE;
+			CompLookNontermConstr (x, k);
+			UnConstrained := save;
+			IF Position = Length THEN
+			   UnionTree (Node, FirstPtr^ [x - FirstNonterm].Look, k);
+			ELSE
+			   MakeSet (TempTree.Set, Epsilon);
+			   TempTree.Array := NIL; TempTree.Token := NIL;
+			   AssignTree (TempTree, FirstPtr^ [x - FirstNonterm].Look, k);
+			   Concat (TempTree, k);
+			   UnionTree (Node, TempTree, k);
+			   ReleaseTree (TempTree);
+			END;
+		     ELSIF HasEpsilon THEN
+			Include (Set, Epsilon);
+		     END;
+		  END;
+	       END;
+	    ELSIF Index <= RootCount THEN		(* start rule	*)
+   Message ("LRk internal problem 6: Rule <= RootCount", Warning, NoPosition);
+	    ELSE
+	       Include (Set, Epsilon);
+	    END;
+	 END;
+      END;
+   END CompLookRuleConstr;
+
+PROCEDURE CompLookNontermConstr (x, k: CARDINAL);
+   VAR
+      y, z, Depth	: SHORTCARD;
+      rule		: tTree;
+      Position, i, j	: CARDINAL;
+      TempTree		: tNode;
+
+   PROCEDURE Concat (VAR Node: tNode; k: CARDINAL);
+      VAR i		: CARDINAL;
+      BEGIN
+	 WITH Node DO
+	    IF (Array # NIL) AND (k > 1) THEN
+	       IF Token = NIL THEN			(* uncompressed *)
+		  FOR i := 0 TO MaxToken - MinToken DO
+		     IF Array^ [i] # NIL THEN
+			Concat (Array^ [i]^, k - 1);
+			WITH Array^ [i]^ DO
+			   IF IsElement (Epsilon, Set) THEN
+			      Exclude (Set, Epsilon);
+			      CompLookRuleConstr (rule, Position + 1, k - 1, Node.Array^ [i]^);
+			   END;
+			END;
+		     END;
+		  END;
+	       ELSE					(* compressed	*)
+		  i := 0;
+		  REPEAT
+		     j := Token^ [i];
+		     Concat (Array^ [i]^, k - 1);
+		     WITH Array^ [i]^ DO
+			IF IsElement (Epsilon, Set) THEN
+			   Exclude (Set, Epsilon);
+			   CompLookRuleConstr (rule, Position + 1, k - 1, Node.Array^ [i]^);
+			END;
+		     END;
+		     INC (i);
+		  UNTIL j = MaxToken;
+	       END;
+	    END;
+	 END;
+      END Concat;
+
+   BEGIN						(* Digraph *)
+      WITH ToSymbolPtr^ [x]^.Nonterminal DO
+	 WITH FirstPtr^ [x - FirstNonterm] DO
+	    IF N = NIL THEN
+	       INC (FirstCount);
+	       MakeSet (Look.Set, Epsilon);
+	       IF Size (Look.Set) = 0 THEN
+		  Message ("out of memory", Fatal, NoPosition);
+	       END;
+	       Assign  (Look.Set, First);
+	       InitArray (Look);
+	       MakeArray   (N, Look1Size, TSIZE (SHORTCARD));
+	       CheckMemory (N, 0); INC (NCount);
+	       FOR i := 2 TO LimitK DO N^ [i] := 0; END;
+	    END;
+	    IF k = 1 THEN RETURN; END;
+	    IF N^ [k] = 0 THEN
+(*
+WriteS ("NT START	"); WriteIdent (StdOutput, Name);
+WriteI (k, 5); WriteNl;
+*)
+	       INC (StackTop [k]);
+	       Depth := StackTop [k];
+	       StackPtr [k]^ [Depth] := x;
+	       N^ [k] := Depth;
+	       MakeSet (TempTree.Set, Epsilon);
+	       TempTree.Array := NIL; TempTree.Token := NIL;
+
+	       rule := Rules;	(* pass 1: compute epsilon on level k *)
+	       WHILE IsType (rule, Tree.Rule) DO
+		  WITH rule^.Rule DO
+		     Position := 1;
+		     LOOP
+			IF Position > Length THEN
+			   IF Index <= RootCount THEN
+   Message ("LRk internal problem 7: Rule <= RootCount", Warning, NoPosition);
+			   ELSE
+			      Include (Look.Set, Epsilon); EXIT;
+			   END;
+			END;
+			y := ElmtsPtr^ [Position];
+			IF y < Epsilon THEN		(* terminal	*)
+			   CompLookRuleConstr (rule, Position, k, Look);
+			   EXIT;
+			ELSIF Position = Length THEN	(* nonterminal	*)
+			   EXIT;
+			ELSE
+			   CompLookNontermConstr (y, k - 1);
+			   AssignTree (TempTree, FirstPtr^ [y - FirstNonterm].Look, k - 1);
+			   Concat (TempTree, k);
+			   IF Nullable IN ToSymbolPtr^ [y]^.Nonterminal.Properties THEN
+			      Exclude (TempTree.Set, Epsilon);
+			      UnionTree (Look, TempTree, k);
+			      INC (Position);
+			   ELSE
+			      UnionTree (Look, TempTree, k);
+			      EXIT;
+			   END;
+			END;
+		     END;
+		     rule := Next;
+		  END;
+	       END;
+
+	       rule := Rules;	(* pass 2: compute lookahead on level k *)
+	       WHILE IsType (rule, Tree.Rule) DO
+		  WITH rule^.Rule DO
+		     Position := 1;
+		     LOOP
+			IF Position > Length THEN
+			   IF Index <= RootCount THEN
+   Message ("LRk internal problem 8: Rule <= RootCount", Warning, NoPosition);
+			   ELSE
+			      EXIT;
+			   END;
+			END;
+			y := ElmtsPtr^ [Position];
+			IF y < Epsilon THEN		(* terminal	*)
+			   EXIT;
+			ELSE				(* nonterminal	*)
+			   CompLookNontermConstr (y, k);
+			   N^ [k] := Min (N^ [k], FirstPtr^ [y - FirstNonterm].N^ [k]);
+			   IF Position = Length THEN
+			      UnionTree (Look, FirstPtr^ [y - FirstNonterm].Look, k);
+			      EXIT;
+			   ELSE
+			      AssignTree (TempTree, FirstPtr^ [y - FirstNonterm].Look, k);
+			      Concat (TempTree, k);
+			      IF Nullable IN ToSymbolPtr^ [y]^.Nonterminal.Properties THEN
+				 Exclude (TempTree.Set, Epsilon);
+				 UnionTree (Look, TempTree, k);
+				 INC (Position);
+			      ELSE
+				 UnionTree (Look, TempTree, k);
+				 EXIT;
+			      END;
+			   END;
+			END;
+		     END;
+		     rule := Next;
+		  END;
+	       END;
+
+	       IF N^ [k] = Depth THEN
+		  CompressTree (Look);
+		  LOOP
+		     y := StackPtr [k]^ [StackTop [k]];
+		     DEC (StackTop [k]);
+		     WITH FirstPtr^ [y - FirstNonterm] DO
+			N^ [k] := Infinite;
+			IF y = x THEN EXIT; END;
+			rule := ToSymbolPtr^ [y]^.Nonterminal.Rules;
+			WHILE IsType (rule, Tree.Rule) DO
+			   WITH rule^.Rule DO
+			      Position := 1;
+			      LOOP
+				 IF Position > Length THEN
+				    IF Index <= RootCount THEN
+   Message ("LRk internal problem 9: Rule <= RootCount", Warning, NoPosition);
+				    ELSE
+				       EXIT;
+				    END;
+				 END;
+				 z := ElmtsPtr^ [Position];
+				 IF z < Epsilon THEN	(* terminal	*)
+				    EXIT;
+				 ELSE			(* nonterminal	*)
+				    IF Position = Length THEN
+				       UnionTree (Look, FirstPtr^ [z - FirstNonterm].Look, k);
+				       EXIT;
+				    ELSE
+				       AssignTree (TempTree, FirstPtr^ [z - FirstNonterm].Look, k);
+				       Concat (TempTree, k);
+				       IF Nullable IN ToSymbolPtr^ [z]^.Nonterminal.Properties THEN
+					  Exclude (TempTree.Set, Epsilon);
+					  UnionTree (Look, TempTree, k);
+					  INC (Position);
+				       ELSE
+					  UnionTree (Look, TempTree, k);
+					  EXIT;
+				       END;
+				    END;
+				 END;
+			      END;
+			      rule := Next;
+			   END;
+			END;
+			CompressTree (Look);
+(*
+WriteS ("NT	"); WriteIdent (StdOutput, ToSymbolPtr^ [y]^.Nonterminal.Name); WriteI (k, 5); WriteNl;
+PrintNode (Look);
+*)
+		     END;
+		  END;
+	       END;
+	       ReleaseTree (TempTree);
+(*
+WriteS ("NT	"); WriteIdent (StdOutput, Name); WriteI (k, 5); WriteNl;
+PrintNode (Look);
+*)
+	    END;
+	 END;
+      END;
+   END CompLookNontermConstr;
+
+PROCEDURE CheckLRk (State, x: CARDINAL; ConflictSet1: tSet; VAR ElseItem: CARDINAL): INTEGER;
+   VAR
+      iItem		: SHORTINT;
+      i			: LONGINT;
+      j			: SHORTCARD;
+      k			: INTEGER;
+      n, ElseCard, t	: CARDINAL;
+      AllReadK, AllReduceK, LookAhead	: tNode;
+      lFirstSize	: LONGINT;
+   BEGIN
+      InitLRk;
+      lFirstSize := FirstSize;
+   (* IF LKCount > 400000 THEN ReleaseKernel; LKCount := 0; END; *)
+      PrevLATreeCount := LATreeCount;
+      CanClear := TRUE;
+      FOR k := 2 TO SHORTINT (LimitK) DO
+	 IF StackPtr [k] = NIL THEN
+	    MakeArray   (StackPtr [k], lFirstSize, TSIZE (SHORTCARD));
+	    CheckMemory (StackPtr [k], 0);
+	 END;
+	 ConstrSize := k;
+	 AssignEmpty (ConflictSet);
+	 IF NOT IsElement (ORD ('E'), Options) THEN
+	    Assign (Constraint [0], ConflictSet1);
+	    Assign (Constraint [k - 1], AllTokens);
+	    AssignEmpty (AllReads);
+	    AssignEmpty (AllReduces);
+	    ElseCard := 0;
+	    iItem := ToItemListPtr^ [x].First;
+	    WHILE iItem >= 0 DO
+	       WITH ItemListPtr^ [iItem] DO
+		  WITH ItemPtr^ [lItem] DO
+		     WITH ToRulePtr^ [Rule]^.Rule DO
+(*
+WriteS ("LR 1	"); WriteI (State, 5); WriteI (lItem, 7);
+WriteS (" "); WriteIdent (StdOutput, ToSymbolPtr^ [x]^.Terminal.Name);
+WriteS ("	"); PrintItem (StdOutput, lItem);
+WriteNl;
+*)
+			IF Dot < Length THEN
+			   UnConstrained := FALSE;
+			   t := GetLATree (lItem);
+			   WITH LATreePtr^ [t] DO
+			      IF Look1 = NIL THEN
+				 MakeArray   (Look1, Look1SizeSet, TSIZE (tpSet));
+				 CheckMemory (Look1, State); INC (Look1Count);
+				 FOR j := 2 TO LimitK DO Look1^ [j] := NIL; END;
+			      END;
+			      IF Look1^ [k] = NIL THEN
+				 Look1^ [k] := AllocLookahead ();
+				 MakeSet (Look1^ [k]^, Epsilon);
+				 IF Size (Look1^ [k]^) = 0 THEN
+				    MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (State));
+				 END;
+				 INC (Look1SetCount);
+			      END;
+			      CompLook (State, lItem, Dot + 2, k - 1, Look1^ [k]^);
+			      Union (AllReads, Look1^ [k]^);
+(*
+WriteSymSet (StdOutput, Look1^ [k]^); WriteNl;
+*)
+			   END;
+			ELSE
+			   UnConstrained := Dot > 0;
+			   AssignEmpty (Reduces);
+			   CompLook (State, lItem, Dot + 1, k, Reduces);
+			   Assign (TempSet, AllReduces);
+			   Intersection (TempSet, Reduces);
+			   Union (ConflictSet, TempSet);
+			   Union (AllReduces, Reduces);
+			   n := Card (Reduces);
+			   IF n >= ElseCard THEN
+			      ElseCard := n; ElseItem := lItem;
+			   END;
+(*
+WriteSymSet (StdOutput, Reduces); WriteNl;
+*)
+			   IF Dot = 0 THEN
+			      t := GetLATree (lItem);
+			      WITH LATreePtr^ [t] DO
+				 IF Look1 = NIL THEN
+				    MakeArray   (Look1, Look1SizeSet, TSIZE (tpSet));
+				    CheckMemory (Look1, State); INC (Look1Count);
+				    FOR j := 2 TO LimitK DO Look1^ [j] := NIL; END;
+				 END;
+				 IF Look1^ [k] = NIL THEN
+				    Look1^ [k] := AllocLookahead ();
+				    MakeSet (Look1^ [k]^, Epsilon);
+				    IF Size (Look1^ [k]^) = 0 THEN
+				       MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (State));
+				    END;
+				    INC (Look1SetCount);
+				 END;
+				 Union (Look1^ [k]^, Reduces);
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+		  iItem := Next;
+	       END;
+	    END;
+	    Assign (TempSet, AllReduces);
+	    Intersection (TempSet, AllReads);
+	    Union (ConflictSet, TempSet);
+	    n := Card (AllReads);
+	    IF n >= ElseCard THEN ElseItem := 0; END;
+	    IF IsEmpty (ConflictSet) THEN
+(*
+WriteS ("HURRA 1	"); WriteIdent (StdOutput, ToSymbolPtr^ [x]^.Terminal.Name);
+WriteI (State, 5); WriteI (k, 5); WriteNl;
+*)
+	       RETURN k;
+ELSE
+(*
+WriteS ("CONFLICTSET 1	"); WriteIdent (StdOutput, ToSymbolPtr^ [x]^.Terminal.Name);
+WriteI (State, 5); WriteI (k, 5); WriteSymSet (StdOutput, ConflictSet); WriteNl;
+*)
+	    END;
+	 ELSE
+	    Complement (ConflictSet);
+	 END;
+
+	 IF NOT IsElement (ORD ('F'), Options) THEN
+	    AssignElmt (Constraint [0], x);
+	    Assign (Constraint [k - 1], ConflictSet);
+	    Assign (Constraint [k - 1], AllTokens);
+	    AssignEmpty (ConflictSet);
+	    MakeSet (LookAhead	.Set, Epsilon);
+	    LookAhead	.Array := NIL; LookAhead	.Token := NIL;
+	    MakeSet (AllReadK	.Set, Epsilon);
+	    AllReadK	.Array := NIL; AllReadK		.Token := NIL;
+	    MakeSet (AllReduceK	.Set, Epsilon);
+	    AllReduceK	.Array := NIL; AllReduceK	.Token := NIL;
+	    ElseCard := 0;
+	    WITH StatePtr^ [State] DO
+	       iItem := ToItemListPtr^ [x].First;
+	       WHILE iItem >= 0 DO
+		  WITH ItemListPtr^ [iItem] DO
+		     WITH ItemPtr^ [lItem] DO
+			WITH ToRulePtr^ [Rule]^.Rule DO
+(*
+WriteS ("LR	"); WriteI (State, 5); WriteI (lItem, 7); WriteI (k, 5);
+WriteS (" "); WriteIdent (StdOutput, ToSymbolPtr^ [x]^.Terminal.Name);
+WriteS ("	"); PrintItem (StdOutput, lItem);
+WriteNl;
+*)
+			   UnConstrained := FALSE;
+			   IF Dot < Length THEN
+			      t := GetLATree (lItem);
+			      WITH LATreePtr^ [t] DO
+				 IF Node.Array = NIL THEN
+				    MakeSet (Node.Set, Epsilon);
+				    IF Size (Node.Set) = 0 THEN
+				       MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (State));
+				    END;
+				    Include (Node.Set, x);
+				    InitArray (Node);
+				 END;
+				 IF Node.Array^ [0] = NIL THEN MakeTree (Node.Array^ [0]); END;
+				 CompLookConstr (State, lItem, Dot + 2, k - 1, Node.Array^ [0]^);
+(*
+WriteS ("CLCs	"); WriteI (State, 5); WriteI (lItem, 7);
+WriteS (" "); PrintItem (StdOutput, lItem); WriteNl;
+PrintNode (Node);
+*)
+				 UnionTree (AllReadK, Node, k);
+			      END;
+			   ELSE
+			      AssignEmptyTree (LookAhead);
+			      Include (LookAhead.Set, x);
+			      InitArray (LookAhead);
+			      CompLookConstr (State, lItem, Dot + 1, k, LookAhead);
+			      CompareTree (AllReduceK, LookAhead, k);
+			      UnionTree (AllReduceK, LookAhead, k);
+			      IF LookAhead.Array # NIL THEN
+				 n := Card (LookAhead.Array^ [x - LookAhead.MinToken]^.Set);
+				 IF n >= ElseCard THEN
+				    ElseCard := n; ElseItem := lItem;
+				 END;
+			      END;
+			      IF Dot > 0 THEN
+(*
+WriteS ("CLCr	"); WriteI (State, 5); WriteI (lItem, 7);
+WriteS (" "); PrintItem (StdOutput, lItem); WriteNl;
+PrintNode (LookAhead);
+*)
+			      ELSE
+(*
+WriteS ("CLCp	"); WriteI (State, 5); WriteI (lItem, 7);
+WriteS (" "); PrintItem (StdOutput, lItem); WriteNl;
+PrintNode (LookAhead);
+*)
+				 t := GetLATree (lItem);
+				 WITH LATreePtr^ [t] DO
+				    IF Node.Array = NIL THEN
+				       MakeSet (Node.Set, Epsilon);
+				       IF Size (Node.Set) = 0 THEN
+					  MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (State));
+				       END;
+				    END;
+				    UnConstrained := TRUE;
+				    UnionTree (Node, LookAhead, k);
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		     iItem := Next;
+		  END;
+	       END;
+	    END;
+	    CompareTree (AllReadK, AllReduceK, k);
+	    IF AllReadK.Array # NIL THEN
+	       n := Card (AllReadK.Array^ [x - AllReadK.MinToken]^.Set);
+	       IF n >= ElseCard THEN ElseItem := 0; END;
+	    END;
+	    ReleaseTree (LookAhead	);
+	    ReleaseTree (AllReadK	);
+	    ReleaseTree (AllReduceK	);
+	    IF IsEmpty (ConflictSet) THEN
+	       IF CanClear THEN
+		  FOR i := PrevLATreeCount + 1 TO LATreeCount DO
+		     CompressTree (LATreePtr^ [i].Node);
+		  END;
+	       END;
+(*
+WriteS ("HURRA	"); WriteIdent (StdOutput, ToSymbolPtr^ [x]^.Terminal.Name);
+WriteI (State, 5); WriteI (k, 5); WriteNl;
+*)
+	       RETURN - k;
+	    END;
+	    (* Assign (Constraint [k - 1], ConflictSet); *)
+	 END;
+      END;
+
+      WHILE CanClear AND (LATreeCount > PrevLATreeCount) DO
+	 WITH LATreePtr^ [LATreeCount] DO
+(*
+WriteS ("CLEAR	"); WriteI (Item, 6); WriteI (LATreeCount, 6); PrintItem (StdOutput, Item); WriteNl;
+*)
+	    IF Look1 # NIL THEN
+	       FOR j := 2 TO LimitK DO
+		  IF Look1^ [j] # NIL THEN
+		  (* ReleaseSet (Look1^ [j]^); DEC (Look1SetCount);
+		     Free (TSIZE (tSet), Look1^ [j]); *)
+		     AssignEmpty (Look1^ [j]^);
+		  END;
+	       END;
+	    (* ReleaseArray (Look1, Look1SizeSet, TSIZE (tpSet));
+	       DEC (Look1Count); *)
+	    END;
+	    IF Node.Array # NIL THEN
+	       ReleaseTree (LATreePtr^ [LATreeCount].Node);
+	    END;
+	    Exclude (LATreeSet, Item);
+	    DEC (LATreeCount);
+	 END;
+      END;
+      RETURN 0;
+   END CheckLRk;
+
+PROCEDURE InitLRk;
+   VAR i	: LONGINT;
+   BEGIN
+      IF NOT IsInit THEN
+	 LAKSize := KernelItemCount + 1;
+	 MakeArray   (LAKPtr, LAKSize, TSIZE (tpLAK));
+	 CheckMemory (LAKPtr, 0);
+	 FOR i := 1 TO KernelItemCount DO LAKPtr^ [i].LAK := NIL; END;
+
+	 FirstSize := NontermCount;
+	 MakeArray   (FirstPtr, FirstSize, TSIZE (tLAKNT));
+	 CheckMemory (FirstPtr, 0);
+	 FOR i := 0 TO LONGINT (NontermCount) - 1 DO
+	    FirstPtr^ [i].N1 := NIL;
+	    FirstPtr^ [i].N  := NIL;
+	 END;
+	 FOR i := 2 TO SHORTINT (LimitK) DO
+	    StackTop [i] := 0;
+	    StackPtr [i] := NIL;
+	 END;
+
+	 BusyItemCount := 0;
+	 BusyItemSize := 32;
+	 MakeArray   (BusyItemPtr, BusyItemSize, TSIZE (CARDINAL));
+	 CheckMemory (BusyItemPtr, 0);
+	 BusyItemPtr^ [0] := 0;
+
+	 MakeSet (AllReads	, Epsilon);
+	 MakeSet (AllReduces	, Epsilon);
+	 MakeSet (Reduces	, Epsilon);
+	 MakeSet (TempSet	, Epsilon);
+	 MakeSet (ConflictSet	, Epsilon);
+	 MakeSet (AllTokens	, Epsilon);
+	 Complement (AllTokens);
+
+	 Look1Size := LimitK - 1;
+	 Look1SizeSet := Look1Size;
+	 WITH LAKPtr^ [0] DO
+	    LAK := Alloc (TSIZE (tLAK)); INC (LAKCount);
+	    MakeArray   (LAK^.N1, Look1Size, TSIZE (SHORTCARD));
+	    CheckMemory (LAK^.N1, 0); INC (N1Count);
+	    MakeArray   (LAK^.N , Look1Size, TSIZE (SHORTCARD));
+	    CheckMemory (LAK^.N , 0); INC (NCount);
+	    FOR i := 2 TO SHORTINT (LimitK) DO
+	       ItemStackTop  [i] := 0;
+	       ItemStackSize [i] := 16;
+	       MakeArray   (StateStackPtr [i], ItemStackSize [i], TSIZE (tStateRange));
+	       CheckMemory (StateStackPtr [i], 0);
+	       MakeArray   (ItemStackPtr  [i], ItemStackSize [i], TSIZE (CARDINAL));
+	       CheckMemory (ItemStackPtr  [i], 0);
+	       ItemStackPtr  [i]^[0] := 0;
+	       StateStackPtr [i]^[0] := 0;
+	       LAK^.N1^ [i] := 0;
+	       LAK^.N ^ [i] := 0;
+	    END;
+	 END;
+
+	 FOR i := 0 TO Look1SizeSet DO MakeSet (Constraint [i], Epsilon); END;
+
+	 LATreeSize	:= 64;
+	 MakeArray   (LATreePtr, LATreeSize, TSIZE (tLATree));
+	 CheckMemory (LATreePtr, 0);
+	 LATreeCount	:= 0;
+	 LATreePtr^ [0].Item := 0;
+	 MakeSet (LATreeSet, ItemCount);
+	 IsInit		:= TRUE;
+      END;
+   END InitLRk;
+
+PROCEDURE PrintItem (File: tFile; Item: CARDINAL);
+   VAR
+      i	: CARDINAL;
+      x	: tTree;
+   BEGIN
+      WITH ItemPtr^ [Item] DO
+	 WITH ToRulePtr^ [Rule]^.Rule DO
+	    WriteS (" ");
+	    WriteIdent (File, LHS^.Nonterminal.Name);
+	    WriteS (": ");
+	    IF Dot = 0 THEN WriteS ("."); ELSE WriteS (" "); END;
+	    FOR i := 1 TO Length DO
+	       x := ToSymbolPtr^ [ElmtsPtr^ [i]];
+	       IF x^.Kind = Tree.Terminal THEN
+		  WriteIdent (File, x^.Terminal.Name);
+	       ELSE
+		  WriteIdent (File, x^.Nonterminal.Name);
+	       END;
+	       IF i = Dot THEN WriteS ("."); ELSE WriteS (" "); END;
+	    END;
+	 END;
+      END;
+   END PrintItem;
+
+PROCEDURE PrintRule (File: tFile; rule: tTree);
+   VAR
+      i	: CARDINAL;
+      r	: tTree;
+   BEGIN
+      WITH rule^.Rule DO
+	 WriteS (" "); WriteIdent (StdOutput, LHS^.Nonterminal.Name); WriteS (": ");
+	 FOR i := 1 TO Length DO
+	    r := ToSymbolPtr^ [ElmtsPtr^ [i]];
+	    IF r^.Kind = Tree.Terminal THEN
+	       WriteIdent (StdOutput, r^.Terminal.Name);
+	    ELSE
+	       WriteIdent (StdOutput, r^.Nonterminal.Name);
+	    END;
+	    WriteS (" ");
+	 END;
+      END;
+   END PrintRule;
+
+PROCEDURE PrintNode (Node: tNode);
+   BEGIN
+      WriteS ("NODE BEGIN"); WriteNl;
+      PrintNode2 (Node, 0);
+      WriteS ("NODE END"); WriteNl;
+   END PrintNode;
+
+PROCEDURE PrintNode2 (Node: tNode; indent: CARDINAL);
+   VAR
+      i, j, k	: CARDINAL;
+   BEGIN
+      WITH Node DO
+	 IF Array = NIL THEN
+	    WriteS (" "); WriteSymSet (StdOutput, Set); WriteNl;
+	 ELSE
+	    (*
+	    WriteS (" MIN"); WriteI (MinToken, 5); WriteS (" ");
+	    WriteIdent (StdOutput, ToSymbolPtr^ [MinToken]^.Terminal.Name);
+	    WriteS (" MAX"); WriteI (MaxToken, 5); WriteS (" ");
+	    WriteIdent (StdOutput, ToSymbolPtr^ [MaxToken]^.Terminal.Name);
+	    WriteNl;
+	    *)
+	    WriteS (" "); WriteSymSet (StdOutput, Set); WriteNl;
+	    IF Token = NIL THEN				(* uncompressed	*)
+	       FOR i := MinToken TO MaxToken DO
+		  IF Array^ [i - MinToken] # NIL THEN
+		     FOR j := 1 TO indent DO WriteS ("        "); END;
+		     WriteIdent (StdOutput, ToSymbolPtr^ [i]^.Terminal.Name);
+		     PrintNode2 (Array^ [i - MinToken]^, indent + 1);
+		  END;
+	       END;
+	    ELSE					(* compressed	*)
+	       i := 0;
+	       REPEAT
+		  k := Token^ [i];
+		  FOR j := 1 TO indent DO WriteS ("        "); END;
+		  WriteIdent (StdOutput, ToSymbolPtr^ [k]^.Terminal.Name);
+		  PrintNode2 (Array^ [i]^, indent + 1);
+		  INC (i);
+	       UNTIL k = MaxToken;
+	    END;
+	    IF IsElement (Epsilon, Set) THEN
+	       FOR j := 1 TO indent DO WriteS ("        "); END;
+	       WriteS ("Epsilon"); WriteNl;
+	    END;
+	 END;
+      END;
+   END PrintNode2;
+
+PROCEDURE MakeTree (VAR Look: tpNode);
+   BEGIN
+      Look := Alloc (TSIZE (tNode)); INC (NodeCount);
+      MakeSet (Look^.Set, Epsilon);
+      IF Size (Look^.Set) = 0 THEN
+	 Message ("out of memory", Fatal, NoPosition);
+      END;
+      Look^.Array := NIL; Look^.Token := NIL;
+   END MakeTree;
+
+PROCEDURE InitArray (VAR Node: tNode);
+   VAR
+      i		: CARDINAL;
+      Size	: LONGINT;
+   BEGIN
+      WITH Node DO
+	 IF IsElement (Epsilon, Set) THEN
+	    Exclude (Set, Epsilon);
+	    IF IsEmpty (Set) THEN
+	       MinToken := Epsilon;
+	       MaxToken := 0;
+	    ELSE
+	       MinToken := Minimum (Set);
+	       MaxToken := Maximum (Set);
+	    END;
+	    Include (Set, Epsilon);
+	 ELSE
+	    MinToken := Minimum (Set);
+	    MaxToken := Maximum (Set);
+	 END;
+	 Size := MaxToken - MinToken + 1;
+	 IF Size > 0 THEN
+	    MakeArray   (Array, Size, TSIZE (tpNode));
+	    CheckMemory (Array, 0); INC (ArrayCount, Size);
+	    FOR i := 0 TO MaxToken - MinToken DO Array^ [i] := NIL; END;
+	 ELSE
+	    Array := NIL;
+	 END;
+	 Token := NIL;
+      END;
+   END InitArray;
+
+PROCEDURE ResizeArray (VAR Node: tNode);
+   VAR
+      PrevMin, PrevMax, i	: CARDINAL;
+      Size			: LONGINT;
+      PrevArr			: tpArray;
+   BEGIN
+      WITH Node DO
+	 PrevMin := MinToken;
+	 PrevMax := MaxToken;
+	 IF IsElement (Epsilon, Set) THEN
+	    Exclude (Set, Epsilon);
+	    MinToken := Minimum (Set);
+	    MaxToken := Maximum (Set);
+	    Include (Set, Epsilon);
+	 ELSE
+	    MinToken := Minimum (Set);
+	    MaxToken := Maximum (Set);
+	 END;
+	 IF (MinToken < PrevMin) OR (PrevMax < MaxToken) THEN
+	    PrevArr := Array;
+	    Size := MaxToken - MinToken + 1;
+	    MakeArray   (Array, Size, TSIZE (tpNode));
+	    CheckMemory (Array, 0); INC (ArrayCount, Size);
+	    IF PrevMin <= PrevMax THEN
+	       IF PrevMin > 0 THEN
+		  FOR i := MinToken TO PrevMin - 1 DO Array^ [i - MinToken] := NIL; END;
+	       END;
+	       FOR i := PrevMin TO PrevMax DO Array^ [i - MinToken] := PrevArr^ [i - PrevMin]; END;
+	       FOR i := PrevMax + 1 TO MaxToken DO Array^ [i - MinToken] := NIL; END;
+	       Size := PrevMax - PrevMin + 1;
+	       ReleaseArray (PrevArr, Size, TSIZE (tpNode));
+	       DEC (ArrayCount, Size);
+	    ELSE
+	       FOR i := 0 TO MaxToken - MinToken DO Array^ [i] := NIL; END;
+	    END;
+	 END;
+      END;
+   END ResizeArray;
+
+PROCEDURE ReleaseTree (VAR Node: tNode);
+   VAR
+      i, j	: CARDINAL;
+      Size	: LONGINT;
+   BEGIN
+      WITH Node DO
+	 IF Array # NIL THEN
+	    IF Token = NIL THEN				(* uncompressed	*)
+(*
+WriteS ("RELEASE1	"); WriteI (LastTerm + 1, 5);
+WriteI (MaxToken - MinToken + 1, 5); WriteI (Card (Set), 5); WriteNl;
+*)
+	       FOR i := 0 TO MaxToken - MinToken DO
+		  IF Array^ [i] # NIL THEN
+		     ReleaseTree (Array^ [i]^);
+		     Free (TSIZE (tNode), Array^ [i]); DEC (NodeCount);
+		  END;
+	       END;
+	       Size := MaxToken - MinToken + 1;
+	       ReleaseArray (Array, Size, TSIZE (tpNode));
+	       DEC (ArrayCount, Size);
+	    ELSE					(* compressed	*)
+	       i := 0;
+	       REPEAT
+		  j := Token^ [i];
+		  ReleaseTree (Array^ [i]^);
+		  Free (TSIZE (tNode), Array^ [i]); DEC (NodeCount);
+		  INC (i);
+	       UNTIL j = MaxToken;
+(*
+WriteS ("RELEASE2	"); WriteI (LastTerm + 1, 5);
+WriteI (Token^ [i-1] - Token^ [0] + 1, 5); WriteI (Size, 5); WriteNl;
+*)
+	       Size := i;
+	       ReleaseArray (Array, Size, TSIZE (tpNode));
+	       DEC (ArrayCount, Size);
+	       Size := i;
+	       ReleaseArray (Token, Size, TSIZE (SHORTCARD));
+	       DEC (TokenCount, Size);
+	    END;
+	 END;
+	 ReleaseSet (Set);
+      END;
+   END ReleaseTree;
+
+PROCEDURE AssignEmptyTree (VAR Node: tNode);
+   VAR i	: CARDINAL;
+   BEGIN
+      WITH Node DO
+	 ReleaseTree (Node);
+	 MakeSet (Set, Epsilon);
+	 Array := NIL; Token := NIL;
+      END;
+   END AssignEmptyTree;
+
+PROCEDURE AssignTree (VAR Node1: tNode; Node2: tNode; k: CARDINAL);
+   BEGIN
+      AssignEmptyTree (Node1);
+      UnionTree (Node1, Node2, k);
+   END AssignTree;
+
+PROCEDURE UnionTree (VAR Node1: tNode; Node2: tNode; k: CARDINAL);
+   VAR i, j, j2	: CARDINAL;
+   BEGIN
+      Union (Node1.Set, Node2.Set);
+      IF NOT UnConstrained THEN
+	 IF IsElement (Epsilon, Node1.Set) THEN
+	    Intersection (Node1.Set, Constraint [ConstrSize - k]);
+	    Include (Node1.Set, Epsilon);
+	 ELSE
+	    Intersection (Node1.Set, Constraint [ConstrSize - k]);
+	 END;
+      END;
+      IF (Node2.Array # NIL) AND (k > 1) THEN
+	 IF Node1.Array = NIL THEN
+	    InitArray (Node1);
+	 ELSE
+	    IF Node1.Token # NIL THEN UnCompressTree (Node1); END;
+	    IF (Node2.MinToken < Node1.MinToken) OR (Node1.MaxToken < Node2.MaxToken) THEN
+	       ResizeArray (Node1);
+	    END;
+	 END;
+	 IF Node2.Token = NIL THEN			(* uncompressed	*)
+	    FOR i := Node2.MinToken TO Node2.MaxToken DO
+	       IF (Node2.Array^ [i - Node2.MinToken] # NIL) AND
+		  (UnConstrained OR IsElement (i, Constraint [ConstrSize - k])) THEN
+		  j := i - Node1.MinToken;
+		  IF Node1.Array^ [j] = NIL THEN MakeTree (Node1.Array^ [j]); END;
+		  UnionTree (Node1.Array^ [j]^, Node2.Array^ [i - Node2.MinToken]^, k - 1);
+	       END;
+	    END;
+	 ELSE						(* compressed	*)
+	    i := 0;
+	    REPEAT
+	       j2 := Node2.Token^ [i];
+	       IF UnConstrained OR IsElement (j2, Constraint [ConstrSize - k]) THEN
+		  j := j2 - Node1.MinToken;
+		  IF Node1.Array^ [j] = NIL THEN MakeTree (Node1.Array^ [j]); END;
+		  UnionTree (Node1.Array^ [j]^, Node2.Array^ [i]^, k - 1);
+	       END;
+	       INC (i);
+	    UNTIL j2 = Node2.MaxToken;
+	 END;
+      END;
+   END UnionTree;
+
+PROCEDURE CompareTree (Node1, Node2: tNode; k: CARDINAL);
+   VAR i	: CARDINAL;
+   BEGIN
+      IF k = 1 THEN
+	 Assign (TempSet, Node1.Set);
+	 Intersection (TempSet, Node2.Set);
+	 Union (ConflictSet, TempSet);
+      ELSE
+	 IF (Node1.Token = NIL) AND (Node2.Token = NIL) THEN
+	    IF (Node1.Array # NIL) AND (Node2.Array # NIL) THEN
+	       FOR i := CARDINAL (Max (Node1.MinToken, Node2.MinToken)) TO
+			CARDINAL (Min (Node1.MaxToken, Node2.MaxToken)) DO
+		  IF (Node1.Array^ [i - Node1.MinToken] # NIL) AND
+		     (Node2.Array^ [i - Node2.MinToken] # NIL) THEN
+		     CompareTree (Node1.Array^ [i - Node1.MinToken]^,
+				  Node2.Array^ [i - Node2.MinToken]^, k - 1);
+		  END;
+	       END;
+	    END;
+	 ELSE
+	    WriteS ("ERROR CompareTree"); WriteNl;
+	 END;
+      END;
+   END CompareTree;
+
+PROCEDURE CompressTree (VAR Node: tNode);
+   VAR
+      i			: CARDINAL;
+      n			: INTEGER;
+      array		: tpArray;
+      SizeA, SizeT	: LONGINT;
+   BEGIN
+      WITH Node DO
+	 IF (Array # NIL) AND (Token = NIL) AND (MaxToken - MinToken >= 5) THEN
+	    array := Array;
+	    SizeA := Card (Set);
+	    IF IsElement (Epsilon, Set) THEN DEC (SizeA); END;
+	    SizeT := SizeA;
+	    MakeArray   (Array, SizeA, TSIZE (tpNode));
+	    CheckMemory (Array, 0); INC (ArrayCount, SizeA);
+	    MakeArray   (Token, SizeT, TSIZE (SHORTCARD));
+	    CheckMemory (Token, 0); INC (TokenCount, SizeT);
+	    n := 0;
+	    FOR i := MinToken TO MaxToken DO
+	       IF array^ [i - MinToken] # NIL THEN
+		  Array^ [n] := array^ [i - MinToken];
+		  Token^ [n] := i;
+		  CompressTree (Array^ [n]^);
+		  INC (n);
+	       END;
+	    END;
+IF n = 0 THEN
+(* Message ("CompressTree: n = 0", Warning, NoPosition); *)
+	    ReleaseArray   (Array, SizeA, TSIZE (tpNode));
+	    ReleaseArray   (Token, SizeT, TSIZE (SHORTCARD));
+	    Array := array;
+	    Token := NIL;
+ELSE
+	    SizeT := MaxToken - MinToken + 1;
+	    ReleaseArray (array, SizeT, TSIZE (tpNode));
+	    DEC (ArrayCount, SizeT);
+(*
+WriteS ("COMPRESS	"); WriteI (LastTerm + 1, 5);
+WriteI (Token^ [n-1] - Token^ [0] + 1, 5); WriteI (SizeA, 5); WriteNl;
+*)
+END;
+	 END;
+      END;
+   END CompressTree;
+
+PROCEDURE UnCompressTree (VAR Node: tNode);
+   VAR
+      i, j	: CARDINAL;
+      array	: tpArray;
+      Size	: LONGINT;
+   BEGIN
+      WITH Node DO
+	 IF Token # NIL THEN
+	    array := Array;
+	    Size := MaxToken - MinToken + 1;
+	    MakeArray   (Array, Size, TSIZE (tpNode));
+	    CheckMemory (Array, 0); INC (ArrayCount, Size);
+	    FOR i := 0 TO MaxToken - MinToken DO Array^ [i] := NIL; END;
+	    i := 0;
+	    REPEAT
+	       j := Token^ [i];
+	       UnCompressTree (array^ [i]^);
+	       Array^ [j - MinToken] := array^ [i];
+	       INC (i);
+	    UNTIL j = MaxToken;
+	    Size := i;
+	    ReleaseArray (array, Size, TSIZE (tpNode));
+	    DEC (ArrayCount, Size);
+	    Size := i;
+	    ReleaseArray (Token, Size, TSIZE (SHORTCARD));
+	    DEC (TokenCount, Size);
+	    Token := NIL;
+	 END;
+      END;
+   END UnCompressTree;
+
+PROCEDURE CountTree (Node: tNode): CARDINAL;
+   VAR i, j, n	: CARDINAL;
+   BEGIN
+      WITH Node DO
+	 n := 1;
+	 IF Array = NIL THEN
+	    INC (FrontCount);
+	 ELSIF Token = NIL THEN				(* uncompressed	*)
+	    INC (UncompressedCount);
+	    FOR i := 0 TO MaxToken - MinToken DO
+	       IF Array^ [i] # NIL THEN
+		  INC (n, CountTree (Array^ [i]^));
+	       END;
+	    END;
+	 ELSE						(* compressed	*)
+	    INC (CompressedCount);
+	    i := 0;
+	    REPEAT
+	       j := Token^ [i];
+	       INC (n, CountTree (Array^ [i]^));
+	       INC (i);
+	    UNTIL j = MaxToken;
+	 END;
+	 RETURN n;
+      END;
+   END CountTree;
+
+PROCEDURE ReleaseKernel;
+   VAR i, j	: CARDINAL;
+   BEGIN
+      FOR i := 1 TO CARDINAL (KernelItemCount) DO
+	 WITH LAKPtr^ [i] DO
+	    IF LAK # NIL THEN
+	       WITH LAK^ DO
+	          IF N # NIL THEN
+(*
+WriteS ("FREE	"); WriteI (0, 5); WriteI (i, 7); WriteNl;
+*)
+		     ReleaseTree (Look^);
+		     Free (TSIZE (tNode), Look); DEC (NodeCount);
+		     ReleaseArray (N, Look1Size, TSIZE (SHORTCARD));
+		     DEC (NCount);
+		     N := NIL;
+		  END;
+		  IF N1 # NIL THEN
+		     FOR j := 2 TO LimitK DO
+			IF N1^ [j] # 0 THEN
+			   ReleaseSet (Look1^ [j]^); DEC (Look1SetCount);
+			   Free (TSIZE (tSet), Look1^ [j]);
+			END;
+		     END;
+		     ReleaseArray (Look1, Look1SizeSet, TSIZE (tpSet));
+		     DEC (Look1Count);
+		     ReleaseArray (N1, Look1Size, TSIZE (SHORTCARD));
+		     DEC (N1Count);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END ReleaseKernel;
+
+PROCEDURE CloseLRk;
+   VAR
+      i, j		: CARDINAL;
+      lFirstSize	: LONGINT;
+   BEGIN
+      IF IsInit THEN
+	 IF IsElement (ORD ('T'), Options) THEN
+	    FOR i := FirstNonterm TO LastNonterm DO
+	       WITH FirstPtr^ [i - FirstNonterm] DO
+		  IF N # NIL THEN
+		     INC (NTCount, CountTree (Look));
+		     INC (NTTreeCount);
+		  END;
+	       END;
+	    END;
+	    FOR i := 1 TO CARDINAL (LATreeCount) DO
+	       INC (LTCount, CountTree (LATreePtr^ [i].Node));
+	       INC (LTTreeCount);
+	    END;
+	    PrintStatistics;
+	 END;
+
+	 ReleaseSet (AllReads	);
+	 ReleaseSet (AllReduces	);
+	 ReleaseSet (Reduces	);
+	 ReleaseSet (TempSet	);
+	 ReleaseSet (ConflictSet);
+	 ReleaseSet (AllTokens	);
+	 ReleaseSet (LATreeSet	);
+	 FOR i := 0 TO CARDINAL (Look1SizeSet) DO
+	    ReleaseSet (Constraint [i]);
+	 END;
+      (* ReleaseKernel; *)
+      (* ReleaseArray (LAKPtr, LAKSize, TSIZE (tpLAK)); *)
+	 ReleaseArray (BusyItemPtr, BusyItemSize, TSIZE (CARDINAL));
+	 lFirstSize := FirstSize;
+	 FOR i := 2 TO LimitK DO
+	    IF StackPtr [i] # NIL THEN
+	       ReleaseArray (StackPtr [i], lFirstSize, TSIZE (SHORTCARD));
+	    END;
+	    ReleaseArray (StateStackPtr [i], ItemStackSize [i], TSIZE (tStateRange));
+	    ReleaseArray (ItemStackPtr  [i], ItemStackSize [i], TSIZE (CARDINAL));
+	 END;
+
+	 FOR i := FirstNonterm TO LastNonterm DO
+	    WITH FirstPtr^ [i - FirstNonterm] DO
+	       IF N # NIL THEN
+		  ReleaseTree (Look);
+		  ReleaseArray (N, Look1Size, TSIZE (SHORTCARD));
+		  DEC (NCount);
+	       END;
+	       IF N1 # NIL THEN
+		  FOR j := 2 TO LimitK DO
+		     IF N1^ [j] # 0 THEN
+			ReleaseSet (Look1^ [j]^); DEC (Look1SetCount);
+			Free (TSIZE (tSet), Look1^ [j]);
+		     END;
+		  END;
+		  ReleaseArray (Look1, Look1SizeSet, TSIZE (tpSet));
+		  DEC (Look1Count);
+		  ReleaseArray (N1, Look1Size, TSIZE (SHORTCARD));
+		  DEC (N1Count);
+	       END;
+	    END;
+	 END;
+	 ReleaseArray (FirstPtr, FirstSize, TSIZE (tLAKNT));
+      (* Sort (1, LATreeCount, IsLess, Swap); *)
+      END;
+   END CloseLRk;
+
+(* PROCEDURE IsLess (i, j: INTEGER): BOOLEAN;
+   BEGIN
+      RETURN LATreePtr^ [i].Item < LATreePtr^ [j].Item;
+   END IsLess;
+
+PROCEDURE Swap (i, j: INTEGER);
+   VAR t	: tLATree;
+   BEGIN
+      t := LATreePtr^ [i]; LATreePtr^ [i] := LATreePtr^ [j]; LATreePtr^ [j] := t;
+   END Swap; *)
+
+PROCEDURE CheckMemory (Ptr: ADDRESS; State: tStateRange);
+   BEGIN
+      IF Ptr = NIL THEN
+	 MessageI ("out of memory for state", Fatal, NoPosition, Short, ADR (State));
+      END;
+   END CheckMemory;
+
+PROCEDURE GetLATreeIndex (Item: CARDINAL): CARDINAL;
+   VAR low, mid, high	: INTEGER;
+   BEGIN
+      low  := 1;
+      high := LATreeCount;
+      WHILE low + 1 < high DO
+	 mid := (low + high) DIV 2;
+	 IF LATreePtr^ [mid].Item < Item THEN
+	    low := mid;
+	 ELSE
+	    high := mid;
+	 END;
+      END;
+      IF LATreePtr^ [low].Item = Item THEN
+	 RETURN low;
+      ELSIF LATreePtr^ [high].Item = Item THEN
+	 RETURN high;
+      ELSE
+	 MessageI ("GetLATreeIndex fails at Item", Fatal, NoPosition, Long, ADR (Item));
+	 RETURN 0;
+      END;
+   END GetLATreeIndex;
+
+PROCEDURE GetLATree (pItem: CARDINAL): CARDINAL;
+   VAR i:	LONGINT;
+   BEGIN
+      IF IsElement (pItem, LATreeSet) THEN
+	 RETURN GetLATreeIndex (pItem);
+      ELSE
+	 INC (LATreeCount);
+	 IF LATreeCount = LATreeSize THEN
+	    ExtendArray (LATreePtr, LATreeSize, TSIZE (tLATree));
+	    CheckMemory (LATreePtr, 0);
+(* MessageI ("extend LATree", Warning, NoPosition, Long, ADR (LATreeSize)); *)
+	 END;
+	 i := LATreeCount;
+	 WHILE LATreePtr^ [i - 1].Item > pItem DO
+	    LATreePtr^ [i] := LATreePtr^ [i - 1];
+	    CanClear := FALSE;
+	    DEC (i);
+	 END;
+	 WITH LATreePtr^ [i] DO
+	    Item	:= pItem;
+	    Look1	:= NIL;
+	    Node.Array	:= NIL;
+	    Node.Token	:= NIL;
+	 END;
+	 Include (LATreeSet, pItem);
+(*
+WriteS ("ENTER	"); WriteI (pItem, 6); WriteI (i, 6); WriteI (LATreeCount, 6); PrintItem (StdOutput, pItem); WriteNl;
+*)
+	 RETURN i;
+      END;
+   END GetLATree;
+
+PROCEDURE PrintLine (Text: ARRAY OF CHAR; Value: INTEGER);
+   BEGIN
+      WriteS ("          ");
+      WriteS (Text); WriteI (Value, 8); WriteNl;
+   END PrintLine;
+
+PROCEDURE PrintStatistics;
+   BEGIN
+      PrintLine ("LAKPtr     Size    ", LAKSize	);
+      PrintLine ("LAKPtr     Space   ", LAKSize		* TSIZE (tpLAK	));
+      PrintLine ("FirstPtr   Size    ", FirstSize	);
+      PrintLine ("FirstPtr   Elmts   ", FirstCount	);
+      PrintLine ("FirstPtr   Space   ", CARDINAL (FirstSize) * TSIZE (tLAKNT) +
+			 FirstCount * ((Epsilon + 32) DIV 32 * TSIZE (BITSET)));
+      PrintLine ("LATree     Size    ", LATreeSize	);
+      PrintLine ("LATree     Elmts   ", LATreeCount	);
+      PrintLine ("LATree     Space   ", LATreeCount	* TSIZE (tLATree));
+      PrintLine ("LAK Nodes          ", LAKCount	);
+      PrintLine ("LAK Nodes  Space   ", LAKCount	* TSIZE (tLAK	));
+      PrintLine ("LRK Nodes          ", NodeCount	);
+      PrintLine ("LRK Nodes  Space   ", NodeCount	* (TSIZE (tNode) + (Epsilon + 32) DIV 32 * TSIZE (BITSET)));
+      PrintLine ("Array      Space   ", ArrayCount	* TSIZE (tpNode));
+      PrintLine ("Token      Space   ", TokenCount	* TSIZE (SHORTCARD));
+      PrintLine ("Kernel     Nodes   ", LKCount		);
+      PrintLine ("Nonterm    Nodes   ", NTCount		);
+      PrintLine ("LATree     Nodes   ", LTCount		);
+      PrintLine ("Kernel             ", LKTreeCount	);
+      PrintLine ("Nonterm            ", NTTreeCount	);
+      PrintLine ("LATree             ", LTTreeCount	);
+      PrintLine ("Front      Nodes   ", FrontCount	);
+      PrintLine ("UnCompress Nodes   ", UncompressedCount);
+      PrintLine ("Compressed Nodes   ", CompressedCount	);
+      PrintLine ("Look1 Sets         ", Look1SetCount	);
+      PrintLine ("Look1 Sets Space   ", Look1SetCount * (TSIZE (tSet) + (Epsilon + 32) DIV 32 * TSIZE (BITSET)));
+   (*
+      PrintLine ("Look1 Arr          ", Look1Count	);
+      PrintLine ("Look1 Arr  Space   ", Look1Count * CARDINAL (Look1SizeSet) * TSIZE (tpSet));
+      PrintLine ("N1                 ", N1Count		);
+      PrintLine ("N1         Space   ", N1Count	* CARDINAL (Look1Size) * TSIZE (SHORTCARD));
+      PrintLine ("N                  ", NCount		);
+      PrintLine ("N          Space   ", NCount	* CARDINAL (Look1Size) * TSIZE (SHORTCARD));
+   *)
+   END PrintStatistics;
+
+PROCEDURE WriteNode (Node: tNode);
+   VAR
+      i, j		: CARDINAL;
+   BEGIN
+      WITH Node DO
+	 IF Array = NIL THEN RETURN; END;
+	 WriteS (" NODE ");
+	 IF Token # NIL THEN WriteS ("COMPRESSED "); END;
+	 WriteS ("Min, Max, Set = ");
+	 WriteI (MinToken, 5); WriteI (MaxToken, 5);
+	 WriteSet (StdOutput, Set); WriteNl;
+	 IF Token # NIL THEN
+	    i := 0;
+	    REPEAT
+	       j := Token^ [i];
+	       WriteI (j, 5);
+	       IF Array^ [i] # NIL THEN
+		  WriteNode (Array^ [i]^);
+	       ELSE
+		  WriteS (" ERROR"); WriteNl;
+	       END;
+	       INC (i);
+	    UNTIL j = MaxToken;
+	 ELSE
+	    FOR i := MinToken TO MaxToken DO
+	       IF Array^ [i - MinToken] # NIL THEN
+		  WriteI (i, 5);
+		  WriteNode (Array^ [i - MinToken]^);
+	       END;
+	    END;
+	 END;
+      END;
+   END WriteNode;
+
+PROCEDURE WriteLATree;
+   VAR
+      i		: LONGINT;
+   BEGIN
+      FOR i := 1 TO LATreeCount DO
+	 WITH LATreePtr^ [i] DO
+	    WriteS ("i, Item, Look1 = ");
+	    WriteI (i, 5); WriteI (Item, 6);
+	    WriteSet (StdOutput, Look1^[2]^);
+	    WriteNode (Node);
+	    WriteNl;
+	 END;
+      END;
+   END WriteLATree;
+
+BEGIN
+   LimitK		:= 1;
+   IsInit		:= FALSE;
+   LAKCount		:= 0;
+   FirstCount		:= 0;
+   NodeCount		:= 0;
+   N1Count		:= 0;
+   NCount		:= 0;
+   Look1Count		:= 0;
+   Look1SetCount	:= 0;
+   ArrayCount		:= 0;
+   TokenCount		:= 0;
+   LKCount		:= 0;
+   NTCount		:= 0;
+   LTCount		:= 0;
+   FrontCount		:= 0;
+   UncompressedCount	:= 0;
+   CompressedCount	:= 0;
+   LKTreeCount		:= 0;
+   NTTreeCount		:= 0;
+   LTTreeCount		:= 0;
+END LRk.

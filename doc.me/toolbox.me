@@ -1,0 +1,1502 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.\" .po 3.0c	\" page offset (left margin)
+.\" .ll 15.9c	\" line length
+.\" .lt 15.9c	\" title length
+.ds ], , 
+.EQ
+gsize 12
+delim $$
+.EN
+.T0
+
+
+	A Tool Box for
+	Compiler Construction
+
+	J. Grosch
+	H. Emmelmann
+
+.T1
+.T2 "" "A Tool Box for Compiler Construction" "Josef Grosch, Helmut Emmelmann" "Jan. 21, 1990" 20 1994
+.hc ~
+.bp 1
+.ce 99
+.b "A Tool Box for Compiler Construction"
+.ce 0
+.sp 1
+.uh Abstract
+.pp
+.\" This paper presents a rather complete set of tools supporting the construction of all phases of a
+.\" compiler. The tools are very powerful and flexible in order to be useful for wide ranges of
+.\" compiler designs and programming languages. The modules generated by the tools allow the
+.\" construction of production quality compilers. Currently modules in the target languages C and
+.\" Modula-2 can be generated. First realistic applications demonstrate the excellent performance
+.\" of the tools.
+.\" We designed and implemented a rather complete set of tools to support the construction of high
+.\" quality compilers. The tool box currently contains the following tools
+.\" covering most phases of a compiler:
+This paper presents a set of tools supporting 
+the construction of nearly every compiler phase.
+Design goals of this tool box have been practical usability,
+significantly reduced effort for compiler construction,
+and high quality of the generated compilers.
+Especially efficiency should be competitive to hand crafting.
+.pp
+Currently modules in the target languages C and Modula-2 can be generated.
+First realistic applications demonstrate the excellent performance of the tools and
+show that the tools allow the construction of production quality compilers.
+.sh 1 Introduction
+.pp
+Within this paper we present a compiler generation tool box.
+It contains tools for nearly every compiler phase. We believe the 
+tools are applicable for realistic compiler projects.
+.pp
+The tools generally accept as input a specification written in 
+a language specific to the tool and produce modules in
+a target language (C or Modula-2). Therefore a tool can be 
+seen as a generic solution of a compilation subproblem,
+which is instantiated by the specification.
+.pp
+Using tools instead of hand crafting a compiler has several advantages:
+The effort necessary to build a compiler is substantially 
+reduced. Instead of writing a program a much shorter specification
+has to be developed. The tools can perform many consistency checks 
+on the specifications. Writing automatically checked specifications
+drastically reduces the amount of possible errors and hence 
+increases the reliability of the resulting compiler.
+.pp
+The tool box consists of the following tools:
+.(b
+.ta 2c
+Rex	scanner generator
+Lalr	LALR(1) parser generator
+Ell	LL(1) parser generator
+Ast	generator for abstract syntax trees
+Ag	attribute evaluator generator
+Estra	transformation of attributed syntax trees
+Beg	back end generator
+Reuse	library of reusable modules
+.)b
+.pp
+All the tools were originally programmed in Modula-2 and run under UNIX. Using the Modula-2
+to C translator called
+.i Mtc
+\*([[Mar90\*(]] (see section 6.1), the sources also exist in C. Currently most
+of the tools generate modules in the target languages C and Modula-2.
+.\" Using the tool box to construct compilers has several advantages in comparison to an
+.\" implementation by hand. A large percentage of programming is replaced by
+.\" writing specifications. The
+.\" tools drastically reduce the construction effort for compilers. The use of specifications
+.\" enables the tools to perform consistency checks thus avoiding many errors. The automatic
+.\" generation of program modules increases their reliability. The efficiency of the generated
+.\" modules is comparable to hand-written implementations.
+.pp
+The next two sections present the design goals and the common features of the tools.
+Section 4 describes the compiler model we prefer.
+In section 5 all the tools are sketched briefly.
+Section 6 reports about the experiences of two realistic applications of the tools.
+Section 7 gives a summary and describes future work.
+.sh 1 "Design Goals"
+.pp
+The major design goals of the tool box were:
+.ip -
+practical usability for realistic languages
+.ip -
+automatic generation of production quality compilers
+.ip -
+substantial increase in compiler construction productivity and compiler reliability
+.ip -
+quality of the resulting compiler competitive to hand crafting 
+.pp
+By defining these goals we wanted to produce a tool box which
+will be used in practical compiler construction work.
+Therefore we considered competitiveness to hand crafting important,
+because we feel that tools promising a high productivity and reliability
+but which produce compilers whose code quality 
+or efficiency is lower than hand crafted compilers, will hardly be used.
+.sh 1 "Common Implementation Decisions"
+.pp
+Our design goals lead to several design decisions common to all of our tools. 
+Nearly every tool needs a programming language in which the user can specify certain
+actions, conditions, or calculations. That is obviously 
+true for attribute grammars, but also the back end
+generator needs to evaluate several attributes and 
+conditions. Even the parser generators need such a language for the
+specification of semantic actions.
+.pp
+We decided to select the target language (namely C or Modula-2).
+Specifications therefore may contain pieces of target language code.
+Besides some pattern replacement the text is copied unchanged to the generated modules.
+The disadvantage of that method is that the target language
+code can not be checked completely by the tool. 
+For example the attribute grammar tool can not check if 
+attribute evaluations do not have side-effects.
+On the other hand it gives a great deal of flexibility,
+as the whole power of the target language is available.
+It also drastically increases the practical usability,
+as interfacing to other components (perhaps hand-written ones) is easily possible.
+It finally keeps the tools and the specification languages
+simple. The user is not forced to learn a new language to express conditions or actions.
+.pp
+Our experience with prior tools is that during realistic compiler design 
+a lot of small special problems occur, which the tool can not handle. 
+Therefore loopholes, possibilities how the user of the tools can
+easily plug in hand-written parts, are necessary. 
+Loopholes also allow to keep tools simple, as one is not forced
+to provide a solution for every special case, immediately. 
+It is possible to use the loophole until a really good solution
+is found to be build in a tool.
+.pp
+The tools are largely independent of each other. This is 
+achieved by the property that none of the generated modules has a fixed kind of output.
+Instead this output is specified using statements from the target language and thus can be
+chosen arbitrarily.
+.\" This way, it is also easily possible to add hand-written parts to the generated ones.
+The independence of the tools allows for a large degree of freedom in the
+compiler design. An exception are the tools
+.i Ag
+and
+.i Estra
+which operate on syntax trees specified using
+.i Ast .
+Therefore they depend on
+.i Ast
+and all three tools require the compiler to use an attributed abstract syntax tree.
+.\" The main design goal for the tools was to allow the largely automatic generation of
+.\" production quality compilers for real languages such as Modula-2, C, or Ada. All the
+.\" following goals are more or less consequences of this main goal. The tools set should be
+.\" complete and support all phases of a compiler. Each tool should be simple and easy to use by
+.\" concentrating on the specification of the underlying concepts. Yet, every tool has to be
+.\" powerful enough to be able to handle not only toy languages but realistic ones. The tools
+.\" should be open and flexible to allow many compiler designs and they should provide loopholes
+.\" to cope with the malices of existing language definitions. Last but not least the program
+.\" modules generated by the tools should be as efficient as possible primarily in terms of run
+.\" time.
+.\" .pp
+.\" The tools share several common features. They are largely independent of each other. This is
+.\" achieved by the property that none of the generated modules has a fixed kind of output.
+.sh 1 "Compiler Model"
+.(z
+.PS
+linewid	= linewid * 1.2
+boxwid	= boxwid * 1.7
+boxht	= boxht * 1.2
+circlerad = circlerad * 1.2
+bh	= boxht * 1.7
+bw	= boxwid * 0.5
+
+	right
+
+S1:	box wid bw height bh invis
+SP:	box wid boxwid * 1.6 "Scanner spec:" "regular expressions"
+	arrow
+T:	circle "rex"
+	arrow
+I1:	box "Scanner"
+
+S2:	box at S1 - (0, bh) wid bw height bh invis
+P:	box wid boxwid * 1.6 "Parser spec:" "concrete syntax (grammar)" "mapping: concrete \(-> abstract"
+	arrow
+	circle "lalr" "ell"
+	arrow
+I2:	box "Parser"
+
+S3:	box at S2 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Tree spec:" "abstract syntax" "(grammar)"
+	arrow
+	circle "ast"
+	arrow
+I3:	box "Tree"
+
+S4:	box at S3 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Semantics spec:" "attribute grammar"
+	arrow
+	circle "ag"
+	arrow
+I4:	box "Semantic"
+
+S5:	box at S4 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Trafo spec:" "mapping:" "abstract \(-> intermediate"
+	arrow
+	circle "estra"
+	arrow
+I5:	box "Trafo"
+
+S6:	box at S5 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Intermediate spec:" "intermediate language" "(grammar)"
+	arrow
+	circle "ast"
+	arrow
+I6:	box "Intermediate"
+
+S7:	box at S6 - (0, bh) wid bw height bh invis
+	box wid boxwid * 1.6 "Codegenerator spec:" "mapping:" "intermediate \(-> machine"
+	arrow
+	circle "beg"
+	arrow
+I7:	box "Codegenerator"
+
+	box invis "Specification" at SP + (0, bh)
+	box invis "Tool" at T + (0, bh)
+	box invis "Compiler" "Module" at I1 + (0, bh)
+
+	line from I1.n up boxht * 0.9 <-
+	arrow from I1.s to I2.n
+	arrow from I2.s to I3.n
+	arrow from I3.s to I4.n <->
+	arc from I3.se to I5.ne at I4 -> cw
+	arrow from I5.s to I6.n
+	arrow from I6.s to I7.n
+	arrow from I7.s down boxht * 0.9
+.PE
+.sp 0.5
+.ce
+Fig. 1: Compiler Model
+.)z
+.pp
+Although the tools do not directly enforce any specific compiler model, we want to present
+the model we prefer and which we believe is supported best by the tools. We still consider
+semantic analysis to be the hard part of a compiler. Therefore we base semantic analysis and
+the generation of an intermediate language on the abstract syntax. We explicitly construct
+the abstract syntax tree which might be decorated with attributes during semantic analysis.
+Besides the abstract syntax, which can be regarded as a first (high-level) intermediate
+representation, we prefer to use a second (low-level) intermediate representation as
+interface to the code generator. This has advantages for optimizations and for pattern
+directed code selection.
+.pp
+Figure 1 shows our preferred compiler model. In the right column are the main modules
+that constitute a compiler. The left column contains the necessary specifications. In
+between there are the tools which are controlled by the specifications and which produce the
+modules. The arrows represent the data flow in part during generation time and in part during
+run time.
+.pp
+In principle the compiler model works as follows: a scanner and a parser read the source,
+check the concrete syntax, and construct an abstract syntax tree. They may perform several
+normalizations, simplifications, or transformations in order to keep the abstract syntax
+relatively simple. Semantic analysis is performed on the abstract syntax tree. Optionally
+attributes for code generation may be computed. Afterwards the abstract syntax tree is
+transformed into an intermediate representation. The latter is the input of the code generator
+which finally produces the machine code.
+.sh 1 "The Tools"
+.pp
+The following sections briefly sketch the tools that make up the tool box. We only describe the
+features of the tools - for details, for the specification techniques, or for examples there
+exist separate documents.
+.sh 2 Rex
+.pp
+The scanner generator \fIRex\fP has been developed with the aim to combine
+the powerful specification method of regular expressions with the generation
+of highly efficient scanners
+\*([[Gro88\*(],Gro89\*(],Gro\*(]].
+The name \fIRex\fP stands for
+.i "regular expression tool,"
+reflecting the specification method.
+.pp
+A scanner specification consists in principle of a set of regular
+expressions each associated with a semantic action. Whenever a string
+constructed according to a regular expression is recognized in the input of
+the scanner its semantic action which is a sequence of arbitrary statements
+written in the target language is executed. To be able to recognize tokens
+depending on their context, \fIRex\fP provides start states to handle left context
+and the right context can be specified by an additional regular expression.
+If several regular expressions match the input characters, the
+longest match is preferred. If there are still several possibilities, the
+regular expression given first in the specification is chosen.
+.pp
+\fIRex\fP generated scanners automatically provide the line and column position of
+each token. For languages like Pascal and Ada where the case of letters is
+insignificant tokens can be normalized to lower or upper case. There are
+predefined rules to skip white space like blanks, tabs, or newlines
+and there is a mechanism to handle include files.
+.\" pp
+The generated scanners are table-driven deterministic finite automatons. The
+tables are compressed using the so-called comb-vector technique
+\*([[ASU86\*(]].
+.\" Whereas the generator \fIRex\fP is implemented in Modula-2
+.\" it can generate scanners in the languages C and Modula-2. Currently \fIRex\fP is
+.\" available for PCS Cadmus/UNIX and SUN/UNIX workstations.
+.pp
+The most outstanding feature of \fIRex\fP is its speed. The generated scanners
+process nearly 200,000 lines per minute without hashing of identifiers and
+up to 150,000 lines per minute if hashing is applied.
+(Keywords do not require hashing if they are recognized directly by the generated automaton.)
+This is 4 times the
+speed of \fILex\fP\*([<\*([[Les75\*(]]\*(>] generated scanners. In typical cases \fIRex\fP generated
+scanners are 4 times smaller then \fILex\fP generated ones. Usually
+\fIRex\fP takes only 1/10 of the time of \fILex\fP to generate a scanner.
+.\" All figures have been measured on a MC 68020 processor.
+.sh 2 Lalr
+.pp
+The parser generator \fILalr\fP has been developed with the aim to combine a
+powerful specification technique for context-free languages with the
+generation of highly efficient parsers\*([<\*([[Gro88\*(],GrV\*(]]\*(>].
+As it processes the class of LALR(1) grammars we chose the name \fILalr\fP to
+express the power of the specification technique.
+.pp
+The grammars may be written using EBNF constructs. Each grammar rule
+may be associated with a semantic action consisting of arbitrary statements
+written in the target language. Whenever a grammar rule is recognized by the
+generated parser the associated semantic action is executed. A mechanism for
+S-attribution (only synthesized attributes) is provided to allow
+communication between the semantic actions.
+.pp
+In case of LR-conflicts a derivation tree is printed to ease the location of the
+problem. The conflict can be resolved by specifying precedence and
+associativity for terminals and rules. Syntactic errors are handled fully
+automatically by the generated parsers including error reporting, recovery,
+and repair.
+.\" The mentioned features are discussed in more detail in the following chapters.
+.\" pp
+The generated parsers are table-driven. Like in the case of \fIRex\fP,
+comb-vector technique is used to compress the parse tables.
+.\" The generator \fILalr\fP is implemented in the language Modula-2. Parsers
+.\" can be generated in the languages C and Modula-2.
+The generator uses the algorithm described by
+\*([[DeP82\*(]] to compute the look-ahead sets.
+.\" although the algorithm published by .[ives.] promises to perform better.
+.\" Currently \fILalr\fP is available for PCS-Cadmus/UNIX and SUN/UNIX workstations.
+.pp
+Parsers generated by \fILalr\fP are two to three times faster than \fIYacc\fP
+\*([[Joh75\*(]] generated
+ones. They reach a speed of 580,000 lines per minute on a MC 68020 processor
+excluding the time for scanning. The size of the parsers is only slightly
+increased in comparison to \fIYacc\fP, because there
+is a small price to be paid for the speed.
+.sh 2 Ell
+.pp
+The parser generator \fIEll\fP processes LL(1) grammars which may contain EBNF
+constructs and semantic actions. It generates recursive descent parsers
+\*([[Gro88\*(],GrV\*(],Groa\*(]].
+A mechanism for L-attribution (inherited and synthesized attributes
+evaluable during one preorder traversal) is provided. Like \fILalr\fP, syntax
+errors are handled fully automatic including error reporting from a prototype
+error module, error recovery, and error repair.
+.\" The generator \fIEll\fP is implemented in Modula-2 and can generate parsers in C and Modula-2.
+Those satisfied with the restricted power of LL(1) grammars may profit from the
+high speed of the generated parsers which lies around 900,000 lines per minute.
+.\" For a detailed comparison see Figure 12.
+.sh 2 Ast
+.pp
+.i Ast
+is a generator for \fIa\fPbstract \fIs\fPyntax \fIt\fPrees
+\*([[Gro91\*(],Grob\*(]].
+It generates program modules or abstract data types
+to handle attributed trees. Besides trees attributed graphs can be handled as well. The nodes
+of these data structures may be associated with arbitrary many attributes of arbitrary type.
+The specifications for this tool are based on extended tree grammars.
+They can be regarded as a common notation for concrete and abstract syntax as well as for
+attributed trees and graphs. An extension mechanism provides single inheritance. Internally
+the trees are stored as linked records.
+.i Ast
+can be requested to generate many operations for trees:
+node constructors combine aggregate notation and storage management. Reader and writer
+procedures transfer graphs from/to files in ASCII or binary format. The order of subtrees
+in a list can be reversed. Procedures for commonly used traversal strategies like top down
+(depth first) or bottom up (reverse depth first) are provided. An interactive graph browser
+allows the inspection of graphs in a readable way and thus supports debugging.
+.sh 2 Ag
+.pp
+.i Ag
+is an attribute evaluator generator\*([<\*([[Gro90\*(],Groc\*(]]\*(>].
+It processes ordered attribute grammars (OAGs)\*([<\*([[Kas80\*(]]\*(>]
+as well as higher order attribute grammars (HAGs)
+\*([[VSK89\*(],Vog93\*(]].
+It is based on the abstract syntax or to be more specific on tree modules generated by
+.i Ast .
+Therefore the tree structure is fully known.
+The terminals and nonterminals may have arbitrary many attributes
+which can have any target language type.
+This includes tree-valued attributes.
+.\" - differentiates input and output attributes
+.i Ag
+allows attributes local to rules and offers an extension mechanism which provides (single)
+inheritance for attributes and for attribute computations.
+It also allows the elimination of chain rules.
+.\" The attributes are denoted by unique selector names instead of nonterminal names with subscripts.
+The attribute computations are expressed in the target language and should be written
+in a functional style.
+It is possible to call external functions of separately compiled modules.
+Non-functional statements and side-effects are possible but require careful consideration.
+The syntax of the specification language is designed to support compact, modular,
+and readable documents.
+An attribute grammar can consist of several modules
+where the context-free grammar is specified only once.
+.\" - checks an AG for completeness of the attribute computations
+.\" - checks for unused attributes
+.\" - checks an AG for the classes SNC, DNC, OAG, LAG, and SAG
+There are shorthand notations for copy rules and threaded attributes which allow the user to
+omit many trivial attribute computations.
+The generated evaluators are very efficient because they are directly coded using
+recursive procedures.
+Attribute storage is optimized by implementing attributes as local variables and procedure
+parameters whenever their lifetime is contained within one visit.
+.\" - generates efficient evaluators
+.\" - generates evaluators in Modula-2 (or C)
+.sh 2 Estra
+.pp
+.i Estra
+is a generator for \fIe\fPfficient \fIs\fPyntax \fItr\fPee \fItra\fPnsformers
+\*([[Vie89\*(]]. The generated
+transformation modules take an attributed tree as input and map it to an arbitrary output.
+The output can be a new tree, a linear code such as e. g. P-Code, source code like e. g.
+Pascal, or a sequence of procedure calls. In any case the input tree remains unchanged in
+order to avoid to reevaluate the attributes for reasons of consistency. However, subtrees of
+the input tree may be reused to construct an output tree. The intended application areas for
+the transformations are the generation of intermediate representations out of abstract syntax
+trees and optimizers operating on internal tree representations of any level.
+.i Estra
+cooperates with
+.i Ast :
+the input trees are constructed by modules generated with the latter tool.
+.pp
+The specification of a transformer is rule based. A rule consists of a pattern describing a
+tree fragment and an action. Actions are composed of target language statements. It is
+possible to specify several transformations. The subtrees of a pattern can be transformed in
+any order. They can be transformed several times by the same or by different transformations.
+The actions have read access to the attributes of the input tree. Additional synthesized
+and inherited attributes may be evaluated during the transformation. The application of rules
+can be restricted by conditions. Ambiguities may be resolved using costs.
+.pp
+Two
+implementations of the pattern-matcher can be selected: a directly coded dynamic programming
+algorithm or a table-driven tree pattern-matcher. In both cases the transformation has two
+phases. While the first one determines the patterns that match with minimal costs the second
+one executes the associated actions.
+.sh 2 Beg
+.pp
+.i Beg
+(a \fIb\fPack \fIe\fPnd \fIg\fPenerator) produces code selectors and register 
+allocators\*([<\*([[Emm89a\*(],Emm89b\*(]]\*(>].
+Code selection is performed using tree pattern matching.
+The target instructions are described using rules containing tree patterns.
+The resulting code generator accepts a tree oriented intermediate
+language. An input tree is translated by covering the tree by the patterns
+and afterwards emitting the corresponding instructions.
+Rules are annotated with cost values which allows the code 
+generator to select a cover of minimal cost, that means the sum
+of the costs of all rules in the cover is minimal.
+.pp
+Therefore the user only describes ambiguously how certain intermediate 
+language constructs 
+can be translated. He need not to program the algorithm to 
+select the best way to translate a specific input tree. 
+A good way to develop a code generator description is to first
+describe only a subset of the machine's instructions, big enough 
+to compile the whole language. This results in a running
+compiler, which may produce inefficient code.
+Afterwards gradually more and more rules can be added 
+which finally leads to a compiler producing good code.
+.pp
+.i Beg
+implements the determination of the minimal cover using a
+directly coded version of the dynamic programming algorithm
+\*([[Emm89a\*(],ESL89\*(]].
+.pp
+The generation of register allocators is of specific importance, because
+hand crafting is a rather difficult and tedious job and because
+errors in the register allocator are sometimes very difficult to find.
+Within rules, the characteristics with respect to register allocation
+of an instruction can be specified: the allowed registers for 
+each operand, the registers changed by side-effects, and 
+whether the instruction is a two address instruction or not.
+Additionally the register set of the target machine has to be described.
+Even the double register problem (e. g. IBM 370) can be handled.
+.pp
+Two kinds of local register allocators can be requested: the on the fly
+register allocator handles simple register sets.
+However, it provides satisfying results for many machines and is very efficient.
+In some cases the general register allocator is
+necessary which performs some kind of look-ahead.
+Therefore it requires an extra pass.
+.\" .i Beg
+.\" is a \fIb\fPack \fIe\fPnd \fIg\fPenerator that produces modules for code selection
+.\" and for register allocation\*([<\*([[ESL89\*(]]\*(>].
+.\" The code selectors are specified in a strictly declarative style. A specification consists of
+.\" a description of the input language and a set of rules. The input language is basically an
+.\" attributed tree. However, this tree is not stored in memory, it is transferred by a series of
+.\" procedure calls.
+.\" .i Beg
+.\" generates a procedure for every node type or operator respectively. The parameters of the
+.\" procedures describe the sons or operands and the attributes.
+.\" .pp
+.\" The rules consist of a pattern and an action. Again, the actions are formulated using
+.\" statements of the target language. This gives a large degree of freedom  and allows for
+.\" example the production of readable assembly code as well as binary machine code. The actions
+.\" may also evaluate attributes during code selection. Again, the application of rules can be
+.\" restricted by conditions and costs may be used to resolve ambiguities.
+.\" Pattern-matching is implemented by a directly coded dynamic programming algorithm.
+.\" It works in two phases where the first one determines the applicable and cheapest patterns
+.\" and the second one executes the associated actions.
+.\" .pp
+.\" Two kinds of register allocators can be requested. The on the fly register allocator provides
+.\" satisfying results for many simple machines. In some cases, however, the general register
+.\" allocator is necessary which performs some kind of look-ahead. It therefore minimizes the
+.\" generation of register copy and register spilling operations. While the on the fly register
+.\" allocator is integrated with the actions, the general method requires an additional phase.
+.sh 2 Reuse
+.pp
+.i Reuse
+is a library of reusable modules oriented towards compiler construction
+\*([[Grod\*(],Groe\*(]].
+It contains modules or abstract data types which are needed in almost every compiler:
+.ip -
+a dynamic storage handler
+.ip -
+a module that provides dynamic and flexible arrays
+.ip -
+a facility to store strings of arbitrary length
+.ip -
+a module for string handling
+.ip -
+an identifier table which maps strings to unique integers using hashing
+.ip -
+modules for commonly used data structures such as sets of integers or binary relations
+between integers with no limitation of the domain
+.sh 1 "Application Experiences"
+.pp
+This section reports the experience of applying the tool box for realistic problems.
+.sh 2 "Modula to C Translator"
+.pp
+The largest application for the tool box so far was the generation of a Modula-2 to C
+translator\*([<\*([[Mar90\*(]]\*(>]. The program called
+.i Mtc
+translates Modula-2 programs into readable C code without any restrictions
+(even nested procedures and modules).
+It is largely generated and follows the compiler model proposed in section 4.
+Instead of generating an intermediate language,
+.i Mtc
+produces C code and therefore there is no need for a machine code generator.
+It incorporates as much of a semantic analysis as is needed for this task.
+The semantic analysis is rather complete and contains scope handling, name analysis, and type
+determination. However it does not check for semantic errors, as we assume that only correct
+programs will be translated.
+Table 1 gives the sizes of the specifications and the generated source modules.
+The design and implementation of
+.i Mtc
+was completed within a master thesis and took approximately 6 person months.
+The program is stable and has already converted more than 100,000 lines from Modula-2 to C.
+.(z
+.TS
+center box;
+l2 |2 c2 s2 s2 |2 c2 s2 s2 |2 c1 s
+l2 |2 l2 l2 l2 |2 l2 l2 l2 |2 l1 l
+l2 |2 n2 n2 n2 |2 n2 n2 n2 |2 l1 l
+.
+part	specification	source module	tool
+_
+	formal	code	total	def.	impl.	total	name	references
+_
+scanner 	392	133	525	56	1320	1376	Rex	\*([[Gro88\*(],Gro\*(]]
+parser  	951	88	1039	81	3007	3088	Ell	\*([[Gro88\*(],GrV\*(]]
+tree    	189	51	240	579	2992	3571	Ast	\*([[Grof\*(]]
+symbol table   	115	938	1053	413	1475	1888	Ast	\*([[Grof\*(]]
+semantics	1886	151	2037	9	3288	3297	Ag	\*([[Groc\*(]]
+code generator	2793	969	3762	47	7309	7356	Estra	\*([[Vie89\*(]]
+reusable parts	-	-	-	819	2722	3541	Reuse	\*([[Grod\*(],Groe\*(]]
+miscellaneous	-	-	-	698	3153	3851
+_
+total   	6326	2330	8656	2702	25266	27968
+.TE
+.sp 0.5
+.ce
+Table 1: Sizes of the specifications and source modules of \fIMtc
+.)z
+.pp
+The binary program comprises 301,240 bytes.
+It runs at a speed of 810 tokens per second or 167 lines per second on a SUN
+workstation (MC 68020 processor). This figures are computed by taking only
+the size of the translated modules into account. If we include the definition
+modules which are imported transitively and which are scanned, parsed, and
+analyzed as well, we arrive at 1320 tokens per second
+or 418 lines per second. In comparison, the compilers supplied by the
+manufacturer run at a speed of 97 lines per second (excluding header files)
+or 163 lines per second (including header files) in the case of C
+and 48 lines per second in the case of Modula-2. The run time of
+.i Mtc
+is distributed as follows:
+.(b
+.TS
+center;
+l l.
+scanning + parsing + tree construction	42 %
+semantic analysis	33 %
+code generation 	25 %
+.TE
+.)b
+The semantic analysis spends 95 % in attribute computations using user
+supplied code and 5 % in tree traversal or visit actions respectively.
+By the way, there are up to five visits to 11 node types.
+.pp
+.i Mtc
+uses approximately 360 K Bytes dynamic memory per 1000 source lines to store
+the abstract syntax tree, the attributes, and the symbol table without optimization of
+attribute storage. Another 600 K Bytes are used by the transformer generated with
+.i Estra .
+This is bearable with today's memory capacities.
+Contrary to the literature this shows that it is
+possible to store all attributes in the tree. We even do this for the
+environment attribute. This becomes possible by implementing the symbol
+table as an abstract data type in the target language. The implementation is
+time and space efficient by taking advantage of pointer semantics and
+structure sharing.
+.sh 2 "Code Generator for Modula-2 Compiler"
+.pp
+In another application we replaced the hand-written code generator of the
+GMD Modula-2 compiler
+.i Mocka
+by two versions produced by
+.i Beg .
+Target machine was the MC 68020 processor. The specification of the code generator
+comprises 1625 lines. It contains 187 rules and 99 intermediate language operators. To
+compare the quality of the generated code, we measured the execution time for a collection of
+benchmark programs (see Table 2).
+.(z
+.sz -2
+.TS
+center box tab(;);
+l2 ||2 c2 |2 c2 |2 c2 |2 c2 |2 c2 |2 c2 |2 c2 |2 c2 |2 c2 |2 c2 |2 c.
+ ;Perm;Towers;Queens;Intmm;Mm;Puzzle;Quick;Tree;Bubble;FFT;\(*S
+_
+Mocka ;40;58;37;53;103;285;32;72;56;152;888
+Begra ;42;57;35;54;104;297;32;58;56;153;888
+Begfly;42;57;34;54;102;299;33;56;56;151;884
+Sun   ;67;90;28;83;101;263;41;81;63;150;967
+.TE
+.sz +2
+.sp
+.ce
+Table 2: Comparison of code quality (run times in \fIticks\fP = 1/60 seconds)
+.)z
+.i Mocka
+denotes the GMD Modula-2 compiler with the hand-written code generator,
+.i Begra
+and
+.i Begfly
+refer to the code generators produced by
+.i Beg
+with the general register allocator and the on the fly register allocator respectively, and
+.i Sun
+is the SUN Modula-2 compiler version 1.0. On the average code generators produced by
+.i Beg
+generate code that is as fast as the one from the hand-written code generator.
+.\" It is 8% faster than the code produced by the SUN Modula-2 compiler.
+.(z
+.TS
+center box tab(;);
+l | n.
+Mocka ;2.9
+Begfly;3.2
+Begra ;3.9
+Sun   ;25.4
+.TE
+.sp
+.ce
+Table 3: Comparison of compilation times (times in sec.)
+.)z
+.pp
+Table 3 compares the run times of the compilers for processing a program with 1116 lines. All
+measurements were carried out on a diskless SUN 3/60, all measured times are user times. The
+size of the code generator increased from 5140 lines (17,117 tokens) for the hand-written
+version to 9574 lines (27,044 tokens).
+.sh 1 "Summary and Future Work"
+.pp
+We presented a complete tool box of compiler construction tools which supports the
+construction of all phases of a compiler. The tools are very powerful and flexible and
+largely independent of each other. They support a wide range of compiler designs and
+allow the construction of production quality compilers for many programming languages.
+First realistic applications demonstrate the excellent performance of the tools.
+.\" .pp
+.\" We are planning to improve the existing tools and to construct some more tools.
+.\" Currently a tool is being implemented which allows to describe the attribution mechanism of
+.\" .i Lalr
+.\" in a symbolic way and checks it for completeness and whether it fulfills the property of an
+.\" S-attribution. Furthermore, the specification of the scanner is extracted largely out of the
+.\" parser specification. Therefore the coding of the tokens is determined automatically and
+.\" hence it is consistent in both, scanner and parser specification.
+.pp
+The optimization of attribute storage of
+.i Ag
+will be improved allowing attributes to be treated as global variables and global stacks.
+The transformation of non-OAG grammars into OAG ones should be automized.
+.pp
+A redesign is planned for the tool
+.i Estra .
+The specification language will become simpler and clearer and the tool will be integrated
+better with
+.i Ast .
+The efficiency of the generated transformation modules can be improved both in terms of run
+time and storage consumption.
+.pp
+The optimization phase of a compiler clearly needs to be supported. This could be either done
+by a reusable, language independent optimizer, by an optimizer which can be parameterized, or
+by some means of an optimizer generator.
+.pp
+The tool
+.i Beg
+will be extended in the directions of the generation of a global register allocator,
+support for instruction scheduling, and a facility for the direct generation of binary
+object code.
+.uh Acknowledgement
+.pp
+We thank all that have contributed to the development of this toolbox either by active
+participation or with their ideas:
+Michael Besser,
+Carsten Gerlhof,
+Bob Gray,
+Rudolf Landwehr,
+Matthias Martin,
+Thomas M\*uller,
+F. W. Schr\*oer,
+Dirk Schwartz-Hertzner,
+Doris Vielsack,
+Bertram Vielsack und
+William M. Waite.
+.fi
+.sz 12
+.[]
+.[-
+.ds [F ASU86
+.ds [A A\*(p]\*(a]V\*(p] Aho
+.as [A \*(c]R\*(p] Sethi
+.as [A \*(m]J\*(p]\*(a]D\*(p] Ullman
+.ds [T Compilers: Principles, Techniques, and Tools
+.ds [I Addison Wesley
+.ds [C Reading, M\&A
+.ds [D 1986
+.][
+.[-
+.ds [F DeP82
+.ds [A F\*(p] DeRemer
+.as [A \*(n]T\*(p]\*(a]J\*(p] Pennello
+.ds [T Efficient Computation of LALR(1) Look-Ahead Sets
+.ds [J ACM Trans. Prog. Lang. and Systems
+.ds [V 4
+.nr [P 1
+.ds [P 615-649
+.ds [N 4
+.ds [D Oct. 1982
+.][
+.[-
+.ds [F Emm89a
+.ds [A H\*(p] Emmelmann
+.ds [T Automatische Erzeugung effizienter Codegeneratoren
+.ds [R GMD-Studie Nr. 158
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D 1989
+.][
+.[-
+.ds [F Emm89b
+.ds [A H\*(p] Emmelmann
+.ds [T BEG - A Back End Generator - User Manual
+.ds [R Arbeitspapier Nr. 420
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Dec. 1989
+.][
+.[-
+.ds [F ESL89
+.ds [A H\*(p] Emmelmann
+.as [A \*(c]F\*(p]\*(a]W\*(p] Schr\\*oer
+.as [A \*(m]R\*(p] Landwehr
+.ds [T BEG - a Generator for Efficient Back Ends
+.ds [J SI\&GPLAN Notices
+.ds [V 24
+.ds [N 7
+.nr [P 1
+.ds [P 227-237
+.ds [D July 1989
+.][
+.[-
+.ds [F Gro88
+.ds [A J\*(p] Grosch
+.ds [T Generators for High-Speed Front-Ends
+.ds [V 371
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 81-92
+.ds [D Oct. 1988
+.][
+.[-
+.ds [F Gro89
+.ds [A J\*(p] Grosch
+.ds [T Efficient Generation of Lexical Analysers
+.ds [J Software\(emPractice & Experience
+.ds [V 19
+.ds [N 11
+.nr [P 1
+.ds [P 1089-1103
+.ds [D Nov. 1989
+.][
+.[-
+.ds [F Gro90
+.ds [A J\*(p] Grosch
+.ds [T Object-Oriented Attribute Grammars
+.ds [E A\*(p]\*(a]E\*(p] Harmanci
+.as [E \*(n]E\*(p] Gelenbe
+.nr [E 2
+.ds [B Proceedings of the Fifth International Symposium on Computer and Information Sciences (ISCIS V)
+.ds [C Cappadocia, Nevsehir, Turkey
+.nr [P 1
+.ds [P 807-816
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Gro91
+.ds [A J\*(p] Grosch
+.ds [T Tool Support for Data Structures
+.ds [J Structured Programming
+.ds [V 12
+.nr [P 1
+.ds [P 31-38
+.ds [D 1991
+.][
+.[-
+.ds [F Gro
+.ds [A J\*(p] Grosch
+.ds [T Rex - A Scanner Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 5
+.ds [N 5
+.][
+.[-
+.ds [F GrV
+.ds [A J\*(p] Grosch
+.as [A \*(n]B\*(p] Vielsack
+.ds [T The Parser Generators Lalr and Ell
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 8
+.ds [N 8
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Efficient and Comfortable Error Recovery in Recursive Descent Parsers
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 19
+.ds [N 19
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Ast - A Generator for Abstract Syntax Trees
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 15
+.ds [N 15
+.][
+.[-
+.ds [F Groc
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F Grod
+.ds [A J\*(p] Grosch
+.ds [T Reusable Software - A Collection of Modula-Modules
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 4
+.ds [N 4
+.][
+.[-
+.ds [F Groe
+.ds [A J\*(p] Grosch
+.ds [T Reusable Software - A Collection of C-Modules
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 30
+.ds [N 30
+.][
+.[-
+.ds [F Grof
+.ds [A J\*(p] Grosch
+.ds [T Ast - A Generator for Abstract Syntax Trees (Revised Version)
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 15
+.ds [N 15
+.][
+.[-
+.ds [F Joh75
+.ds [A S\*(p]\*(a]C\*(p] Johnson
+.ds [T Yacc \(em  Yet Another Compiler-Compiler
+.ds [R Computer Science Technical Report 32
+.ds [I Bell Telephone Laboratories
+.ds [C Murray Hill, NJ
+.ds [D July 1975
+.][
+.[-
+.ds [F Kas80
+.ds [A U\*(p] Kastens
+.ds [T Ordered Attribute Grammars
+.nr [P 1
+.ds [P 229-256
+.ds [J Acta Inf.
+.ds [V 13
+.ds [D 1980
+.ds [N 3
+.][
+.[-
+.ds [F Les75
+.ds [A M\*(p]\*(a]E\*(p] Lesk
+.ds [T LEX \(em A Lexical Analyzer Generator
+.ds [R Computing Science Technical Report 39
+.ds [I Bell Telephone Laboratories
+.ds [C Murray Hill, NJ
+.ds [D 1975
+.][
+.[-
+.ds [F Mar90
+.ds [A M\*(p] Martin
+.ds [T Entwurf und Implementierung eines \\*Ubersetzers von Modula-2 nach C
+.ds [R Diplomarbeit
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Feb. 1990
+.][
+.[-
+.ds [F Vie89
+.ds [A B\*(p] Vielsack
+.ds [T Spezifikation und Implementierung der Transformation attributierter B\\*aume
+.ds [R Diplomarbeit
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D June 1989
+.][
+.[-
+.ds [F VSK89
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.as [A \*(c]S\*(p]\*(a]D\*(p] Swierstra
+.as [A \*(m]M\*(p]\*(a]F\*(p] Kuiper
+.ds [T Higher Order Attribute Grammars
+.ds [J SI\&GPLAN Notices
+.ds [V 24
+.ds [N 7
+.nr [P 1
+.ds [P 131-145
+.ds [D July 1989
+.][
+.[-
+.ds [F Vog93
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.ds [T Higher Order Attribute Grammars
+.ds [I PhD Thesis, University of Utrecht
+.ds [D Feb. 1993
+.][
+.bp 1
+.lp
+.b Contents
+.sp
+.xp

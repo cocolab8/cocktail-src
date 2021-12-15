@@ -1,0 +1,605 @@
+
+
+IMPLEMENTATION MODULE tsl;
+
+IMPORT SYSTEM, rSystem, IO, Tree;
+(* line 5 "tsl.puma" *)
+
+
+FROM IO		IMPORT StdOutput, WriteS, WriteI, WriteN, WriteNl;
+FROM Strings	IMPORT tString, ArrayToString, StringToArray;
+FROM Idents	IMPORT tIdent, MakeIdent, GetLength, GetString, WriteIdent;
+FROM Tree	IMPORT Test, Dummy, Reverse;
+
+VAR
+  ichar			,
+  icpp_tconvention	,
+  icpp_thash_table	,
+  icpp_tkind		,
+  icpp_toperator	,
+  icpp_tspecifier	,
+  iint			,
+  irbool		,
+  ishort		,
+  itIdent		,
+  itPosition		,
+  itStringRef		,
+  itcpp_tree		,
+  ius_long		,
+  ius_short		,
+  elmt_name		: tIdent;
+
+PROCEDURE is_next (ident: tIdent): BOOLEAN;
+VAR
+  s: tString;
+  a: ARRAY [1..5] OF CHAR;
+  i: CARDINAL;
+BEGIN
+  IF GetLength (ident) # 4 THEN RETURN FALSE; END;
+  GetString (ident, s);
+  StringToArray (s, a);
+  FOR i := 1 TO 4 DO
+    IF ('A' <= a [i]) AND (a [i] <= 'Z') THEN
+      a [i] := CHR (ORD (a [i]) - ORD ('A') + ORD ('a'));
+    END;
+  END;
+  RETURN (a [1] = 'n') AND (a [2] = 'e') AND (a [3] = 'x') AND (a [4] = 't');
+END is_next;
+
+PROCEDURE is_no (ident: tIdent): BOOLEAN;
+VAR
+  s: tString;
+  a: ARRAY [1..256] OF CHAR;
+  i: CARDINAL;
+BEGIN
+  IF GetLength (ident) < 2 THEN RETURN FALSE; END;
+  GetString (ident, s);
+  StringToArray (s, a);
+  FOR i := 1 TO 2 DO
+    IF ('A' <= a [i]) AND (a [i] <= 'Z') THEN
+      a [i] := CHR (ORD (a [i]) - ORD ('A') + ORD ('a'));
+    END;
+  END;
+  RETURN (a [1] = 'n') AND (a [2] = 'o');
+END is_no;
+
+PROCEDURE write_ident (ident: tIdent);
+BEGIN
+  WriteIdent (StdOutput, ident);
+END write_ident;
+
+PROCEDURE MI (VAR array: ARRAY OF CHAR): tIdent;
+VAR string: tString;
+BEGIN
+  ArrayToString (array, string);
+  RETURN MakeIdent (string);
+END MI;
+
+
+VAR
+
+
+PROCEDURE yyAbort (yyFunction: ARRAY OF CHAR);
+ BEGIN
+  IO.WriteS (IO.StdError, 'Error: module tsl, routine ');
+  IO.WriteS (IO.StdError, yyFunction);
+  IO.WriteS (IO.StdError, ' failed');
+  IO.WriteNl (IO.StdError);
+  Exit;
+ END yyAbort;
+
+PROCEDURE yyIsEqual (yya, yyb: ARRAY OF SYSTEM.BYTE): BOOLEAN;
+ VAR yyi	: INTEGER;
+ BEGIN
+  FOR yyi := 0 TO INTEGER (HIGH (yya)) DO
+   IF yya [yyi] # yyb [yyi] THEN RETURN FALSE; END;
+  END;
+  RETURN TRUE;
+ END yyIsEqual;
+
+PROCEDURE tsl (yyP1: Tree.tTree);
+ VAR yyTempo: RECORD CASE : INTEGER OF
+ | 3: yyR3: RECORD
+  yyE6948976: RECORD
+  list: BOOLEAN;
+  END;
+  END;
+ END; END;
+ BEGIN
+  LOOP LOOP
+  IF yyP1 = Tree.NoTree THEN RETURN; END;
+  IF (yyP1 # NIL) AND (yyP1^.Kind = Tree.Ag) THEN
+(* line 109 "tsl.puma" *)
+     WITH yyP1^.Ag DO
+(* line 110 "tsl.puma" *)
+      IO.WriteS (yyf, "base-package = com.cocolab.cxx;");
+(* line 110 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 111 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 112 "tsl.puma" *)
+      IO.WriteS (yyf, "type _ref");
+(* line 112 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 113 "tsl.puma" *)
+      IO.WriteS (yyf, "  attributes");
+(* line 113 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 114 "tsl.puma" *)
+      IO.WriteS (yyf, "  <");
+(* line 114 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 115 "tsl.puma" *)
+      IO.WriteS (yyf, "    _addr = string // pointer to tree node");
+(* line 115 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 116 "tsl.puma" *)
+      IO.WriteS (yyf, "  >");
+(* line 116 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 117 "tsl.puma" *)
+      IO.WriteS (yyf, "end-type");
+(* line 117 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 118 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 119 "tsl.puma" *)
+      IO.WriteS (yyf, "type _node abstract");
+(* line 119 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 120 "tsl.puma" *)
+      IO.WriteS (yyf, "  attributes");
+(* line 120 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 121 "tsl.puma" *)
+      IO.WriteS (yyf, "  <");
+(* line 121 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 122 "tsl.puma" *)
+      IO.WriteS (yyf, "    _addr = string // address of tree node");
+(* line 122 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 123 "tsl.puma" *)
+      IO.WriteS (yyf, "  >");
+(* line 123 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 124 "tsl.puma" *)
+      IO.WriteS (yyf, "end-type");
+(* line 124 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 125 "tsl.puma" *)
+      yyP1 := Classes;
+      EXIT;
+     END;
+
+  END;
+  IF (yyP1 # NIL) AND (yyP1^.Kind = Tree.Class) THEN
+(* line 127 "tsl.puma" *)
+     WITH yyP1^.Class DO
+(* line 128 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 129 "tsl.puma" *)
+      IO.WriteS (yyf, "type ");
+(* line 129 "tsl.puma" *)
+      write_ident (Name);
+(* line 129 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 130 "tsl.puma" *)
+      yyb := FALSE;
+      LOOP
+      IF (yyP1^.Class.BaseClass = NIL) OR (yyP1^.Class.BaseClass^.Kind # Tree.Class) THEN EXIT; END;
+      yyb := TRUE; EXIT;
+      END;
+      IF yyb THEN
+(* line 131 "tsl.puma" *)
+      IO.WriteS (yyf, "  parent (");
+(* line 131 "tsl.puma" *)
+      write_ident (yyP1^.Class.BaseClass^.Class.Name);
+(* line 131 "tsl.puma" *)
+      IO.WriteS (yyf, ")");
+(* line 131 "tsl.puma" *)
+      IO.WriteNl (yyf);
+      ELSE
+(* line 133 "tsl.puma" *)
+      IO.WriteS (yyf, "  parent (_node)");
+(* line 133 "tsl.puma" *)
+      IO.WriteNl (yyf);
+      END;
+(* line 135 "tsl.puma" *)
+      IF have_members (yyP1^.Class.Attributes) THEN
+(* line 136 "tsl.puma" *)
+      IO.WriteS (yyf, "  attributes");
+(* line 136 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 137 "tsl.puma" *)
+      IO.WriteS (yyf, "  <");
+(* line 137 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 138 "tsl.puma" *)
+      tsl (yyP1^.Class.Attributes);
+(* line 139 "tsl.puma" *)
+      IO.WriteS (yyf, "  >");
+(* line 139 "tsl.puma" *)
+      IO.WriteNl (yyf);
+      END;
+(* line 141 "tsl.puma" *)
+      IO.WriteS (yyf, "end-type");
+(* line 141 "tsl.puma" *)
+      IO.WriteNl (yyf);
+(* line 142 "tsl.puma" *)
+      tsl (Extensions);
+(* line 143 "tsl.puma" *)
+      yyP1 := Next;
+      EXIT;
+     END;
+
+  END;
+  IF (yyP1 # NIL) AND (yyP1^.Kind = Tree.Child) THEN
+(* line 145 "tsl.puma" *)
+    WITH yyTempo.yyR3 DO
+     WITH yyP1^.Child DO
+(* line 146 "tsl.puma" *)
+      IF (Reverse IN Properties) AND is_next (Name) THEN
+      ELSE
+      WITH yyE6948976 DO
+(* line 148 "tsl.puma" *)
+      list := is_list (Class);
+(* line 149 "tsl.puma" *)
+      IO.WriteS (yyf, "    ");
+(* line 149 "tsl.puma" *)
+      write_ident (Name);
+(* line 149 "tsl.puma" *)
+      IO.WriteS (yyf, " = ");
+(* line 150 "tsl.puma" *)
+      IF list THEN
+(* line 151 "tsl.puma" *)
+      IO.WriteS (yyf, "list [");
+(* line 151 "tsl.puma" *)
+      write_ident (elmt_name);
+(* line 151 "tsl.puma" *)
+      IO.WriteS (yyf, "]");
+      ELSE
+(* line 152 "tsl.puma" *)
+      write_ident (Type);
+      END;
+(* line 154 "tsl.puma" *)
+      IF have_members (Next) THEN
+(* line 154 "tsl.puma" *)
+      IO.WriteS (yyf, ",");
+      END;
+(* line 155 "tsl.puma" *)
+      IF list THEN
+(* line 155 "tsl.puma" *)
+      IO.WriteS (yyf, " // ");
+(* line 155 "tsl.puma" *)
+      write_ident (Type);
+      END;
+(* line 156 "tsl.puma" *)
+      IO.WriteNl (yyf);
+      END;
+      END;
+(* line 158 "tsl.puma" *)
+      yyP1 := Next;
+      EXIT;
+     END;
+    END;
+
+  END;
+  IF (yyP1 # NIL) AND (yyP1^.Kind = Tree.Attribute) THEN
+(* line 160 "tsl.puma" *)
+     WITH yyP1^.Attribute DO
+(* line 161 "tsl.puma" *)
+      IF {Test, Dummy} * Properties = {} THEN
+(* line 162 "tsl.puma" *)
+      IO.WriteS (yyf, "    ");
+(* line 162 "tsl.puma" *)
+      write_ident (Name);
+(* line 162 "tsl.puma" *)
+      IO.WriteS (yyf, " = ");
+(* line 162 "tsl.puma" *)
+      write_type (Type);
+(* line 163 "tsl.puma" *)
+      IF have_members (Next) THEN
+(* line 163 "tsl.puma" *)
+      IO.WriteS (yyf, ",");
+      END;
+(* line 163 "tsl.puma" *)
+      IO.WriteS (yyf, " // ");
+(* line 163 "tsl.puma" *)
+      write_ident (Type);
+(* line 163 "tsl.puma" *)
+      IO.WriteNl (yyf);
+      END;
+(* line 165 "tsl.puma" *)
+      yyP1 := Next;
+      EXIT;
+     END;
+
+  END;
+  IF Tree.IsType (yyP1, Tree.AttrOrAction) THEN
+(* line 167 "tsl.puma" *)
+     WITH yyP1^.AttrOrAction DO
+(* line 168 "tsl.puma" *)
+      yyP1 := Next;
+      EXIT;
+     END;
+
+  END;
+   RETURN;
+  END; END;
+ END tsl;
+
+PROCEDURE write_type (yyP2: tIdent);
+ VAR yyTempo: RECORD CASE : INTEGER OF
+ END; END;
+ BEGIN
+  IF ((yyP2) = ( (ichar))) THEN
+(* line 173 "tsl.puma" *)
+(* line 173 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (icpp_tconvention))) THEN
+(* line 174 "tsl.puma" *)
+(* line 174 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (icpp_thash_table))) THEN
+(* line 175 "tsl.puma" *)
+(* line 175 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (icpp_tkind))) THEN
+(* line 176 "tsl.puma" *)
+(* line 176 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (icpp_toperator))) THEN
+(* line 177 "tsl.puma" *)
+(* line 177 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (icpp_tspecifier))) THEN
+(* line 178 "tsl.puma" *)
+(* line 178 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (iint))) THEN
+(* line 179 "tsl.puma" *)
+(* line 179 "tsl.puma" *)
+      IO.WriteS (yyf, "int");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (irbool))) THEN
+(* line 180 "tsl.puma" *)
+(* line 180 "tsl.puma" *)
+      IO.WriteS (yyf, "boolean");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (ishort))) THEN
+(* line 181 "tsl.puma" *)
+(* line 181 "tsl.puma" *)
+      IO.WriteS (yyf, "int");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (itIdent))) THEN
+(* line 182 "tsl.puma" *)
+(* line 182 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (itPosition))) THEN
+(* line 183 "tsl.puma" *)
+(* line 183 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (itStringRef))) THEN
+(* line 184 "tsl.puma" *)
+(* line 184 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (itcpp_tree))) THEN
+(* line 185 "tsl.puma" *)
+(* line 185 "tsl.puma" *)
+      IO.WriteS (yyf, "string");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (ius_long))) THEN
+(* line 186 "tsl.puma" *)
+(* line 186 "tsl.puma" *)
+      IO.WriteS (yyf, "int");
+      RETURN;
+
+  END;
+  IF ((yyP2) = ( (ius_short))) THEN
+(* line 187 "tsl.puma" *)
+(* line 187 "tsl.puma" *)
+      IO.WriteS (yyf, "int");
+      RETURN;
+
+  END;
+ END write_type;
+
+PROCEDURE have_members (yyP3: Tree.tTree): BOOLEAN;
+ VAR yyTempo: RECORD CASE : INTEGER OF
+ END; END;
+ BEGIN
+  LOOP LOOP
+  IF yyP3 = Tree.NoTree THEN RETURN FALSE; END;
+  IF (yyP3 # NIL) AND (yyP3^.Kind = Tree.Child) THEN
+(* line 191 "tsl.puma" *)
+   LOOP
+     WITH yyP3^.Child DO
+(* line 192 "tsl.puma" *)
+      IF NOT ((Reverse IN Properties) AND is_next (Name)) THEN EXIT; END;
+(* line 193 "tsl.puma" *)
+      IF NOT have_members (Next) THEN
+(* line 193 "tsl.puma" *)
+      RETURN FALSE;
+      END;
+      RETURN TRUE;
+     END;
+   END;
+
+(* line 195 "tsl.puma" *)
+      RETURN TRUE;
+
+  END;
+  IF (yyP3 # NIL) AND (yyP3^.Kind = Tree.Attribute) THEN
+(* line 197 "tsl.puma" *)
+   LOOP
+     WITH yyP3^.Attribute DO
+(* line 198 "tsl.puma" *)
+      IF NOT ({Test, Dummy} * Properties = {}) THEN EXIT; END;
+      RETURN TRUE;
+     END;
+   END;
+
+  END;
+  IF Tree.IsType (yyP3, Tree.AttrOrAction) THEN
+(* line 200 "tsl.puma" *)
+     WITH yyP3^.AttrOrAction DO
+(* line 201 "tsl.puma" *)
+      yyP3 := Next;
+      EXIT;
+     END;
+
+  END;
+  RETURN FALSE;
+  END; END;
+ END have_members;
+
+PROCEDURE is_list (yyP4: Tree.tTree): BOOLEAN;
+ VAR yyTempo: RECORD CASE : INTEGER OF
+ END; END;
+ BEGIN
+  IF yyP4 = Tree.NoTree THEN RETURN FALSE; END;
+(* line 206 "tsl.puma" *)
+   LOOP
+     WITH yyP4^.Class DO
+(* line 207 "tsl.puma" *)
+      IF NOT (have_iterator (Attributes)) THEN EXIT; END;
+(* line 208 "tsl.puma" *)
+      elmt_name := Name;
+      RETURN TRUE;
+     END;
+   END;
+
+(* line 210 "tsl.puma" *)
+   LOOP
+     WITH yyP4^.Class DO
+(* line 211 "tsl.puma" *)
+      IF NOT (have_iterator (Extensions)) THEN EXIT; END;
+      RETURN TRUE;
+     END;
+   END;
+
+  RETURN FALSE;
+ END is_list;
+
+PROCEDURE have_iterator (yyP5: Tree.tTree): BOOLEAN;
+ VAR yyTempo: RECORD CASE : INTEGER OF
+ END; END;
+ BEGIN
+  LOOP LOOP
+  IF yyP5 = Tree.NoTree THEN RETURN FALSE; END;
+  IF (yyP5 # NIL) AND (yyP5^.Kind = Tree.Class) THEN
+(* line 216 "tsl.puma" *)
+   LOOP
+     WITH yyP5^.Class DO
+(* line 217 "tsl.puma" *)
+      IF NOT (have_iterator (Attributes)) THEN EXIT; END;
+(* line 218 "tsl.puma" *)
+      elmt_name := Name;
+      RETURN TRUE;
+     END;
+   END;
+
+(* line 220 "tsl.puma" *)
+     WITH yyP5^.Class DO
+(* line 221 "tsl.puma" *)
+      yyP5 := Next;
+      EXIT;
+     END;
+
+  END;
+  IF (yyP5 # NIL) AND (yyP5^.Kind = Tree.Child) THEN
+(* line 223 "tsl.puma" *)
+   LOOP
+     WITH yyP5^.Child DO
+(* line 224 "tsl.puma" *)
+      IF NOT ((Reverse IN Properties) AND is_next (Name)) THEN EXIT; END;
+      RETURN TRUE;
+     END;
+   END;
+
+  END;
+  IF Tree.IsType (yyP5, Tree.AttrOrAction) THEN
+(* line 226 "tsl.puma" *)
+     WITH yyP5^.AttrOrAction DO
+(* line 227 "tsl.puma" *)
+      yyP5 := Next;
+      EXIT;
+     END;
+
+  END;
+  RETURN FALSE;
+  END; END;
+ END have_iterator;
+
+PROCEDURE Begintsl;
+ BEGIN
+(* line 78 "tsl.puma" *)
+
+  ichar			:= MI ("char");
+  icpp_tconvention	:= MI ("cpp_tconvention");
+  icpp_thash_table	:= MI ("cpp_thash_table");
+  icpp_tkind		:= MI ("cpp_tkind");
+  icpp_toperator	:= MI ("cpp_toperator");
+  icpp_tspecifier	:= MI ("cpp_tspecifier");
+  iint			:= MI ("int");
+  irbool		:= MI ("rbool");
+  ishort		:= MI ("short");
+  itIdent		:= MI ("tIdent");
+  itPosition		:= MI ("tPosition");
+  itStringRef		:= MI ("tStringRef");
+  itcpp_tree		:= MI ("tcpp_tree");
+  ius_long		:= MI ("us_long");
+  ius_short		:= MI ("us_short");
+
+ END Begintsl;
+
+PROCEDURE Closetsl;
+ BEGIN
+ END Closetsl;
+
+PROCEDURE yyExit;
+ BEGIN
+  IO.CloseIO; rSystem.rExit (1);
+ END yyExit;
+
+BEGIN
+ yyf	:= IO.StdOutput;
+ Exit	:= yyExit;
+ Begintsl;
+END tsl.

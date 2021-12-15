@@ -1,0 +1,225 @@
+(* $Id: Tree.mi,v 3.7 2001/08/08 14:57:56 grosch rel $ *)
+
+(*
+ * $Log: Tree.mi,v $
+ * Revision 3.7  2001/08/08 14:57:56  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 3.6  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 3.5  1998/04/21 10:32:57  grosch
+ * cosmetic changes
+ * truncation of file and module names to 8.3 format
+ *
+ * Revision 3.4  1994/04/05 09:11:01  grosch
+ * added handling of CHARACTER_SET
+ *
+ * Revision 3.3  1993/08/18  15:10:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 3.2  1992/08/07  15:10:26  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 3.1  1991/11/21  14:41:19  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.0  91/04/04  18:08:05  grosch
+ * introduced partitioning of character set
+ *
+ * Revision 2.0  91/03/08  18:18:09  grosch
+ * turned tables into initialized arrays (in C)
+ * reduced case size
+ * changed interface for source position
+ *
+ * Revision 1.2  89/02/23  15:56:03  grosch
+ * added completeness check for the automaton
+ *
+ * Revision 1.1  89/01/17  15:01:45  grosch
+ * correction and redesign of source position handling
+ *
+ * Revision 1.0  88/10/04  11:59:55  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Nov. 1987 *)
+
+IMPLEMENTATION MODULE Tree;
+
+FROM SYSTEM	IMPORT TSIZE;
+FROM rMemory	IMPORT Alloc;
+FROM Texts	IMPORT tText, WriteText;
+FROM Sets	IMPORT tSet, WriteSet;
+FROM WStrings	IMPORT WCHAR, tString;
+FROM StringM	IMPORT tWStringRef, GetWString;
+FROM IO		IMPORT StdOutput, WriteS, WriteI, WriteNl, WriteB;
+FROM Layout	IMPORT WriteSpace;
+FROM Position	IMPORT tPosition;
+FROM Idents	IMPORT tIdent;
+FROM UniCode	IMPORT WriteChar;
+
+IMPORT WStrings;
+
+PROCEDURE MakeTree1 (pRule: SHORTCARD; pSon1: tTree): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (Node1));
+      WITH Tree^.vNode1 DO
+	 Rule := pRule;
+	 Son1 := pSon1;
+      END;
+      RETURN Tree;
+   END MakeTree1;
+
+PROCEDURE MakeTree2 (pRule: SHORTCARD; pSon1, pSon2: tTree): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (Node2));
+      WITH Tree^.vNode2 DO
+	 Rule := pRule;
+	 Son1 := pSon1;
+	 Son2 := pSon2;
+      END;
+      RETURN Tree;
+   END MakeTree2;
+
+PROCEDURE MakeTreeCh (pRule: SHORTCARD; pCh: WCHAR): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (NodeCh));
+      WITH Tree^.vNodeCh DO
+	 Rule := pRule;
+	 Ch   := pCh;
+      END;
+      RETURN Tree;
+   END MakeTreeCh;
+
+PROCEDURE MakeTreeSet (pRule: SHORTCARD; pSet: tSet): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (NodeSet));
+      WITH Tree^.vNodeSet DO
+	 Rule := pRule;
+	 Set  := pSet;
+      END;
+      RETURN Tree;
+   END MakeTreeSet;
+
+PROCEDURE MakeTreeString(pRule: SHORTCARD; pString: tWStringRef): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (NodeString));
+      WITH Tree^.vNodeString DO
+	 Rule	:= pRule;
+	 String	:= pString;
+      END;
+      RETURN Tree;
+   END MakeTreeString;
+
+PROCEDURE MakeTreeRule	(pRule: SHORTCARD; pPatterns: tTree; pTargetCode: tText;
+			 pFile: tIdent; pLine: CARDINAL;
+			 pCodeMode, pRuleNr: SHORTCARD): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (NodeRule));
+      WITH Tree^.vNodeRule DO
+	 Rule		:= pRule;
+	 Patterns	:= pPatterns;
+	 TargetCode	:= pTargetCode;
+	 File		:= pFile;
+	 Line		:= pLine;
+	 CodeMode	:= pCodeMode;
+	 RuleNr		:= pRuleNr;
+      END;
+      RETURN Tree;
+   END MakeTreeRule;
+
+PROCEDURE MakeTreePattern(pRule: SHORTCARD; pStartStates: tSet; pRegExpr,
+			pRightContext: tTree; pIsConstantRE: BOOLEAN;
+			pPatternNr: SHORTCARD; pPosition: tPosition): tTree;
+   VAR Tree : tTree;
+   BEGIN
+      Tree := Alloc (TSIZE (NodePattern));
+      WITH Tree^.vNodePattern DO
+	 Rule		:= pRule;
+	 StartStates	:= pStartStates;
+	 RegExpr	:= pRegExpr;
+	 RightContext	:= pRightContext;
+	 IsConstantRE	:= pIsConstantRE;
+	 PatternNr	:= pPatternNr;
+	 Position	:= pPosition;
+      END;
+      RETURN Tree;
+   END MakeTreePattern;
+
+PROCEDURE WriteTree (t: tTree);
+   VAR
+      i		: SHORTCARD;
+      string	: tString;
+   BEGIN
+      FOR i := 1 TO indent DO
+	 WriteSpace (StdOutput);
+      END;
+
+      IF t = NoTree THEN
+	 WriteS (StdOutput, "NoTree");	WriteNl (StdOutput);
+	 RETURN;
+      END;
+
+      CASE t^.vNode0.Rule OF
+      |  nRule		: WriteS (StdOutput, "Rule ");
+			  WriteI (StdOutput, t^.vNodeRule.RuleNr, 1);
+								WriteNl (StdOutput);
+			  WriteText (StdOutput, t^.vNodeRule.TargetCode);
+      |  nList		: WriteS (StdOutput, "List");		WriteNl (StdOutput);
+      |  nPattern	: WriteS (StdOutput, "Pattern ");
+			  WriteSet (StdOutput, t^.vNodePattern.StartStates);
+			  WriteSpace (StdOutput);
+			  WriteB (StdOutput, t^.vNodePattern.IsConstantRE);
+			  WriteI (StdOutput, t^.vNodePattern.PatternNr, 5);
+								WriteNl (StdOutput);
+      |  nAlternative	: WriteS (StdOutput, "Alternative");	WriteNl (StdOutput);
+      |  nSequence	: WriteS (StdOutput, "Sequence");	WriteNl (StdOutput);
+      |  nRepetition	: WriteS (StdOutput, "Repetition");	WriteNl (StdOutput);
+      |  nOption	: WriteS (StdOutput, "Option");		WriteNl (StdOutput);
+      |  nChar		: WriteS (StdOutput, "Char ");
+			  WriteChar (StdOutput, t^.vNodeCh.Ch);	WriteNl (StdOutput);
+      |  nSet		: WriteS (StdOutput, "Set ");
+			  WriteSet (StdOutput, t^.vNodeSet.Set);WriteNl (StdOutput);
+      |  nString	: WriteS (StdOutput, "String ");
+			  GetWString (t^.vNodeString.String, string);
+			  WStrings.WriteS (StdOutput, string);	WriteNl (StdOutput);
+      END;
+
+      IF t^.vNode0.Rule # nList THEN
+	 INC (indent, 2);
+      END;
+      CASE t^.vNode0.Rule OF
+      |  nRule		: WriteTree (t^.vNodeRule.Patterns);
+      |  nList		: WriteTree (t^.vNode2.Son1);
+			  WriteTree (t^.vNode2.Son2);
+      |  nPattern	: WriteTree (t^.vNodePattern.RegExpr);
+			  WriteTree (t^.vNodePattern.RightContext);
+      |  nAlternative	: WriteTree (t^.vNode2.Son1);
+			  WriteTree (t^.vNode2.Son2);
+      |  nSequence	: WriteTree (t^.vNode2.Son1);
+			  WriteTree (t^.vNode2.Son2);
+      |  nRepetition	: WriteTree (t^.vNode1.Son1);
+      |  nOption	: WriteTree (t^.vNode1.Son1);
+      ELSE
+      END;
+      IF t^.vNode0.Rule # nList THEN
+	 DEC (indent, 2);
+      END;
+   END WriteTree;
+
+VAR
+   indent	: SHORTCARD;
+   c		: CHAR;
+
+BEGIN
+   indent := 0;
+   FOR c := MIN (CHAR) TO MAX (CHAR) DO CharCode [c] := c; END;
+END Tree.

@@ -1,0 +1,492 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 23.5.1989 */
+
+TRAFO	EvalCxx
+TREE	Tree
+PUBLIC	EvalDefCxx EvalImplCxx EvalImplHead EvalImplTail GenEvaluator WC
+
+EXPORT {
+FROM Idents	IMPORT tIdent;
+
+VAR Class: Tree.tTree; yyMax: SHORTCARD;
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT ADR;
+FROM IO		IMPORT WriteS, WriteN, WriteNl;
+FROM StringM	IMPORT Length, WriteString;
+FROM Idents	IMPORT tIdent, GetStringRef;
+FROM Texts	IMPORT WriteText;
+FROM Sets	IMPORT IsElement;
+FROM Semantic	IMPORT CodeClass;
+FROM TreeCxx1	IMPORT BSS;
+FROM TreeCxx2	IMPORT WriteLine;
+FROM EvalCxx3	IMPORT ToBit0;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Child		, ClassCount	,
+   Computed	, Reverse	, Write		, Read		,
+   Inherited	, Synthesized	, Input		, Output	,
+   Stack	, Variable	, NoCodeClass	,
+   CopyDef	, CopyUse	, Thread	, Virtual	,
+   Test		, Left		, Right		,
+   NonBaseComp	, First		, Dummy		, Trace		,
+   Options	, TreeRoot	, iMain		,
+   itTree	, ForallClasses	, f		, WI, WN	,
+   IdentifyClass, IdentifyAttribute, GrammarClass, cOAG		,
+   MaxVisit	;
+
+VAR
+   n		: SHORTCARD;
+   Node		,
+   Attr		,
+   ChildsClass	: tTree;
+}
+
+PROCEDURE WC (tIdent)		// write typecast
+
+ident :- !(class ! WI (iMain); !::! WI (ident); ! *) ! .
+
+PROCEDURE EvalDefCxx (t: Tree)
+
+Ag (..) :- {
+	!# ifndef yy! WI (EvalName); !!
+	!# define yy! WI (EvalName); !!
+	!!
+	@# include "@ WI (iMain); @.h"@
+	!!
+	WriteLine (EvalCodes^.Codes.ImportLine);
+	WriteText (f, EvalCodes^.Codes.Import);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.ImportLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Import);
+	   Node := Node^.Module.Next;
+	END;
+	WriteLine (EvalCodes^.Codes.ExportLine);
+	WriteText (f, EvalCodes^.Codes.Export);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.ExportLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Export);
+	   Node := Node^.Module.Next;
+	END;
+	!!
+	!extern void ! WI (EvalName); ! (! WI (iMain); !::! WI (itTree); !);!
+	!extern void Begin! WI (EvalName); ! ();!
+	!extern void Close! WI (EvalName); ! ();!
+	!!
+	!# endif!
+}; .
+
+PROCEDURE EvalImplHead (t: Tree)
+
+Ag (..) :- {
+	!# define DEP(a, b) a!
+	!# define SELF yyt!
+	!!
+	!# ifndef EXTERN_C_BEGIN!
+	!# define EXTERN_C_BEGIN!
+	!# define EXTERN_C_END!
+	!# endif!
+	!!
+	@# include "@ WI (EvalName); @.h"@
+      IF IsElement (ORD ('Y'), Options) OR
+         IsElement (ORD ('Z'), Options) OR
+         IsElement (ORD ('L'), Options) THEN
+	@# include <stdio.h>@
+      END;
+      IF IsElement (ORD ('Y'), Options) OR
+         IsElement (ORD ('Z'), Options) THEN
+	!EXTERN_C_BEGIN!
+	@# include "rString.h"@
+	@# include "Idents.h"@
+	@# include "Sets.h"@
+	!EXTERN_C_END!
+      END;
+      IF IsElement (ORD ('9'), Options) THEN
+	!EXTERN_C_BEGIN!
+	@# include "General.h"@
+	!EXTERN_C_END!
+	!!
+	!static char * yyMinLow;!
+      END;
+	WriteLine (EvalCodes^.Codes.GlobalLine);
+	WriteText (f, EvalCodes^.Codes.Global);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.GlobalLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Global);
+	   Node := Node^.Module.Next;
+	END;
+	!!
+	!using namespace ! WI (iMain); !;!
+	!!
+      IF IsElement (ORD ('X'), Options) THEN
+	@# include "yy@ WI (iMain); @.h"@
+	!# define yyWrite! WI (iMain); !(a) Write! WI (iMain); ! (yyf, a)!
+	!!
+	!static char yyb;!
+      END;
+      IF IsElement (ORD ('Y'), Options) OR
+         IsElement (ORD ('Z'), Options) THEN
+	!!
+	!# define yyTrace	true!
+	!!
+	!static const char * const yyTypeName [! WN (ClassCount + 1); !] = { 0,!
+	ForallClasses (Classes, TypeName);
+	!};!
+	!!
+	!static void yyWriteType (! WI (iMain); !::! WI (itTree); ! yyt)!
+	!{!
+	! const char * yys = yyTypeName [yyt->Kind];!
+	! register int yyi = 16 - strlen (yys);!
+	@ printf ("%s", yys);@
+	! while (yyi -- > 0) putc (' ', stdout);!
+	!}!
+      END;
+      IF IsElement (ORD ('X'), Options) THEN
+	!!
+	!static FILE * yyf = NULL;!
+	!!
+	!static void yyWriteHex (unsigned char * yyx, int yysize)!
+	@{ register int yyi; for (yyi = 0; yyi < yysize; yyi ++) printf ("%02x ", yyx [yyi]); }@
+	!!
+	!static void xxWriteNl () { if (yyTrace) { putc ('\n', stdout); fflush (stdout); } }!
+      END;
+      IF IsElement (ORD ('X'), Options) THEN
+	!!
+	!static void yyWriteEval (! WI (iMain); !::! WI (itTree); ! yyt, char * yys)!
+	!{!
+	! if (yyTrace) {!
+	!  register int yyi = 24 - strlen (yys);!
+	!  yyWriteType (yyt);!
+	@  printf (" e %s", yys);@
+	!  while (yyi -- > 0) putc (' ', stdout);!
+	@  printf (" = ");@
+	!  fflush (stdout);!
+	! }!
+	!}!
+      ELSIF IsElement (ORD ('Y'), Options) THEN
+	!!
+	!static void yyWriteEval (! WI (iMain); !::! WI (itTree); ! yyt, char * yys)!
+	!{!
+	! if (yyTrace) {!
+	!  yyWriteType (yyt);!
+	@  printf (" e %s\n", yys);@
+	!  fflush (stdout);!
+	! }!
+	!}!
+      END;
+      IF IsElement (ORD ('Z'), Options) THEN
+	!!
+	!static void yyWriteVisit (! WI (iMain); !::! WI (itTree); ! yyt, char * yys)!
+	!{!
+	! if (yyTrace) {!
+	!  yyWriteType (yyt);!
+	@  printf (" v %s\n", yys);@
+	!  fflush (stdout);!
+	! }!
+	!}!
+	!!
+	!static void yyVisitParent (! WI (iMain); !::! WI (itTree); ! yyt)!
+	@{ yyWriteVisit (yyt, "parent"); }@
+      END;
+	!!
+	!# ifdef YYCHECK!
+	!static char * yyCheck1 = & !WI (iMain); !_module_does_not_match_evaluator_module_! WriteN (f, CodeClass, 0, 10); !;!
+	!# endif!
+}; .
+
+PROCEDURE EvalImplTail (t: Tree)
+
+Ag (..) :- {
+	!void Begin! WI (EvalName); ! ()!
+	!{!
+	WriteLine (EvalCodes^.Codes.BeginLine);
+	WriteText (f, EvalCodes^.Codes.Begin);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.BeginLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Begin);
+	   Node := Node^.Module.Next;
+	END;
+	!}!
+	!!
+	!void Close! WI (EvalName); ! ()!
+	!{!
+	WriteLine (EvalCodes^.Codes.CloseLine);
+	WriteText (f, EvalCodes^.Codes.Close);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.CloseLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Close);
+	   Node := Node^.Module.Next;
+	END;
+	!}!
+}; .
+
+PROCEDURE EvalImplCxx (t: Tree)
+
+Ag (..) :- {
+	EvalImplHead (t);
+	!static char * yyCheck2 = & generate_! WI (iMain); !_module_without_option_0;!
+	!!
+	FOR n := 1 TO MaxVisit DO
+	   !static void yyVisit! WN (n); ! (register ! WI (iMain); !::! WI (itTree); !);!
+	END;
+	!!
+	!void ! WI (EvalName); ! (! WI (iMain); !::! WI (itTree); ! yyt)!
+	!{!
+      IF IsElement (ORD ('9'), Options) THEN
+	! char yyHigh;!
+	! yyMinLow = & yyHigh;!
+      END;
+      IF IsElement (ORD ('X'), Options) THEN
+	! if (yyf == NULL) yyf = stdout;!
+      END;
+      IF MaxVisit > 0 THEN
+	! yyVisit1 (yyt);!
+      END;
+      IF IsElement (ORD ('9'), Options) THEN
+	@ printf ("Stacksize %ld\n", (long) (& yyHigh - yyMinLow));@
+      END;
+	!}!
+	!!
+	FOR n := 1 TO MaxVisit DO
+	   !static void yyVisit! WN (n); ! (register ! WI (iMain); !::! WI (itTree); ! yyt)!
+	   !{!
+	   WriteLine (EvalCodes^.Codes.LocalLine);
+	   WriteText (f, EvalCodes^.Codes.Local);
+	   Node := Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.LocalLine);
+	      WriteText (f, Node^.Module.EvalCodes^.Codes.Local);
+	      Node := Node^.Module.Next;
+	   END;
+      IF IsElement (ORD ('9'), Options) THEN
+	   ! char yyLow;!
+	   ! if (& yyLow < yyMinLow) yyMinLow = & yyLow;!
+      END;
+	   !!
+	   !yyRecursion:!
+	   ! switch (yyt->Kind) {!
+	   IF cOAG IN GrammarClass THEN		(* generate evaluator	*)
+	      ForallClasses (Classes, GenEvaluator);
+	   END;
+	   ! default: ;!
+      IF IsElement (ORD ('Z'), Options) THEN
+	   !  yyVisitParent (yyt);!
+      END;
+	   ! }!
+	   !}!
+	   !!
+	END;
+	EvalImplTail (t);
+}; .
+
+
+PROCEDURE TypeName (t: Tree)
+
+Class (..) :-
+	CONDITION NoCodeClass * Properties = {{}};
+	IF Trace IN Properties THEN
+	   @"@ WI (Name); @",@
+	ELSE
+	   !0,!
+	END
+	.
+
+PROCEDURE GenEvaluator (t: Tree)
+
+Class (..) :-
+	CONDITION NoCodeClass * Properties = {{}};
+	CONDITION (Generated < InstCount) AND (Visits >= n);
+	CONDITION NOT NoCode ({t}, Generated);
+	HasTailRecursion: BOOLEAN := FALSE;
+	!!
+	!case k! WI (Name); !:!
+	Class := t;
+{	LOOP
+	   IF Generated = InstCount THEN EXIT; END;
+	   INC (Generated);
+	   WITH Instance^ [Instance^ [Generated].Order] DO
+	      IF (Left IN Properties) AND (Attribute^.Child.Partition > n) THEN
+	         DEC (Generated); EXIT;
+	      END;
+	      IF ({Inherited, Right, First} <= Properties) AND NOT (Virtual IN Properties) THEN
+      IF IsElement (ORD ('X'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @yyWriteEval (yyt, "@ WI (Selector^.Child.Name); !:! WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END; !!
+		 IF (Attribute^.Kind = Tree.Child) OR (Attribute^.Attribute.Type = itTree) THEN
+		    !write! WI (itTree);
+		 ELSE
+		    !write! WI (Attribute^.Child.Type);
+		 END;
+		 ! ((! WC (Name); !yyt)->! WI (Selector^.Child.Name);
+		 !->! WI (Attribute^.Child.Name); !) xxWriteNl ();!
+      ELSIF IsElement (ORD ('Y'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @yyWriteEval (yyt, "@ WI (Selector^.Child.Name); !:! WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      ELSE
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      END;
+	      END;
+	      IF ({Synthesized, Left, First} <= Properties) AND ({Dummy, Virtual} * Properties = {}) THEN
+      IF IsElement (ORD ('X'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @yyWriteEval (yyt, "@ WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END; !!
+		 IF Test IN Properties THEN
+		    !writebool (yyb) xxWriteNl ();!
+		 ELSIF (Attribute^.Kind = Tree.Child) OR (Attribute^.Attribute.Type = itTree) THEN
+		    !write! WI (itTree);
+		    ! ((! WC (Name); !yyt)->! WI (Attribute^.Child.Name); !) xxWriteNl ();!
+		 ELSE
+		    !write! WI (Attribute^.Child.Type);
+		    ! ((! WC (Name); !yyt)->! WI (Attribute^.Child.Name); !) xxWriteNl ();!
+		 END;
+      ELSIF IsElement (ORD ('Y'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @yyWriteEval (yyt, "@ WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      ELSE
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      END;
+	      END;
+	      IF ({Synthesized, Right, First} <= Properties) AND
+		 (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) THEN
+      IF IsElement (ORD ('Z'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @yyWriteVisit (yyt, "@ WI (Selector^.Child.Name); ! ! 
+		 WN (Attribute^.Child.Partition); @");@
+      END;
+		 IF (Attribute^.Child.Partition = n) AND NoCode (Class, Generated) THEN
+		    !yyt = (! WC (Name); !yyt)->! WI (Selector^.Child.Name); !; goto yyRecursion;!
+		    HasTailRecursion := TRUE;
+		 ELSE
+		    !yyVisit! WN (Attribute^.Child.Partition);
+		    ! ((! WC (Name); !yyt)->! WI (Selector^.Child.Name); !);!
+		 END;
+	      END;
+	   END;
+	END;
+	IF NOT HasTailRecursion THEN
+      IF IsElement (ORD ('Z'), Options) AND (Trace IN t^.Class.Properties) THEN
+	   !yyVisitParent (yyt);!
+      END;
+	   !break;!
+	END;
+}; .
+Assign (..) :- {
+	WriteLine (Pos);
+	GenEvaluator (Results); !=! GenEvaluator (Arguments); !;!
+}; .
+Copy (..) :- {
+	WriteLine (Pos);
+	GenEvaluator (Results); !=! GenEvaluator (Arguments); !;!
+}; .
+TargetCode (..) :- {
+	WriteLine (Pos);
+	GenEvaluator (Code); !!
+}; .
+Check (..) :- {
+	WriteLine (Pos);
+	IF Condition # NoTree THEN
+	   @if (! (@ 
+      IF IsElement (ORD ('X'), Options) THEN
+	   !yyb = ! 
+      END;
+	   GenEvaluator (Condition); !)) {! GenEvaluator (Statement); !; }!
+	   IF Actions^.Kind = Tree.Check THEN
+	      !else!
+	      GenEvaluator (Actions);
+	   END;
+	ELSE
+      IF IsElement (ORD ('X'), Options) THEN
+	   !yyb = false; ! 
+      END;
+	   GenEvaluator (Statement); !;!
+	   GenEvaluator (Actions);
+	END;
+}; .
+Designator (..) :- {
+	Attr := IdentifyAttribute (Class, Selector);
+	IF Attr # NoTree THEN
+	   ChildsClass := Attr^.Child.Class;
+	   Attr := IdentifyAttribute (ChildsClass, Attribute);
+	   IF NOT (Virtual IN Attr^.Attribute.Properties) THEN
+	      !(! WC (Class^.Class.Name); !yyt)->! WI (Selector); !->! 
+	      WI (Attribute);
+	   END;
+	ELSE
+	   WI (Selector); !:! WI (Attribute);
+	END;
+	GenEvaluator (Next);
+}; .
+Ident (..) :- {
+	Attr := IdentifyAttribute (Class, Attribute);
+	IF Attr # NoTree THEN
+	   IF NOT (Virtual IN Attr^.Attribute.Properties) THEN
+	      !(! WC (Class^.Class.Name); !yyt)->! WI (Attribute);
+	   END;
+	ELSE
+	   WI (Attribute);
+	END;
+	GenEvaluator (Next);
+}; .
+Remote (..) :-
+   TheClass: Class := IdentifyClass (TreeRoot^.Ag.Classes, Type);
+   k: INTEGER;
+{  IF TheClass # NoTree THEN
+      Attr := IdentifyAttribute (TheClass, Attribute);
+      IF Attr # NoTree THEN
+	 WITH Attr^.Attribute DO
+	    k := ToBit0 (TheClass, AttrIndex);
+	    IF Synthesized IN Properties THEN
+	       !REMOTE_SYN (yyIsComp! WN (k DIV BSS); !, ! WN (k MOD BSS); !, yyS! WN (k); !, ! 
+	       GenEvaluator (Designators); !, ! WI (t^.Remote.Type); !, ! WI (Attribute); !)! 
+	    ELSIF Inherited IN Properties THEN
+	       !REMOTE_INH (yyIsComp! WN (k DIV BSS); !, ! WN (k MOD BSS); !, ! WN (k); !, ! 
+	       GenEvaluator (Designators); !, ! WI (t^.Remote.Type); !, ! WI (Attribute); !)! 
+	    ELSE
+	       !(! WC (t^.Remote.Type); GenEvaluator (Designators); !)->! WI (Attribute);
+	    END;
+	 END;
+      END;
+   END;
+   GenEvaluator (Next);
+}; .
+Any (..) :- {
+	WriteString (f, Code);
+	GenEvaluator (Next);
+}; .
+Anys (..) :- {
+	GenEvaluator (Layouts);
+	GenEvaluator (Next);
+}; .
+LayoutAny (..) :- {
+	WriteString (f, Code);
+	GenEvaluator (Next);
+}; .
+
+PREDICATE NoCode (Class, Start: SHORTCARD)
+
+Class (..), ... :- {
+	LOOP
+	   IF Start = InstCount THEN EXIT; END;
+	   INC (Start);
+	   WITH Instance^ [Instance^ [Start].Order] DO
+	      IF (Left IN Properties) AND (Attribute^.Child.Partition > n) THEN
+	         EXIT;
+	      END;
+	      IF ({Inherited, Right, First} <= Properties) AND NOT (Virtual IN Properties) THEN
+		 IF Action # tTree (ADR (Action)) THEN RETURN FALSE; END;
+	      END;
+	      IF ({Synthesized, Left, First} <= Properties) AND ({Dummy, Virtual} * Properties = {}) THEN
+		 IF Action # tTree (ADR (Action)) THEN RETURN FALSE; END;
+	      END;
+	      IF ({Synthesized, Right, First} <= Properties) AND
+		 (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) THEN
+		 RETURN FALSE;
+	      END;
+	   END;
+	END;
+}; .

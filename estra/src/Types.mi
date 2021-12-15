@@ -1,0 +1,118 @@
+(* $Id: Types.mi,v 2.0 1989/06/22 13:10:35 vielsack rel $ *)
+
+IMPLEMENTATION MODULE Types;
+
+FROM	DynArray	IMPORT	MakeArray;
+FROM	Idents		IMPORT	tIdent;
+FROM	Scanner		IMPORT	MaxIdent, NoIdent;
+FROM	Sets		IMPORT	tSet, MakeSet, Include, Union, Assign,
+				IsElement;
+FROM	SYSTEM		IMPORT	TSIZE;
+
+CONST
+  NoCode = -1;
+
+VAR
+  TypeArray: POINTER TO ARRAY [0..10000] OF tType;
+  CodeArray: POINTER TO ARRAY [0..10000] OF INTEGER;
+  vMaxClassCode: INTEGER;
+  allNodes: tSet;
+  allClasses: tSet;
+  EssentialClasses: tSet;
+
+PROCEDURE MakeTransformation (name: tIdent);
+  BEGIN
+    IF name = NoIdent THEN RETURN END;
+    TypeArray^[name] := cTransformation;
+  END MakeTransformation;
+
+PROCEDURE MakeFunction (name: tIdent);
+  BEGIN
+    IF name = NoIdent THEN RETURN END;
+    TypeArray^[name] := cFunction;
+  END MakeFunction;
+
+PROCEDURE MakeClass (name: tIdent);
+  BEGIN
+    IF name = NoIdent THEN RETURN END;
+    TypeArray^[name] := cClass;
+    INC (vMaxClassCode);
+    CodeArray^[name] := vMaxClassCode;
+    Include (allClasses, name);
+  END MakeClass;
+
+PROCEDURE MakeNode (name : tIdent);
+  BEGIN
+    IF name = NoIdent THEN RETURN END;
+    TypeArray^[name] := cNode;
+    Include (allNodes, name);
+  END MakeNode;
+
+PROCEDURE MakeNodeId (ident : tIdent);
+  BEGIN
+    IF ident = NoIdent THEN RETURN END;
+    TypeArray^[ident] := cNodeId;
+  END MakeNodeId;
+
+PROCEDURE Type (id: tIdent): tType;
+  BEGIN
+    RETURN TypeArray^[id];
+  END Type;
+
+
+PROCEDURE BeginTypes;
+  VAR
+    size: LONGINT;
+    id: tIdent;
+  BEGIN
+    size := MaxIdent + 1;
+    MakeArray (TypeArray, size, TSIZE (tType));
+    MakeArray (CodeArray, size, TSIZE (INTEGER));
+    FOR id := 0 TO MaxIdent DO
+      TypeArray^[id] := cNoType;
+      CodeArray^[id] := NoCode;
+    END;
+    MakeSet (allNodes, MaxIdent);
+    MakeSet (allClasses, MaxIdent);
+    MakeSet (EssentialClasses, MaxIdent);
+  END BeginTypes;
+
+
+PROCEDURE AllNodes (VAR nodes: tSet);
+  BEGIN
+    Assign (nodes, allNodes);
+  END AllNodes;
+
+PROCEDURE AllClasses (VAR classes: tSet);
+  BEGIN
+    Assign (classes, allClasses);
+  END AllClasses;
+
+PROCEDURE SetEssential (name: tIdent);
+  BEGIN
+    Include (EssentialClasses, name);
+  END SetEssential;
+
+PROCEDURE UnionEssential (set: tSet);
+  BEGIN
+    Union (EssentialClasses, set);
+  END UnionEssential;
+
+PROCEDURE Essential (name: tIdent): BOOLEAN;
+  BEGIN
+    RETURN IsElement (name, EssentialClasses);
+  END Essential;
+
+PROCEDURE ClassCode (class: tIdent): INTEGER;
+  BEGIN
+    RETURN CodeArray^[class];
+  END ClassCode;
+
+PROCEDURE MaxClassCode (): INTEGER;
+  BEGIN
+    RETURN vMaxClassCode;
+  END MaxClassCode;
+
+BEGIN
+  vMaxClassCode := -1;
+END Types.

@@ -1,0 +1,1937 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.EQ
+delim off
+.EN
+.ds ], , 
+.T0
+
+	Transformation
+	of Attributed Trees
+	Using Pattern Matching
+
+	J. Grosch
+
+
+.T1
+.T2 "" "Transformation of Attributed Trees Using Pattern Matching" "Josef Grosch" "Aug. 28, 1991" 27 1994
+.hc ~
+.if 0 \{\
+.nr $r 12	\" factor for vertical spacing
+.nr $R \n($r
+.bp
+.ce 99
+.b "Transformation of Attributed Trees Using Pattern Matching"
+.sp 2
+Josef Grosch
+GMD Forschungsstelle an der Universit\*at Karlsruhe
+Vincenz-Prie\*snitz-Str. 1, D-76131 Karlsruhe, Germany
+.sp 2
+\fBKeywords\fP transformation, attributed trees, pattern matching
+.ce 0
+.\}
+.oh '''%'
+.eh '''%'
+.bp 1
+.ce 99
+.b "Transformation of Attributed Trees Using Pattern Matching"
+.ce 0
+.sp 1
+.uh Abstract
+This paper describes a tool for the transformation of attributed trees using pattern matching.
+The trees to be processed are defined by a formalism based on context-free grammars.
+Operations for trees such as composition and decomposition are provided.
+The approach can be characterized as an amalgamation of trees or terms including
+pattern matching, with recursion, attribute grammars, and imperative programming.
+Transformations can either modify the input trees or map them to arbitrary output.
+Possible applications are the various transformation tasks in compilers such as
+semantic analysis, optimization, or the generation of intermediate representations.
+The design goals have been to combine an expressive and high level technique for
+transformation with flexibility, efficiency, and practical usability.
+A reliable development style is supported by static typing and checks for the single
+assignment property of variables.
+We give some example transformations and describe the input language of our tool called
+.i puma .
+The relationship to similar work is discussed.
+Finally, experimental results are presented that demonstrate the efficiency of our approach.
+.uh Keywords
+transformation, attributed trees, pattern matching
+.sh 1 Introduction
+.lp
+The transformation of trees using pattern matching becomes an accepted technique.
+Several tools have been constructed recently that follow this principle
+\*([[CoP90\*(],HeS91\*(],LMW89\*(],Vol91\*(]].
+Tools for code generation successfully use the same technique, too
+\*([[AGT89\*(],ESL89\*(]]. We present a new tool called
+.i puma
+and its input language for the transformation and manipulation of attributed trees and graphs
+\*([[Groa\*(]].
+.i Puma
+stands for \fIp\fPattern \fIma\fPtching and \fIu\fPnification.
+Its intended application areas are the various transformation tasks in a
+compiler operating on abstract syntax trees or arbitrary graph structures. This includes
+semantic analysis, optimization, intermediate code generation, source-to-source translation,
+and eventually machine code generation.
+.pp
+The trees that are subject to pattern matching are described by a formalism based on
+context-free grammars. The tree nodes may be associated with attributes of arbitrary types.
+Node types are used to specify the properties of tree nodes. An extension mechanism induces
+a subtype relation among the node types. Pattern matching is extended to handle subtypes and
+attributes, too. Operations for the composition and decomposition of trees are supported by
+a concise notation.
+.pp
+The building blocks for a transformation are recursive subroutines, classified as
+procedures, functions, and predicates, with an arbitrary number of input and output
+parameters. The bodies of the subroutines consist of rules which are made
+up of patterns, conditions, statements, and expressions.
+The first two components control the applicability of a rule.
+The statements determine what has to be done whenever a rule is applicable.
+The expressions provide values for the output parameters and the function result.
+.pp
+Static type checking with respect to trees is provided. Variables are declared implicitly and
+they are checked for the single assignment property. There is read and write access to
+attributes stored in the tree which allows the construction of attribute evaluators.
+In all places it is possible to escape to hand-written code
+which provides the power and flexibility of the imperative programming style.
+.pp
+The output of the generator is a source module in one of the target languages C or Modula-2.
+This module allows for easy integration and cooperation with other modules, either
+hand-written or generated ones.
+The pattern matching is local and considers a region at the top of the current subtree, only.
+It is implemented by direct code and therefore efficient.
+.pp
+Our approach can be regarded from several points of view:
+From the point of view of imperative programming it is an extension by statically typed,
+attributed trees, constructs for composition and decomposition, and pattern matching.
+From the point of view of logic programming it omits backtracking and restricts pattern
+matching to one of the two terms being a ground term.
+It adds attributes which are stored in the terms
+(trees), static typing, input and output modes for parameters, and an easy escape to
+imperative features.
+From the point of view of functional programming it offers the simple style of
+functional programming which has always been present in imperative languages having
+functions and recursion. It adds the pattern matching facility.
+From the point of view of attribute grammars it allows the specification of attribute
+evaluation with explicit control of the evaluation order or visit sequences. This eases the
+use of global attributes and gives full control on side-effects.
+.pp
+The intended use of this tool proceeds in three steps:
+First, a tree is constructed either by a parser, a previous transformation phase, or whatever
+is appropriate.
+Second, the attributes in the tree are evaluated either using an attribute grammar based
+tool, by a
+.i puma
+specified tree traversal and attribute computations, or by hand-written code.
+Third, the attributed tree is transformed or mapped to another data structure by a
+.i puma
+generated transformation module.
+These steps can be executed one after the other or more or less simultaneously.
+Besides trees,
+.i puma
+can handle attributed graphs as well, even cyclic ones. Of course the cycles have to be
+detected in order to avoid infinite loops. A possible solution uses attributes as marks for
+nodes already visited.
+.pp
+A transformer module can make use of attributes in the following ways:
+If attribute values have been computed by a preceding attribute evaluator and are accessed
+in read only mode then this corresponds to the three step model explained above. A
+.i puma
+generated module can also evaluate attributes on its own. A further possibility is that an
+attribute evaluator can call
+.i puma
+subroutines in order to compute attributes. This is especially of interest when attributes
+depend on tree-valued arguments.
+.pp
+The tool supports two classes of tree transformations:
+.i mappings
+and
+.i modifications .
+Tree mappings map an input tree to arbitrary output data.
+The input tree is accessed in read only mode and left unchanged. Tree
+.i modifications
+change a tree by e. g. computing and storing
+attributes at tree nodes or by changing the tree structure. In this
+case the tree data structure serves as input as well as output and it
+is accessed in read and write mode.
+.pp
+The first class covers applications like the generation of
+intermediate languages or machine code. Trees are mapped to arbitrary
+output like source code, assembly code, binary machine code,
+linearized intermediate languages like P-Code, or another tree
+structure. A further variant of mapping is to emit a sequence of
+procedure calls which are handled by an abstract data type.
+.pp
+The second class covers applications like semantic analysis or
+optimization. Trees are decorated with attribute values, properties of
+the trees corresponding to context conditions are checked, or trees
+are changed in order to reflect optimizing transformations.
+.pp
+.i Puma
+is part of the Karlsruhe Toolbox for Compiler Construction\*([<\*([[GrE90\*(]]\*(>].
+In particular it cooperates with the generator for abstract syntax trees
+.i ast
+\*([[Gro91\*(]] and the attribute evaluator generator
+.i ag
+\*([[Grob\*(]]. The attributed trees are defined and managed by a module generated with
+.i ast .
+A second module generated by
+.i puma
+creates and handles these trees.
+This way all the powerful operations for trees and graphs provided by
+.i ast
+are available such as reader and writer procedures or the interactive browser.
+For sake of simplicity we will deviate from reality in this paper and treat the
+definition of the tree structure as part of
+.i puma .
+.pp
+The rest of this paper is organized as follows:
+Section 2 presents a few simple examples of how to describe transformations with
+.i puma .
+Section 3 describes the input language of the tool.
+Section 4 sketches the implementation of the generated transformer module.
+Section 5 compares our approach with related work.
+Section 6 presents experimental results.
+Section 7 contains concluding remarks.
+.sh 1 "Tree Transformation by Pattern Matching"
+.lp
+The probably easiest way to get an impression of our approach can be obtained by having a
+look at a few introductory examples. We will use the abstract syntax of simple arithmetic
+expressions as input data structure. Besides a few intrinsic attributes describing e. g. the
+values of constants we use an attribute called
+.i Type .
+It describes the type of every subexpression. Its domain are trees, too.
+The tree definition based on a context-free grammar shown
+in Example 1 specifies the structure of expressions and types.
+.(b I
+Example 1: Tree Definition
+.sp 0.5
+.FT
+Expr            = Type <
+   Plus         = Lop: Expr Rop: Expr .
+   Minus        = Lop: Expr Rop: Expr .
+   Const        = [Value] .
+   Adr          = <
+      Index     = Adr Expr .
+      Select    = Adr [Ident: tIdent] .
+      Ident     = [Ident: tIdent] .
+   >.
+>.
+Type            = <
+   Int          = .
+   Real         = .
+   Bool         = .
+   Array        = [Lwb] [Upb] Type .
+   Record       = Fields .
+>.
+Fields          = <
+   NoField      = .
+   Field        = [Ident: tIdent] Type Fields .
+>.
+.)b
+.pp
+The names before the character '=' can be regarded both as rule names or nonterminals.
+The possible right-hand sides for one nonterminal are enclosed in angle brackets '<' and '>'.
+Non-tree valued attributes are enclosed in square brackets '[' and ']'.
+The attributes
+.i Lwb ,
+.i Upb ,
+and
+.i Value
+are of the default type
+.i int .
+The attribute
+.i Ident
+is of the user-defined type
+.i tIdent .
+The tree-valued attribute
+.i Type
+of the rule named
+.i Expr
+is written like every other right-hand side nonterminal.
+The selector names
+.i Lop
+and
+.i Rop
+used in the rules called
+.i Plus
+and
+.i Minus
+allow symbolic access to right-hand side elements having the same type.
+.pp
+The association of an attribute such as
+.i Type
+with a nonterminal like
+.i Expr
+adds this attribute to every right-hand side belonging to this nonterminal. Hence the rules
+.i Plus
+and
+.i Minus
+have three right-hand side elements.
+.(z I
+Example 2: Generation of P-Code
+.sp 0.5
+.FT
+PROCEDURE P_Code (Tree)
+.sp 0.5
+Plus  (Int  (), Lop, Rop) :- P_Code (Lop); P_Code (Rop); Emit (ADDI); .
+Plus  (Real (), Lop, Rop) :- P_Code (Lop); P_Code (Rop); Emit (ADDR); .
+Minus (Int  (), Lop, Rop) :- P_Code (Lop); P_Code (Rop); Emit (SUBI); .
+Minus (Real (), Lop, Rop) :- P_Code (Lop); P_Code (Rop); Emit (SUBR); .
+.)z
+.pp
+The subroutine specification presented in Example 2 describes part of a transformation of
+expression trees to P-Code\*([<\*([[NAJ76\*(]]\*(>]. The procedure
+.i P_Code
+performs a recursive tree traversal. Its body consists of a sequence of rules. Every rule is
+made up of a pattern and a list of statements separated by ':-'.
+Whenever a pattern matches against the input parameter of the subroutine,
+the associated statement list is executed. The parameter of the procedure
+.i P_Code
+is of type
+.i Tree
+which means that every tree according to the tree definition is a legal argument. The
+procedure
+.i Emit
+is supposed to be an external subroutine that performs output.
+.(b I
+Example 3: Computation of Type Sizes
+.sp 0.5
+.FT
+FUNCTION TypeSize ([Type, Fields]) int
+.sp 0.5
+Int  ()              RETURN 4 .
+Real ()              RETURN 4 .
+Bool ()              RETURN 1 .
+Array (Lwb, Upb, T)  RETURN (Upb - Lwb + 1) * TypeSize (T) .
+Record (F)           RETURN TypeSize (F) .
+Field (_, T, F)      RETURN TypeSize (T) + TypeSize (F) .
+NoField ()           RETURN 0 .
+.)b
+.pp
+The function
+.i TypeSize
+in Example 3 transforms or maps trees to integer values. It is defined to
+operate on trees of types
+.i Type
+and
+.i Fields
+and it returns a value of a type named
+.i int .
+Again this subroutine performs a recursive tree traversal. Instead of producing a side-effect
+like in the previous example it represents a pure functional mapping and demonstrates the
+arithmetic expression capabilities of
+.i puma .
+The character '_' denotes a so-called don't care pattern.
+.(b I
+Example 4: Testing two Types for Compatibility
+.sp 0.5
+.FT
+PREDICATE IsCompatible ([Type, Fields], [Type, Fields])
+.sp 0.5
+Int  ()             , Int  ()              .
+Real ()             , Real ()              .
+Bool ()             , Bool ()              .
+Array (Lwb, Upb, T1), Array (Lwb, Upb, T2) :- IsCompatible (T1, T2); .
+Record (F1)         , Record (F2)          :- IsCompatible (F1, F2); .
+Field (_, T1, F1)   , Field (_, T2, F2)    :- IsCompatible (T1, T2);
+                                              IsCompatible (F1, F2); .
+.)b
+.pp
+Example 4 presents the predicate
+.i IsCompatible
+which can be seen as a boolean function. It operates on two parameters of types
+.i Type
+or
+.i Fields .
+Accordingly, every rule has two patterns for matching against the two arguments.
+The first three rules lead to a return value of true if both patterns match both arguments.
+The fourth rule returns true if the attributes
+.i Lwb
+and
+.i Upb
+of the two argument trees match (have the same value) and if the recursive call
+.i IsCompatible
+returns true for the two types
+.i T1
+and
+.i T2
+of the array elements. If none of the rules matches the predicate returns false.
+.(z I
+Example 5: Procedure with Input and Output Parameters
+.sp 0.5
+.FT
+PROCEDURE ResultType (Type, Type, Operator: int => Type)
+.sp 0.5
+Int  () , Int  () , { opPlus  } => Int  () .
+Real () , Real () , { opPlus  } => Real () .
+Int  () , Int  () , { opMinus } => Int  () .
+Real () , Real () , { opMinus } => Real () .
+.)z
+.pp
+The subroutine given in Example 5 has three input and one output parameter. It computes
+the result type of a binary expression which depends on the types of the operands and on the
+operator. The third pattern of every rule is enclosed in curly brackets '{ and '}'. This
+represents so-called target code which is more or less passed unchanged and unchecked
+to the generated module. In this case
+.i opPlus
+and
+.i opMinus
+are named constants encoding operators. Without the curly brackets they would be treated as
+pattern variables. The expression after the symbol '=>' describes the value of the output
+parameter in case of a successful match. It consists of a tree constructor which creates
+a tree having one node.
+.sh 1 "Specification Language"
+.lp
+The description of a tree transformation consists of the definition of attributed trees and a
+set of subroutines.
+.sh 2 "Tree Structure"
+.lp
+The structure of attributed trees or (directed) graphs is specified by a
+formalism based on context-free grammars. However, we primarily use the terminology of trees
+and types, here. A tree consists of
+.i nodes .
+A node may be related to other nodes in a so-called
+.i parent-child
+relation. Then the first node is called a
+.i parent
+node and the latter nodes are called
+.i child
+nodes. Nodes without a parent node are usually called
+.i root
+nodes, nodes without children are called
+.i leaf
+nodes.
+.pp
+The structure and the properties of nodes are described by
+.i "node types" .
+Every node belongs to a node type.
+A specification of a tree describes a finite number of node types.
+A node type specifies the names of the child nodes and the associated node
+types as well as the names of the attributes and the associated attribute types.
+.\" .sh 2 Children
+.pp
+Children are distinguished by
+.i selector
+names which have to be unambiguous within one node type.
+The children are of a certain node type. Example:
+.(b
+.FT
+   Plus      = Lop: Expr Rop: Expr .
+   Index     = Adr: Adr Expr: Expr .
+.)b
+The example introduces two node types called
+.i Plus
+and
+.i Index .
+A node of type 
+.i Plus
+has two children which are selected by the names
+.i Lop
+and
+.i Rop .
+Both children are of the node type
+.i Expr .
+If a selector name is equal to the associated name of the node type it can
+be omitted. Therefore, the node type
+.i Index
+can be abbreviated as follows:
+.(b
+.FT
+   Index     = Adr Expr .
+.)b
+.\" .sh 2 Attributes
+.pp
+As well as children, every node type can specify an arbitrary number of
+.i attributes
+of arbitrary types. Like children, attributes are characterized by a selector
+name and a certain type.
+The descriptions of attributes are enclosed in brackets '[' and ']'. The attribute types
+are given by names taken from the target language. Missing attribute types
+are assumed to be
+.i int
+or
+.i INTEGER
+depending on the target language (C or Modula-2).
+Children and attributes can be given in any order (see Example 1).
+.\" .sh 2 Extensions
+.pp
+To allow several alternatives for the types of children an
+.i extension
+mechanism is used. A node type may be associated with several other node types enclosed
+in angle brackets '<' and '>'. Then this node type is called
+.i base
+or
+.i super
+type and the associated types are called
+.i derived
+types or
+.i subtypes .
+A derived type can in turn be extended with no limitation of the nesting depth.
+The extension mechanism induces a subtype relation between node types denoted by the symbol
+\(ib . This relation is transitive.
+Where a node of a certain node type is required, either a node of this node type or a node of
+a subtype thereof is legal.
+.pp
+In Example 1
+.i Expr
+is a base type describing nodes with one child called
+.i Type .
+The node type
+.i Expr
+has four derived types called
+.i Plus ,
+.i Minus ,
+.i Const ,
+and
+.i Adr .
+The node type
+.i Adr
+is in turn extended by three derived types called
+.i Index ,
+.i Select ,
+and
+.i Ident .
+Where a node of type
+.i Expr
+is required, all mentioned node types are legal.
+Where a node of type
+.i Adr
+is required, nodes of the types
+.i Index ,
+.i Select ,
+or
+.i Ident
+are legal.
+Where a node of type
+.i Index
+is required, nodes of type
+.i Index
+are legal, only. The subtype relation is the transitive and reflexive closure of:
+.i
+Plus \(ib Expr, Minus \(ib Expr, Const \(ib Expr, Adr \(ib Expr,
+Index \(ib Adr, Select \(ib Adr, Ident \(ib Adr.
+.pp
+Besides extending the set of legal node types, the extension mechanism has
+the property of extending the children and attributes of the base type.
+The derived types possess the children and attributes of the base type.
+They may define additional children and attributes. In other words they
+.i inherit
+the structure of the base type.
+The selector names of all children and attributes in an extension hierarchy have to be distinct.
+The syntax has been designed this way in order to allow single inheritance, only.
+.pp
+In Example 1 nodes of type
+.i Expr
+have one child selected by the name
+.i Type .
+Nodes of type
+.i Plus
+have three children with the selector names
+.i Type ,
+.i Lop ,
+and
+.i Rop .
+.sh 2 Subroutines
+.lp
+A set of subroutines constitutes the main building blocks of a transformation.
+Like in programming languages, subroutines are parameterized
+abstractions of statements or expressions.
+There are three kinds of subroutines:
+.(b
+.ta 2c
+procedure	: a subroutine acting as a statement
+function	: a subroutine acting as an expression and returning a value
+predicate	: a boolean function
+.)b
+Subroutines are specified according to the following syntax:
+.(b
+.FT
+Subroutine = Header { Rule }
+Header     = PROCEDURE Ident ( [ Parameters ] [ => Parameters ] )
+           | FUNCTION  Ident ( [ Parameters ] [ => Parameters ] ) Type
+           | PREDICATE Ident ( [ Parameters ] [ => Parameters ] )
+Parameters = [ Ident : ] Type { , [ Ident : ] Type }
+.)b
+.lp
+A subroutine consists of a header and a sequence of rules.
+The header specifies the kind of the subroutine, its name, and its
+parameters. In case of a function, the type of the result value is
+added. Input and output parameters are separated by the symbol '=>'.
+It suffices to give the type of a parameter. A name for the formal
+parameter is optional.
+.sh 2 Types
+.lp
+Types are either predefined in the target language like \fIint\fP and \fIINTEGER\fP,
+or user-defined like \fIMyType\fP, or they are tree types like \fIExpr\fP.
+A tree type is described by the name of a tree
+definition, a single node type, or a list of node types enclosed in
+brackets '[' and ']'. In case of ambiguities the latter two kinds may be
+qualified by preceding the name of the tree definition.
+.\" In every case a tree-type defines a set of legal node types. The name of a tree
+.\" definition refers to every node type that is defined there. A single
+.\" node type yields a set with just this one element and a list of node
+.\" types yields the union of all list elements.
+.(b
+.\" Syntax:
+.\" .sp 0.5
+.FT
+Type     = TreeType | UserType
+TreeType = Ident | [ Ident . ] Ident | [ Ident . ] '[' Idents ']'
+UserType = Ident
+Idents   = Ident { , Ident }
+.)b
+.sh 2 Rules
+.lp
+A rule behaves like a branch in a case or switch statement. It consists
+of a list of patterns, a list of expressions, a return expression in
+case of a function, and a list of statements.
+.\" The number of patterns must agree with the number of input parameters,
+.\" and the types of the elements of those lists must be pairwise compatible.
+.\" The number of expressions must agree with the number of output parameters,
+.\" and the types of the elements of those lists must be pairwise compatible.
+.\" The type of the expression after RETURN has to be compatible with the
+.\" result type of a function.
+.\" The type s of a pattern or an expression is said to be compatible
+.\" to the type t of a formal parameter if s is a subtype of t (s \(ib t).
+.(b
+.\" Syntax:
+.\" .sp 0.5
+.FT
+Rule     = [ Patterns ] [ => Exprs ] [ RETURN Expr ] :- { Statement ; } .
+Patterns = Pattern { , Pattern }
+Exprs    = Expr { , Expr }
+.)b
+.pp
+The semantics of a rule is as follows:
+A rule may succeed or fail.
+It succeeds if all its patterns, statements, and expressions succeed \(en
+otherwise it fails. The patterns, statements, and expressions are
+checked for success in the following order:
+First, the patterns are checked from left to right. A pattern succeeds
+if it matches its corresponding input parameter as described below.
+Second, the statements are executed in sequence as long as they succeed.
+The success of statements is defined below.
+Third, the expressions are evaluated from left to right and
+their results are passed to the corresponding output parameters.
+In case of a function, additionally the expression after RETURN is
+evaluated and its result is returned as value of the function call.
+The success of expressions is defined below, too.
+If all elements of a rule succeed then the rule succeeds and the subroutine returns.
+If one element of a rule fails the process described above stops and
+causes the rule to fail. Then the next rule is tried.
+This search process continues until either a successful rule is found
+or the end of the list is reached. In the latter case the behaviour
+depends on the kind of the subroutine:
+A procedure does nothing, a predicate returns false, and a function signals a runtime error.
+There is one exception to this definition of the semantics which is explained later.
+.sh 2 Patterns
+.lp
+A pattern describes the shape at the top or root of a subtree.
+A pattern can be a decomposition of a tree, the keyword NIL,
+a label or a variable, one of the don't care symbols '_' or '\fC\s-2..\s+2\fP',
+or an expression. A decomposition is written as
+a node type followed by a list of patterns in parenthesis '(' and ')'.
+It may be optionally preceded by a label.
+.(b L
+.\" Syntax:
+.\" .sp 0.5
+.FT
+Pattern = [ Ident : ] Ident ( [ Patterns ] ) | NIL | Ident | _ | .. | Expr
+.)b
+.lp
+The match between a pattern and a value is defined recursively depending
+on the kind of the pattern:
+.pp
+A decomposition with a node type t matches a tree u with a root node of type s if s is a
+subtype of t (s \(ib t) and all subpatterns of t match their
+corresponding subtrees or attributes of u.
+If the node type is preceded by a label l then a binding is
+established between l and u which defines the label l to refer to the tree u.
+.pp
+The first occurrence of a label l in a rule matches an arbitrary subtree
+or attribute value u.
+All further occurrences of the label l within patterns of this rule
+match a subtree or an attribute value v only if u is equal to v.
+The equality for trees is defined in the sense of structural equivalence.
+Two attributes are equal if they have the same values.
+A binding is established between l and u which defines the label l to refer to the value u.
+The label can be used later to access the associated value.
+.pp
+The pattern NIL matches the values NULL or NIL.
+The don't care symbol '_' matches one arbitrary subtree or attribute value.
+The don't care symbol '\fC\s-2..\s+2\fP' matches any number of arbitrary subtrees or attribute values.
+An expression matches a parameter or an attribute if both have the same values.
+.\" .lp
+.\" The ambiguity between a node type without a list of patterns in
+.\" parentheses and a label is resolved in favor of the node type, by
+.\" default. A node type t without a list of subpatterns is treated as t (\fC\s-2..\s+2\fP).
+.\" .i Puma
+.\" has an option that disables this behaviour. Then all node types require
+.\" parentheses, otherwise they are considered as labels.
+.sh 2 Expressions
+.lp
+Expressions denote the computation of values or the construction of trees.
+Binary and unary operations as well as calls of external functions
+are written as in the target language. Calls of
+.i puma
+functions and predicates distinguish between input and output arguments.
+The syntax for tree composition is similar to the syntax of patterns.
+.(b
+.\" Syntax:
+.\" .sp 0.5
+.FT
+Expr = Ident ( [ Exprs ] ) | NIL | Ident | _ | ..
+     | Ident ( [ Exprs ] [ => Patterns ] )
+.)b
+.lp
+The semantics of the different kinds of expressions is as follows:
+.pp
+A node type creates a tree node and provides the children and attributes
+of this node with the values given in parenthesis.
+.\" Again a missing list in parentheses is treated as (\fC\s-2..\s+2\fP).
+NIL represents the value NULL or NIL.
+A label refers to the expression it was bound to upon its definition.
+.pp
+A function or predicate call must be compatible with the corresponding definition in
+terms of the numbers of expressions and patterns as well as their types.
+A function call evaluates the expressions corresponding to input
+parameters, passes the results to the function, and executes the
+function. Upon return from the function the result value of the
+function determines the result of this expression.
+The values of the output parameters that the function returns are
+matched against the actual patterns of the function call.
+If one pair does not match the call fails.
+Labels in the patterns may establish bindings that enable to refer to
+the output parameters or subtrees thereof.
+.pp
+The don't care symbols specify that no computation should be executed,
+either for one or for several expressions. The result values are undefined.
+The binary and unary operators (prefix and postfix) of the
+target language as well as array indexing, parentheses, numbers, and strings are known to
+.i puma .
+They are passed unchanged to the output.
+.pp
+In case of node types, labels for tree values, and functions returning
+tree values,
+.i puma
+does type checking. For user types, target code
+expressions, or target operators no type checking is done by
+.i puma
+but later by the compiler. An expression that does not contain calls of
+.i puma
+functions or predicates always succeeds. An expression containing those calls
+succeeds if all the calls succeed \(en otherwise it fails.
+.sh 2 Statements
+.lp
+Statements are used to describe conditions, to perform output, to assign
+values to attributes, and to control the execution of the transformer
+via recursive subroutine calls. A statement is either a condition denoted
+by an expression, a call of a procedure, an assignment, one of the
+keywords REJECT or FAIL, or a target code statement. Every kind of
+statement may succeed or fail as described below.
+.(b
+.\" Syntax:
+.\" .sp 0.5
+.FT
+Statement    = Expr | Ident ( [ Exprs ] [ => Patterns ] ) | Ident := Expr
+             | REJECT | FAIL | [ Declarations ] TargetCode
+Declarations = Parameters 
+.)b
+.\" .pp
+.\" There are two syntactic ambiguities: Target code in curly brackets { }
+.\" is considered as target code statement instead of as target code
+.\" expression. To obtain the latter meaning the expression should be
+.\" enclosed in parentheses ( ).
+.\" Subroutine calls are treated according to their declaration:
+.\" Predicates and functions are treated as conditions,
+.\" procedures and external subroutines are treated as procedure calls.
+.\" If external subroutines should be considered as expressions the call should be
+.\" enclosed in parentheses ( ), too.
+.pp
+Conditions are denoted by expressions and can be used to determine
+properties that can not be expressed with pattern matching alone. Patterns describe
+either shapes of a fixed size of a tree or the equality between two
+values. Properties of trees of unlimited size and relations like '<', '<='
+etc. have to be checked with conditions.
+The expression has to be of type boolean or the call of a predicate.
+.\" For a predicate call the same rules as for a function call apply.
+A condition succeeds if the expression evaluates to true \(en otherwise it fails.
+.pp
+For a procedure call the same rules as for a function call apply.
+It succeeds if the values of all output parameters are matched by the
+corresponding patterns \(en otherwise it fails.
+.\" A call of an undefined subroutine is treated as a call of a procedure
+.\" that is defined externally. Such a call is flagged by a warning message.
+.pp
+An assignment statement evaluates its expression and stores this value
+at the entity denoted by the identifier on the left-hand side. The
+identifier can denote
+a global or a local variable,
+an input or an output parameter, as well as
+a label for an attribute or a subtree.
+An assignment statement succeeds if the expression succeeds \(en otherwise it fails.
+.pp
+The statement REJECT does nothing but fail. This way the execution of the
+current rule terminates and control is passed to the next rule.
+The statement FAIL causes the execution of the current subroutine to
+terminate. This statement is allowed in procedures and predicates, only.
+Depending on the kind of subroutine the following happens:
+A procedure terminates and a predicate returns false.
+.pp
+A target code statement which is enclosed in curly brackets '{' and '}'
+is executed as in the target language. It can
+be used to define labels by means of implementation language code or
+calls of external subroutines. In this case the names of the labels and
+their types have to be defined explicitly. This is done by declarations
+written in the syntax of a parameter list that precede the target code statement.
+.\" The user has to take care that all labels receive
+.\" values within the target code statement using either assignments or via
+.\" output parameters of subroutines.
+A target code statement always succeeds.
+.pp
+Note, statements and expressions may cause side effects by changing e. g. global
+variables, local variables, the input tree, or by producing
+output. Those side effects are not undone when a rule fails.
+.pp
+Further features such as various possibilities concerning the use of hand-written target
+code, named patterns instead of positional ones, or the definition of the equality or
+matching operation between attributes by a macro mechanism are omitted for the
+sake of brevity.
+.sh 1 Implementation
+.lp
+From a given specification,
+.i puma
+generates a program module in one of the target languages C or Modula-2
+implementing the desired transformation. The subroutines in the sense of
+.i puma
+are mapped to subroutines in the target language. Procedures
+yield procedures, functions yield functions that return a value, and
+predicates yield boolean functions. These subroutines can be called
+from other modules using the usual subroutine call syntax of the target
+language provided they are exported: All arguments are separated by commas \(en
+the symbol '=>' as separator between input and output arguments is only
+required in calls processed by
+.i puma .
+.pp
+The types of the parameters are treated as follows: Predefined types or
+user defined types remain unchanged. Node types or sets of node types
+are replaced by the name of the corresponding tree type.
+This is a pointer to a union of record types. Input parameters are
+passed by value and output parameters are passed by reference.
+.pp
+The rules of a subroutine are treated like a comfortable case or switch statement.
+The code generated for pattern matching is relatively simple.
+A naive implementation would just use a sequence of if statements.
+This kind of code showed to be already rather efficient.
+.i puma
+optimizes the code with respect to the elimination of common tests for patterns and the
+clever use of switch statements. Furthermore, tail recursion can be turned into iteration.
+Labels are replaced by access paths to the associated values.
+The code for the construction of tree nodes is inserted in-line.
+It is therefore efficient because
+no procedure calls are necessary for the creation of tree nodes.
+.sh 1 "Related Research"
+.lp
+In this section we compare our approach with several programming paradigms and similar tools.
+The intention is to provide further insight in the nature of our tool by looking at styles or
+work the reader might be familiar with.
+.sh 2 "Imperative Programming"
+.lp
+Our approach can be regarded as an extension of imperative languages by a type constructor
+for trees. Operations
+on trees for the composition and decomposition are provided using a concise term notation.
+The storage management for trees is completely automatic. Intermediate variables for
+output parameters of subroutines are declared implicitly and checked for the single
+assignment property. Pattern matching represents a comfortable kind of case or switch
+statement tailored towards processing of trees. This imperative view is reflected best by the
+implementation of the generator
+.i puma .
+It can be seen as a preprocessor that provides attributed trees and pattern matching for
+imperative languages.
+.sh 2 "Logic Programming"
+.lp
+From the stand point of logic programming languages such as Prolog\*([<\*([[ClM84\*(]]\*(>]
+our approach is relatively restricted and therefore one cannot classify
+.i puma
+as a logic programming language.
+.i Puma
+has no backtracking, no logic variables, and nothing like assert and retract. The
+unification is unidirectional and restricted to one of the two terms being a ground term.
+Similar are the syntax and the presence of predicates.
+.i Puma
+retains the "imperative subset" of Prolog. It turns out that this subset can be implemented
+efficiently and it suffices to specify most of the transformation problems in compilers
+\*([[Paa89\*(]].
+.pp
+Compared to Prolog the following features have been added:
+Besides predicates there are procedures, functions, and customary expressions.
+This allows for recursive functions and easy calls of
+.i puma
+subroutines from hand-written code. Attributes can be stored in the tree and accessed in read
+and write mode. The terms or trees are statically typed. For parameters the modes input and
+output are distinguished. Pattern matching is extended to cope with subtypes and attributes.
+The modification of input terms is possible. Easy escape to hand-written code and cooperation
+with other modules, either hand-written or generated, gives great flexibility and "imperative
+power". The transformer modules including the pattern matching are translated to direct code
+and therefore efficient.
+.sh 2 "Functional Programming"
+.lp
+Compared to modern functional programming languages such as Hope\*([<\*([[BMS80\*(]]\*(>],
+ML\*([<\*([[Mil85\*(]]\*(>], or Miranda\*([<\*([[Tur85\*(]]\*(>] our approach can of course not claim to
+be functional. There is nothing like under or over supply of functions or higher-order
+functions. It just supports the restricted kind of functional programming that can be found
+in imperative languages having functions and recursion like e. g. C or Pascal. Even the
+function results are restricted to simple data types and pointers. However, the latter allow
+functions to return trees and graphs. With respect to the traditional functional language
+Lisp\*([<\*([[MAE65\*(]]\*(>] our approach might be worth to be compared.
+Whereas Lisp supports binary trees only,
+.i puma
+provides tree nodes with an arbitrary number of subtrees and attributes.
+Dynamic typing and binding have
+been replaced by their static counterparts. The pattern matching facility has been added.
+.sh 2 "Attribute Grammars"
+.lp
+Our technique is related to attribute grammars
+\*([[Knu68\*(],Knu71\*(]]
+in several ways. Compared to pure attribute grammar processors such as
+\*([[Grob\*(],JoP90\*(],KHZ82\*(]]
+there are some restrictions. In pure attribute grammar systems the attribute computations
+are written in a functional notation. Knowing the dependencies among the attributes allows
+the automatic (implicit) determination of an evaluation order for the attributes (visit
+sequences). Furthermore it is possible to check an attribute grammar for completeness and
+non-circularity.
+Our approach is based on an explicit evaluation order using hand-written visit sequences.
+Three kinds of data can be regarded as attributes: The "real" attributes stored in the tree,
+the parameters of the subroutines, and global variables. This classification of the attributes
+is done by the user. Whereas pure attribute grammars allow only computations local to a
+grammar rule, the pattern matching facility makes computations on larger tree regions of
+fixed size feasible. Considering attributes of the kind parameter and non-nested patterns
+only, our approach is similar to affix grammars
+\*([[Kos71\*(],Kos77\*(]]
+or extended affix grammars\*([<\*([[Wat74\*(]]\*(>].
+This holds from the syntactic as well as from the semantic point of view. A
+.i puma
+generated module can contribute to attribute evaluation in several ways:
+First, the evaluation can be carried out completely by a transformation module itself using
+one or more subroutines for traversing the tree.
+Second,
+.i puma
+subroutines can be called as external subroutines from an attribute evaluator to compute
+attributes \(en especially those depending on tree-valued arguments.
+The imperative or sequential style of
+.i puma
+allows simple control on side effects and easy production of arbitrary output.
+.sh 2 "Optran"
+.lp
+The transformation tool Optran\*([<\*([[LMW89\*(]]\*(>]
+has been designed for optimizing transformations. It is based on an attribute grammar and
+modifies an input tree according to a given set of rules. A rule consists of a pattern,
+conditions, and action statements. The actions can replace the tree part matched by the
+pattern (where the unmatched subtrees might be reused) and compute new attribute values.
+Optran emphasizes the automatic reevaluation of attributes\*([<\*([[LMO88\*(]]\*(>]
+in order to arrive at attribute
+values consistent with the specified attribute grammar. As the goals of Optran are rather
+ambitious they pose several problems: In which order will the rules be applied and how to
+find the locations in the tree where a pattern matches? When will the reevaluation of
+attributes be carried out? The latter question is interesting because in the worst case
+it will be necessary to recompute many attributes in a large part of the tree and therefore
+consume a considerable amount of run time.
+.pp
+Our technique groups rules into an arbitrary number of subroutines. Every routine may perform
+pattern matching on an arbitrary number of trees supplied as arguments not just one.
+We explicitly control the execution order thus gaining an efficient and detailed way to
+describe where and when what should happen.
+.i Puma
+is not concerned with reevaluation of attributes. Besides modification of the input
+tree it also allows for mappings that produce arbitrary output.
+.sh 2 "Trafola"
+.lp
+The functional language Trafola-H\*([<\*([[HeS91\*(]]\*(>]
+was designed to be a specification language for program transformations. Besides all the
+features one would expect from a modern functional language it has powerful constructs for
+pattern matching. For example pattern matching is extended to cope with tuples and sequences.
+This introduces nondeterminism which is handled using backtracking. The language is
+statically typed and offers type polymorphism. Pattern matching is implemented by a
+table-driven bottom up tree automata or by a backtracking algorithm. The functional
+constructs are usually implemented by interpretation of an internal abstract machine.
+Our approach does not aim to be functional but it retains the flexibility and efficiency of
+imperative programming. Whereas the Trafola type constructor for sequences allows the grammar
+for legal trees to be written in extended BNF,
+.i puma
+supports pure BNF, only. Both approaches allow so-called non linear patterns where a variable
+occurs more than once in a pattern.
+.i Puma
+has extended pattern matching to handle subtypes.
+.sh 2 "Codegenerator-Generators"
+.lp
+Tools for the generation of code generators such as
+.i Twig
+\*([[AGT89\*(]] or
+.i Beg
+\*([[ESL89\*(]] often use tree
+pattern matching, too. In addition to a pattern, a condition, and an action a rule is
+associated with costs. Pattern matching usually performs a global match on the complete input
+tree in order to find a complete cover of the tree where the sum of all participating
+rules is of minimal cost. Algorithms based on dynamic programming have proved to yield
+satisfactory results. These tools are oriented towards code selection by transforming a
+tree-like intermediate representation into machine code. Therefore there is de facto only one
+subroutine with one tree-valued argument.
+.i Beg
+provides support for register allocation, has a fixed traversal scheme (post order),
+and generates directly coded code-generators.
+.i Twig
+allows for the modification of the input tree, supports arbitrary traversal strategies, and
+generates table-driven code-generators.
+.sh 2 "Txl"
+.lp
+The tree transformation tool
+.i txl
+\*([[CaC91\*(],CoP90\*(]]
+processes concrete syntax. It comprises a parser and an unparser for input and output of
+trees and allows the generation of source-to-source translators. The tree transformation is
+described by a set of rules consisting of a pattern, a condition, and a replacement. Usually
+the user does not have to take care about the order or location of rule applications. Rules
+are applied as long as there is one that matches. Thereby the tree is modified. There are
+means to describe which set of rules should be applied to which subtrees. Patterns are not
+written in a nested fashion but as strings containing nonterminals. The tool parses
+these strings in order to recognize the nesting structure. As
+.i puma
+is oriented towards abstract trees, the transformers are independent of parsing or
+unparsing. Besides tree modifications
+.i puma
+allows for tree mappings producing arbitrary output.
+Another difference is the explicit control of the execution order which allows an efficient
+implementation of the generated transformers.
+.sh 1 "Experiences"
+.lp
+In a first real world application,
+.i puma
+was successfully used to generate a code-generator in a compiler for the robot control
+language IRL\*([<\*([[IRL92\*(]]\*(>].
+The front-end of this compiler constructs an abstract syntax tree which is decorated with
+attributes during the semantic analysis phase. The code-generator maps this attributed tree to
+the standardized robot control code IRDATA\*([<\*([[IRD91\*(]]\*(>]
+which is comparable to assembly code. The strongly typed nature of IRDATA makes code-generation
+harder than one would expect. For instance it is impossible to implement record variables
+other than by turning every field into a separate variable. More complex types such as arrays
+with elements of a record type have to be transformed into records containing arrays.
+Nevertheless these nontrivial
+problems could be solved relatively easy with appropriate transformation rules.
+The code-generator uses a two phase scheme in order to deal with forward references.
+The first phase selects IRDATA instructions and stores them in memory. The second phase
+replaces symbolic labels by absolute ones, encodes the instructions, and writes the final
+code to an output file. The data structure for storing the instructions in memory is managed
+by a module generated by the tool
+.i ast .
+The development time was three months.
+.(z L
+.ce
+Table 1: Sizes of the Code-Generator Parts
+.sp 0.5
+.TS
+center box;
+l | c | c | c
+l | c | c | c
+l | n | n | n
+.
+ 	Specification	C Code	Binary Code
+ 	[lines]	[lines]	[KB]
+_
+code selection (\fIpuma\fP)	3032	8600	111
+instruction storage (\fIast\fP)	165	3430	36
+output (hand-written)   	-	700	7
+_
+total                     	3197	12730	154
+.TE
+.)z
+.pp
+The parts of the code-generator have the sizes listed in Table 1.
+The figures stem from measurements on a SPARC station ELC.
+The complete compiler runs at speed of 1000 lines per second.
+The run time is distributed among the phases as follows:
+Scanning and parsing takes 21 %, semantic analysis 10 %, code-generation 18 %, and output of
+the generated code 51 %. The huge share for the output comes from the voluminous nature of
+IRDATA. The output reaches four times the size of the source program.
+.sh 1 Conclusions
+.lp
+We presented a tool for the transformation of attributed trees using pattern matching.
+It is based on the definition, composition, and decomposition of trees in combination with
+recursion and pattern matching for trees as well as for attributes. It supports the mapping
+of trees to arbitrary output as well as the modification of trees. Moreover it can be used to
+construct attribute evaluators. The easy escape to an imperative programming language
+assures flexibility and practical usability. The tool has been designed to provide an
+expressive technique that can be implemented efficiently.
+.pp
+The tool
+.i puma
+and its predecessor called
+.i Gentle
+\*([[WGS89\*(]] have been used successfully in several real world projects.
+At our institution a front-end for a C compiler and a compiler for a functional language have
+been generated. An industrial company makes use of it for a language implementation project,
+too. All applications report their satisfaction with this approach and relative short
+development times. The interesting question is where does this success come from?
+The final paragraphs give the author's subjective opinion.
+.pp
+First, there are several aspects that support a high level programming style.
+The data type tree including operations for composition and decomposition replaces
+the handling of pointers, records, and dynamic storage allocation.
+Pattern matching offers a comfortable kind of case statement.
+Once it is understood and accepted then recursion seems to be easier to deal with then
+iteration.
+The implicit declaration of variables simplifies coding.
+The check for the single assignment property catches errors such as missing or multiple
+computations.
+A concise syntactic notation is probably more profitable than one would imagine.
+(Many of the the mentioned arguments have contributed to the success of Lisp and Prolog.)
+The approach supports an incremental development style: Initially, rules for the most general
+form are supplied and later rules for special cases are added in order to improve
+performance.
+Furthermore static typing discovers many errors during generation time.
+.pp
+Second, the approach is designed to be very flexible and open.
+Every combination of attribute processing from mere reading and matching of attributes to
+complete evaluation can be expressed.
+The method allows tree modifications as well as mappings that produce arbitrary output.
+The explicit description of execution order gives full control on side effects.
+The escape to imperative programming and the easy integration with external subroutines are
+essential loopholes.
+The tool as well as the generated code are efficient and can be used in production projects.
+It is probably the combination of all the mentioned properties and reasons that 
+we regard this approach to be very promising.
+.fi
+.sz 12
+.[]
+.[-
+.ds [F AGT89
+.ds [A A\*(p]\*(a]V\*(p] Aho
+.as [A \*(c]M\*(p] Ganapathi
+.as [A \*(m]S\*(p]\*(a]W\*(p]\*(a]K\*(p] Tjiang
+.ds [T Code Generation Using Tree Matching and Dynamic Programming
+.ds [J ACM Trans. Prog. Lang. and Systems
+.ds [V 11
+.ds [N 4
+.nr [P 1
+.ds [P 491-516
+.ds [D Oct. 1989
+.][
+.[-
+.ds [F BMS80
+.ds [A R\*(p] Burstall
+.as [A \*(c]D\*(p] MacQueen
+.as [A \*(m]D\*(p] Sannella
+.ds [T HOPE: An Experimental Applicative Language
+.ds [I Computer Science Department, Edinburgh
+.ds [R Report CSR-62-80
+.ds [D 1980
+.][
+.[-
+.ds [F CaC91
+.ds [A I\*(p]\*(a]H\*(p] Carmichael
+.as [A \*(n]J\*(p]\*(a]R\*(p] Cordy
+.ds [T TXL - Tree Transformation Language, Syntax and Informal Semantics
+.ds [I Dept. of Computing and Information Sciences, Queens's Univeristy, Kingston
+.ds [D Apr. 1991
+.][
+.[-
+.ds [F ClM84
+.ds [A W\*(p]\*(a]F\*(p] Clocksin
+.as [A \*(n]C\*(p]\*(a]S\*(p] Mellish
+.ds [T Programming in Prolog
+.ds [I Springer Verlag
+.ds [C Berlin
+.ds [D 1984
+.][
+.[-
+.ds [F CoP90
+.ds [A J\*(p]\*(a]R\*(p] Cordy
+.as [A \*(n]E\*(p] Promislow
+.ds [T Specification and Automatic Prototype Implementation of Polymorphic Objects in TURING using the TXL Dialect Processor
+.ds [J Proc. IEEE 1990 International Conference on Computer Languages
+.nr [P 1
+.ds [P 145-154
+.ds [D Mar. 1990
+.ds [C New Orleans
+.][
+.[-
+.ds [F ESL89
+.ds [A H\*(p] Emmelmann
+.as [A \*(c]F\*(p]\*(a]W\*(p] Schr\\*oer
+.as [A \*(m]R\*(p] Landwehr
+.ds [T BEG - a Generator for Efficient Back Ends
+.ds [J SI\&GPLAN Notices
+.ds [V 24
+.ds [N 7
+.nr [P 1
+.ds [P 227-237
+.ds [D July 1989
+.][
+.[-
+.ds [F GrE90
+.ds [A J\*(p] Grosch
+.as [A \*(n]H\*(p] Emmelmann
+.ds [T A Tool Box for Compiler Construction
+.ds [V 477
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 106-116
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Gro91
+.ds [A J\*(p] Grosch
+.ds [T Tool Support for Data Structures
+.ds [J Structured Programming
+.ds [V 12
+.nr [P 1
+.ds [P 31-38
+.ds [D 1991
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Puma - A Generator for the Transformation of Attributed Trees
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 26
+.ds [N 26
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F HeS91
+.ds [A R\*(p] Heckmann
+.as [A \*(n]G\*(p] Sander
+.ds [T Trafola-H Reference Manual
+.ds [I Universit\\*at des Saarlandes, Saarbr\\*ucken
+.ds [R Prospectra Project Report
+.ds [D 1991
+.][
+.[-
+.ds [F IRD91
+.ds [A IRDATA
+.ds [T Industrial Robot Data, DIN 66313
+.ds [I Beuth-Verlag
+.ds [C Berlin
+.ds [D 1991
+.][
+.[-
+.ds [F IRL92
+.ds [A IRL
+.ds [T Industrial Robot Language, DIN 66312
+.ds [I Beuth-Verlag
+.ds [C Berlin, to appear
+.ds [D 1992
+.][
+.[-
+.ds [F JoP90
+.ds [A M\*(p] Jourdan
+.as [A \*(n]D\*(p] Parigot
+.ds [T Application Development with the FNC-2 Attribute Grammar System
+.ds [V 477
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 11-25
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F KHZ82
+.ds [A U\*(p] Kastens
+.as [A \*(c]B\*(p] Hutt
+.as [A \*(m]E\*(p] Zimmermann
+.ds [T GAG: A Practical Compiler Generator
+.ds [V 141
+.ds [S LNCS
+.ds [I Springer Verlag
+.ds [C Heidelberg
+.ds [D 1982
+.][
+.[-
+.ds [F Knu68
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-Free Languages
+.nr [P 1
+.ds [P 127-146
+.ds [J Mathematical Systems Theory
+.ds [V 2
+.ds [D June 1968
+.ds [N 2
+.][
+.[-
+.ds [F Knu71
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-free Languages: Correction
+.nr [P 1
+.ds [P 95-96
+.ds [J Mathematical Systems Theory
+.ds [V 5
+.ds [D Mar. 1971
+.][
+.[-
+.ds [F Kos71
+.ds [A C\*(p]\*(a]H\*(p]\*(a]A\*(p] Koster
+.ds [T Affix Grammars
+.nr [P 1
+.ds [P 95-109
+.ds [B ALGOL 68 Implementation
+.ds [E J\*(p]\*(a]E\*(p]\*(a]L\*(p] Peck
+.nr [E 1
+.ds [I North Holland
+.ds [C Amsterdam
+.ds [D 1971
+.][
+.[-
+.ds [F Kos77
+.ds [A C\*(p]\*(a]H\*(p]\*(a]A\*(p] Koster
+.ds [T CDL: A Compiler Implementation Language
+.ds [V 47
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 341-351
+.ds [D 1977
+.][
+.[-
+.ds [F LMO88
+.ds [A P\*(p] Lipps
+.as [A \*(c]U\*(p] M\\*oncke
+.as [A \*(c]M\*(p] Olk
+.as [A \*(m]R\*(p] Wilhelm
+.ds [T Attribute (Re)evaluation in OPTRAN
+.ds [V 26
+.ds [J Acta Inf.
+.nr [P 1
+.ds [P 213-239
+.ds [D 1988
+.][
+.[-
+.ds [F LMW89
+.ds [A P\*(p] Lipps
+.as [A \*(c]U\*(p] M\\*oncke
+.as [A \*(m]R\*(p] Wilhelm
+.ds [T OPTRAN - A Language/System for the Specification of Program Transformations, System Overview and Experiences
+.ds [V 371
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 52-65
+.ds [D 1989
+.][
+.[-
+.ds [F MAE65
+.ds [A J\*(p] McCarthy
+.as [A \*(c]P\*(p]\*(a]W\*(p] Abrahams
+.as [A \*(c]D\*(p]\*(a]J\*(p] Edwards
+.as [A \*(c]T\*(p]\*(a]R\*(p] Hart
+.as [A \*(m]M\*(p]\*(a]I\*(p] Levin
+.ds [T Lisp 1.5 Programmer's Manual
+.nr [P 0
+.ds [P 106
+.ds [I MIT Press
+.ds [C Cambridge, MA
+.ds [D 1965
+.][
+.[-
+.ds [F Mil85
+.ds [A R\*(p] Milner
+.ds [T The Standard ML Core Language
+.ds [J Polymorphism
+.ds [V 2
+.ds [N 2
+.ds [D 1985
+.][
+.[-
+.ds [F NAJ76
+.ds [A K\*(p]\*(a]V\*(p] Nori
+.as [A \*(c]U\*(p] Ammann
+.as [A \*(c]K\*(p] Jensen
+.as [A \*(c]H\*(p]\*(a]H\*(p] N\\*:ageli
+.as [A \*(m]C\*(p] Jacobi
+.ds [T The Pascal-P Compiler: Implementation Notes
+.nr [P 0
+.ds [P 53
+.ds [R Bericht 10
+.ds [I Eidgen\\*:ossische Technische Hochschule
+.ds [C Z\\*:urich
+.ds [D July 1976
+.][
+.[-
+.ds [F Paa89
+.ds [A J\*(p] Paakki
+.ds [T A Prolog-Based Compiler Writing Tool
+.ds [E D\*(p] Hammer
+.nr [E 1
+.ds [B Proceedings of the Workshop on Compiler Compiler and High Speed Compilation
+.ds [C Berlin, GDR
+.nr [P 1
+.ds [P 107-117
+.ds [D 1989
+.][
+.[-
+.ds [F Tur85
+.ds [A D\*(p]\*(a]A\*(p] Turner
+.ds [T Miranda: A Nonstrict Functional Language with Polymorphic Types
+.ds [V 201
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 1-16
+.ds [D 1985
+.][
+.[-
+.ds [F Vol91
+.ds [A J\*(p] Vollmer
+.ds [T The Compiler Construction System GENTLE
+.ds [R GMD-Arbeitspapier Nr. 508
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Feb. 1991
+.][
+.[-
+.ds [F WGS89
+.ds [A W\*(p]\*(a]M\*(p] Waite
+.as [A \*(c]J\*(p] Grosch
+.as [A \*(m]F\*(p]\*(a]W\*(p] Schr\\*oer
+.ds [T Three Compiler Specifications
+.ds [R GMD-Studie Nr. 166
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Aug. 1989
+.][
+.[-
+.ds [F Wat74
+.ds [A D\*(p]\*(a]A\*(p] Watt
+.ds [T Analysis Oriented Two Level Grammars
+.ds [I University of Glasgow
+.ds [R Ph. D. thesis
+.ds [C Glasgow
+.ds [D 1974
+.][
+.bp 1
+.lp
+.b Contents
+.sp
+.xp

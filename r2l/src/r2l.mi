@@ -1,0 +1,96 @@
+(* $Id: r2l.mi,v 4.2 2002/10/02 16:34:46 grosch rel $ *)
+
+(*
+ * $Log: r2l.mi,v $
+ * Revision 4.2  2002/10/02 16:34:46  grosch
+ * added initialization of Attribute.Position
+ *
+ * Revision 4.1  1997/05/27 15:44:37  grosch
+ * cosmetic changes
+ *
+ * Revision 4.0  1993/08/26 16:08:42  grosch
+ * replaced table files (Scanner.Tab, Parser.Tab, ...) by initialization code
+ *
+ * Revision 1.0  1993/08/17  16:20:29  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Dec. 1990 *)
+
+MODULE r2l;
+
+FROM rSystem	IMPORT GetArgCount, GetArgument, rExit;
+FROM IO		IMPORT CloseIO;
+FROM StdIO	IMPORT WriteS, WriteNl;
+FROM Strings	IMPORT tString, ArrayToString;
+FROM Idents	IMPORT MakeIdent;
+FROM Position	IMPORT NoPosition;
+FROM Scanner	IMPORT BeginScanner, BeginFile, Attribute;
+FROM Parser	IMPORT Parser;
+
+VAR
+   SourceFile	,
+   Argument	: ARRAY [0 .. 255] OF CHAR;
+   String	: tString;
+   i, j, n	: SHORTCARD;
+   h		: BOOLEAN;
+   ch		: CHAR;
+
+BEGIN
+   h := FALSE;
+   n := 0;
+   SourceFile [0] := 0C;
+
+   FOR i := 1 TO GetArgCount () - 1 DO
+      GetArgument (i, Argument);
+      IF Argument [0] = '-' THEN 
+	 IF Argument [1] = 'l' THEN 
+	    j := 2;
+	    LOOP
+	       ch := Argument [j];
+	       IF ch = 0C THEN EXIT; END;
+	       INC (j);
+	    END;
+	 ELSE
+	    j := 0;
+	    LOOP
+	       INC (j);
+	       ch := Argument [j];
+	       CASE ch OF
+	       | 0C : EXIT;
+	       | '?': h := TRUE;
+	       | 'h': h := TRUE;
+	       ELSE
+	       END;
+	    END;
+	 END;
+      ELSIF Argument [0] = '?' THEN 
+	 h := TRUE;
+      ELSE
+	 j := 0;
+	 REPEAT
+            ch := Argument [j];
+	    SourceFile [j] := ch;
+	    INC (j);
+	 UNTIL ch = 0C;
+      END;
+   END;
+
+   IF h THEN
+      WriteS ("usage: r2l [-options] [file]"		); WriteNl; WriteNl;
+      WriteS (" -h print help information"		); WriteNl;
+   ELSE
+      Attribute.Position := NoPosition;
+      IF SourceFile [0] # 0C THEN
+	 BeginFile (SourceFile);
+	 ArrayToString (SourceFile, String);
+	 Attribute.Position.File := MakeIdent (String);
+      END;
+      BeginScanner;
+      n := Parser ();
+   END;
+
+   CloseIO;
+   rExit (0);
+END r2l.

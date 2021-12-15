@@ -1,0 +1,7 @@
+MODULE	Main;
+
+IMPORT	Convert,	Characte,	Checks,
+	Errors,		Listing,	Path,
+	Queues,		Stack,		SysError;
+
+END Main.

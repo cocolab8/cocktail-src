@@ -1,0 +1,557 @@
+(* $Id: Patterns.mi,v 2.1 1993/08/18 15:18:10 grosch rel $ *)
+
+IMPLEMENTATION MODULE Patterns;
+
+FROM DynArray	IMPORT	MakeArray, ReleaseArray;
+
+FROM Errors	IMPORT	ERROR;
+
+FROM Grammar	IMPORT	tLayout, Arity, Layout, MainClass, DirectSubclasses,
+			SuperClass, SonClass, ClassesOfNode, NodesOfClass,
+			Subclasses;
+
+FROM Idents	IMPORT	tIdent, WriteIdent;
+
+FROM IO		IMPORT	tFile, WriteS;
+
+FROM rMemory	IMPORT	Alloc, Free;
+
+FROM Queues	IMPORT	tQueue, Insert;
+
+FROM Scanner	IMPORT	NoIdent;
+
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsEmpty, Minimum, Union,
+			Include, Card, Assign, AssignElmt, AssignEmpty,
+			Extract, IsElement, Intersection, Difference;
+
+FROM Stack	IMPORT	tStack, MakeStack, ReleaseStack, ClearStack,
+			IsEmptyStack, Push, Pop;
+
+FROM Types	IMPORT	tType, Type;
+
+FROM Scanner	IMPORT	MaxIdent;
+
+FROM SYSTEM	IMPORT	TSIZE;
+
+
+
+(* PATT_   
+FROM Info	IMPORT	WriteIdentSet;
+FROM IO		IMPORT	StdOutput, WriteNl;
+   _PATT *)
+
+VAR
+  vExtendPos: tPattern;
+
+PROCEDURE MakePattern	(id: tIdent): tPattern;
+  VAR
+    arity: INTEGER;
+    size: LONGINT;
+    pat: tPattern;
+    pos: INTEGER;
+  BEGIN
+    pat := Alloc (TSIZE (tPatternR));
+    pat^.Ident := id;
+    MakeSet (pat^.Classes, MaxIdent);
+    IF Type (id) = cNode THEN
+      arity := Arity (id);
+      size := arity + 1;
+      MakeArray (pat^.Sons, size, TSIZE (tPattern));
+      FOR pos := 1 TO arity DO
+	pat^.Sons^[pos] := NIL;
+      END;
+    ELSE
+      pat^.Sons := NIL;
+    END;
+    RETURN pat;
+  END MakePattern;
+
+PROCEDURE PatternClasses (pat: tPattern; VAR classes: tSet);
+  BEGIN
+    Assign (classes, pat^.Classes);
+  END PatternClasses;
+
+PROCEDURE SetPatternSon (pat: tPattern; pos: INTEGER; son: tPattern);
+  BEGIN
+    pat^.Sons^[pos] := son;
+  END SetPatternSon;
+
+PROCEDURE GetPatternSon (pat: tPattern; pos: INTEGER): tPattern;
+  BEGIN
+    RETURN pat^.Sons^[pos];
+  END GetPatternSon;
+
+PROCEDURE GetPatternId (pat: tPattern): tIdent;
+  BEGIN
+    RETURN pat^.Ident;
+  END GetPatternId;
+
+PROCEDURE ReleasePattern (VAR pat: tPattern);
+  VAR
+    size: LONGINT;
+    arity, pos: INTEGER;
+  BEGIN
+    IF pat # NIL THEN
+      ReleaseSet (pat^.Classes);
+      IF Type (pat^.Ident) = cNode THEN
+	arity := Arity (pat^.Ident);
+	FOR pos := 1 TO arity DO
+	  ReleasePattern (pat^.Sons^[pos]);
+	END;
+	size := arity + 1;
+	ReleaseArray (pat^.Sons, size, TSIZE (tPattern));
+      END;
+      Free (TSIZE (tPatternR), pat);
+      pat := NIL;
+    END;
+  END ReleasePattern;
+
+PROCEDURE CopyPattern (pat: tPattern): tPattern;
+  VAR
+    pos: INTEGER;
+    copy: tPattern;
+  BEGIN
+    IF pat = NIL THEN 
+      copy := NIL
+    ELSE
+      copy := MakePattern (pat^.Ident);
+      Assign (copy^.Classes, pat^.Classes);
+      IF Type (pat^.Ident) = cNode THEN
+	FOR pos := 1 TO Arity (pat^.Ident) DO
+	  copy^.Sons^[pos] := CopyPattern (pat^.Sons^[pos]);
+	END;
+      END;
+    END;
+    RETURN copy;
+  END CopyPattern;
+
+PROCEDURE NormPattern (pat: tPattern): tPattern;
+  BEGIN
+    RETURN Normalize (pat, TRUE);
+  END NormPattern;
+
+PROCEDURE Normalize (pat: tPattern; reduce: BOOLEAN): tPattern;
+
+  VAR
+    mainclass, class: tIdent;
+    classes: tSet;
+    mainlayout, layout: tLayout;
+    arity, pos: INTEGER;
+    ok: BOOLEAN;
+    nilsonly: BOOLEAN;
+    sonpat: tPattern;
+
+  BEGIN
+    IF pat = NIL THEN
+			(* no restriction at all *)
+      ;
+    ELSE
+      MakeSet (classes, MaxIdent);
+
+			(* pattern is specified	 *)
+
+      IF Type (pat^.Ident) = cNode THEN
+			  (* node pattern *)
+
+	arity := Arity (pat^.Ident);
+	mainclass := MainClass (pat^.Ident);
+	mainlayout := Layout (pat^.Ident, mainclass);
+
+				  (* normalize sons *)
+				  (* check presence of sons *)
+	nilsonly := TRUE;
+	FOR pos := 1 TO arity DO
+	  sonpat := Normalize (pat^.Sons^[pos], reduce);
+	  IF (sonpat # NIL) THEN
+	    IF (sonpat^.Ident = SonClass (mainlayout, pos)) THEN
+	      IF reduce THEN
+		ReleasePattern (sonpat);
+		sonpat := NIL;
+	      END;
+	    ELSE
+	      nilsonly := FALSE;
+	    END;
+	  END;
+	  pat^.Sons^[pos] := sonpat;
+	END;
+
+				  (* define classes *)
+	AssignEmpty (pat^.Classes);
+	ClassesOfNode (pat^.Ident, classes);
+	WHILE NOT IsEmpty (classes) DO
+	  class := Extract (classes);
+	  layout := Layout (pat^.Ident, class);
+	  ok := TRUE;
+	  FOR pos := 1 TO arity DO
+	    IF ok THEN
+              IF pat^.Sons^[pos] = NIL THEN
+                ok := SonClass (layout, pos) = SonClass (mainlayout, pos);
+	      ELSE
+	        ok := IsElement (SonClass (layout, pos),
+				 pat^.Sons^[pos]^.Classes);
+	      END;
+	    END;
+	  END;
+	  IF ok THEN
+	    Include (pat^.Classes, class);
+	  END;
+	END;
+
+				  (* reduce to class if wished and possible *)
+	IF reduce & nilsonly & UniqNodeClass (mainclass) THEN
+	  ReleasePattern (pat);
+	  pat := MakePattern (mainclass);
+	END;
+
+      END;
+
+      IF Type (pat^.Ident) = cClass THEN
+			(* class pattern (on call or after reduction) *)
+
+			(* define classes *)
+	AssignElmt (pat^.Classes, pat^.Ident);
+
+      END;
+
+      			(* complete classes *)
+      Assign (classes, pat^.Classes);
+      WHILE NOT IsEmpty (classes) DO
+	class := SuperClass (Extract (classes));
+	WHILE (class # NoIdent) AND NOT IsElement (class, pat^.Classes) DO
+	  Include (pat^.Classes, class);
+	  class := SuperClass (class);
+	END;
+      END;
+
+      ReleaseSet (classes);
+
+    END;
+    RETURN pat;
+  END Normalize;
+
+PROCEDURE UniqNodeClass (class: tIdent): BOOLEAN;
+  VAR
+    classes, nodes: tSet;
+    node: tIdent;
+    count: INTEGER;
+  BEGIN
+    MakeSet (classes, MaxIdent);
+    MakeSet (nodes, MaxIdent);
+    Subclasses (class, classes);
+    count := 0;
+    LOOP
+      NodesOfClass (class, nodes);
+      WHILE NOT IsEmpty (nodes) DO
+        node := Extract (nodes);
+        INC (count);
+	IF count > 1 THEN EXIT END;
+      END;
+      IF IsEmpty (classes) THEN EXIT END;
+      class := Extract (classes);
+    END;
+    ReleaseSet (classes);
+    ReleaseSet (nodes);
+    RETURN count = 1;
+  END UniqNodeClass;
+
+PROCEDURE Relation (pat1, pat2: tPattern): tRelation;
+  VAR
+    id1, id2: tIdent;
+    t1, t2: tType;
+    pos: INTEGER;
+    relation: tRelation;
+    common, classes, nodes: tSet;
+  BEGIN
+    IF (pat1 = NIL) & (pat2 = NIL) THEN RETURN cEqual END;
+    IF (pat1 = NIL) THEN RETURN cSupersumes END;
+    IF (pat2 = NIL) THEN RETURN cSubsumes END;
+
+    id1 := pat1^.Ident;
+    t1 := Type (id1);
+    id2 := pat2^.Ident;
+    t2 := Type (id2);
+
+    IF (t1 = cClass) AND (t2 = cClass) THEN
+
+      IF id1 = id2 THEN
+	RETURN cEqual;
+      ELSIF IsElement (id1, pat2^.Classes) THEN
+	vExtendPos := pat1;
+	RETURN cSupersumes;
+      ELSIF IsElement (id2, pat1^.Classes) THEN
+	RETURN cSubsumes;
+      ELSE
+	MakeSet (common, MaxIdent);
+	MakeSet (nodes, MaxIdent);
+	AllNodesOfClass (id1, common);
+	AllNodesOfClass (id2, nodes);
+	Intersection (common, nodes);
+	IF IsEmpty (common) THEN
+	  relation := cInconsistent;
+	ELSE
+	  relation := cIndependent;
+	END;
+	ReleaseSet (nodes);
+	ReleaseSet (common);
+	RETURN relation;
+      END;
+    
+    ELSIF (t1 = cClass) THEN
+
+      IF IsElement (id1, pat2^.Classes) THEN
+	vExtendPos := pat1;
+	RETURN cSupersumes;
+      ELSE
+	MakeSet (common, MaxIdent);
+	MakeSet (classes, MaxIdent);
+	Subclasses (id1, common);
+	ClassesOfNode (id2, classes);
+        Include (common, id1);
+	Intersection (common, classes);
+	IF IsEmpty (common) THEN
+	  relation := cInconsistent;
+	ELSE
+	  vExtendPos := pat1;
+	  relation := cIndependent;
+	END;
+	ReleaseSet (classes);
+	ReleaseSet (common);
+	RETURN relation;
+      END;
+
+    ELSIF (t2 = cClass) THEN
+
+      IF IsElement (id2, pat1^.Classes) THEN
+	RETURN cSubsumes;
+      ELSE
+	MakeSet (common, MaxIdent);
+	MakeSet (classes, MaxIdent);
+	Subclasses (id2, common);
+	ClassesOfNode (id1, classes);
+        Include (common, id2);
+	Intersection (common, classes);
+	IF IsEmpty (common) THEN
+	  relation := cInconsistent;
+	ELSE
+	  relation := cIndependent;
+	END;
+	ReleaseSet (classes);
+	ReleaseSet (common);
+	RETURN relation;
+      END;
+
+    ELSE 
+      
+      IF id1 = id2 THEN
+        relation := cEqual;
+	FOR pos := 1 TO Arity (id1) DO
+          CASE Relation (pat1^.Sons^[pos], pat2^.Sons^[pos]) OF
+	  | cEqual:	
+	      ;
+	  | cIndependent:
+              IF relation # cInconsistent THEN
+		relation := cIndependent;
+	      END;
+	  | cInconsistent:
+	      RETURN cInconsistent;
+	  | cSubsumes:
+	      IF relation = cEqual THEN
+		relation := cSubsumes;
+	      ELSIF relation = cSupersumes THEN
+		relation := cIndependent;
+	      END;
+	  | cSupersumes:
+	      IF relation = cEqual THEN
+		relation := cSupersumes;
+	      ELSIF relation = cSubsumes THEN
+		relation := cIndependent;
+	      END;
+	  END;
+	END;
+	RETURN relation;
+      ELSE
+	RETURN cInconsistent;
+      END;
+
+    END;
+  END Relation;
+
+PROCEDURE AllNodesOfClass (cl: tIdent; VAR nodesofclass: tSet);
+  VAR
+    classes, nodes: tSet;
+  BEGIN
+    AssignEmpty (nodesofclass);
+    MakeSet (classes, MaxIdent);
+    MakeSet (nodes, MaxIdent);
+    Subclasses (cl, classes);
+    LOOP
+      NodesOfClass (cl, nodes);
+      Union (nodesofclass, nodes);
+      IF IsEmpty (classes) THEN EXIT END;
+      cl := Extract (classes);
+    END;
+    ReleaseSet (classes);
+    ReleaseSet (nodes);
+  END AllNodesOfClass;
+
+PROCEDURE ResetExtendPos;
+  BEGIN
+    vExtendPos := NIL;
+  END ResetExtendPos;
+
+PROCEDURE ExtendPos (): tPattern;
+  BEGIN
+    RETURN vExtendPos;
+  END ExtendPos;
+
+PROCEDURE Extend (pat, pos: tPattern; VAR out: tQueue);
+  VAR
+    pats: tStack;
+    EmptySet: tSet;
+  BEGIN
+    MakeStack (pats);
+    MakeSet (EmptySet, MaxIdent);
+    Synthesize (pos^.Ident, pats, EmptySet);
+    WHILE NOT IsEmptyStack (pats) DO
+      Insert (out, Normalize (Copy (pat, pos, Pop (pats)), FALSE));
+    END;
+    ReleaseSet (EmptySet);
+    ReleaseStack (pats);
+  END Extend;
+
+PROCEDURE SynthesizePatterns (class: tIdent; VAR pats: tStack);
+  VAR
+    EmptySet: tSet;
+  BEGIN
+    MakeSet (EmptySet, MaxIdent);
+    ClearStack (pats);
+    Synthesize (class, pats, EmptySet);
+    ReleaseSet (EmptySet);
+  END SynthesizePatterns;
+
+PROCEDURE Synthesize (class: tIdent; VAR out: tStack; NodesIn: tSet);
+  VAR
+    nodes, classes: tSet; NodesOut: tSet;
+    node: tIdent; layout: tLayout;
+    pat: tPattern; i: INTEGER;
+    mainclass: tIdent;
+  BEGIN
+    IF Type (class) # cClass THEN ERROR ('Synthesize');END;
+    MakeSet (nodes, MaxIdent);
+    MakeSet (classes, MaxIdent);
+    MakeSet (NodesOut, MaxIdent);
+
+    Assign (NodesOut, NodesIn);
+
+    (* make patterns imediately for the class *)
+    NodesOfClass (class, nodes);
+    Difference (nodes, NodesIn);	(* NodesIn are made already *)
+    WHILE NOT IsEmpty (nodes) DO
+      node := Extract (nodes);
+      mainclass := MainClass (node);
+      IF mainclass # NoIdent THEN
+	IF class = mainclass THEN
+	  Include (NodesOut, node);	(* no further construction for node *)
+	END;
+	layout := Layout (node, class);
+	pat := MakePattern (node);
+	FOR i := 1 TO Arity (node) DO
+	  SetPatternSon (pat, i, MakePattern (SonClass (layout, i)));
+	END;
+	Push (out, pat);
+      END;
+    END;
+
+    (* make pattern for the subclasses *)
+    DirectSubclasses (class, classes);
+    WHILE NOT IsEmpty (classes) DO
+      class := Extract (classes);
+      Synthesize (class, out, NodesOut);
+    END;
+
+    ReleaseSet (classes);
+    ReleaseSet (nodes);
+    ReleaseSet (NodesOut);
+  END Synthesize;
+
+PROCEDURE Copy (pat, pos, sub: tPattern): tPattern;
+  VAR
+    p: INTEGER;
+    copy: tPattern;
+  BEGIN
+    IF pat = pos THEN
+      copy := sub;
+    ELSE
+      copy := MakePattern (pat^.Ident);
+      Assign (copy^.Classes, pat^.Classes);
+      IF Type (pat^.Ident) = cNode THEN
+	FOR p := 1 TO Arity (pat^.Ident) DO
+	  copy^.Sons^[p] := Copy (pat^.Sons^[p], pos, sub);
+	END;
+      END;
+    END;
+    RETURN copy;
+  END Copy;
+
+PROCEDURE IsEqual (pat1, pat2: tPattern): BOOLEAN;
+  BEGIN
+    RETURN Relation (pat1, pat2) = cEqual;
+  END IsEqual;
+
+PROCEDURE WritePattern (f: tFile; pat: tPattern);
+  VAR
+    arity, pos: INTEGER;
+  BEGIN
+    IF pat = NIL THEN
+      WriteS (f, ':');
+    ELSE
+      WriteIdent (f, pat^.Ident);
+      (* PATT_   
+      WriteS (f, '<');
+      WriteIdentSet (f, pat^.Classes);
+      WriteS (f, '>');
+         _PATT *)
+      IF Type (pat^.Ident) = cNode THEN
+	WriteS (f, ' (');
+	arity := Arity (pat^.Ident);
+	IF arity > 0 THEN
+	  pos := 0;
+	  LOOP
+	    INC (pos);
+	    WritePattern (f, pat^.Sons^[pos]);
+	    IF pos = arity THEN EXIT END;
+	    WriteS (f, ', ');
+	  END;
+	END;
+	WriteS (f, ')');
+      END;
+    END;
+  END WritePattern;
+
+(* PATT_   
+PROCEDURE WriteRelation (pat1, pat2: tPattern);
+  VAR
+    rel: tRelation;
+  BEGIN
+    rel := Relation (pat1, pat2);
+    WritePattern (StdOutput, pat1);
+    CASE rel OF
+    | cIndependent:	WriteS (StdOutput, '  ~  ');
+    | cInconsistent:	WriteS (StdOutput, ' ||  ');
+    | cSubsumes:	WriteS (StdOutput, '  >  ');
+    | cSupersumes:	WriteS (StdOutput, '  <  ');
+    | cEqual:		WriteS (StdOutput, '  =  ');
+    END;
+    WritePattern (StdOutput, pat2);
+    CASE rel OF
+    | cIndependent:	WriteS (StdOutput, '   (independent)');
+    | cInconsistent:	WriteS (StdOutput, '   (inconsistent)');
+    | cSubsumes:	WriteS (StdOutput, '   (subsumes)');
+    | cSupersumes:	WriteS (StdOutput, '   (supersumes)');
+    | cEqual:		WriteS (StdOutput, '   (equal)');
+    END;
+    WriteNl (StdOutput);
+  END WriteRelation;
+     _PATT *)
+
+END Patterns.

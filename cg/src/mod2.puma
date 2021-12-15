@@ -1,0 +1,1204 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 26.1.1989 */
+
+TRAFO	TreeMod2
+TREE	Tree
+PUBLIC	TreeIO GetIterator Graphic Search TreatTVAasChild
+
+EXPORT	{
+FROM Position	IMPORT tPosition;
+
+CONST
+   DRAWTREE	= ORD ('D') - ORD ('A');
+
+VAR Iterator	: Tree.tTree;
+
+PROCEDURE WriteLine (Line: tPosition);
+}
+
+GLOBAL	{
+
+FROM IO		IMPORT WriteS, WriteC, WriteNl;
+FROM Sets	IMPORT IsElement;
+FROM Idents	IMPORT tIdent;
+FROM Position	IMPORT tPosition;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Options	, ClassCount	,
+   f		, WI	, WN	, iInteger	, itTree	,
+   iNoTree	, iModule	, iMain		, HasChildren	,
+   HasAttributes, NoCodeAttr	, NoCodeClass	, itPosition	,
+   ForallClasses, ForallAttributes, Reverse	, CgLib		;
+
+IMPORT Strings;
+
+VAR
+   iClassName	: tIdent;
+   RevChild	: tTree;
+   i		: CARDINAL;
+   ch		: CHAR;
+
+PROCEDURE WriteLine (Line: tPosition);
+   BEGIN
+      IF Line.Line # 0 THEN
+	 !(* line ! WN (Line.Line); @ "@ WI (Line.File); @" *)@
+      END;
+   END WriteLine;
+}
+
+PROCEDURE TreatTVAasChild ()
+
+:-	IF IsElement (ORD ('<'), Options) THEN WI (iMain); !.! END
+	WI (iMain); !_TreatTVAasChild! 
+	.
+
+PROCEDURE TreeIO (t: Tree)
+
+Ag (..) :- {
+	!TYPE yytTreePtr	= POINTER TO ! WI (itTree); !;!
+	!!
+	!VAR yyLabel	: SHORTCARD;!
+	!VAR yyKind	: SHORTCARD;!
+	!VAR yyc	: CHAR;!
+	!VAR yys	: Strings.tString;!
+	!!
+      IF IsElement (ORD (','), Options) THEN
+	!PROCEDURE yyMark (yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  LOOP!
+	!   IF yyt = ! WI (iNoTree); ! THEN RETURN; END;!
+	!   INC (yyt^.yyHead.yyMark);!
+	!   IF yyt^.yyHead.yyMark > 1 THEN RETURN; END;!
+	!!
+	!   CASE yyt^.Kind OF!
+	ForallClasses (Classes, Mark);
+	!   ELSE RETURN;!
+	!   END;!
+	!  END;!
+	! END yyMark;!
+	!!
+      END;
+      IF IsElement (ORD (';'), Options) THEN
+	!CONST yyInitTreeStoreSize	= 32;!
+	!!
+	!VAR yyTreeStoreSize	: LONGINT;!
+	!VAR yyTreeStorePtr	: POINTER TO ARRAY [0..50000] OF ! WI (itTree); !;!
+	!VAR yyLabelCount	: INTEGER;!
+	!VAR yyRecursionLevel	: SHORTINT;!
+	!!
+	!PROCEDURE yyMapToLabel (yyTree: ! WI (itTree); !): SHORTCARD;!
+	! VAR yyi	: INTEGER;!
+	! BEGIN!
+	!  FOR yyi := 1 TO yyLabelCount DO!
+	!   IF yyTreeStorePtr^[yyi] = yyTree THEN RETURN yyi; END;!
+	!  END;!
+	!  INC (yyLabelCount);!
+	!  IF yyLabelCount = yyTreeStoreSize THEN!
+	!   DynArray.ExtendArray (yyTreeStorePtr, yyTreeStoreSize, SYSTEM.TSIZE (! WI (itTree); !));!
+	!  END;!
+	!  yyTreeStorePtr^[yyLabelCount] := yyTree;!
+	!  RETURN yyLabelCount;!
+	! END yyMapToLabel;!
+	!!
+	!PROCEDURE yyMapToTree (yyLabel: SHORTCARD): ! WI (itTree); !;!
+	! BEGIN RETURN yyTreeStorePtr^[yyLabel]; END yyMapToTree;!
+	!!
+      END;
+      IF IsElement (ORD ('$'), Options) THEN
+	!PROCEDURE yyWriteNl; BEGIN IO.WriteNl (yyf); END yyWriteNl;!
+	!!
+	!PROCEDURE yyWriteSelector (yys: ARRAY OF CHAR);!
+	! BEGIN!
+	!  IO.WriteS (yyf, yys);!
+	!  Layout.WriteSpaces (yyf, 16 - INTEGER (HIGH (yys)));!
+	!  IO.WriteS (yyf, ' = ');!
+	! END yyWriteSelector;!
+	!!
+	!PROCEDURE yyWriteHex (VAR yyx: ARRAY OF SYSTEM.BYTE);!
+	! VAR yyi	: INTEGER;!
+	! BEGIN!
+	!  FOR yyi := 0 TO INTEGER (HIGH (yyx)) DO!
+	!   IO.WriteN (yyf, ORD (CHAR (yyx [yyi])), 2, 16);!
+	!   IO.WriteC (yyf, ' ');!
+	!  END;!
+	! END yyWriteHex;!
+	!!
+	!PROCEDURE yyWriteNodeType (yyf: IO.tFile; yyt: ! WI (itTree); !);!
+	! VAR yyString	: Strings.tString;!
+	! BEGIN!
+	!  NodeName (yyt, yyString);!
+	!  Strings.WriteL (yyf, yyString);!
+	! END yyWriteNodeType;!
+	!!
+      END;
+      IF IsElement (ORD ('o'), Options) THEN
+	!PROCEDURE yyWriteAddr (yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  IF yyt = ! WI (iNoTree); ! THEN!
+	!   IO.WriteS (yyf, '! WI (iNoTree); !');!
+	!  ELSE!
+	!   IO.WriteN (yyf, LONGCARD (yyt), 8, 16);!
+	@   IO.WriteS (yyf, " *");@
+	!  END;!
+	!  yyWriteNl;!
+	! END yyWriteAddr;!
+	!!
+	ForallClasses (Classes, WriteNode);
+	!PROCEDURE Write! WI (iMain); !Node (yyyf: IO.tFile; yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  yyf := yyyf;!
+	!  IF yyt = ! WI (iNoTree); ! THEN!
+	!   IO.WriteS (yyf, '! WI (iNoTree); !'); yyWriteNl; RETURN;!
+	!  END;!
+	!!
+	!  yyWriteNodeType (yyf, yyt);!
+	!  CASE yyt^.Kind OF!
+	ForallClasses (Classes, WriteNodeName);
+	!  ELSE!
+	!  END;!
+	! END Write! WI (iMain); !Node;!
+	!!
+      END;
+      IF IsElement (ORD ('w'), Options) THEN
+	!VAR yyIndentLevel	: SHORTINT;!
+	!!
+	!PROCEDURE Write! WI (iMain); ! (yyyf: IO.tFile; yyt: ! WI (itTree); !);!
+	! VAR yySaveLevel	: SHORTINT;!
+	! BEGIN!
+	!  yyf := yyyf;!
+	!  IF yyRecursionLevel = 0 THEN yyLabelCount := 0; END;!
+	!  INC (yyRecursionLevel);!
+	!  yyMark (yyt);!
+	!  yySaveLevel := yyIndentLevel;!
+	!  yyIndentLevel := 0;!
+	!  yyWrite! WI (iMain); ! (yyt);!
+	!  yyIndentLevel := yySaveLevel;!
+	!  DEC (yyRecursionLevel);!
+	! END Write! WI (iMain); !;!
+	!!
+	!PROCEDURE yyIndentSelector (yys: ARRAY OF CHAR);!
+	! BEGIN Layout.WriteSpaces (yyf, yyIndentLevel); yyWriteSelector (yys); END yyIndentSelector;!
+	!!
+	!PROCEDURE yyIndentSelectorTree (yys: ARRAY OF CHAR; yyt: ! WI (itTree); !);!
+	! BEGIN writeSELECTOR (yys); yyWrite! WI (iMain); ! (yyt); END yyIndentSelectorTree;!
+	!!
+	ForallClasses (Classes, WriteAttributes);
+	!PROCEDURE yyWrite! WI (iMain); ! (yyt: ! WI (itTree); !);!
+	! VAR yyLevel	: SHORTCARD;!
+	! BEGIN!
+	!  yyLevel := yyIndentLevel;!
+	!  LOOP!
+	!   IF yyt = ! WI (iNoTree); ! THEN!
+	!    IO.WriteS (yyf, ' ! WI (iNoTree); !'); yyWriteNl; EXIT;!
+	!   ELSIF yyt^.yyHead.yyMark = 0 THEN!
+	!    IO.WriteC (yyf, '^'); IO.WriteI (yyf, yyMapToLabel (yyt), 0); yyWriteNl; EXIT;!
+	!   ELSIF yyt^.yyHead.yyMark > 1 THEN!
+	!    yyWriteNl; IO.WriteN (yyf, yyMapToLabel (yyt), 6, 10); IO.WriteC (yyf, ':');!
+	!    Layout.WriteSpaces (yyf, yyIndentLevel - 7);!
+	!   ELSE!
+	!    IO.WriteC (yyf, ' ');!
+	!   END;!
+	!   yyt^.yyHead.yyMark := 0;!
+	!   INC (yyIndentLevel, 2);!
+	!!
+	!   CASE yyt^.Kind OF!
+	ForallClasses (Classes, WriteClassName);
+	!   ELSE EXIT;!
+	!   END;!
+	!  END;!
+	!  yyIndentLevel := yyLevel;!
+	! END yyWrite! WI (iMain); !;!
+	!!
+      END;
+      IF IsElement (ORD ('r'), Options) THEN
+	!PROCEDURE Read! WI (iMain); ! (yyyf: IO.tFile): ! WI (itTree); !;!
+	! VAR yyt	: ! WI (itTree); !;!
+	! BEGIN!
+	!  yyf := yyyf;!
+	!  IF yyRecursionLevel = 0 THEN yyLabelCount := 0; END;!
+	!  INC (yyRecursionLevel);!
+	!  IF NOT yyIsInitialized THEN!
+	!   yyInitKindToIdent; yyIsInitialized := TRUE;!
+	!  END;!
+	!  yyRead! WI (iMain); ! (SYSTEM.ADR (yyt));!
+	!  DEC (yyRecursionLevel);!
+	!  RETURN yyt;!
+	! END Read! WI (iMain); !;!
+	!!
+	!PROCEDURE yyRead! WI (iMain); ! (yyt: yytTreePtr);!
+	! BEGIN!
+	!  LOOP!
+	!   CASE IO.ReadC (yyf) OF!
+	!   | '^': yyLabel := IO.ReadI (yyf); yyReadNl; yyt^ := yyMapToTree (yyLabel); RETURN;!
+	!   | 12C, '0': yyLabel := IO.ReadI (yyf); yyc := IO.ReadC (yyf);!
+	!    Layout.SkipSpaces (yyf); Strings.ReadL (yyf, yys);!
+	!    yyKind := yyMapToKind (yys); yyt^ := Make! WI (iMain); ! (yyKind);!
+	!    IF yyLabel # yyMapToLabel (yyt^) THEN IO.WriteS (IO.StdError, '! WI (iModule); !: error in Read! 
+	WI (iMain); !'); IO.WriteNl (IO.StdError); yyExit; END;!
+	!   ELSE!
+	!    Layout.SkipSpaces (yyf); Strings.ReadL (yyf, yys);!
+	!    yyKind := yyMapToKind (yys);!
+	!    IF yyKind = 0 THEN yyt^ := ! WI (iNoTree); !; RETURN; END;!
+	!    yyt^ := Make! WI (iMain); ! (yyKind);!
+	!   END;!
+	!!
+	!   CASE yyKind OF!
+	ForallClasses (Classes, ReadAttributes);
+	!   ELSE RETURN;!
+	!   END;!
+	!  END;!
+	! END yyRead! WI (iMain); !;!
+	!!
+	!VAR yyKindToIdent	: ARRAY [0..! WN (ClassCount); !] OF Idents.tIdent;!
+	!VAR yyIsInitialized	: BOOLEAN;!
+	!!
+	!PROCEDURE yyMapToKind (VAR yys: Strings.tString): SHORTCARD;!
+	! VAR yyi	: Idents.tIdent;!
+	! VAR yyk	: SHORTCARD;!
+	! BEGIN!
+	!  yyi := Idents.MakeIdent (yys);!
+	!  FOR yyk := 0 TO ! WN (ClassCount); ! DO!
+	!   IF yyKindToIdent [yyk] = yyi THEN RETURN yyk; END;!
+	!  END;!
+	!  RETURN 0;!
+	! END yyMapToKind;!
+	!!
+	!PROCEDURE yyInitKindToIdent2 (yya: ARRAY OF CHAR; yyKind: SHORTCARD);!
+	! VAR yys	: Strings.tString;!
+	! BEGIN!
+	!  Strings.ArrayToString (yya, yys);!
+	!  yyKindToIdent [yyKind] := Idents.MakeIdent (yys);!
+	! END yyInitKindToIdent2;!
+	!!
+	!PROCEDURE yyInitKindToIdent;!
+	! BEGIN!
+	!  yyInitKindToIdent2 ('! WI (iNoTree); !', 0);!
+	ForallClasses (Classes, InitKindToIdent);
+	! END yyInitKindToIdent;!
+	!!
+	!PROCEDURE yyReadNl; BEGIN IO.ReadNl (yyf); END yyReadNl;!
+	!!
+	!PROCEDURE yyReadIdent (): Idents.tIdent;!
+	! VAR yys	: Strings.tString;!
+	! BEGIN!
+	!  Strings.ReadL (yyf, yys);!
+	!  IO.UnRead (yyf);!
+	!  RETURN Idents.MakeIdent (yys);!
+	! END yyReadIdent;!
+	!!
+	!PROCEDURE yyReadHex (VAR yyx: ARRAY OF SYSTEM.BYTE);!
+	! VAR yyi	: INTEGER;!
+	! BEGIN!
+	!  FOR yyi := 0 TO INTEGER (HIGH (yyx)) DO!
+	!   yyx [yyi] := SYSTEM.BYTE (CHR (CARDINAL (IO.ReadN (yyf, 16))));!
+	!  END;!
+	! END yyReadHex;!
+	!!
+	!PROCEDURE yySkip;!
+	! BEGIN!
+	!  REPEAT UNTIL IO.ReadC (yyf) = '='; yyc := IO.ReadC (yyf);!
+	! END yySkip;!
+	!!
+	!PROCEDURE yyReadSelectorTree (yyt: yytTreePtr);!
+	! BEGIN!
+	!  readSELECTOR (); yyRead! WI (iMain); ! (yyt);!
+	! END yyReadSelectorTree;!
+	!!
+      END;
+	!CONST yyNil	= 374C;!
+	!CONST yyNoLabel	= 375C;!
+	!CONST yyLabelDef	= 376C;!
+	!CONST yyLabelUse	= 377C;!
+	!!
+      IF IsElement (ORD ('p'), Options) THEN
+	!PROCEDURE Put! WI (iMain); ! (yyyf: IO.tFile; yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  yyf := yyyf;!
+	!  IF yyRecursionLevel = 0 THEN yyLabelCount := 0; END;!
+	!  INC (yyRecursionLevel);!
+	!  yyMark (yyt);!
+	!  yyPut! WI (iMain); ! (yyt);!
+	!  DEC (yyRecursionLevel);!
+	! END Put! WI (iMain); !;!
+	!!
+	!PROCEDURE yyPut! WI (iMain); ! (yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  LOOP!
+	!   IF yyt = ! WI (iNoTree); ! THEN!
+	!    IO.WriteC (yyf, yyNil); RETURN;!
+	!   ELSIF yyt^.yyHead.yyMark = 0 THEN!
+	!    IO.WriteC (yyf, yyLabelUse); yyLabel := yyMapToLabel (yyt); yyPut (yyLabel);!
+	!    RETURN;!
+	!   ELSIF yyt^.yyHead.yyMark > 1 THEN!
+	!    IO.WriteC (yyf, yyLabelDef); yyLabel := yyMapToLabel (yyt); yyPut (yyLabel);!
+	IF ClassCount > 251 THEN
+	!    yyPut (yyt^.Kind);!
+	!   ELSIF yyt^.Kind > 251 THEN!
+	!    IO.WriteC (yyf, yyNoLabel); yyPut (yyt^.Kind);!
+	ELSE
+	!    IO.WriteC (yyf, CHR (yyt^.Kind));!
+	END;
+	!   ELSE!
+	!    IO.WriteC (yyf, CHR (yyt^.Kind));!
+	!   END;!
+	!   yyt^.yyHead.yyMark := 0;!
+	!!
+	!   CASE yyt^.Kind OF!
+	ForallClasses (Classes, PutAttributes);
+	!   ELSE RETURN;!
+	!   END;!
+	!  END;!
+	! END yyPut! WI (iMain); !;!
+	!!
+	!PROCEDURE yyPut (VAR yyx: ARRAY OF SYSTEM.BYTE);!
+	! VAR yyi	: INTEGER;!
+	! BEGIN!
+	!  yyi := IO.Write (yyf, SYSTEM.ADR (yyx), INTEGER (HIGH (yyx)) + 1);!
+	! END yyPut;!
+	!!
+	!PROCEDURE yyPutIdent (yyi: Idents.tIdent);!
+	! VAR yys	: Strings.tString;!
+	! BEGIN!
+	!  Idents.GetString (yyi, yys);!
+	!  Strings.WriteL (yyf, yys);!
+	! END yyPutIdent;!
+	!!
+      END;
+      IF IsElement (ORD ('g'), Options) THEN
+	!PROCEDURE Get! WI (iMain); ! (yyyf: IO.tFile): ! WI (itTree); !;!
+	! VAR yyt	: ! WI (itTree); !;!
+	! BEGIN!
+	!  yyf := yyyf;!
+	!  IF yyRecursionLevel = 0 THEN yyLabelCount := 0; END;!
+	!  INC (yyRecursionLevel);!
+	!  yyGet! WI (iMain); ! (SYSTEM.ADR (yyt));!
+	!  DEC (yyRecursionLevel);!
+	!  RETURN yyt;!
+	! END Get! WI (iMain); !;!
+	!!
+	!PROCEDURE yyGet! WI (iMain); ! (yyt: yytTreePtr);!
+	! BEGIN!
+	!  LOOP!
+	!   yyc := IO.ReadC (yyf);!
+	!   CASE yyc OF!
+	!   | yyNil	: yyt^ := ! WI (iNoTree); !; RETURN;!
+	!   | yyLabelUse	: yyGet (yyLabel); yyt^ := yyMapToTree (yyLabel); RETURN;!
+	!   | yyLabelDef	: yyGet (yyLabel);! 
+	IF ClassCount > 251 THEN
+	! yyGet (yyKind);! 
+	ELSE
+	! yyKind := ORD (IO.ReadC (yyf));! 
+	END;
+	! yyt^ := Make! WI (iMain); ! (yyKind);!
+	!    IF yyLabel # yyMapToLabel (yyt^) THEN IO.WriteS (IO.StdError, '! WI (iModule); !: error in Get! 
+	WI (iMain); !'); IO.WriteNl (IO.StdError); yyExit; END;!
+	IF ClassCount > 251 THEN
+	!   | yyNoLabel	: yyGet (yyKind); yyt^ := Make! WI (iMain); ! (yyKind);!
+	END;
+	!   ELSE yyKind := ORD (yyc); yyt^ := Make! WI (iMain); ! (yyKind);!
+	!   END;!
+	!!
+	!   CASE yyKind OF!
+	ForallClasses (Classes, GetAttributes);
+	!   ELSE RETURN;!
+	!   END;!
+	!  END;!
+	! END yyGet! WI (iMain); !;!
+	!!
+	!PROCEDURE yyGet (VAR yyx: ARRAY OF SYSTEM.BYTE);!
+	! VAR yyi	: INTEGER;!
+	! BEGIN!
+	!  yyi := IO.Read (yyf, SYSTEM.ADR (yyx), INTEGER (HIGH (yyx)) + 1);!
+	! END yyGet;!
+	!!
+	!PROCEDURE yyGetIdent (VAR yyi: Idents.tIdent);!
+	! VAR yys	: Strings.tString;!
+	! BEGIN!
+	!  Strings.ReadL (yyf, yys);!
+	!  yyi := Idents.MakeIdent (yys);!
+	! END yyGetIdent;!
+	!!
+      END;
+}; .
+
+
+PROCEDURE WriteNodeName (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	CONDITION ({{HasChildren, HasAttributes}} * Properties) # {{}};
+	!| ! WI (Name); !: yWriteNode! WI (Name); ! (yyt);!
+	.
+
+
+PROCEDURE WriteNode (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND
+	   (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!PROCEDURE yWriteNode! WI (Name); ! (yyt: ! WI (itTree); !);!
+	! BEGIN!
+	IF (BaseClass^.Kind = Tree.Class) AND		// NOT Top ?
+	   (({{HasChildren, HasAttributes}} * BaseClass^.Class.Properties) # {{}}) THEN
+	!  yWriteNode! WI (BaseClass^.Class.Name); ! (yyt);!
+	END;
+	iClassName := Name;
+	ForallAttributes (Attributes, WriteNode);
+	! END yWriteNode! WI (Name); !;!
+	!!
+	.
+Child (..) :-
+	!  yyWriteSelector ('! WI (Name); !');! 
+	! yyWriteAddr (yyt^.! WI (iClassName); !.! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	!  yyWriteSelector ('! WI (Name); !'); write! WI (Type);
+	! (yyt^.! WI (iClassName); !.! WI (Name); !) yyWriteNl;!
+	.
+
+
+PROCEDURE Mark (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	!| ! WI (Name); !:!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, Mark);
+	!yyt := yyt^.! WI (iClassName); !.! WI (Iterator^.Child.Name); !;!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!yyMark (yyt^.! WI (iClassName); !.! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	CONDITION Type = itTree;
+	!# ifdef SUPPORT_TVA!
+	!IF ! TreatTVAasChild (); ! THEN yyMark (yyt^.! WI (iClassName); !.! WI (Name); !); END;!
+	!# endif!
+	.
+
+
+PROCEDURE WriteClassName (t: Tree)
+
+Class (..) :- {
+	IF (NoCodeClass * Properties) = {} THEN
+	   !| ! WI (Name); !: ! 
+	   IF ({HasChildren, HasAttributes} * Properties) # {} THEN
+	      !yWrite! WI (Name); ! (yyt); ! 
+	      GetIterator (t);
+	      IF Iterator = NoTree THEN
+		 !EXIT;!
+	      ELSE
+		 !writeSELECTOR ('! WI (Iterator^.Child.Name); !'); ! 
+		 !yyt := yyt^.! WI (Name); !.! WI (Iterator^.Child.Name); !;!
+	      END;
+	   ELSE
+	      !IO.WriteS (yyf, '! WI (Name); !'); yyWriteNl; EXIT;!
+	   END;
+	END;
+}; .
+
+
+PROCEDURE WriteAttributes (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND
+	   (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!PROCEDURE yWrite! WI (Name); ! (yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  yyWriteNodeType (yyf, yyt);!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, WriteAttributes);
+	! END yWrite! WI (Name); !;!
+	!!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!  yyIndentSelectorTree ('! WI (Name); !', yyt^.! WI (iClassName); !.! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !IF ! TreatTVAasChild (); ! THEN!
+	   @  yyIndentSelectorTree ("@ WI (Name); @",@ 
+	   ! yyt^.! WI (iClassName); !.! WI (Name); !);!
+	   !ELSE!
+	   !# endif!
+	END
+	!  writeSELECTOR ('! WI (Name); !'); ! 
+	!write! WI (Type); ! (yyt^.! WI (iClassName); !.! WI (Name); !) yyWriteNl;!
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !END;!
+	   !# endif!
+	END
+	.
+
+
+PROCEDURE ReadAttributes (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND
+	   (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!| ! WI (Name); !:!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, ReadAttributes);
+	IF Iterator = NoTree THEN
+	   !RETURN;!
+	ELSE
+	   !readSELECTOR (); yyt := SYSTEM.ADR (yyt^^.! WI (iClassName); !.! WI (Iterator^.Child.Name); !);!
+	END;
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!yyReadSelectorTree (SYSTEM.ADR (yyt^^.! WI (iClassName); !.! WI (Name); !));!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !IF ! TreatTVAasChild (); ! THEN!
+	   ! yyReadSelectorTree (SYSTEM.ADR (yyt^^.! WI (iClassName); !.! WI (Name); !));!
+	   !ELSE!
+	   !# endif!
+	END
+	!readSELECTOR (); read! WI (Type); ! (yyt^^.! WI (iClassName); !.! WI (Name); !) yyReadNl;!
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !END;!
+	   !# endif!
+	END
+	.
+
+
+PROCEDURE PutAttributes (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND
+	   (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!| ! WI (Name); !:!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, PutAttributes);
+	IF Iterator = NoTree THEN
+	   !RETURN;!
+	ELSE
+	   !yyt := yyt^.! WI (iClassName); !.! WI (Iterator^.Child.Name); !;!
+	END;
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!yyPut! WI (iMain); ! (yyt^.! WI (iClassName); !.! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !IF ! TreatTVAasChild (); ! THEN!
+	   ! yyPut! WI (iMain); ! (yyt^.! WI (iClassName); !.! WI (Name); !);!
+	   !ELSE!
+	   !# endif!
+	END
+	!put! WI (Type); ! (yyt^.! WI (iClassName); !.! WI (Name); !)!
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !END;!
+	   !# endif!
+	END
+	.
+
+
+PROCEDURE GetAttributes (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND
+	   (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!| ! WI (Name); !:!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, GetAttributes);
+	IF Iterator = NoTree THEN
+	   !RETURN;!
+	ELSE
+	   !yyt := SYSTEM.ADR (yyt^^.! WI (iClassName); !.! WI (Iterator^.Child.Name); !);!
+	END;
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!yyGet! WI (iMain); ! (SYSTEM.ADR (yyt^^.! WI (iClassName); !.! WI (Name); !));!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !IF ! TreatTVAasChild (); ! THEN!
+	   ! yyGet! WI (iMain); ! (SYSTEM.ADR (yyt^^.! WI (iClassName); !.! WI (Name); !));!
+	   !ELSE!
+	   !# endif!
+	END
+	!get! WI (Type); ! (yyt^^.! WI (iClassName); !.! WI (Name); !)!
+	IF Type = itTree THEN		// tree-valued attribute
+	   !# ifdef SUPPORT_TVA!
+	   !END;!
+	   !# endif!
+	END
+	.
+
+
+PROCEDURE InitKindToIdent (t: Tree)
+
+Class (..) :- {
+	IF (NoCodeClass * Properties) = {} THEN
+	   !  yyInitKindToIdent2 ('! WI (Name); !', ! WI (Name); !);!
+	END;
+}; .
+
+
+PROCEDURE GetIterator (t: Tree)
+
+Class (..) :- {
+	Iterator := NoTree;
+	RevChild := NoTree;
+	ForallAttributes (t, GetIterator);
+	IF RevChild # NoTree THEN Iterator := RevChild; END;
+}; .
+Child (..) :- {
+	Iterator := t;
+	IF Reverse IN Properties THEN RevChild := t; END;
+}; .
+
+
+PROCEDURE Search (t: Tree)
+
+Ag (..) :-
+	!VAR yyLine, yyCurLine: CARDINAL;!
+	!VAR yyTheTree, yyTheNode: ! WI (itTree); !;!
+	!VAR yyFile: Idents.tIdent;!
+//	!VAR yySearch3: PROCEDURE (! WI (itTree); !, Position.tPosition);!
+	!!
+	!PROCEDURE yySearch4 (yyt: ! WI (itTree); !; yyp: Position.tPosition);!
+	! BEGIN!
+	!  IF ((yyFile = Idents.NoIdent) OR (yyFile = yyp.File)) AND!
+	!    (yyLine <= yyp.Line) AND (yyp.Line < yyCurLine) THEN!
+	!   yyTheNode := yyt; yyCurLine := yyp.Line; END;!
+	! END yySearch4;!
+	!!
+	!PROCEDURE yySearch2 (yyt: ! WI (itTree); !);!
+	! BEGIN!
+	!  CASE yyt^.Kind OF!
+	ForallClasses (Classes, Search2);
+	!  ELSE!
+	!  END;!
+	! END yySearch2;!
+	!!
+	.
+
+PROCEDURE GetNext (t: Tree)
+
+Class (..) :-
+	Iterator := NoTree;
+	ForallAttributes (t, GetNext);
+	.
+Child (..) :-
+	CONDITION Reverse IN Properties;
+	Iterator := t;
+	.
+
+PROCEDURE Search2 (Tree)
+
+t: Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasAttributes IN Properties);
+	CONDITION HastPosition (t);
+	!| ! WI (Name); !:!
+	iClassName := Name;
+	ForallAttributes (t, Search2);
+	.
+Attribute (..) :-
+	CONDITION Type = itPosition;
+	!yySearch4 (yyt, yyt^.! WI (iClassName); !.! WI (Name); !);!
+	.
+
+PREDICATE HastPosition ([Attributes, Classes])
+
+Attribute	(..) :- CONDITION Type = itPosition; .
+AttrOrAction	(..) :- CONDITION HastPosition (Next); .
+Class		(..) :- CONDITION HastPosition (Attributes) OR HastPosition (BaseClass); .
+
+FUNCTION CountChildren ([Attributes, Classes]) INTEGER
+
+Child		(Next := Next)	:- RETURN CountChildren (Next) + 1; .
+AttrOrAction	(Next := Next)	:- RETURN CountChildren (Next); .
+Class		(Attributes := Attributes, BaseClass := BaseClass)
+		:- RETURN CountChildren (Attributes) + CountChildren (BaseClass); .
+_		:- RETURN 0; .
+
+PROCEDURE Graphic (t: Tree)
+
+Ag (..) :-
+	CONDITION IsElement (ORD ('e'), Options);
+	 IF IsElement (DRAWTREE, Options) THEN
+//	!# ifdef DRAWTREE!
+	 END
+//	!!
+	!CONST!
+	! yyMaxCoord		= 65535;!
+	! yyIsBusy		= 65535;!
+	! yyTruncByDepth	= 65535;!
+	! yyTruncByLength	= 65534;!
+	!!
+	!VAR yygInterp	: TclTk.Tcl_Interp;!
+	!!
+/*
+	!PROCEDURE yySearch5 (yyt: ! WI (itTree); !; yyp: Position.tPosition);!
+	!BEGIN!
+	@ IF (yyt^.yyHead.yyy < yyTruncByLength) AND (yyLine <= yyp.Line) AND (yyp.Line < yyCurLine) THEN@
+	!  yyTheNode := yyt; yyCurLine := yyp.Line;!
+	! END;!
+	!END yySearch5;!
+	!!
+*/
+	!PROCEDURE ArgToString (yyPtr: SYSTEM.ADDRESS; VAR yyString: Strings.tString);!
+	!VAR!
+	! yyi	: INTEGER;!
+	! yyArray	: rSystem.tArrayChar;!
+	!BEGIN!
+	! yyArray := yyPtr;!
+	! Strings.AssignEmpty (yyString);!
+	! yyi := 0;!
+	! LOOP!
+	!  IF (yyArray^ [yyi] = 0C) OR (yyi = 255) THEN EXIT; END;!
+	!  Strings.Append (yyString, yyArray^ [yyi]);!
+	!  INC (yyi);!
+	! END;!
+	!END ArgToString;!
+	!!
+	!PROCEDURE yySearch (yyclass: TclTk.ClientData; yyinterp: TclTk.Tcl_Interp; yyargc: INTEGER; yyargv: Argument.ArgTable): INTEGER;!
+	!VAR!
+	! yyTheTree	: ! WI (itTree); !;!
+	! yyString	: Strings.tString;!
+	! yyArray	: TclTk.TclTk_String;!
+	!BEGIN!
+	! ArgToString (yyargv^ [1], yyString);!
+	! yyTheTree := ! WI (itTree); ! (Strings.StringToInt (yyString));!
+	! ArgToString (yyargv^ [2], yyString);!
+	! yyLine := Strings.StringToInt (yyString);!
+	! ArgToString (yyargv^ [3], yyString);!
+	! IF Strings.Length (yyString) = 0 THEN yyFile := Idents.NoIdent;!
+	! ELSE yyFile := Idents.MakeIdent (yyString); END;!
+	! yyCurLine := 1000000;!
+	! yyTheNode := yyTheTree;!
+//	! yySearch3 := yySearch5;!
+	! Traverse! WI (iMain); !TD (yyTheTree, yySearch2);!
+	! Strings.IntToString (INTEGER (yyTheNode), yyString);!
+	! Strings.StringToArray (yyString, yyArray);!
+	! TclTk.Tcl_SetResult (yyinterp, yyArray, TclTk.TCL_VOLATILE);!
+	! RETURN TclTk.TCL_OK;!
+	!END yySearch;!
+	!!
+	!VAR yyphase1	: BOOLEAN;!
+	!VAR yymaxx, yymaxy: SHORTCARD;!
+	!!
+	!PROCEDURE yySetY (yyp, yyt: ! WI (itTree); !; yyy, yyk: INTEGER; yyl: SHORTCARD): INTEGER;!
+	!VAR yy, yymax	: INTEGER;!
+	!BEGIN!
+	! INC (yyy);!
+	! yymax := yyy;!
+	! IF yyphase1 THEN!
+	!  IF (yyt = ! WI (iNoTree); !) OR ((yyt^.yyHead.yyMark = 0) AND!
+	!   ((yyt^.yyHead.yyx = yyIsBusy) OR (yyt^.yyHead.yyy >= CARDINAL (yyy)) OR!
+	!    (yyp^.yyHead.yyy >= yyTruncByLength))) THEN RETURN yymax; END;!
+	!  yyt^.yyHead.yyparent := yyp;!
+	!  yyt^.yyHead.yyx := yyIsBusy;!
+	! ELSE!
+
+	!  IF (yyt = ! WI (iNoTree); !) OR!
+	@  (yyt^.yyHead.yyMark = 0) OR (yyt^.yyHead.yyparent # yyp) THEN RETURN yymax; END;@
+	! END;!
+	! yyt^.yyHead.yyMark := 0;!
+	! INC (yyl);!
+	! IF yyl > ! WI (iMain); !_DrawLength THEN yyk := ! WI (iMain); !_DrawDepth; END;!
+	! INC (yyk);!
+	! CASE yyt^.Kind OF!
+	ForallClasses (Classes, SetY);
+	! ELSE!
+	! END;!
+	! yyt^.yyHead.yyx := 0;!
+	! IF yyl > ! WI (iMain); !_DrawLength THEN!
+	!  yyt^.yyHead.yyy := yyTruncByLength;!
+	!  RETURN yyy;!
+	! ELSIF yyk > ! WI (iMain); !_DrawDepth THEN!
+	!  yyt^.yyHead.yyy := yyTruncByDepth;!
+	!  RETURN yyy;!
+	! ELSE!
+	!  yyt^.yyHead.yyy := yyy;!
+	!  yymaxy := General.Max (yymaxy, yyy);!
+	!  RETURN yymax;!
+	! END;!
+	!END yySetY;!
+	!!
+	!TYPE yytFirstLast = RECORD yyfirst, yylast: SHORTCARD; END;!
+	!!
+	!PROCEDURE yySetX (yyp, yyt: ! WI (itTree); !; yyx: SHORTCARD; VAR yyout: yytFirstLast): SHORTCARD;!
+	!VAR!
+	! yyxin, yyw	: SHORTCARD;!
+	! yyFirstLast	: yytFirstLast;!
+	! yyList	: BOOLEAN;!
+	!BEGIN!
+	! yyxin := yyx;!
+	! IF (yyt = ! WI (iNoTree); !) OR (yyt^.yyHead.yyMark = 0) OR!
+	@  (yyt^.yyHead.yyparent # yyp) THEN RETURN yyx; END;@
+	! yyt^.yyHead.yyMark := 0;!
+	! yyFirstLast.yyfirst := yyMaxCoord;!
+	! yyList := FALSE;!
+	! CASE yyt^.Kind OF!
+	ForallClasses (Classes, SetX);
+	! ELSE!
+	! END;!
+	! IF NOT yyList THEN!
+	!  IF yyt^.yyHead.yyy >= yyTruncByLength THEN!
+	!   RETURN yyxin;!
+	!  ELSE!
+	!   IF yyFirstLast.yyfirst = yyMaxCoord THEN!
+	!    yyt^.yyHead.yyx := yyx;!
+	!   ELSE!
+	!    yyt^.yyHead.yyx := (yyFirstLast.yyfirst + yyFirstLast.yylast) DIV 2;!
+	!   END;!
+	!   yymaxx := General.Max (yymaxx, yyt^.yyHead.yyx);!
+	!   IF yyt^.yyHead.yyparent = yyp THEN!
+	!    IF yyout.yyfirst = yyMaxCoord THEN yyout.yyfirst := yyt^.yyHead.yyx; END;!
+	!    yyout.yylast := yyt^.yyHead.yyx;!
+	!   END;!
+	!   INC (yyxin);!
+	!   RETURN General.Max (yyx, yyxin);!
+	!  END;!
+	! ELSE!
+	!  IF yyt^.yyHead.yyy >= yyTruncByLength THEN!
+	!   RETURN yyxin;!
+	!  ELSE!
+	!   yyt^.yyHead.yyx := yyxin;!
+	!   yymaxx := General.Max (yymaxx, yyxin);!
+	!   IF yyt^.yyHead.yyparent = yyp THEN!
+	!    IF yyout.yyfirst = yyMaxCoord THEN yyout.yyfirst := yyt^.yyHead.yyx; END;!
+	!    yyout.yylast := yyt^.yyHead.yyx;!
+	!   END;!
+	!   RETURN General.Max (yyx, yyw);!
+	!  END;!
+	! END;!
+	!END yySetX;!
+	!!
+	!PROCEDURE yyDrawEdge (yyfrom, yyto: ! WI (itTree); !);!
+	!VAR!
+	! yyString, yyTemp	: Strings.tString;!
+	! yyArray, yyCoord	: TclTk.TclTk_String;!
+	!BEGIN!
+	! IF yyto = ! WI (iNoTree); ! THEN RETURN; END;!
+	! Strings.IntToString (yyfrom^.yyHead.yyx, yyString);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (yyfrom^.yyHead.yyy, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! IF yyto^.yyHead.yyy < yyTruncByLength THEN!
+	!  Strings.IntToString (yyto^.yyHead.yyx, yyTemp);!
+	!  Strings.Concatenate (yyString, yyTemp);!
+	!  Strings.Append (yyString, ' ');!
+	!  Strings.IntToString (yyto^.yyHead.yyy, yyTemp);!
+	!  Strings.Concatenate (yyString, yyTemp);!
+	! ELSIF yyto^.yyHead.yyy = yyTruncByDepth THEN!
+	!  Strings.IntToString (yyfrom^.yyHead.yyx + 1, yyTemp);!
+	!  Strings.Concatenate (yyString, yyTemp);!
+	!  Strings.Append (yyString, ' ');!
+	!  Strings.IntToString (yyfrom^.yyHead.yyy, yyTemp);!
+	!  Strings.Concatenate (yyString, yyTemp);!
+	!  Strings.Append (yyString, ' ');!
+	!  Strings.Append (yyString, '1');!
+	! ELSE!
+	!  Strings.IntToString (yyfrom^.yyHead.yyx, yyTemp);!
+	!  Strings.Concatenate (yyString, yyTemp);!
+	!  Strings.Append (yyString, ' ');!
+	!  Strings.IntToString (yyfrom^.yyHead.yyy + 1, yyTemp);!
+	!  Strings.Concatenate (yyString, yyTemp);!
+	!  Strings.Append (yyString, ' ');!
+	!  Strings.Append (yyString, '1');!
+	! END;!
+	! Strings.StringToArray (yyString, yyCoord);!
+	@ yyArray := "draw_edge ";@
+	! TclTk.Tcl_VarEval (yygInterp, yyArray, yyCoord, NIL);!
+	!END yyDrawEdge;!
+	!!
+	!PROCEDURE yyDrawNode (yyt: ! WI (itTree); !);!
+	!VAR!
+	! yyString, yyTemp	: Strings.tString;!
+	! yyArray, yyCoord	: TclTk.TclTk_String;!
+	!BEGIN!
+	! IF yyt^.yyHead.yyy >= yyTruncByLength THEN RETURN; END;!
+	! Strings.IntToString (yyt^.yyHead.yyx, yyString);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (yyt^.yyHead.yyy, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (INTEGER (yyt), yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! NodeName (yyt, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.StringToArray (yyString, yyCoord);!
+	@ yyArray := "draw_node ";@
+	! TclTk.Tcl_VarEval (yygInterp, yyArray, yyCoord, NIL);!
+	! CASE yyt^.Kind OF!
+	ForallClasses (Classes, DrawNode);
+	! ELSE!
+	! END;!
+	!END yyDrawNode;!
+	!!
+	!PROCEDURE yyPutAttr (yyclass: TclTk.ClientData; yyinterp: TclTk.Tcl_Interp; yyargc: INTEGER; yyargv: Argument.ArgTable): INTEGER;!
+	!VAR!
+	! yyf	: IO.tFile;!
+	! yyString	: Strings.tString;!
+	!BEGIN!
+	@ yyf := IO.WriteOpen ("yyNode");@
+	! ArgToString (yyargv^ [1], yyString);!
+	! Write! WI (iMain); !Node (yyf, ! WI (itTree); ! (Strings.StringToInt (yyString)));!
+	! IO.WriteClose (yyf);!
+	! RETURN TclTk.TCL_OK;!
+	!END yyPutAttr;!
+	!!
+	!PROCEDURE yyDrawSubTree (yyclass: TclTk.ClientData; yyinterp: TclTk.Tcl_Interp; yyargc: INTEGER; yyargv: Argument.ArgTable): INTEGER;!
+	!VAR yyString	: Strings.tString;!
+	!BEGIN!
+	! ArgToString (yyargv^ [1], yyString);!
+	! Draw! WI (iMain); ! (! WI (itTree); ! (Strings.StringToInt (yyString)));!
+//	! yyDrawTree (! WI (itTree); ! (Strings.StringToInt (yyString)));!
+	! RETURN TclTk.TCL_OK;!
+	!END yyDrawSubTree;!
+	!!
+	!# ifndef DrawAttr!
+	!# define DrawAttr(x, y)!
+	!# endif!
+	!!
+	!PROCEDURE yyCallAttr (yyclass: TclTk.ClientData; yyinterp: TclTk.Tcl_Interp; yyargc: INTEGER; yyargv: Argument.ArgTable): INTEGER;!
+	!VAR yyString	: Strings.tString;!
+	!BEGIN!
+	! ArgToString (yyargv^ [1], yyString);!
+	! DrawAttr (! WI (itTree); ! (Strings.StringToInt (yyString)), yyargv^ [2]);!
+	! RETURN TclTk.TCL_OK;!
+	!END yyCallAttr;!
+	!!
+	!PROCEDURE yySetParam (yyclass: TclTk.ClientData; yyinterp: TclTk.Tcl_Interp; yyargc: INTEGER; yyargv: Argument.ArgTable): INTEGER;!
+	!VAR yyString	: Strings.tString;!
+	!BEGIN!
+	! ArgToString (yyargv^ [1], yyString);!
+	! ! WI (iMain); !_DrawDepth := Strings.StringToInt (yyString);!
+	! ArgToString (yyargv^ [2], yyString);!
+	! ! WI (iMain); !_DrawLength := Strings.StringToInt (yyString);!
+	! ArgToString (yyargv^ [3], yyString);!
+	! ! WI (iMain); !_DrawBoxWidth := Strings.StringToInt (yyString);!
+	! ArgToString (yyargv^ [4], yyString);!
+	! ! WI (iMain); !_DrawBoxHeight := Strings.StringToInt (yyString);!
+	! ArgToString (yyargv^ [5], yyString);!
+	! Strings.Assign (! WI (iMain); !_DrawFileName, yyString);!
+	! RETURN TclTk.TCL_OK;!
+	!END yySetParam;!
+	!!
+	!PROCEDURE SetDepth! WI (iMain); ! (yyyDepth: INTEGER);!
+	!BEGIN!
+	! ! WI (iMain); !_DrawDepth := yyyDepth;!
+	!END SetDepth! WI (iMain); !;!
+	!!
+	!PROCEDURE SetBox! WI (iMain); ! (yyyWidth, yyyHeight: INTEGER);!
+	!BEGIN!
+	! ! WI (iMain); !_DrawBoxWidth  := yyyWidth;!
+	! ! WI (iMain); !_DrawBoxHeight := yyyHeight;!
+	!END SetBox! WI (iMain); !;!
+	!!
+	!PROCEDURE yyDrawTree (yyt: ! WI (itTree); !);!
+	!VAR!
+	! yyDummy	: yytFirstLast;!
+	! yyd	: SHORTCARD;!
+	! yyString, yyTemp	: Strings.tString;!
+	! yyArray1, yyArray2	: TclTk.TclTk_String;!
+	!# ifdef SUPPORT_TVA!
+	!VAR yyPrevTreatTVAasChild	: BOOLEAN;!
+	!# endif!
+	!BEGIN!
+	!# ifdef SUPPORT_TVA!
+	! yyPrevTreatTVAasChild := ! TreatTVAasChild (); !;!
+	! ! TreatTVAasChild (); ! := FALSE;!
+	!# endif!
+	! yyDummy.yyfirst := yyMaxCoord;!
+	! yymaxx := 0;!
+	! yymaxy := 0;!
+	! yyMark (yyt); yyphase1 := TRUE ;!
+	! yyd := yySetY (! WI (itTree); ! (SYSTEM.ADR (yyt)), yyt, 0, 0, 0);!
+	! yyMark (yyt); yyphase1 := FALSE;!
+	! yyd := yySetY (! WI (itTree); ! (SYSTEM.ADR (yyt)), yyt, 0, 0, 0);!
+	! yyMark (yyt);!
+	! yyd := yySetX (! WI (itTree); ! (SYSTEM.ADR (yyt)), yyt, 0, yyDummy);!
+	! yymaxx := General.Max (yymaxx, 16);!
+	! yymaxy := General.Max (yymaxy, 16);!
+	! Strings.IntToString (yymaxx, yyString);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (yymaxy, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (! WI (iMain); !_DrawBoxWidth, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (! WI (iMain); !_DrawBoxHeight, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (! WI (iMain); !_DrawDepth, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.IntToString (! WI (iMain); !_DrawLength, yyTemp);!
+	! Strings.Concatenate (yyString, yyTemp);!
+	! Strings.Append (yyString, ' ');!
+	! Strings.Concatenate (yyString, ! WI (iMain); !_DrawFileName);!
+	! Strings.StringToArray (yyString, yyArray2);!
+	@ yyArray1 := "draw_tree ";@
+	! TclTk.Tcl_VarEval (yygInterp, yyArray1, yyArray2, NIL);!
+	! Traverse! WI (iMain); !TD (yyt, yyDrawNode);!
+	!# ifdef SUPPORT_TVA!
+	! ! TreatTVAasChild (); ! := yyPrevTreatTVAasChild;!
+	!# endif!
+	!END yyDrawTree;!
+	!!
+	!PROCEDURE Draw! WI (iMain); ! (yyt: ! WI (itTree); !);!
+	!VAR!
+	! yyCode	: INTEGER;!
+	! yyInterp	: TclTk.Tcl_Interp;!
+	! yyEnvVarPtr	: rSystem.tArrayChar;!
+	! yyPath	: ARRAY [0..255] OF CHAR;!
+	! yyArray	: TclTk.TclTk_String;!
+	! yyString, yyTemp	: Strings.tString;!
+	!BEGIN!
+	@ TclTk.Tcl_FindExecutable ("");@
+	! yyInterp := TclTk.Tcl_CreateInterp ();!
+	! yygInterp := yyInterp;!
+	! yyCode := TclTk.Tcl_Init (yyInterp);!
+	! IF yyCode # TclTk.TCL_OK THEN!
+	!  Errors.ErrorMessageI (Errors.TclTkError, Errors.Error, Position.NoPosition, Errors.Array, TclTk.Tcl_GetStringResult (yyInterp));!
+	!  TclTk.Tcl_DeleteInterp (yyInterp); TclTk.Tcl_Finalize (); RETURN;!
+	! END;!
+	! yyCode := TclTk.Tk_Init (yyInterp);!
+	! IF yyCode # TclTk.TCL_OK THEN!
+	!  Errors.ErrorMessageI (Errors.TclTkError, Errors.Error, Position.NoPosition, Errors.Array, TclTk.Tcl_GetStringResult (yyInterp));!
+	!  TclTk.Tcl_DeleteInterp (yyInterp); TclTk.Tcl_Finalize (); RETURN;!
+	! END;!
+	@ yyArray := "Tk";@
+	! TclTk.Tcl_StaticPackage (yyInterp, yyArray, TclTk.Tk_Init, NIL);!
+	@ yyArray := "put_attr";@
+	! TclTk.Tcl_CreateCommand (yyInterp, yyArray, yyPutAttr, NIL, NIL);!
+	@ yyArray := "search_pos";@
+	! TclTk.Tcl_CreateCommand (yyInterp, yyArray, yySearch, NIL, NIL);!
+	@ yyArray := "draw_subtree";@
+	! TclTk.Tcl_CreateCommand (yyInterp, yyArray, yyDrawSubTree, NIL, NIL);!
+	@ yyArray := "call_attr";@
+	! TclTk.Tcl_CreateCommand (yyInterp, yyArray, yyCallAttr, NIL, NIL);!
+	@ yyArray := "set_param";@
+	! TclTk.Tcl_CreateCommand (yyInterp, yyArray, yySetParam, NIL, NIL);!
+	@ yyCode := TclTk.Tcl_EvalFile (yyInterp, "Tree.tcl");@
+	! IF yyCode # TclTk.TCL_OK THEN!
+	@  yyEnvVarPtr := rSystem.GetEnvVar ("HOME");@
+	!  IF yyEnvVarPtr # NIL THEN!
+	!   ArgToString (yyEnvVarPtr, yyString);!
+	@   Strings.ArrayToString ("/.Tree.tcl", yyTemp);@
+	!   Strings.Concatenate (yyString, yyTemp);!
+	!   Strings.StringToArray (yyString, yyPath);!
+	!   yyCode := TclTk.Tcl_EvalFile (yyInterp, yyPath);!
+	!  END;!
+	! END;!
+	! IF yyCode # TclTk.TCL_OK THEN!
+	@  yyEnvVarPtr := rSystem.GetEnvVar ("CT_DIR");@
+	!  IF yyEnvVarPtr # NIL THEN!
+	!   ArgToString (yyEnvVarPtr, yyString);!
+	@   Strings.ArrayToString ("/lib/cg/Tree.tcl", yyTemp);@
+	!   Strings.Concatenate (yyString, yyTemp);!
+	!   Strings.StringToArray (yyString, yyPath);!
+	!   yyCode := TclTk.Tcl_EvalFile (yyInterp, yyPath);!
+	!  END;!
+	! END;!
+	! IF yyCode # TclTk.TCL_OK THEN!
+	@  yyCode := TclTk.Tcl_EvalFile (yyInterp, "@ 
+{
+	FOR i := 1 TO Strings.Length (CgLib) DO
+	   ch := Strings.Char (CgLib, i);
+	   IF ch = '\' THEN !/! ELSE WriteC (f, ch); END
+	END;
+};
+	@Tree.tcl");@
+	! END;!
+	! IF yyCode # TclTk.TCL_OK THEN!
+	!  Errors.ErrorMessageI (Errors.TclTkError, Errors.Error, Position.NoPosition, Errors.Array, TclTk.Tcl_GetStringResult (yyInterp));!
+	!  TclTk.Tcl_DeleteInterp (yyInterp); TclTk.Tcl_Finalize (); RETURN;!
+	! END;!
+	! yyDrawTree (yyt);!
+	! TclTk.Tk_MainLoop ();!
+	! TclTk.Tcl_DeleteInterp (yyInterp);!
+//	! TclTk.Tcl_Finalize ();!
+	!END Draw! WI (iMain); !;!
+	!!
+	 IF IsElement (DRAWTREE, Options) THEN
+//	!# endif!
+	 END
+	!!
+	.
+
+PROCEDURE SetY (t: [Attributes, Classes])
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	!| ! WI (Name); !:!
+	GetNext (t);
+	iClassName := Name;
+	ForallAttributes (t, SetY);
+	IF Iterator # NoTree THEN
+	   !yymax := yySetY (yyt, yyt^.! WI (iClassName); !.! WI (Iterator^.Child.Name);
+	   !, yymax! 
+	   IF CountChildren (t) # 1 THEN ! - 1! END
+	   !, yyk - 1, yyl);!
+	END
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!yy := yySetY (yyt, yyt^.! WI (iClassName); !.! WI (Name); !, yyy, yyk, 0);!
+	!yymax := General.Max (yymax, yy);!
+	.
+
+PROCEDURE SetX (t: [Attributes, Classes])
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	!| ! WI (Name); !:!
+	GetNext (t);
+	iClassName := Name;
+	IF Iterator # NoTree THEN
+	   !yyw := yySetX (yyt, yyt^.! WI (iClassName); !.! WI (Iterator^.Child.Name); !, yyx, yyFirstLast);!
+	   !INC (yyx);!
+	   ForallAttributes (t, SetX);
+	   !yyList := TRUE;!
+	ELSE
+	   ForallAttributes (t, SetX);
+	END
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!yyx := yySetX (yyt, yyt^.! WI (iClassName); !.! WI (Name); !, yyx, yyFirstLast);!
+	.
+
+PROCEDURE DrawNode (t: [Attributes, Classes])
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	!| ! WI (Name); !:!
+	iClassName := Name;
+	ForallAttributes (t, DrawNode);
+	.
+Child (..) :-
+	!yyDrawEdge (yyt, yyt^.! WI (iClassName); !.! WI (Name); !);!
+	.
+

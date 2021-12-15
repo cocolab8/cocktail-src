@@ -1,0 +1,42 @@
+(* $Id: Test.mi,v 2.1 1993/08/18 15:18:10 grosch rel $ *)
+
+IMPLEMENTATION MODULE Test;
+
+FROM ArgCheck	IMPORT	TEST;
+FROM Idents	IMPORT	MaxIdent;
+FROM rMemory	IMPORT	MemoryUsed;
+FROM StdIO	IMPORT	WriteI,		WriteS,		WriteNl;
+FROM Times	IMPORT	CpuTime;
+
+IMPORT	Times;
+
+VAR
+  time: LONGINT;
+
+PROCEDURE WriteTest;
+  BEGIN
+    WriteS ('MaxIdent: ');
+    WriteI (MaxIdent (), 1);
+    WriteNl;
+
+    WriteI (MemoryUsed DIV 1024, 4);
+    WriteS ('.');
+    WriteI (MemoryUsed MOD 1024 * 10 DIV 1024, 1);
+    WriteS ('  kBytes   memory used');
+    WriteNl;
+
+    time := CpuTime ();
+    WriteI (time DIV 1000,4);
+    WriteS ('.');
+    WriteI (time MOD 1000 DIV 10, 2);
+    WriteS (' s        CPU time used');
+    WriteNl;
+  END WriteTest;
+
+PROCEDURE WriteStepTime (s: ARRAY OF CHAR);
+  BEGIN
+    IF TEST THEN
+      Times.WriteStepTime (s);
+    END;
+  END WriteStepTime;
+END Test.

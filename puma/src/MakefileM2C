@@ -1,0 +1,112 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+C$(ES)	: C$(ED)	; $(MD) C$(SD)
+C$(ES)	: Tree$(ES)
+
+C$(EO)	: C$(EI)	; $(MI) C$(SI)
+C$(EO)	: C$(ES)
+C$(EO)	: Tree$(ES)
+C$(EO)	: Semantic$(ES)
+C$(EO)	: Optimize$(ES)
+C$(EO)	: Tree$(ES)
+
+Mod$(ES)	: Mod$(ED)	; $(MD) Mod$(SD)
+Mod$(ES)	: Tree$(ES)
+
+Mod$(EO)	: Mod$(EI)	; $(MI) Mod$(SI)
+Mod$(EO)	: Mod$(ES)
+Mod$(EO)	: Tree$(ES)
+Mod$(EO)	: Semantic$(ES)
+Mod$(EO)	: Optimize$(ES)
+Mod$(EO)	: Tree$(ES)
+
+Optimize$(ES)	: Optimize$(ED)	; $(MD) Optimize$(SD)
+Optimize$(ES)	: Tree$(ES)
+
+Optimize$(EO)	: Optimize$(EI)	; $(MI) Optimize$(SI)
+Optimize$(EO)	: Optimize$(ES)
+Optimize$(EO)	: Tree$(ES)
+Optimize$(EO)	: Mod$(ES)
+Optimize$(EO)	: Tree$(ES)
+Optimize$(EO)	: Semantic$(ES)
+Optimize$(EO)	: Scanner$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Tree$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Tree$(ES)
+
+Semantic$(ES)	: Semantic$(ED)	; $(MD) Semantic$(SD)
+Semantic$(ES)	: Tree$(ES)
+Semantic$(ES)	: Tree$(ES)
+
+Semantic$(EO)	: Semantic$(EI)	; $(MI) Semantic$(SI)
+Semantic$(EO)	: Semantic$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Scanner$(ES)
+Semantic$(EO)	: Tree$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+
+Tree2$(ES)	: Tree2$(ED)	; $(MD) Tree2$(SD)
+Tree2$(ES)	: Tree$(ES)
+
+Tree2$(EO)	: Tree2$(EI)	; $(MI) Tree2$(SI)
+Tree2$(EO)	: Tree2$(ES)
+Tree2$(EO)	: Tree$(ES)
+
+all	: puma
+puma$(EO)	: puma$(EP)	; $(MP) puma$(SP)
+puma$(EO)	: Scanner$(ES)
+puma$(EO)	: Parser$(ES)
+puma$(EO)	: Tree$(ES)
+puma$(EO)	: Tree2$(ES)
+puma$(EO)	: Semantic$(ES)
+puma$(EO)	: Optimize$(ES)
+puma$(EO)	: Mod$(ES)
+puma$(EO)	: C$(ES)
+
+puma	: puma$(EO) C$(EO) Tree$(EO) Optimize$(EO) Scanner$(EO) Semantic$(EO) Mod$(EO) Tree2$(EO) Parser$(EO)	; $(ML) puma $(OUT) puma
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

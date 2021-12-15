@@ -1,0 +1,48 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Reachabl.mi,v $
+ *	
+ *	purpose:	check the reachability of the nonterminals
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+IMPLEMENTATION MODULE Reachabl;
+
+FROM Idents	IMPORT	tIdent;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsEmpty, IsElement,
+			Include, Extract, Union, Difference;
+FROM Table	IMPORT	Leafs, MaxId;
+FROM Types	IMPORT	IsNonterm;
+
+VAR
+  vReachable: tSet;
+
+PROCEDURE WindThrough (start: tIdent);
+  VAR todo, leafs: tSet;
+  BEGIN
+    MakeSet (vReachable, MaxId);
+    MakeSet (todo, MaxId);
+    MakeSet (leafs, MaxId);
+    Include (todo, start);
+    REPEAT
+      start := Extract (todo);
+      Include (vReachable, start);
+      IF IsNonterm (start) THEN
+	Leafs (start, leafs);
+	Difference (leafs, vReachable);
+	Union (todo, leafs);
+      END;
+    UNTIL IsEmpty (todo);
+    ReleaseSet (todo);
+    ReleaseSet (leafs);
+  END WindThrough;
+
+PROCEDURE IsReachable (id: tIdent): BOOLEAN;
+  BEGIN
+    RETURN IsElement (id, vReachable);
+  END IsReachable;
+
+END Reachabl.

@@ -1,0 +1,10 @@
+MODULE l2cg;
+
+FROM Parser	IMPORT Parser, CloseParser;
+FROM IO		IMPORT CloseIO;
+
+BEGIN
+   IF Parser () = 0 THEN END;
+   CloseParser;
+   CloseIO;
+END l2cg.

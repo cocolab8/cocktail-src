@@ -1,0 +1,401 @@
+(* $Id: GenLRk.mi,v 1.3 2013/01/15 13:38:20 grosch Exp $ *)
+
+(*
+ * $Log: GenLRk.mi,v $
+ * Revision 1.3  2013/01/15 13:38:20  grosch
+ * allow generation of large parsers in Java
+ *
+ * Revision 1.2  1999/12/01 11:27:17  grosch
+ * added generation of Java
+ *
+ * Revision 1.1  1998/04/21 10:49:14  grosch
+ * added procedure WriteLook
+ *
+ * Revision 1.0  1995/11/07  09:33:17  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Dez. 1995 *)
+
+IMPLEMENTATION MODULE GenLRk;
+
+FROM IO		IMPORT tFile, StdOutput;
+FROM Idents	IMPORT WriteIdent;
+FROM Sets	IMPORT tSet, MakeSet, ReleaseSet, IsElement, Assign, IsEmpty,
+			Extract, Union, Intersection, Difference, AssignEmpty,
+			Card;
+FROM Tree	IMPORT Epsilon, ToRulePtr, ToSymbolPtr, Language, tLanguage,
+			Options;
+FROM Semantic	IMPORT WriteSymSet;
+FROM LR1	IMPORT StatePtr, RuleBase, ItemPtr, PrintItem;
+FROM LRk	IMPORT tNode, LAKPtr, LATreePtr, LATreeCount, GetLATreeIndex;
+FROM Conflict	IMPORT ConditionPtr;
+FROM Compress	IMPORT RecodeTableElmt;
+FROM Generate	IMPORT WriteS, WriteI, WriteNl, Writeyy, WriteReduceCode,
+			WriteToken;
+
+IMPORT Tree, StdIO, IO;
+
+PROCEDURE WriteCaseLRk (f: tFile; Rule: CARDINAL);
+   VAR
+      Item, c, x	: CARDINAL;
+      IsFirst		: BOOLEAN;
+      AllReads, AllReduces, Reduces, ConflictSet, Set, Set2	: tSet;
+   BEGIN
+      MakeSet (AllReads	, Epsilon);
+      MakeSet (Set	, Epsilon);
+      MakeSet (Set2	, Epsilon);
+      MakeSet (ConflictSet, Epsilon);
+      IsFirst := TRUE;
+      WITH ConditionPtr^ [Rule] DO
+	 WITH StatePtr^ [dState] DO
+	    CASE Language OF
+	    | Modula2		: WriteS (f, "yy2 :=");
+	    | C, Cpp, Java	: WriteS (f, "yy2 =");
+	    | Eiffel		: WriteS (f, "yy2 :=");
+	    | Ada		: WriteS (f, "yy2 :=");
+	    END;
+	    WriteS (f, " GetLookahead (2);");
+	    WriteNl (f);
+
+(*
+	 IF (TheK < 0) AND NOT IsElement (ORD ('E'), Options) THEN
+	    MakeSet (AllReduces	, Epsilon);
+	    MakeSet (Reduces	, Epsilon);
+	    FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+	       WITH ItemPtr^ [Item] DO
+		  WITH ToRulePtr^ [Rule]^.Rule DO
+		     IF (Dot = Length) AND IsElement (Rule, RuleSet) THEN
+			IF Dot > 0 THEN			(* Kernel AND reduce *)
+			   Assign (Reduces, LAKPtr^ [Item - Kernel + KernelInfo].LAK^.Look1^ [- TheK]^);
+			ELSE				(* Closure OR read *)
+			   Assign (Reduces, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [- TheK]^);
+			END;
+			Assign (Set, AllReduces);
+			Intersection (Set, Reduces);
+			Union (ConflictSet, Set);
+			Union (AllReduces, Reduces);
+		     ELSIF (Dot < Length) AND (ElmtsPtr^ [Dot + 1] = TheX) THEN
+			Union (AllReads, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [- TheK]^);
+		     END;
+		  END;
+	       END;
+	    END;
+	    Assign (Set, AllReduces);
+	    Intersection (Set, AllReads);
+	    Union (ConflictSet, Set);
+	    IF NOT IsEmpty (ConflictSet) THEN
+StdIO.WriteS ("CONFLICTSET 2	"); WriteIdent (StdOutput, ToSymbolPtr^ [TheX]^.Terminal.Name);
+StdIO.WriteI (dState, 5); StdIO.WriteI (- TheK, 5); WriteSymSet (StdOutput, ConflictSet); StdIO.WriteNl;
+	    END;
+	    ReleaseSet (AllReduces);
+	    ReleaseSet (Reduces);
+	 END;
+*)
+
+	    AssignEmpty (AllReads);
+	    FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+	       WITH ItemPtr^ [Item] DO
+		  WITH ToRulePtr^ [Rule]^.Rule DO
+		     IF (Dot = Length) AND (dElseItem # Item) AND IsElement (Rule, RuleSet) THEN
+			IF IsFirst THEN
+			   CASE Language OF
+			   | Modula2		: WriteS (f, "IF ");
+			   | C, Cpp, Java	: WriteS (f, "if (");
+			   | Eiffel		: WriteS (f, "if ");
+			   | Ada		: WriteS (f, "if ");
+			   END;
+			   IsFirst := FALSE;
+			ELSE
+			   CASE Language OF
+			   | Modula2		: WriteS (f, "ELSIF ");
+			   | C, Cpp, Java	: WriteS (f, "else if (");
+			   | Eiffel		: WriteS (f, "elseif ");
+			   | Ada		: WriteS (f, "elsif ");
+			   END;
+			END;
+			IF TheK > 0 THEN
+			   IF Dot > 0 THEN		(* Kernel AND reduce *)
+			      Assign (Set, LAKPtr^ [Item - Kernel + KernelInfo].LAK^.Look1^ [TheK]^);
+			   ELSE				(* Closure OR read *)
+			      Assign (Set, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [TheK]^);
+			   END;
+			ELSE (* IF TheK < 0 THEN *)
+			   IF Dot > 0 THEN		(* Kernel AND reduce *)
+			      GetLASet (Set, LAKPtr^ [Item - Kernel + KernelInfo].LAK^.Look^, TheX);
+			   ELSE				(* Closure OR read *)
+			      GetLASet (Set, LATreePtr^ [GetLATreeIndex (Item)].Node, TheX);
+			   END;
+			(*
+			   IF NOT IsElement (ORD ('E'), Options) THEN
+			      IF Dot > 0 THEN		(* Kernel AND reduce *)
+				 Assign (Set2, LAKPtr^ [Item - Kernel + KernelInfo].LAK^.Look1^ [- TheK]^);
+			      ELSE			(* Closure OR read *)
+				 Assign (Set2, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [- TheK]^);
+			      END;
+			      Difference (Set2, ConflictSet);
+			      Union (Set, Set2);
+			   END;
+			*)
+			END;
+			c := 0;
+			WHILE NOT IsEmpty (Set) DO
+			   x := Extract (Set);
+			   IF c > 0 THEN
+			      CASE Language OF
+			      | Modula2		: WriteS (f, " OR ");
+			      | C, Cpp, Java	: WriteS (f, " || ");
+			      | Eiffel		: WriteS (f, " or ");
+			      | Ada		: WriteS (f, " or else ");
+			      END;
+			   END;
+			   CASE Language OF
+			   | Modula2		: WriteS (f, "(yy2 = ");
+			   | C, Cpp, Java	: WriteS (f, "(yy2 == ");
+			   | Eiffel		: WriteS (f, "(yy2 = ");
+			   | Ada		: WriteS (f, "(yy2 = ");
+			   END;
+			   WriteI (f, ToSymbolPtr^ [x]^.Terminal.Code, 0);
+			   WriteS (f, ")");
+			   INC (c);
+			END;
+			CASE Language OF
+			| Modula2	: WriteS (f, " THEN");
+			| C, Cpp, Java	: WriteS (f, ")");
+			| Eiffel	: WriteS (f, " then");
+			| Ada		: WriteS (f, " then");
+			END;
+			WriteReduce (f, RuleBase + Rule);
+		     ELSIF (Dot < Length) AND (dElseItem # 0) AND (ElmtsPtr^ [Dot + 1] = TheX) THEN
+			IF TheK > 0 THEN
+			   Union (AllReads, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [TheK]^);
+			ELSE (* IF TheK < 0 THEN *)
+			   GetLASet (Set, LATreePtr^ [GetLATreeIndex (Item)].Node, TheX);
+			(*
+			   IF NOT IsElement (ORD ('E'), Options) THEN
+			      Assign (Set2, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [- TheK]^);
+			      Difference (Set2, ConflictSet);
+			      Union (Set, Set2);
+			   END;
+			*)
+			   Union (AllReads, Set);
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+
+	    IF NOT IsEmpty (AllReads) THEN
+	       IF IsFirst THEN
+		  CASE Language OF
+		  | Modula2	: WriteS (f, "IF ");
+		  | C, Cpp, Java: WriteS (f, "if (");
+		  | Eiffel	: WriteS (f, "if ");
+		  | Ada		: WriteS (f, "if ");
+		  END;
+		  IsFirst := FALSE;
+	       ELSE
+		  CASE Language OF
+		  | Modula2	: WriteS (f, "ELSIF ");
+		  | C, Cpp, Java: WriteS (f, "else if (");
+		  | Eiffel	: WriteS (f, "elseif ");
+		  | Ada		: WriteS (f, "elsif ");
+		  END;
+	       END;
+	       c := 0;
+	       WHILE NOT IsEmpty (AllReads) DO
+		  x := Extract (AllReads);
+		  IF c > 0 THEN
+		     CASE Language OF
+		     | Modula2		: WriteS (f, " OR ");
+		     | C, Cpp, Java	: WriteS (f, " || ");
+		     | Eiffel		: WriteS (f, " or ");
+		     | Ada		: WriteS (f, " or else ");
+		     END;
+		  END;
+		  CASE Language OF
+		  | Modula2	: WriteS (f, "(yy2 = ");
+		  | C, Cpp, Java: WriteS (f, "(yy2 == ");
+		  | Eiffel	: WriteS (f, "(yy2 = ");
+		  | Ada		: WriteS (f, "(yy2 = ");
+		  END;
+		  WriteI (f, ToSymbolPtr^ [x]^.Terminal.Code, 0);
+		  WriteS (f, ")");
+		  INC (c);
+	       END;
+	       CASE Language OF
+	       | Modula2	: WriteS (f, " THEN");
+	       | C, Cpp, Java	: WriteS (f, ")");
+	       | Eiffel		: WriteS (f, " then");
+	       | Ada		: WriteS (f, " then");
+	       END;
+	       WriteRead (f, Implicit);
+	    END;
+
+	    CASE Language OF
+	    | Modula2		: WriteS (f, "ELSE");
+	    | C, Cpp, Java	: WriteS (f, "else {");
+	    | Eiffel		: WriteS (f, "else");
+	    | Ada		: WriteS (f, "else");
+	    END;
+	    IF dElseItem > 0 THEN
+	       WriteReduce (f, RuleBase + ItemPtr^ [dElseItem].Rule);
+	    ELSE
+	       WriteRead (f, Implicit);
+	    END;
+	 END;
+	 CASE Language OF
+	 | Modula2	: WriteS (f, "END;");
+	 | C, Cpp, Java	: WriteS (f, '}');
+	 | Eiffel	: WriteS (f, "end;");
+	 | Ada		: WriteS (f, "end if;");
+	 END;
+	 WriteNl (f);
+      END;
+      ReleaseSet (Set);
+      ReleaseSet (Set2);
+      ReleaseSet (AllReads);
+      ReleaseSet (ConflictSet);
+   END WriteCaseLRk;
+
+PROCEDURE WriteRead (f: tFile; Rule: CARDINAL);
+   BEGIN
+      CASE Language OF
+      | Modula2	:
+	 WriteS (f, " yyRead; EXIT;");
+      | C, Cpp	:
+	 WriteS (f, " yyGotoRead (");
+	 WriteI (f, RecodeTableElmt (Rule), 0);
+	 WriteS (f, ")");
+      | Eiffel	:
+	 WriteS (f, " yyState := yyCondition.item (yyState);"); WriteNl (f);
+	 WriteS (f, " yyStackPtr := yyStackPtr + 1;"); WriteNl (f);
+	 Writeyy (f, 'A');
+	 WriteS (f, ".put (Scanner.Attribute, yyStackPtr);"); WriteNl (f);
+	 WriteS (f, " yyTerminal := yyGetToken;"); WriteNl (f);
+	 WriteS (f, " debug yyRead (yyPrevTerminal, yyTerminal)"); WriteNl (f);
+	 WriteS (f, " yyPrevTerminal := yyTerminal end;"); WriteNl (f);
+	 WriteS (f, " yyIsRepairing := FALSE;"); WriteNl (f);
+	 WriteS (f, " yyquit_loop3 := TRUE;");
+      | Ada	:
+	 WriteS (f, " yyRead; exit;");
+      | Java	:
+         WriteS (f, " YYREAD");
+      END;
+      WriteNl (f);
+   END WriteRead;
+
+PROCEDURE WriteReduce (f: tFile; Rule: CARDINAL);
+   BEGIN
+      CASE Language OF
+      | Modula2	:
+	 WriteS (f, " yyReduce (");
+	 WriteI (f, RecodeTableElmt (Rule), 0);
+	 WriteS (f, ");");
+	 WriteReduceCode (f, Rule - RuleBase, TRUE);
+      | C, Cpp	:
+	 WriteS (f, " yyGotoReduce (");
+	 WriteI (f, RecodeTableElmt (Rule), 0);
+	 WriteS (f, ", yy");
+	 WriteI (f, Rule - RuleBase, 0);
+	 WriteS (f, ")");
+	 WriteNl (f);
+      | Eiffel	:
+	 WriteS (f, " debug yyReduce (");
+	 WriteI (f, RecodeTableElmt (Rule), 0);
+	 WriteS (f, ") end;");
+	 WriteReduceCode (f, Rule - RuleBase, TRUE);
+      | Ada	:
+	 WriteS (f, " yyGotoReduce (");
+	 WriteI (f, RecodeTableElmt (Rule), 0);
+	 WriteS (f, ", yy");
+	 WriteI (f, Rule - RuleBase, 0);
+	 WriteS (f, ')');
+	 WriteNl (f);
+      | Java	:
+         WriteS (f, " yyReduce (");
+	 WriteI (f, RecodeTableElmt (Rule), 0);
+	 WriteS (f, ");");
+	 WriteReduceCode (f, Rule - RuleBase, TRUE);
+      END;
+   END WriteReduce;
+
+PROCEDURE GetLASet (VAR LASet: tSet; Node: tNode; x: CARDINAL);
+   VAR i	: CARDINAL;
+   BEGIN
+      WITH Node DO
+	 IF Token = NIL THEN
+	    Assign (LASet, Array^ [x - MinToken]^.Set);
+	 ELSE
+	    i := 0;
+	    LOOP
+	       IF Token^ [i] = x THEN
+		  Assign (LASet, Array^ [i]^.Set);
+		  RETURN;
+	       END;
+	       INC (i);
+	    END;
+	 END;
+      END;
+   END GetLASet;
+
+PROCEDURE WriteLook (f: tFile; Rule, Item: CARDINAL);
+   VAR
+      Set	: tSet;
+
+   PROCEDURE WriteLASet;
+      VAR
+	 c		: CARDINAL;
+	 IsFirst	: BOOLEAN;
+      BEGIN
+	 IsFirst := TRUE;
+	 c := 0;
+	 IO.WriteS (f, " F2: {");
+	 IF Card (Set) > 3 THEN IO.WriteNl (f); IO.WriteC (f, '	'); END;
+	 WHILE NOT IsEmpty (Set) DO
+	    IF IsFirst THEN IsFirst := FALSE; ELSE IO.WriteS (f, ", "); END;
+	    IF c = 6 THEN c := 0; IO.WriteNl (f); IO.WriteC (f, '	'); END;
+	    WriteToken (f, Extract (Set));
+	    INC (c);
+	 END;
+	 IO.WriteS (f, "}");
+      END WriteLASet;
+
+   BEGIN
+      MakeSet (Set, Epsilon);
+      WITH ConditionPtr^ [Rule] DO
+	 WITH StatePtr^ [dState] DO
+	    WITH ItemPtr^ [Item] DO
+	       WITH ToRulePtr^ [Rule]^.Rule DO
+		  IF (Dot = Length) AND IsElement (Rule, RuleSet) THEN
+		     IF TheK > 0 THEN
+			IF Dot > 0 THEN		(* Kernel AND reduce *)
+			   Assign (Set, LAKPtr^ [Item - Kernel + KernelInfo].LAK^.Look1^ [TheK]^);
+			ELSE				(* Closure OR read *)
+			   Assign (Set, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [TheK]^);
+			END;
+		     ELSE (* IF TheK < 0 THEN *)
+			IF Dot > 0 THEN		(* Kernel AND reduce *)
+			   GetLASet (Set, LAKPtr^ [Item - Kernel + KernelInfo].LAK^.Look^, TheX);
+			ELSE				(* Closure OR read *)
+			   GetLASet (Set, LATreePtr^ [GetLATreeIndex (Item)].Node, TheX);
+			END;
+		     END;
+		     WriteLASet;
+		  ELSIF (Dot < Length) AND (ElmtsPtr^ [Dot + 1] = TheX) THEN
+		     IF TheK > 0 THEN
+			Assign (Set, LATreePtr^ [GetLATreeIndex (Item)].Look1^ [TheK]^);
+		     ELSE (* IF TheK < 0 THEN *)
+			GetLASet (Set, LATreePtr^ [GetLATreeIndex (Item)].Node, TheX);
+		     END;
+		     WriteLASet;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      ReleaseSet (Set);
+   END WriteLook;
+
+END GenLRk.

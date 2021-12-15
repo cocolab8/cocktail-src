@@ -1,0 +1,136 @@
+(* $Id: Characte.mi,v 1.4 1997/05/27 14:57:52 grosch rel $ *)
+
+(*
+ * $Log: Characte.mi,v $
+ * Revision 1.4  1997/05/27 14:57:52  grosch
+ * truncated module names to 8 characters: Characte
+ *
+ * Revision 1.3  1990/06/12 18:33:29  grosch
+ * layout improvements
+ *
+ * Revision 1.2  89/02/15	20:06:40  vielsack
+ * fixed bug in Concatenate
+ * 
+ * Revision 1.1  89/01/31	15:56:23  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE Characte;
+
+(* CHAR_   
+FROM	Errors		IMPORT	ERROR;
+FROM	StdIO		IMPORT	WriteS,		WriteI,		WriteNl;
+   _CHAR *)
+
+PROCEDURE IsEqual (c1, c2: ARRAY OF CHAR): BOOLEAN;
+  VAR
+    pos: INTEGER;
+    len: INTEGER;
+  BEGIN
+    pos := 0;
+    len := Length (c1);
+    IF len # Length (c2) THEN RETURN FALSE; END;
+    pos := 0;
+    LOOP
+      IF pos >= len THEN EXIT; END;
+      IF c1 [pos] # c2 [pos] THEN EXIT; END;
+      INC (pos);
+    END;
+    RETURN pos = len;
+  END IsEqual;
+
+PROCEDURE Length (c: ARRAY OF CHAR): INTEGER;
+  VAR len: INTEGER;
+  BEGIN
+    len := 0;
+    LOOP
+      IF len > INTEGER (HIGH (c)) THEN EXIT; END;
+      IF c [len] = 0C THEN EXIT; END;
+      INC (len);
+    END;
+    RETURN len;
+  END Length;
+
+PROCEDURE Char (s: ARRAY OF CHAR; i: INTEGER): CHAR;
+  BEGIN
+    (* CHAR_   
+    IF (i < 1) OR (i > Length (s)) THEN
+      ERROR ('Characte.Char');
+    END;
+       _CHAR *)
+    RETURN s [i-1];
+  END Char;
+
+PROCEDURE Append (s: ARRAY OF CHAR; c: CHAR);
+  VAR l : INTEGER;
+  BEGIN
+    l := Length (s);
+    (* CHAR_   
+    IF l > INTEGER (HIGH (s)) - 1 THEN
+      ERROR ('Characte.Append');
+    END;
+       _CHAR *)
+    s [l] := c;
+    s [l+1] := 0C;
+  END Append;
+
+PROCEDURE Concatenate (VAR s1: ARRAY OF CHAR; s2: ARRAY OF CHAR);
+  VAR
+    l1, l2: INTEGER;
+    i1, i2: INTEGER;
+  BEGIN
+    l1 := Length (s1);
+    l2 := Length (s2);
+
+    IF l1 + l2 > INTEGER (HIGH (s1)) + 1 THEN
+      l2 := INTEGER (HIGH (s1)) + 1 - l1;
+      
+      (* CHAR_	 
+	ERROR ('Characte.Concatenate');
+	 _CHAR *)
+    END;
+
+    i1 := l1;
+    FOR i2 := 0 TO l2 - 1 DO
+      s1 [i1] := s2 [i2];
+      INC (i1);
+    END;
+    IF i1 <= INTEGER (HIGH (s1)) THEN
+      s1 [i1] := 0C;
+    END;
+  END Concatenate;
+    
+PROCEDURE SubString (s1: ARRAY OF CHAR;from,to: INTEGER; VAR s2: ARRAY OF CHAR);
+  VAR i: INTEGER;
+  BEGIN
+    (* CHAR_   
+    IF (to - from  >= INTEGER (HIGH (s2)))
+    OR (to > from)
+    OR (from < 1)
+    OR (to > Length (s2)) THEN
+      ERROR ('Characte.SubString');
+    END;
+       _CHAR *)
+
+    FOR i := from-1 TO to-1 DO
+      s2 [i-from+1] := s1 [i];
+    END;
+    s2 [to] := 0C;
+  END SubString;
+
+PROCEDURE Assign (VAR s1: ARRAY OF CHAR; s2: ARRAY OF CHAR);
+  VAR i: INTEGER;
+  BEGIN
+    (* CHAR_   
+    IF Length (s2) >= INTEGER (HIGH (s1)) THEN
+      ERROR ('Characte.Assign');
+    END;
+       _CHAR *)
+
+    FOR i := 0 TO Length (s2) DO
+      s1 [i] := s2 [i];
+    END;
+  END Assign;
+
+END Characte.

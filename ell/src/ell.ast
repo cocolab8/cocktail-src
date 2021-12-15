@@ -1,0 +1,92 @@
+/*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: ell.ast,v $
+ *
+ *	purpose:	abstract syntax tree specification
+ *
+ *	$Author: grosch $
+ *	$Date: 2008/09/03 09:23:39 $
+ */
+
+TREE IMPORT {
+FROM Idents	IMPORT	tIdent;
+FROM Sets	IMPORT	tSet;
+FROM StringM	IMPORT	tStringRef;
+FROM Position	IMPORT	tPosition;
+FROM SYSTEM	IMPORT	ADDRESS;
+
+TYPE yyEstra = ADDRESS;
+
+# define yyNodeHead yyEstraInfo: yyEstra;
+
+VAR ScannerName, ParserName: tIdent;
+}
+
+GLOBAL {
+FROM Idents	IMPORT	WriteIdent, tIdent, MakeIdent, NoIdent;
+FROM Strings	IMPORT	tString, ArrayToString;
+FROM StringM	IMPORT	tStringRef;
+FROM Position	IMPORT	tPosition;
+(* FROM Info	IMPORT	WriteIdentSet; *)
+FROM IO		IMPORT	tFile, WriteS, WriteI;
+
+# define writetSet(set) WriteIdentSet (yyf, set);
+
+VAR String	: tString;
+}
+
+BEGIN {
+   ScannerName := NoIdent;
+   ArrayToString ("Parser", String); ParserName := MakeIdent (String);
+}
+
+RULE
+
+Grammar		= sections tokens rules .
+
+sections	= <
+  Sections0	= .
+  Sections	= sections REVERSE section .
+> .
+section		= <
+  Export	= codes .
+  Global	= codes .
+  Local		= codes .
+  Begin		= codes .
+  Close		= codes .
+> .
+codes		= <
+  Codes0	= .
+  Codes		= codes REVERSE code:Code .
+> .
+Code		= [pos: tPosition] [ref: tStringRef] .
+tokens		= <
+  Tokens0	= .
+  Tokens	= tokens REVERSE token:Token .
+> .
+Token		= id:Id [string: tIdent] [pos: tPosition] [number] .
+Id		= [pos: tPosition] [ident: tIdent] [isstring: BOOLEAN] .
+rules		= <
+  Rules0	= .
+  Rules		= rules REVERSE rule:Rule .
+> .
+Rule		= [pos: tPosition] id:Id codes expr -> [iscalling: BOOLEAN] .
+expr		= [pos: tPosition] ->
+		  [first: tSet] [follow: tSet] [fifo: tSet] [recovery: tSet]
+		  [length] [index] [followindex] [recindex] [expindex] <
+  Option	= expr .
+  Times		= expr .
+  Plus		= expr .
+  List		= body: expr sep: expr .
+  Action	= codes .
+  Leaf		= id:Id -> [sure: BOOLEAN] [number] .
+  alternative	= -> [depth] [case: BOOLEAN] <
+    Alternative0= -> [recover: BOOLEAN] [default: tTree] .
+    Alternative	= alternative REVERSE expr .
+  > .
+  sequence	= <
+    Sequence0	= .
+    Sequence	= sequence REVERSE expr .
+  > .
+> .

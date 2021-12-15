@@ -1,0 +1,1 @@
+exec LIB/estra/estra $*

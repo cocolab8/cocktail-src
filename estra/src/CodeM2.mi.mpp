@@ -1,0 +1,1221 @@
+(* $Id: CodeM2.MI,v 4.1 1998/05/27 15:23:55 grosch rel $ *)
+
+IMPLEMENTATION MODULE CodeM2;
+
+FROM ArgCheck	IMPORT	DEF, IMP, BU, SourceFileName, cVersion;
+
+FROM Automaton	IMPORT	StartIndex, PackComb;
+
+FROM Checks	IMPORT	CheckWriteOpen;
+
+FROM Characte	IMPORT	Concatenate;
+
+FROM Environs	IMPORT	MaxDirective, WriteMatch, WriteCost,
+			WritePath, WriteAccess, MaxCalls,
+			AlwaysMatch, HasCondition;
+
+FROM Grammar	IMPORT	MainClass, SonName, Arity, NodeIdent,
+			Subclasses, ClassesOfNode, PatsOfNode,
+			SuperClass, NodesOfClass,
+			tLayout, Layout, SonClass;
+
+FROM Idents	IMPORT	tIdent, GetString, WriteIdent;
+
+FROM IO		IMPORT	tFile, WriteOpen, WriteClose, WriteS, WriteI,
+			WriteNl;
+
+FROM Match	IMPORT	MaxMatchIndex, CombSize, PackMatchSets;
+
+FROM Parser	IMPORT	AST;
+
+FROM Scanner	IMPORT	NoIdent, MaxIdent, MaxValue;
+
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, Extract, IsEmpty,
+			Intersection, IsElement, Assign, Exclude,
+			Card, Minimum, Maximum;
+
+FROM StringM	IMPORT	WriteString;
+
+FROM Strings	IMPORT	tString, StringToArray, Append;
+
+FROM Tree	IMPORT	tTree,
+			Function, Directive, Attribute, Type,
+			CdStr, CdId, CdDot, CdComma, CdLPar, CdRPar,
+			CdLBra, CdRBra, CdSpa, CdCom,
+			CdRst, CdEnd, tSelMode, Pattern1,
+			CostD, CostN, CostF, CondF;
+
+FROM Types	IMPORT	AllNodes, AllClasses, ClassCode, MaxClassCode;
+
+(* CODE_ *)
+FROM ArgCheck	IMPORT	DEBUG;
+(* _CODE *)
+
+CONST
+  cNullDevice	= '/dev/null';
+  cDefPost	= '.md';
+  cImpPost	= '.mi';
+  cTabPost	= '.tab';
+  cDefaultCost	= 1;
+  BitsPerBitset	= 32;
+
+VAR
+  Out: tFile;
+  BlaCo: INTEGER;
+  GrammarName: tIdent;
+
+.. ^ Blanks;
+.. $ WriteNl (Out);
+.. + INC (BlaCo%);
+.. - DEC (BlaCo%);
+.. % WriteS (Out, "%");
+.. n WriteI (Out, %, 1);
+.. i WriteIdent (Out, %);
+.. s WriteS (Out, %);
+
+PROCEDURE MakeCodeM2;
+  BEGIN
+    GrammarName := AST^.Spec.grna;
+    IF DEF THEN
+      Definition (AST);
+    END;
+    IF IMP THEN
+      Implementation (AST);
+    END;
+  END MakeCodeM2;
+
+(* ---------- definition -------------------------------------------------
+ *
+ *	produce definition module
+ *
+ *)
+
+PROCEDURE Definition (t: tTree);
+  BEGIN
+    WITH t^.Spec DO
+      OpenDef (name);
+
+.. % WriteS (Out, '%');
+.	(*
+.      \ *	"{i name}.md"
+.      \ *	generated with estra/{s cVersion}
+.      \ *	from "{s SourceFileName}"
+.      \ *
+.      \ *	estra 
+.      \ *	was written by Bertram Vielsack in june 1989
+.      \ *
+.      \ *)
+.
+.. % WriteS (Out, "%");
+
+.     DEFINITION MODULE {i name};
+.
+.     IMPORT {i GrammarName};
+      WritePart (export);
+.     PROCEDURE Begin{i name};
+      BeginDo	(AST);
+.     PROCEDURE Close{i name};
+.     END {i name}.
+      WriteClose (Out);
+    END;
+  END Definition;
+
+PROCEDURE OpenDef	(name: tIdent);
+  VAR s: tString; a: ARRAY [0..128] OF CHAR;
+  BEGIN
+    IF name = NoIdent THEN
+      a := cNullDevice;
+    ELSE
+      GetString (name, s);
+      Append (s, 0C);
+      StringToArray (s, a);
+      Concatenate (a, cDefPost);
+    END;
+    Out := WriteOpen (a);
+    CheckWriteOpen (Out, a);
+  END OpenDef;
+
+(* ---------- implementation -------------------------------------------------
+ *
+ *	produce implementation module
+ *
+ *)
+
+PROCEDURE Implementation (t: tTree);
+  VAR Classes: tSet; class: tIdent; f, tt: tTree; i: INTEGER;
+  BEGIN
+    WITH t^.Spec DO
+      OpenImp (name);
+
+.. % WriteS (Out, '%');
+.	(*
+.      \ *	"{i name}.mi"
+.      \ *	generated with estra/{s cVersion}
+.      \ *	from "{s SourceFileName}"
+.      \ *
+.      \ *	estra 
+.      \ *	was written by Bertram Vielsack in june 1989
+.      \ *
+.      \ *)
+.
+.. % WriteS (Out, "%");
+
+.     IMPLEMENTATION MODULE {i name};
+.
+(*
+ * ----------	IMPORT
+ *)
+      IF BU THEN
+.       IMPORT SYSTEM, IO, rMemory, Pack, {i GrammarName};
+      ELSE
+.       IMPORT SYSTEM, IO, rMemory, {i GrammarName};
+      END;
+.
+      (* CODE_ *)
+      IF DEBUG THEN
+.	IMPORT Times;
+.
+      END;
+      (* _CODE *)
+(*
+ * ----------	GLOBAL
+ *)
+      WritePart (global);
+.
+(*
+ * ----------	CONST
+ *)
+.     CONST
+.    \  yyInfinite = {n (MAX (INTEGER) - MaxValue) DIV MaxCalls ()};
+.  
+.    \  yyBitsPerBitset = 32;
+      IF BU THEN
+.    \  yySetSize = {n MaxDirective ()};
+.    \  yyMaxIndex = {n MaxMatchIndex};
+.    \  yyCombSize = {n CombSize};      
+.    \  yyStartState = 0;
+      ELSE
+	MakeSet (Classes, MaxIdent);
+	AllClasses (Classes);
+	WHILE NOT IsEmpty (Classes) DO
+	  class := Extract (Classes);
+.    \  yyC{i class} = {n ClassCode (class)};
+	END;
+	ReleaseSet (Classes);
+.    \  yyMaxClass = {n MaxClassCode ()};
+      END;
+.
+.    \  yyPoolSize = 10240;
+.  
+(*
+ * ----------	TYPE
+ *)
+.     TYPE
+.    \  yytBlockPtr = POINTER TO yytBlock;
+.    \  yytBlock =
+.    \  RECORD
+.    \    Successor: yytBlockPtr;
+.    \    Block: ARRAY [1..yyPoolSize] OF CHAR;
+.    \  END;
+.
+      IF BU THEN
+.    \  yyStateType = INTEGER;
+.    \  yySetType = ARRAY [0..yySetSize DIV yyBitsPerBitset] OF BITSET;
+.    \  yySetsType = ARRAY [0..yyMaxIndex] OF yySetType;
+.    \  yyCombType = ARRAY [0..yyCombSize] OF yyStateType;
+.
+      END;
+      f := functions;
+.+
+      WHILE f^.Kind = Function DO
+        WITH f^.Function DO
+.         yyP{i name} = PROCEDURE ({i GrammarName}.t{i GrammarName}\
+	  tt := in;
+	  WHILE tt^.Kind = Attribute DO
+	    WITH tt^.Attribute DO
+.             , \
+	      IF mod # NoIdent THEN
+.               {i mod}.\
+	      END;
+.	      {i type}\
+	      tt := attributes;
+	    END;
+	  END;
+	  tt := out;
+	  WHILE tt^.Kind = Attribute DO
+	    WITH tt^.Attribute DO
+.             , VAR \
+	      IF mod # NoIdent THEN
+.               {i mod}.\
+	      END;
+.	      {i type} \
+	      tt := attributes;
+	    END;
+	  END;
+	  tt := result;
+	  IF tt^.Kind = Type THEN
+	    WITH tt^.Type DO
+.            ): \
+	      IF mod # NoIdent THEN
+.               {i mod}.\
+	      END;
+.    	      {i type};\
+	    END;
+	  ELSE
+.           );\
+  	END;
+.
+	  f := functions;
+        END;
+      END;
+.
+.-
+      f := functions;
+.    \  yyInfoPtr  = POINTER TO yyInfoType;
+.    \  yyInfoType =
+.    \    RECORD
+      IF NOT BU THEN
+.    \      yyClasses: ARRAY [0..yyMaxClass DIV yyBitsPerBitset] OF BITSET;
+      END;
+      WHILE f^.Kind = Function DO
+        WITH f^.Function DO
+.    \      {i name}: RECORD Cost: INTEGER; Proc: yyP{i name}; END;
+	  f := functions;
+        END;
+      END;
+.    \    END;
+.
+.     VAR
+      IF BU THEN
+.    \  yySets: yySetsType;
+.    \  yyComb: yyCombType;
+      END;
+.    \  yyInfo: yyInfoType;
+.    \  yyMatch: ARRAY [0..{n MaxDirective ()}] OF BOOLEAN;
+.    \  yyBlockList: yytBlockPtr;
+.    \  yyPoolFreePtr, yyPoolEndPtr: SYSTEM.ADDRESS;
+.
+      (* CODE_ *)
+      IF DEBUG THEN
+.    \  yyTime, yyTime0, yyNodeCount: LONGINT;
+.
+      END;
+      (* _CODE *)
+(*
+ * ----------	PROCEDURES
+ *)
+      IF NOT BU THEN
+.       PROCEDURE yyClass (yyt: {i GrammarName}.t{i GrammarName};\
+.			   Bit, Set: INTEGER): BOOLEAN;
+.       VAR info: yyInfoPtr;
+.       BEGIN
+.      \  info := yyt^.yyHead.yyEstraInfo;
+.      \  RETURN Bit IN info^.yyClasses [Set];
+.       END yyClass;
+.
+      END;
+.     PROCEDURE yyAlloc (): SYSTEM.ADDRESS;
+.     VAR BlockPtr: yytBlockPtr;
+.     BEGIN
+.    \  IF LONGINT (yyPoolEndPtr - yyPoolFreePtr) < SYSTEM.TSIZE (yyInfoType) THEN
+.    \    BlockPtr  := yyBlockList;
+.    \    yyBlockList  := rMemory.Alloc (SYSTEM.TSIZE (yytBlock));
+.    \    yyBlockList^.Successor := BlockPtr;
+.    \    yyPoolFreePtr := SYSTEM.ADR (yyBlockList^.Block);
+.    \    yyPoolEndPtr  := yyPoolFreePtr + yyPoolSize;
+.    \  END;
+.    \  INC (yyPoolFreePtr, SYSTEM.ADDRESS (SYSTEM.TSIZE (yyInfoType)));
+.    \  RETURN yyPoolFreePtr - SYSTEM.ADDRESS (SYSTEM.TSIZE (yyInfoType));
+.     END yyAlloc;
+.
+.     PROCEDURE yyReleaseHeap;
+.     VAR BlockPtr: yytBlockPtr;
+.     BEGIN
+.    \  WHILE yyBlockList # NIL DO
+.    \    BlockPtr:= yyBlockList;
+.    \    yyBlockList:= yyBlockList^.Successor;
+.    \    rMemory.Free (SYSTEM.TSIZE (yytBlock), BlockPtr);
+.    \  END;
+.    \  yyPoolFreePtr:= NIL;
+.    \  yyPoolEndPtr:= NIL;
+.     END yyReleaseHeap;
+.
+      Distributers (functions);
+      ErrorFunctions (functions);
+      Functions (functions);
+      CostFunctions (functions);
+      Traverse (functions);
+      IF BU THEN
+.       PROCEDURE yyErrorCheck (i: INTEGER; s1, s2: ARRAY OF CHAR);
+.       BEGIN
+.      \  IF i < 0 THEN
+.      \    IO.WriteS (IO.StdError, s1);
+.      \    IO.WriteS (IO.StdError, s2);
+.      \    IO.WriteNl (IO.StdError); IO.CloseIO; HALT;
+.      \  END;
+.       END yyErrorCheck;
+.
+      END;
+      IF BU THEN
+.       VAR yyunpackindex, yyunpackcount, yyunpackset: CARDINAL;
+.
+.       PROCEDURE yyIsElement (VAR Set: yySetType; Element: SHORTCARD): BOOLEAN;
+.      \  BEGIN
+.      \    RETURN Element MOD {n BitsPerBitset} IN Set [Element DIV {n BitsPerBitset}];
+.      \  END yyIsElement;
+.
+.       PROCEDURE yyInclElement (VAR Set: yySetType; Element: SHORTCARD);
+.      \  BEGIN
+.      \    INCL (Set [Element DIV {n BitsPerBitset}], Element MOD {n BitsPerBitset});
+.      \  END yyInclElement;
+.
+.       PROCEDURE yyExclElement (VAR Set: yySetType; Element: SHORTCARD);
+.      \  BEGIN
+.      \    EXCL (Set [Element DIV {n BitsPerBitset}], Element MOD {n BitsPerBitset});
+.      \  END yyExclElement;
+.
+.       PROCEDURE UnpackSetsHandler (value: CARDINAL);
+.	VAR i	: CARDINAL;
+.	BEGIN
+.      \  IF yyunpackindex > yyunpackcount THEN
+.      \    yyunpackindex := 0;
+.      \    INC (yyunpackset);
+.      \  END;
+.      \  IF yyunpackindex = 0 THEN
+.      \    yyunpackcount := value;
+.      \    FOR i := 0 TO yySetSize DO
+.      \      yyExclElement (yySets [yyunpackset], i);
+.      \    END;
+.      \  ELSE
+.      \    yyInclElement (yySets [yyunpackset], value)
+.      \  END;
+.      \  INC (yyunpackindex);
+.	END UnpackSetsHandler;      	
+.       PROCEDURE UnpackCombHandler (value: INTEGER);
+.	BEGIN
+.      \  yyComb [yyunpackindex] := value;
+.      \  INC (yyunpackindex);
+.	END UnpackCombHandler;      	
+      END;
+.     PROCEDURE Begin{i name};
+      IF BU THEN
+.       VAR
+.      \  hc	: Pack.UnpackCardHandler;
+.      \  hi	: Pack.UnpackIntHandler;
+      END;
+.     BEGIN
+.+
+      IF BU THEN
+.	yyunpackindex := 0; yyunpackcount := 0; yyunpackset := 0;
+.       hc := UnpackSetsHandler;
+	PackMatchSets (Out);
+.       hi := UnpackCombHandler; yyunpackindex := 0;
+	PackComb (Out);
+      END;
+.-
+      WritePart	(begin);
+.     END Begin{i name};
+.  
+      BeginDo	(t);
+      WITH t^.Spec.functions^.Function DO
+        IF result^.Kind = Type THEN
+	  WITH result^.Type DO
+.   	    VAR yyresult :\
+	    IF mod # NoIdent THEN
+.	      {i mod}.\
+	    END;
+.	    {i type};
+	  END;
+	END;
+      END;
+      IF BU THEN
+.       VAR yystate: yyStateType;
+      END;
+.     BEGIN
+.+
+      (* CODE_ *)
+      IF DEBUG THEN
+.       yyTime0 := Times.CpuTime ();
+.	yyNodeCount := 0;
+      END;
+      (* _CODE *)
+      IF BU THEN
+.       yystate := yyTraverse (yyt);
+      ELSE
+.       yyTraverse (yyt);
+      END;
+      (* CODE_ *)
+      IF DEBUG THEN
+.       yyTime := Times.CpuTime ();
+.	yyTime := yyTime - yyTime0;
+.	IO.WriteI (IO.StdError, yyNodeCount, 1);
+.	IO.WriteS (IO.StdError, ' Nodes');
+.	IO.WriteNl (IO.StdError);
+.	IO.WriteI (IO.StdError, yyTime, 1);
+.	IO.WriteS (IO.StdError, ' msec to traverse');
+.	IO.WriteNl (IO.StdError);
+.	IF yyTime > 0 THEN
+.      \  IO.WriteI (IO.StdError, (yyNodeCount * 1000 + yyTime DIV 2) DIV yyTime, 1);
+.      \  IO.WriteS (IO.StdError, ' Nodes per sec');
+.      \  IO.WriteNl (IO.StdError);
+.      \  IO.WriteNl (IO.StdError);
+.       END;
+      END;
+      (* _CODE *)
+      IF t^.Spec.functions^.Kind = Function THEN
+	WITH t^.Spec.functions^.Function DO
+.  	\
+	  IF result^.Kind = Type THEN
+.   	 yyresult := \
+	  END;
+.   	{i name} (yyt\
+	  tt := in;
+	  WHILE tt^.Kind = Attribute DO
+.           , {i tt^.Attribute.ident}\
+	    tt := tt^.Attribute.attributes;
+	  END;
+	  tt := out;
+	  WHILE tt^.Kind = Attribute DO
+.           , {i tt^.Attribute.ident}\
+	    tt := tt^.Attribute.attributes;
+	  END;
+.  	);
+	END;
+      END;
+      (* CODE_ *)
+      IF DEBUG THEN
+.       yyTime0 := Times.CpuTime ();
+      END;
+      (* _CODE *)
+.     yyReleaseHeap;
+      (* CODE_ *)
+      IF DEBUG THEN
+.       yyTime := Times.CpuTime ();
+.	yyTime := yyTime - yyTime0;
+.	IO.WriteI (IO.StdError, yyTime, 1);
+.	IO.WriteS (IO.StdError, ' msec to release Heap');
+.	IO.WriteNl (IO.StdError);
+      END;
+      (* _CODE *)
+      IF t^.Spec.functions^.Function.result^.Kind = Type THEN
+.       RETURN yyresult;
+      END;
+.-
+.     END Do{i t^.Spec.name};
+      WriteNl (Out);
+.     PROCEDURE Close{i name};
+.     BEGIN
+      WritePart	(close);
+.     END Close{i name};
+.
+      f := functions;
+(*
+ * ----------	BEGIN
+ *)
+.     BEGIN
+.+
+.     WITH yyInfo DO
+.+
+      IF NOT BU THEN
+	FOR i := 0 TO MaxClassCode () DIV BitsPerBitset DO
+.  	  yyClasses [{n i}] := \{\};
+	END;
+      END;
+      WHILE f^.Kind = Function DO
+	WITH f^.Function DO
+.  	{i name}.Cost := yyInfinite;
+.  	{i name}.Proc := yyE{i name};
+	  f := functions;
+	END;
+      END;
+.-
+.     END;
+.-
+.    \  yyBlockList:= NIL;
+.    \  yyPoolFreePtr:= NIL;
+.    \  yyPoolEndPtr:= NIL;
+.     END {i name}.
+      WriteClose (Out);
+    END;
+  END Implementation;
+
+PROCEDURE OpenImp	(name: tIdent);
+  VAR s: tString; a: ARRAY [0..128] OF CHAR;
+  BEGIN
+    IF name = NoIdent THEN
+      a := cNullDevice;
+    ELSE
+      GetString (name, s);
+      Append (s, 0C);
+      StringToArray (s, a);
+      Concatenate (a, cImpPost);
+    END;
+    Out := WriteOpen (a);
+    CheckWriteOpen (Out, a);
+  END OpenImp;
+
+
+(* ---------- traverse ----------
+ *
+ *)
+
+PROCEDURE Traverse (t: tTree);
+  BEGIN
+    IF BU THEN
+.     PROCEDURE yyTraverse (yyt: {i GrammarName}.t{i GrammarName}): yyStateType;
+    ELSE
+.     PROCEDURE yyTraverse (yyt: {i GrammarName}.t{i GrammarName});
+    END;
+.   VAR
+.+
+    IF BU THEN
+.     state: yyStateType;
+.     match: POINTER TO yySetType;
+    END;
+.   cost: INTEGER;
+.   info: yyInfoPtr;
+.   success: BOOLEAN;
+.
+.-
+.   BEGIN
+.+
+    (* CODE_ *)
+    IF DEBUG THEN
+.     INC (yyNodeCount);
+    END;
+    (* _CODE *)
+.   info := yyAlloc ();
+.   info^ := yyInfo;
+.   yyt^.yyHead.yyEstraInfo := info;
+.
+.
+.   CASE yyt^.Kind OF
+.
+    TraverseNodes (t);
+.   END;
+    IF BU THEN
+.     RETURN state;
+    END;
+.-
+.   END yyTraverse;
+.
+  END Traverse;
+
+PROCEDURE TraverseNodes (t: tTree);
+  VAR nodes: tSet; node, ident, class: tIdent; p: INTEGER; numbers: tSet;
+  BEGIN
+    MakeSet (nodes, MaxIdent);
+    MakeSet (numbers, MaxDirective ());
+    AllNodes (nodes);
+    WHILE NOT IsEmpty (nodes) DO
+      node := Extract (nodes);
+      class := MainClass (node);
+      IF class # NoIdent THEN
+	ident := NodeIdent (node);
+.	| {i GrammarName}.{i ident}:
+.+,2
+	IF BU THEN
+.	  state := {n StartIndex (node)};
+	END;
+	FOR p := 1 TO Arity (node) DO
+.	\
+	  IF BU THEN
+.           state := yyComb [state + \
+	  END;
+.	  yyTraverse (yyt^.{i ident}.{i SonName (node, p)}\
+	  IF BU THEN
+.    	    )];\
+	  ELSE
+.	    );\
+	  END;
+.
+	END;
+	PatsOfNode (node, numbers);
+	IF BU THEN
+	  IF NOT NumbersAlwaysMatch (numbers, node) THEN
+.	    match := SYSTEM.ADR (yySets [state]);
+.
+          END;
+	ELSE
+	  SetClasses (node);
+	END;
+	MatchPatterns (t, node, numbers);
+	MinCost (t, node, numbers);
+.-,2
+      END;
+    END;
+    ReleaseSet (numbers);
+    ReleaseSet (nodes);
+  END TraverseNodes;
+
+
+PROCEDURE NumbersAlwaysMatch (numbers: tSet; node: tIdent): BOOLEAN;
+  VAR i: tIdent;
+  BEGIN
+    FOR i := Minimum (numbers) TO Maximum (numbers) DO
+      IF IsElement (i, numbers) & NOT AlwaysMatch (i, node) THEN
+	RETURN FALSE;
+      END;
+    END;
+    RETURN TRUE;
+  END NumbersAlwaysMatch;
+
+
+(* ---------- set classes ----------
+ *
+ *)
+
+PROCEDURE SetClasses (node: tIdent);
+  VAR
+    classes, nodes: tSet; class: tIdent;
+    arity, pos: INTEGER; layout: tLayout;
+  BEGIN
+    MakeSet (classes, MaxIdent);
+    MakeSet (nodes, MaxIdent);
+    ClassesOfNode (node, classes);
+    WHILE NOT IsEmpty (classes) DO
+      class := Extract (classes);
+      arity := Arity (node);
+      IF (arity = 0) OR (class = MainClass (node)) THEN
+        LOOP
+.	  INCL (info^.yyClasses [yyC{i class} DIV yyBitsPerBitset], \
+.	        yyC{i class} MOD yyBitsPerBitset); 
+	  class := SuperClass (class);
+	  IF (class = NoIdent) THEN EXIT END;
+	  NodesOfClass (class, nodes);
+	  IF IsElement (node, nodes) THEN EXIT END;
+        END;
+      ELSE
+        layout := Layout (node, class);
+        IF layout # NIL THEN
+.	  IF \
+	  FOR pos := 1 TO arity DO
+	    IF pos # 1 THEN
+.
+.	     \ & \
+	    END;
+.	    yyClass (yyt^.{i NodeIdent (node)}.{i SonName (node, pos)}, \
+.	    yyC{i class} MOD yyBitsPerBitset, yyC{i class} DIV yyBitsPerBitset) \
+	  END;
+.	  THEN
+.+
+	  LOOP
+.	    INCL (info^.yyClasses [yyC{i class} DIV yyBitsPerBitset], \
+.	          yyC{i class} MOD yyBitsPerBitset);
+	    class := SuperClass (class);
+	    IF (class = NoIdent) OR (class = MainClass (node)) THEN EXIT END;
+	  END;
+.-
+.	  END;
+        END;
+      END;
+    END;
+    WriteNl		(Out);
+    ReleaseSet (nodes);
+    ReleaseSet (classes);
+  END SetClasses;
+
+(* ---------- pattern matching ----------
+ *
+ *)
+
+PROCEDURE MatchPatterns (t: tTree; node: tIdent; numbers: tSet);
+  VAR d: tTree;
+  BEGIN
+    WHILE t^.Kind = Function DO
+      d := t^.Function.directives;
+      WHILE d^.Kind = Directive DO
+	WITH d^.Directive DO
+	  IF correct & IsElement (number, numbers) THEN
+	    IF HasCondition (number) OR NOT AlwaysMatch (number, node) THEN
+	      MatchPattern (condition, node, number, number);
+	    END;
+	  END;
+	  d := directives;
+	END;
+      END;
+      t := t^.Function.functions;
+    END;
+    WriteNl	(Out);
+  END MatchPatterns;
+
+PROCEDURE MatchPattern (cond:tTree; node:tIdent; number:INTEGER; no:INTEGER);
+  VAR started: BOOLEAN;
+  BEGIN
+.     yyMatch [{n number}] := \
+    IF AlwaysMatch (no, node) THEN
+.     TRUE\
+    ELSE
+      IF BU THEN
+.	({n number MOD BitsPerBitset} IN match^[{n number DIV BitsPerBitset}])\
+      ELSE
+	WriteMatch	(Out, no, BlaCo, GrammarName);
+      END;
+    END;
+    IF cond^.Kind = CondF THEN
+      IF NOT BU THEN
+	WriteNl (Out); Blanks;
+      END;
+.    \ & (\
+      WriteCode	(cond^.CondF.code, no);
+.     )\
+    END;
+.   ;
+  END MatchPattern;
+
+(* ---------- minimum cost cover ----------
+ *
+ *)
+
+PROCEDURE MinCost (t: tTree; node: tIdent; patnums: tSet);
+  VAR tt, d: tTree; numbers: tSet; report: BOOLEAN;
+  BEGIN
+    report := FALSE;
+    MakeSet (numbers, MaxDirective ());
+    Assign (numbers, patnums);
+    tt := t;
+    WHILE tt^.Kind = Function DO
+      d := tt^.Function.directives;
+      WHILE d^.Kind = Directive DO
+	WITH d^.Directive DO
+	  IF correct & IsElement (number, numbers) & NOT iter THEN
+	    Exclude (numbers, number);
+	    IF HasCondition (number) OR NOT AlwaysMatch (number, node) THEN
+	      CondMinPatCost (d, tt^.Function.name, report, number);
+	    ELSE
+	      MinPatCost (d, tt^.Function.name, report);
+            END;
+.
+	  END;
+	  d := directives;
+	END;
+      END;
+      tt := tt^.Function.functions;
+    END;
+
+    IF NOT IsEmpty (numbers) THEN
+      IF Card (numbers) > 1 THEN
+.	REPEAT
+.+
+	report := TRUE;
+.	success := FALSE;
+      END;
+      WHILE t^.Kind = Function DO
+	d := t^.Function.directives;
+	WHILE d^.Kind = Directive DO
+	  WITH d^.Directive DO
+	    IF correct & IsElement (number, numbers) & iter THEN
+	      IF HasCondition (number) OR NOT AlwaysMatch (number, node) THEN
+		CondMinPatCost (d, t^.Function.name, report, number);
+	      ELSE
+		MinPatCost (d, t^.Function.name, report);
+	      END;
+.
+	    END;
+	    d := directives;
+	  END;
+	END;
+	t := t^.Function.functions;
+      END;
+      IF Card (numbers) > 1 THEN
+.-
+.	UNTIL NOT success;
+      END;
+    END;
+
+    ReleaseSet (numbers);
+  END MinCost;
+
+PROCEDURE CondMinPatCost (t: tTree; name: tIdent; report: BOOLEAN;
+			  number: INTEGER);
+  BEGIN
+.   IF yyMatch [{n number}] THEN
+.+
+    MinPatCost (t, name, report);
+.-
+.   END;
+  END CondMinPatCost;
+
+PROCEDURE MinPatCost (t: tTree; name: tIdent; report: BOOLEAN);
+  BEGIN
+    WITH t^.Directive DO
+.     cost := \
+      CASE costs^.Kind OF
+      | CostD:
+.	  {n cDefaultCost}\
+	  WriteCost 	(Out, number, BlaCo);
+      | CostN:
+.	  {n costs^.CostN.value}\
+	  WriteCost 	(Out, number, BlaCo);
+      | CostF:
+	  WriteCode	(costs^.CostF.code, number);
+      END;
+.     ;
+.     IF cost < info^.{i name}.Cost THEN
+.+
+.     info^.{i name}.Cost := cost;
+.     info^.{i name}.Proc := yyF{n number}{i name};
+      IF report THEN
+.	success := TRUE;
+      END;
+.-
+.     END;
+    END;
+  END MinPatCost;
+
+(* ---------- functions ----------
+ *
+ *)
+
+PROCEDURE Functions (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+    WITH t^.Function DO
+      Directives (directives, t);
+      t := functions;
+    END;
+  END;
+END Functions;
+
+PROCEDURE Directives (t: tTree; f: tTree);
+  BEGIN
+    WHILE t^.Kind = Directive DO
+      WITH t^.Directive DO
+	IF correct THEN
+	  BeginFunction (f, number);
+	  WritePart (decl);
+.	  BEGIN\
+	  WriteCode (instr, number);
+.
+	  CloseFunction (f, number);
+	END;
+	t := directives;
+      END;
+    END;
+  END Directives;
+
+PROCEDURE WriteCode (t: tTree; no: INTEGER);
+  BEGIN
+    IF t^.Kind # CdEnd THEN
+.    \    (* line {n t^.code.pos.Line} {s SourceFileName} *)
+    END;
+    LOOP
+      CASE t^.Kind OF
+      | CdStr:
+	  CASE t^.CdStr.mode OF
+	  | cNoSel:	WriteIdent (Out, t^.CdStr.ident);
+	  | cSel:	WriteAccess (Out, no, t^.CdStr.ident);
+	  | cTreeSel:	WritePath (Out, no, t^.CdStr.ident);
+	  END;
+	  t := t^.CdStr.code
+      | CdId:
+	  CASE t^.CdId.mode OF
+	  | cNoSel:	WriteIdent (Out, t^.CdId.ident);
+	  | cSel:	WriteAccess (Out, no, t^.CdId.ident);
+	  | cTreeSel:	WritePath (Out, no, t^.CdId.ident);
+	  END;
+	  t := t^.CdId.code
+      | CdDot:
+	  WriteS (Out, '.');
+	  t := t^.CdDot.code
+      | CdComma:
+	  WriteS (Out, ',');
+	  t := t^.CdDot.code
+      | CdLPar:
+	  WriteS (Out, '(');
+	  t := t^.CdLPar.code
+      | CdRPar:
+	  WriteS (Out, ')');
+	  t := t^.CdRPar.code
+      | CdLBra:
+	  WriteS (Out, '{');
+	  t := t^.CdLBra.code
+      | CdRBra:
+	  WriteS (Out, '}');
+	  t := t^.CdRBra.code
+      | CdSpa:
+	  WriteString (Out, t^.CdSpa.ref);
+	  t := t^.CdSpa.code
+      | CdCom:
+	  WriteString (Out, t^.CdCom.ref);
+	  t := t^.CdCom.code
+      | CdRst:
+	  WriteString (Out, t^.CdRst.ref);
+	  t := t^.CdRst.code
+      | CdEnd:
+	  EXIT
+      END;
+    END;
+  END WriteCode;
+
+PROCEDURE CloseFunction (f: tTree; n: INTEGER);
+  BEGIN
+    WITH f^.Function DO
+      IF n > 0 THEN
+.	END yyF{n n}{i name};
+      ELSIF n = -1 THEN
+.	END yyE{i name};
+      ELSE
+.	END {i name};
+      END;
+.
+    END;
+  END CloseFunction;
+
+(* ---------- error functions ----------
+ *
+ *)
+
+PROCEDURE ErrorFunctions (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	ErrorFunction (t);
+	t := functions;
+      END;
+    END;
+  END ErrorFunctions;
+
+PROCEDURE ErrorFunction (f: tTree);
+  BEGIN
+    WITH f^.Function DO
+      BeginFunction (f, -1);
+.     BEGIN
+.+
+.     IO.WriteS (IO.StdError, 'Function {i name} is not defined for this tree');
+.     IO.WriteNl (IO.StdError); IO.CloseIO; HALT;
+.-
+      CloseFunction (f, -1);
+    END;
+  END ErrorFunction;
+
+(* ---------- dirstributers ----------
+ *
+ *)
+
+PROCEDURE Distributers (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	Distributer (t);
+	t := functions;
+      END;
+    END;
+  END Distributers;
+
+PROCEDURE Distributer (f: tTree);
+  VAR tt: tTree;
+  BEGIN
+    WITH f^.Function DO
+      BeginFunction (f, 0);
+.     VAR InfoPtr: yyInfoPtr;
+.     BEGIN
+.+
+.     InfoPtr := yyInfoPtr (yyt^.yyHead.yyEstraInfo);
+.     \
+      IF result^.Kind = Type THEN
+.	RETURN \
+      END;
+.     InfoPtr^.{i name}.Proc (yyt\
+      tt := in;
+      WHILE tt^.Kind = Attribute DO
+.       , {i tt^.Attribute.ident}\
+	tt := tt^.Attribute.attributes;
+      END;
+      tt := out;
+      WHILE tt^.Kind = Attribute DO
+.       , {i tt^.Attribute.ident}\
+	tt := tt^.Attribute.attributes;
+      END;
+.     );
+.-
+      CloseFunction (f, 0);
+    END;
+  END Distributer;
+
+(* ---------- cost functions ----------
+ *
+ *)
+
+PROCEDURE CostFunctions (t: tTree);
+  BEGIN
+    WHILE t^.Kind = Function DO
+      WITH t^.Function DO
+	CostFunction (t);
+	t := functions;
+      END;
+    END;
+  END CostFunctions;
+
+PROCEDURE CostFunction (f: tTree);
+  BEGIN
+    WITH f^.Function DO
+.     PROCEDURE Cost{i name} (yyt: {i GrammarName}.t{i GrammarName}): INTEGER;
+.     VAR
+.    \  InfoPtr: yyInfoPtr;
+.     BEGIN
+.    \  InfoPtr := yyt^.yyHead.yyEstraInfo;
+.    \  RETURN InfoPtr^.{i name}.Cost;
+.     END Cost{i name};
+.
+    END;
+  END CostFunction;
+(* ----------         ----------
+ *
+ *)
+
+PROCEDURE WritePart (t: tTree);
+  BEGIN
+    IF t^.Kind # CdEnd THEN
+.    \    (* line {n t^.code.pos.Line} {s SourceFileName} *)
+    END;
+    LOOP
+      CASE t^.Kind OF
+      | CdStr:
+	  WriteIdent (Out, t^.CdStr.ident);
+	  t := t^.CdStr.code
+      | CdId:
+	  WriteIdent (Out, t^.CdId.ident);
+	  t := t^.CdId.code
+      | CdDot:
+	  WriteS (Out, '.');
+	  t := t^.CdDot.code
+      | CdComma:
+	  WriteS (Out, ',' );
+	  t := t^.CdComma.code
+      | CdLPar:
+	  WriteS (Out, '(');
+	  t := t^.CdLPar.code
+      | CdRPar:
+	  WriteS (Out, ')');
+	  t := t^.CdRPar.code
+      | CdLBra:
+	  WriteS (Out, '{');
+	  t := t^.CdLBra.code
+      | CdRBra:
+	  WriteS (Out, '}');
+	  t := t^.CdRBra.code
+      | CdSpa:
+	  WriteString (Out, t^.CdSpa.ref);
+	  t := t^.CdSpa.code
+      | CdCom:
+	  WriteString (Out, t^.CdCom.ref);
+	  t := t^.CdCom.code
+      | CdRst:
+	  WriteString (Out, t^.CdRst.ref);
+	  t := t^.CdRst.code
+      | CdEnd:
+	  WriteNl (Out);
+	  EXIT
+      END;
+    END;
+  END WritePart;
+
+PROCEDURE BeginDo (t: tTree);
+  VAR tt: tTree;
+  BEGIN
+.   PROCEDURE Do{i t^.Spec.name} (yyt: {i GrammarName}.t{i GrammarName}\
+    IF t^.Spec.functions^.Kind = Function THEN
+      WITH t^.Spec.functions^.Function DO
+	tt := in;
+        WHILE tt^.Kind = Attribute DO
+          WITH tt^.Attribute DO
+.	    ;{i ident}:\
+	    IF mod # NoIdent THEN
+.	      {i mod}.\
+	    END;
+.           {i type}\
+	    tt := attributes;
+	  END;
+	END;
+        tt := out;
+        WHILE tt^.Kind = Attribute DO
+          WITH tt^.Attribute DO
+.	    ; VAR {i ident}:
+	    IF mod # NoIdent THEN
+.	      {i mod}.\
+	    END;
+.	    {i type}\
+	    tt := attributes;
+          END;
+        END;
+        tt := result;
+        IF tt^.Kind = Type THEN
+          WITH tt^.Type DO
+.	    ): \
+	    IF mod # NoIdent THEN
+.	      {i mod}.\
+	    END;
+.	    {i type};\
+          END;
+        ELSE
+.         );\
+        END;
+.
+      END;
+    END;
+  END BeginDo;
+
+PROCEDURE BeginFunction (f: tTree; n: INTEGER);
+  VAR tt: tTree;
+  BEGIN
+    WITH f^.Function DO
+      WriteS	(Out, 'PROCEDURE ');
+      IF n > 0 THEN
+	WriteS	(Out, 'yyF');
+	WriteI	(Out, n, 1);
+      ELSIF n = -1 THEN
+	WriteS	(Out, 'yyE');
+      END;
+      WriteIdent(Out, name);
+.    \ (yyt: {i GrammarName}.t{i GrammarName}\
+      tt := in;
+      WHILE tt^.Kind = Attribute DO
+	WITH tt^.Attribute DO
+.	  ;{i ident}:\
+	  IF mod # NoIdent THEN
+.	    {i mod}.\
+	  END;
+.         {i type}\
+	  tt := attributes;
+	END;
+      END;
+      tt := out;
+      WHILE tt^.Kind = Attribute DO
+        WITH tt^.Attribute DO
+.	  ; VAR {i ident}:
+	  IF mod # NoIdent THEN
+.	    {i mod}.\
+	  END;
+.	  {i type}\
+	  tt := attributes;
+        END;
+      END;
+      tt := result;
+      IF tt^.Kind = Type THEN
+        WITH tt^.Type DO
+.	  ): \
+	  IF mod # NoIdent THEN
+.	    {i mod}.\
+	  END;
+.	  {i type};\
+        END;
+      ELSE
+.       );\
+      END;
+.
+    END;
+  END BeginFunction;
+
+
+PROCEDURE Blanks;
+  VAR i: INTEGER;
+  BEGIN
+    FOR i := 1 TO BlaCo DO
+      WriteS (Out, '  ');
+    END;
+  END Blanks;
+
+BEGIN
+  BlaCo := 0;
+END CodeM2.

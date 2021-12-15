@@ -1,0 +1,553 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 26.1.1989 */
+
+TRAFO TreeJav2
+TREE Tree
+PUBLIC TreeIO GetIterator Search
+
+EXPORT	{
+FROM Position	IMPORT tPosition;
+
+VAR Iterator	: Tree.tTree;
+
+PROCEDURE WriteLine (Line: tPosition);
+}
+
+GLOBAL	{
+
+FROM IO		IMPORT WriteS, WriteNl;
+FROM Sets	IMPORT IsElement;
+FROM Idents	IMPORT tIdent;
+FROM Position	IMPORT tPosition;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Options	, ClassCount	,
+   f		, WI	, WN	, iInteger	, itTree	,
+   iNoTree	, iModule	, iMain		, iTreeNode	,
+   HasChildren	,
+   HasAttributes, NoCodeAttr	, NoCodeClass	, itPosition	,
+   ForallClasses, ForallAttributes, Reverse	;
+
+VAR
+   iClassName	: tIdent;
+   RevChild	: tTree;
+
+PROCEDURE WriteLine (Line: tPosition);
+   BEGIN
+      IF Line.Line # 0 THEN
+	 !// line ! WN (Line.Line); @ "@ WI (Line.File); @"@
+      END;
+   END WriteLine;
+}
+
+PROCEDURE TreeIO (t: Tree)
+
+Ag (..) :- {
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static CocktailWriter yyout;!
+	!   private static CocktailReader yyin;!
+	!=! WI (iTreeNode); !.fields!
+      IF IsElement (ORD (','), Options) THEN
+	!   abstract void yyMark0 ();!
+	!!
+	!   private static void yyMark (! WI (iTreeNode); ! yyt) {!
+	@      while (yyt != null && @ 
+	@! (++ yyt.yyMark > 1) ) {@
+	!         yyt.yyMark0 ();!
+	ForallClasses (Classes, Mark0);
+	!         yyt = yyt.yyGetIterator ();!
+	!      }!
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD (';'), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+        !   private static final int yyInitTreeStoreSize = 32;!
+	!!
+        !   private static ! WI (iTreeNode); ! yyTreeStore [] = new ! WI (iTreeNode); ! [yyInitTreeStoreSize];!
+	!   private static int yyLabelCount;!
+	!   private static int yyRecursionLevel = 0;!
+	!=! WI (iTreeNode); !.fields!
+	!   private static int yyMapToLabel (! WI (iTreeNode); ! yyTree) {!
+	!      for (int yyi = 1; yyi <= yyLabelCount; yyi ++)!
+	!         if (yyTreeStore [yyi] == yyTree) return yyi;!
+	!      yyLabelCount ++;!
+	!      if (yyLabelCount == yyTreeStore.length)!
+	!         yyTreeStore = (! WI (iTreeNode); ! []) DynArrayObject.extend (yyTreeStore);!
+	!      yyTreeStore [yyLabelCount] = yyTree;!
+	!      return yyLabelCount;!
+	!   }!
+	!!
+	!   private static ! WI (iTreeNode); ! yyMapToTree (int yyLabel) {!
+	!      return yyTreeStore [yyLabel];!
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD ('$'), Options) THEN
+	!   private static void yyWriteSpaces (int yyn) throws java.io.IOException {!
+	!      for (int yyi = 1; yyi <= yyn; yyi ++) yyout.write (' ');!
+	!   }!
+	!!
+	!   private static void yyWriteSelector (String yys) throws java.io.IOException {!
+	@      yyout.write (yys); yyWriteSpaces (16 - yys.length ()); yyout.write (" = ");@
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD ('o'), Options) THEN
+	!   private static void yyWriteAddr (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	@      if (yyt == null) yyout.write ("@ WI (iNoTree); @");@
+	!      else yyout.write (Integer.toHexString (yyt.hashCode ()));!
+	!   }!
+	!!
+	!   public static void writeNode (! 
+	!         CocktailWriter yyyout, ! WI (iTreeNode); ! yyt)!
+	!         throws java.io.IOException!
+	!   {!
+	@      if (yyt == null) { yyyout.write ("@ WI (iNoTree); @"); yyyout.writeNl (); return; }@
+	!      yyt.writeNode (yyyout);!
+	!   }!
+	!!
+	!+! WI (iTreeNode); !.methods!
+	!   public void writeNode (CocktailWriter yyyout) throws java.io.IOException!
+	!   {!
+	!      yyout = yyyout;!
+	!      yyout.write (NodeNames [yyKind ()]); yyout.writeNl ();!
+	!      writeNodeHead (this)!
+	!      yWriteNode ();!
+	!   }!
+	!!
+	!   abstract void yWriteNode () throws java.io.IOException;!
+	!!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, WriteNode);
+      END;
+      IF IsElement (ORD ('w'), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static int yyIndentLevel;!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   public static void write (! 
+	!         CocktailWriter yyyout, ! WI (iTreeNode); ! yyt)!
+	!         throws java.io.IOException!
+	!   {!
+	!      int yySaveLevel;!
+	!      yyout = yyyout;!
+	!      if (yyRecursionLevel == 0) yyLabelCount = 0;!
+	!      yyRecursionLevel ++;!
+	!      yyMark (yyt);!
+	!      yySaveLevel = yyIndentLevel;!
+	!      yyIndentLevel = 0;!
+	!      yyWrite (yyt);!
+	!      yyIndentLevel = yySaveLevel;!
+	!      yyRecursionLevel --;!
+	!   }!
+	!!
+	!   public final void write (!
+	!         CocktailWriter yyyout)!
+	!         throws java.io.IOException!
+	!   {!
+	!      ! WI (iModule); !.write (yyyout, this);!
+	!   }!
+	!!
+	!   private static void yyIndentSelector (String yys)!
+	!      throws java.io.IOException!
+	!   {!
+	!      yyWriteSpaces (yyIndentLevel); yyWriteSelector (yys);!
+	!   }!
+	!!
+	!   private static void yyIndentSelectorTree (!
+	!      String yys, ! WI (iTreeNode); ! yyt)!
+	!      throws java.io.IOException!
+	!   {!
+	!      writeSELECTOR (yys) yyWrite (yyt);!
+	!   }!
+	!!
+	!+! WI (iTreeNode); !.methods!
+	!   String yyWrite () throws java.io.IOException {!
+	!      return null;!
+	!   }!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, WriteAttributes);
+	!   private static void yyWrite (! WI (iTreeNode); ! yyt)!
+	!         throws java.io.IOException!
+	!   {!
+	!      int yyLevel = yyIndentLevel;!
+	!      String yys;!
+	!      for (;;) {!
+	!         if (yyt == null) {!
+	@            yyout.write (" @ WI (iNoTree); @"); yyout.writeNl ();@
+	!            break;!
+	!         } else if (yyt.yyMark == 0) {!
+	!            yyout.write ('^'); yyout.write (yyMapToLabel (yyt));!
+	!            yyout.writeNl (); break;!
+	!         } else if (yyt.yyMark > 1) {!
+	!            yyout.writeNl (); yyout.write ('0');!
+	!            yyout.write (yyMapToLabel (yyt)); yyout.write (':');!
+	!            yyWriteSpaces (yyIndentLevel - 7);!
+	!         } else {!
+	!            yyout.write (' ');!
+	!         }!
+	!         yyt.yyMark = 0;!
+	!         yyIndentLevel += 2;!
+	!!
+	!         yyout.write (NodeNames [yyt.yyKind ()]); yyout.writeNl ();!
+	!         writeNodeHead (yyt)!
+	(* yyt.yyWrite returns the selector name if the node type has an iterator *)
+	!         yys = yyt.yyWrite ();!
+	!         if (yys == null) break;!
+	!         writeSELECTOR (yys)!
+	!         yyt = yyt.yyGetIterator ();!
+	!      }!
+	!      yyIndentLevel = yyLevel;!
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD ('r'), Options) THEN
+	!   public static ! WI (iTreeNode); ! read (CocktailReader yyyin) throws java.io.IOException {!
+	!      ! WI (iTreeNode); ! yyt;!
+	!      yyin = yyyin;!
+	!      if (yyRecursionLevel ++ == 0) yyLabelCount = 0;!
+	!      if (yyKindToIdent == null) { yyInitKindToIdent (); }!
+	!      yyt = yyRead ();!
+	!      yyRecursionLevel --;!
+	!      return yyt;!
+	!   }!
+	!!
+	!   public static ! WI (iTreeNode); ! yyRead () throws java.io.IOException {!
+	!      ! WI (iTreeNode); ! yyt = null;!
+	!      ! WI (iTreeNode); ! yyfirst = null;!
+	!      ! WI (iTreeNode); ! yylast = null;!
+	!      int yyKind;!
+	!      String yys;!
+	!      int yyLabel;!
+	!      do {!
+	@         if (yylast != null) { yyin.skipSpaces (); readSELECTOR () }@
+	!         yyLabel = 0;!
+	!         switch (yyin.read ()) {!
+	!            case '^':!
+	!               yyLabel = yyin.readI ();!
+	!               yyin.read ();!
+	!               yyt = yyMapToTree (yyLabel);!
+	!               if (yyfirst == null) yyfirst = yyt;!
+	@               if (yylast != null) yylast.yySetIterator (yyt);@
+	!               return yyfirst;!
+	!            case CocktailReader.EolCh:!
+	!            case '0':!
+	!               yyLabel = yyin.readI ();!
+	!               yyin.read ();!
+	!            default:!
+	!               yyin.skipSpaces ();!
+	!               yys = yyin.readL ().toString ();!
+	!               yyKind = yyMapToKind (yys);!
+	!               switch (yyKind) {!
+	!                  case 0: yyt = null; break;!
+	/*                 case kType: yyt = new Type (yyin); break; */
+	                   ForallClasses (Classes, ReadAttributes);
+	!               }!
+	!               if (yyfirst == null) yyfirst = yyt;!
+	@               if (yyLabel > 0 && yyLabel != yyMapToLabel (yyt)) {@
+	@                  throw new CocktailError (@
+	@                     "@ WI (iMain); @: error in read ()"+@
+	@                     "label " + yyLabel + " mismatched");@
+	@               }@
+	!               break;!
+	!            }!
+	@            if (yylast != null) yylast.yySetIterator (yyt);@
+	!            yylast = yyt;!
+	@         } while (yylast != null && yylast.yyHasIterator ());@
+	!         return yyfirst;!
+	!      }!
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static IdentTable yyIds;!
+	!   private static Ident [] yyKindToIdent;!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   private static int yyMapToKind (String yys) {!
+	!      Ident yyi = yyIds.makeIdent (yys);!
+	!      for (int yyk = 0; yyk < yyKindToIdent.length; yyk ++)!
+	!         if (yyKindToIdent [yyk] == yyi) return yyk;!
+	!      return 0;!
+	!   }!
+	!!
+	!   private static void yyInitKindToIdent () {!
+	!      yyIds = new IdentTable (! WN (ClassCount + 1); !);!
+	!      yyKindToIdent = new Ident [! WN (ClassCount + 1); !];!
+	@      yyKindToIdent [0] = yyIds.makeIdent ("@ WI (iNoTree); @");@
+	ForallClasses (Classes, InitKindToIdent);
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD ('p'), Options) THEN
+	!   public void put (java.io.OutputStream s)!
+	!      throws java.io.IOException {!
+	!      java.io.ObjectOutputStream yyOut;!
+	!      if (s instanceof java.io.ObjectOutputStream) {!
+	!         yyOut = (java.io.ObjectOutputStream) s;!
+	!      } else {!
+	!         yyOut = new java.io.ObjectOutputStream (s);!
+	!      }!
+	!      yyOut.writeObject (this);!
+	!   }!
+	!!
+	!   public void put (String fileName)!
+	!      throws java.io.IOException {!
+	!      java.io.ObjectOutputStream yyOut;!
+	!      yyOut = new java.io.ObjectOutputStream (!
+	!         new java.io.FileOutputStream (fileName));!
+	!      put (yyOut);!
+	!      yyOut.flush ();!
+	!      yyOut.close ();!
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD ('g'), Options) THEN
+	!   public static ! WI (iTreeNode); ! get (java.io.InputStream s)!
+	!      throws java.io.IOException, java.lang.ClassNotFoundException {!
+	!      java.io.ObjectInputStream yyIn;!
+	!      if (s instanceof java.io.ObjectInputStream) {!
+	!         yyIn = (java.io.ObjectInputStream) s;!
+	!      } else {!
+	!         yyIn = new java.io.ObjectInputStream (s);!
+	!      }!
+	!      return (! WI (iTreeNode); !) yyIn.readObject ();!
+	!   }!
+	!!
+	!   public static ! WI (iTreeNode); ! get (String fileName)!
+	!      throws java.io.IOException, java.lang.ClassNotFoundException {!
+	!      java.io.ObjectInputStream yyIn;!
+	!      ! WI (iTreeNode); ! yyt;!
+	!      yyIn = new java.io.ObjectInputStream (new java.io.FileInputStream (fileName));!
+	!      yyt = (! WI (iTreeNode); !) yyIn.readObject ();!
+	!      yyIn.close ();!
+	!      return yyt;!
+	!   }!
+	!!
+      END;
+}; .
+
+
+PROCEDURE WriteNode (t: Tree)
+
+Class (..) :- {
+	IF ((NoCodeClass * Properties) = {}) THEN
+	   !+! WI (Name); !.methods!
+	   !      void yWriteNode () throws java.io.IOException {!
+	   IF (BaseClass^.Kind = Tree.Class) AND		(* NOT Top ? *)
+	      (({HasChildren, HasAttributes} * BaseClass^.Class.Properties) # {}) THEN
+	   !         super.yWriteNode ();!
+	   ELSE
+	   !         writeNodeHead (this)!
+	   END;
+	   iClassName := Name;
+	   ForallAttributes (Attributes, WriteNode);
+	   !      }!
+	   !=! WI (Name); !.methods!
+	END;
+}; .
+Child (..) :- {
+	@         @ WI (iModule); @.yyWriteSelector ("@ WI (Name); @"); @ WI (iModule); @.yyWriteAddr (@ WI (Name); !);! 
+	! yyout.writeNl ();!
+}; .
+Attribute (..) :- {
+	IF (NoCodeAttr * Properties) = {} THEN
+	   @         @ WI (iModule); @.yyWriteSelector ("@ WI (Name); @"); write@ WI (CppType);
+	   ! (! WI (Name); !) yyout.writeNl ();!
+	END;
+}; .
+
+
+PROCEDURE Mark0 (t: Tree)
+
+Class (..) :- {
+	IF ((NoCodeClass * Properties) = {}) THEN
+	   !+! WI (Name); !.methods!
+	   !      void yyMark0 () {!
+	   GetIterator (t);
+	   iClassName := Name;
+	   ForallAttributes (t, Mark0);
+	   !      }!
+	   !=! WI (Name); !.methods!
+	END;
+}; .
+Child (..) :- {
+	IF t # Iterator THEN
+	   !         ! WI (iTreeNode); !.yyMark (! WI (Name); !);!
+	END;
+}; .
+
+
+PROCEDURE WriteClassName (t: Tree)
+
+Class (..) :- {
+	IF ((NoCodeClass * Properties) = {}) AND
+	   (({HasChildren, HasAttributes} * Properties) # {}) THEN
+	   !   case k! WI (Name); !: yWrite! WI (Name); ! (yyt); ! 
+	   GetIterator (t);
+	   IF Iterator = NoTree THEN
+	      !break loop;!
+	   ELSE
+	      @writeSELECTOR ("@ WI (Iterator^.Child.Name); @")@
+	      !    yyt = ((! WI (Name); !) yyt).! WI (Iterator^.Child.Name); !; break;!
+	   END;
+	END;
+}; .
+
+
+PROCEDURE WriteAttributes (t: Tree)
+
+Class (..) :-
+	i: tTree;
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!+! WI (Name); !.methods!
+	!      String yyWrite () throws java.io.IOException {!
+	!         String result = super.yyWrite ();!
+	iClassName := Name;
+{
+	IF (BaseClass^.Kind = Tree.Class) AND		(* NOT Top ? *)
+	   (({HasChildren, HasAttributes} * BaseClass^.Class.Properties) # {}) THEN
+	   GetIterator (BaseClass);
+	   i := Iterator;
+	   GetIterator (t);
+	   IF (i # NoTree) AND (i # Iterator) THEN
+	      @         @ WI (iTreeNode); @.yyIndentSelectorTree ("@ WI (i^.Child.Name); @",@ 
+	      WI (i^.Child.Name); !);!
+	   END;
+	ELSE
+	   GetIterator (t);
+	END;
+};
+	ForallAttributes (Attributes, WriteAttributes);
+	!         return result;!
+	!      }!
+	!=! WI (Name); !.methods!
+	.
+Child (..) :-
+{
+	IF t = Iterator THEN
+	   @         result = "@ WI (Name); @";@
+	ELSE
+	   @         @ WI (iTreeNode); @.yyIndentSelectorTree ("@ WI (Name); @", @ WI (Name); !);!
+	END;
+};
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	@         @ WI (iTreeNode); @.writeSELECTOR ("@ WI (Name); @")@
+	!         write! WI (CppType); ! (! WI (Name); !) yyout.writeNl ();!
+	.
+
+PROCEDURE ReadAttributes (t: Tree)
+
+Class (..) :-
+	i: tTree;
+	CONDITION (NoCodeClass * Properties) = {{}};
+	!                  case k! WI (Name); !: yyt = new ! WI (Name); ! (yyin); break;!
+	!+! WI (Name); !.constructors!
+	!      ! WI (Name); ! (CocktailReader yyin) throws java.io.IOException {!
+	iClassName := Name;
+{
+	IF (BaseClass^.Kind = Tree.Class) AND		(* NOT Top ? *)
+	   (({HasChildren, HasAttributes} * BaseClass^.Class.Properties) # {}) THEN
+	   !         super (yyin);!
+	   GetIterator (BaseClass);
+	   i := Iterator;
+	   GetIterator (t);
+	   IF (i # NoTree) AND (i # Iterator) THEN
+	      !         yyin.skipSpaces (); readSELECTOR ()!
+	      !         ! WI (i^.Child.Name); ! = (! WI (i^.Child.Type); !) this.yyRead (); yyin.read ();!
+	   END;
+	ELSE
+	   !         readNodeHead (this)!
+	   GetIterator (t);
+	END;
+};
+	ForallAttributes (Attributes, ReadAttributes);
+	!      }!
+	!=! WI (Name); !.constructors!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!         yyin.skipSpaces (); readSELECTOR ()!
+	!         ! WI (Name); ! = (! WI (Type); !) this.yyRead (); yyin.read ();!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	   !         yyin.skipSpaces (); readSELECTOR ()!
+	   !         read! WI (CppType); !(! WI (Name); !) yyin.read ();!
+	.
+
+
+PROCEDURE InitKindToIdent (t: Tree)
+
+Class (..) :- {
+	IF (NoCodeClass * Properties) = {} THEN
+	   @      yyKindToIdent [k@ WI (Name); @] = yyIds.makeIdent ("@ WI (Name); @");@
+	END;
+}; .
+
+
+PROCEDURE GetIterator (t: Tree)
+
+Class (..) :- {
+	Iterator := NoTree;
+	RevChild := NoTree;
+	ForallAttributes (t, GetIterator);
+	IF RevChild # NoTree THEN Iterator := RevChild; END;
+}; .
+Child (..) :- {
+	Iterator := t;
+	IF Reverse IN Properties THEN RevChild := t; END;
+}; .
+
+
+PROCEDURE Search (t: Tree)
+
+Ag (..) :-
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static int yyLine, yyCurLine;!
+	!   private static ! WI (iTreeNode); ! yyTheTree, yyTheNode;!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   private void yySearch4 (Position yyp) {!
+	!      if (yyLine <= yyp.line && yyp.line < yyCurLine)!
+	!         { yyTheNode = this; yyCurLine = yyp.line; }!
+	!   }!
+	!!
+	!   private static ProcTree yySearch2 = new ProcTree () {!
+	!      public void proc (! WI (iTreeNode); ! yyt) {!
+	!         yyt.yySearch5 ();!
+	!      }!
+	!   };!
+	!+! WI (iTreeNode); !.methods!
+	!!
+	!   void yySearch5 () {}!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, Search2);
+	.
+
+PROCEDURE Search2 (Tree)
+
+t: Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasAttributes IN Properties);
+	CONDITION HastPosition (t);
+	iClassName := Name;
+	ForallAttributes (t, Search2);
+	.
+Attribute (..) :-
+	CONDITION Type = itPosition;
+	!+! WI (iClassName); !.methods!
+	!!
+	!      void yySearch5 () {yySearch4 (! WI (Name); !);}!
+	!=! WI (iClassName); !.methods!
+	.
+
+PREDICATE HastPosition ([Attributes, Classes])
+
+Attribute	(..) :- CONDITION Type = itPosition; .
+AttrOrAction	(..) :- CONDITION HastPosition (Next); .
+Class		(..) :- CONDITION HastPosition (Attributes) OR HastPosition (BaseClass); .
+

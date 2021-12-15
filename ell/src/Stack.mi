@@ -1,0 +1,137 @@
+(* $Id: Stack.mi,v 5.0 2008/09/03 09:09:10 grosch rel $ *)
+
+(*
+ * $Log: Stack.mi,v $
+ * Revision 5.0  2008/09/03 09:09:10  grosch
+ * moved from ../../common/src
+ *
+ * Revision 1.4  1997/05/27 14:58:14  grosch
+ * cosmetic changes
+ *
+ * Revision 1.3  1990/06/12 18:33:46  grosch
+ * layout improvements
+ *
+ * Revision 1.2  89/02/28	16:11:24  vielsack
+ * fixed bug: Depth must not report an error if s.StackPtr = 0
+ *
+ * Revision 1.1  89/01/31	16:00:29  vielsack
+ * Initial revision
+ *
+ *)
+
+IMPLEMENTATION MODULE Stack;
+
+FROM	DynArray	IMPORT	MakeArray,	ExtendArray,	ReleaseArray;
+FROM	SYSTEM		IMPORT	ADR,		TSIZE;
+
+(* STACK_
+FROM	Errors		IMPORT	ERROR;
+FROM	Strings		IMPORT	tString,	ArrayToString;
+   _STACK *)
+
+CONST
+  InitStackSize = 50;
+
+PROCEDURE MakeStack (VAR s: tStack);
+  BEGIN
+    s.StackPtr := 0;
+    s.StackSize := InitStackSize;
+    MakeArray (s.Array, s.StackSize, TSIZE (tElmt));
+  END MakeStack;
+
+PROCEDURE ReleaseStack (VAR s: tStack);
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL) OR (s.StackSize < InitStackSize) THEN
+	ERROR ('Stack.Release');
+      END;
+       _STACK *)
+    ReleaseArray (s.Array, s.StackSize, TSIZE (tElmt));
+    s.Array := NIL;
+    s.StackSize := -1;
+  END ReleaseStack;
+
+PROCEDURE ClearStack (VAR s: tStack);
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL) OR (s.StackSize < InitStackSize) THEN
+	ERROR ('Stack.ClearStack');
+      END;
+       _STACK *)
+    s.StackPtr := 0;
+  END ClearStack;
+
+PROCEDURE IsEmptyStack (s: tStack): BOOLEAN;
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL) OR (s.StackSize < InitStackSize) THEN
+	ERROR ('Stack.IsEmptyStack');
+      END;
+       _STACK *)
+    RETURN s.StackPtr = 0;
+  END IsEmptyStack;
+
+PROCEDURE Push (VAR s: tStack; e: tElmt);
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL) OR (s.StackSize < InitStackSize) THEN
+	ERROR ('Stack.Push');
+      END;
+       _STACK *)
+    INC (s.StackPtr);
+    IF s.StackPtr >= s.StackSize THEN
+      ExtendArray (s.Array, s.StackSize, TSIZE (tElmt));
+    END;
+    s.Array^[s.StackPtr] := e;
+  END Push;
+
+PROCEDURE Pop (VAR s: tStack): tElmt;
+  VAR
+    e: tElmt;
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL)
+      OR (s.StackSize < InitStackSize)
+      OR (s.StackPtr < 1) THEN
+	ERROR ('Stack.Pop');
+      END;
+       _STACK *)
+    e := Top (s);
+    DEC (s.StackPtr);
+    RETURN e;
+  END Pop;
+
+PROCEDURE Top (VAR s: tStack): tElmt;
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL)
+      OR (s.StackSize < InitStackSize)
+      OR (s.StackPtr < 1) THEN
+	ERROR ('Stack.Top');
+      END;
+       _STACK *)
+    RETURN s.Array^[s.StackPtr];
+  END Top;
+
+PROCEDURE Depth (s: tStack): INTEGER;
+  BEGIN
+    (* STACK_
+      IF (s.Array = NIL)
+      OR (s.StackSize < InitStackSize)
+      OR (s.StackPtr < 0) THEN
+	ERROR ('Stack.Depth');
+      END;
+       _STACK *)
+    RETURN s.StackPtr;
+  END Depth;
+
+PROCEDURE Assign (VAR s1: tStack; s2: tStack);
+  VAR i: INTEGER;
+  BEGIN
+    ClearStack (s1);
+    FOR i := 1 TO Depth (s2) DO
+      Push (s1, s2.Array^[i]);
+    END;
+  END Assign;
+
+END Stack.

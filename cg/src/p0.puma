@@ -1,0 +1,166 @@
+TRAFO	Puma0
+TREE	Tree
+PUBLIC	PumaLite PumaLiteDef
+
+GLOBAL {
+
+FROM IO		IMPORT WriteS, WriteI, WriteN, WriteNl;
+FROM StringM	IMPORT Length;
+FROM Idents	IMPORT tIdent, MaxIdent, GetStringRef;
+FROM Sets	IMPORT tSet, MakeSet, IsElement, Include, ReleaseSet;
+FROM Tree	IMPORT f, WI, WN, itTree;
+
+VAR
+   IdSet	: tSet;
+
+PROCEDURE GetIdent (ident: tIdent);
+   BEGIN
+      IF NOT IsElement (ident, IdSet) THEN
+	 !i [! WN (ident); @] = MakeIdent ("@ WI (ident); @");@
+	 Include (IdSet, ident);
+      END;
+   END GetIdent;
+
+PROCEDURE WProperties (properties: BITSET);
+   BEGIN
+      !0x! WriteN (f, LONGCARD (properties), 8, 16);
+   END WProperties;
+}
+
+PROCEDURE PumaLiteDef (Ag)
+
+Ag (..) :-
+   !# define DEFINITION_Tree3!
+   !!
+   @# include "ratc.h"@
+   !!
+   !# ifndef DEFINITION_Tree!
+   @# include "Tree.h"@
+   !# endif!
+   !!
+   !# define Tree_tTree Zq0A4_171!
+   !!
+   !extern Tree_tTree GetTree ARGS ((void));!
+   .
+
+PROCEDURE PumaLite ([Ag, Classes, Attributes])
+
+Ag (..) :-
+   MakeSet (IdSet, MaxIdent ());
+   @# include "SYSTEM_.h"@
+   !# ifndef DEFINITION_Tree3!
+   @# include "Tree3.h"@
+   !# endif!
+   !# ifndef DEFINITION_Strings!
+   @# include "Strings.h"@
+   !# endif!
+   !# ifndef DEFINITION_Idents!
+   @# include "Idents.h"@
+   !# endif!
+   !!
+   !# define Idents_tIdent	Zfb3DLQ_0!
+   !# define Idents_MakeIdent	Zfb3DLQ_2!
+   !# define Strings_tString	Zp1PEAFD_2!
+   !# define Chars		Z0!
+   !# define Length		Z1!
+   !!
+   !# define Tree_Class		Zq0A4_55!
+   !# define Tree_mNoClass	Zq0A4_362!
+   !# define Tree_mClass	Zq0A4_363!
+   !# define Tree_mNoAttribute	Zq0A4_365!
+   !# define Tree_mChild	Zq0A4_367!
+   !# define Tree_mAttribute	Zq0A4_368!
+   !!
+   !# define Kind		Z0!
+   !# define Class		Z4!
+   !# define Extensions		Z4!
+   !# define Next		Z5!
+   !# define BaseClass		Z6!
+   !!
+   !static void CompBaseClass!
+   !# ifdef HAVE_ARGS!
+   ! (Tree_tTree t, Tree_tTree b)!
+   !# else!
+   ! (t, b) Tree_tTree t, b;!
+   !# endif!
+   !{!
+   ! if (t->U_1.V_1.Kind == Tree_Class) {!
+   !  t->U_1.V_5.Class.BaseClass = b;!
+   !  CompBaseClass (t->U_1.V_5.Class.Next, b);!
+   !  CompBaseClass (t->U_1.V_5.Class.Extensions, t);!
+   ! }!
+   !}!
+   !!
+   !static Idents_tIdent MakeIdent!
+   !# ifdef HAVE_ARGS!
+   ! (char * t)!
+   !# else!
+   ! (t) char * t;!
+   !# endif!
+   !{!
+   ! Strings_tString s;!
+   ! (void) strcpy (s.Chars.A + 1, t);!
+   ! s.Length = strlen (t);!
+   ! return Idents_MakeIdent (& s);!
+   !}!
+   !!
+   !Tree_tTree GetTree ARGS ((void))!
+   !{!
+   ! Idents_tIdent i [! WN (MaxIdent ()); !];!
+   ! Tree_tTree a, c [32], * p = c;!
+   ! Tree_tTree nc = Tree_mNoClass ();!
+   ! Tree_tTree na = Tree_mNoAttribute ();!
+   PumaLite (Classes);
+   ! CompBaseClass (* p, nc);!
+   ! return * p;!
+   !}!
+   !!
+   !void BEGIN_Tree3 ARGS ((void)) {}!
+   ReleaseSet (IdSet);
+   .
+Class (Extensions := NoClass (..)) :-
+   PumaLite (Next);
+   PumaLite (Attributes);
+   GetIdent (Name);
+   !* p = Tree_mClass (i [! WN (Name); !], ! WProperties (Properties); !, a, nc, * p);!
+   .
+Class (..) :-
+   PumaLite (Next);
+   !p ++;!
+   PumaLite (Extensions);
+   !p --;!
+   PumaLite (Attributes);
+   GetIdent (Name);
+   !* p = Tree_mClass (i [! WN (Name); !], ! WProperties (Properties); !, a, p [1], * p);!
+   .
+Child (Next := NoAttribute (..)) :-
+   GetIdent (Name);
+   GetIdent (Type);
+   !a = Tree_mChild (na, i [! WN (Name); !], i [! WN (Type); !], ! WProperties (Properties); !);!
+   .
+Child (..) :-
+   PumaLite (Next);
+   GetIdent (Name);
+   GetIdent (Type);
+   !a = Tree_mChild (a, i [! WN (Name); !], i [! WN (Type); !], ! WProperties (Properties); !);!
+   .
+Attribute (Next := NoAttribute (..)) :-
+   GetIdent (Name);
+   GetIdent (Type);
+   !a = Tree_mAttribute (na, i [! WN (Name); !], i [! WN (Type); !], ! WProperties (Properties); !);!
+   .
+Attribute (..) :-
+   PumaLite (Next);
+   GetIdent (Name);
+   GetIdent (Type);
+   !a = Tree_mAttribute (a, i [! WN (Name); !], i [! WN (Type); !], ! WProperties (Properties); !);!
+   .
+AttrOrAction (..) :-
+   PumaLite (Next);
+   .
+NoAttribute (..) :-
+   !a = na;!
+   .
+NoClass (..) :-
+   !* p = nc;!
+   .

@@ -1,0 +1,179 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+ArgCheck$(ES)	: ArgCheck$(ED)	; $(MD) ArgCheck$(SD)
+
+ArgCheck$(EO)	: ArgCheck$(EI)	; $(MI) ArgCheck$(SI)
+ArgCheck$(EO)	: ArgCheck$(ES)
+ArgCheck$(EO)	: Scanner$(ES)
+
+CodeC$(ES)	: CodeC$(ED)	; $(MD) CodeC$(SD)
+CodeC$(ES)	: Tree$(ES)
+
+CodeC$(EO)	: CodeC$(EI)	; $(MI) CodeC$(SI)
+CodeC$(EO)	: CodeC$(ES)
+CodeC$(EO)	: Tree$(ES)
+CodeC$(EO)	: ArgCheck$(ES)
+CodeC$(EO)	: Codes$(ES)
+CodeC$(EO)	: Scanner$(ES)
+CodeC$(EO)	: Types$(ES)
+CodeC$(EO)	: Tree$(ES)
+
+CodeM2$(ES)	: CodeM2$(ED)	; $(MD) CodeM2$(SD)
+CodeM2$(ES)	: Tree$(ES)
+
+CodeM2$(EO)	: CodeM2$(EI)	; $(MI) CodeM2$(SI)
+CodeM2$(EO)	: CodeM2$(ES)
+CodeM2$(EO)	: Tree$(ES)
+CodeM2$(EO)	: ArgCheck$(ES)
+CodeM2$(EO)	: Codes$(ES)
+CodeM2$(EO)	: Scanner$(ES)
+CodeM2$(EO)	: Types$(ES)
+CodeM2$(EO)	: Tree$(ES)
+
+Codes$(ES)	: Codes$(ED)	; $(MD) Codes$(SD)
+
+Codes$(EO)	: Codes$(EI)	; $(MI) Codes$(SI)
+Codes$(EO)	: Codes$(ES)
+Codes$(EO)	: Scanner$(ES)
+Codes$(EO)	: ArgCheck$(ES)
+
+Derivabl$(ES)	: Derivabl$(ED)	; $(MD) Derivabl$(SD)
+
+Derivabl$(EO)	: Derivabl$(EI)	; $(MI) Derivabl$(SI)
+Derivabl$(EO)	: Derivabl$(ES)
+Derivabl$(EO)	: Table$(ES)
+Derivabl$(EO)	: Tree$(ES)
+Derivabl$(EO)	: Types$(ES)
+
+First$(ES)	: First$(ED)	; $(MD) First$(SD)
+
+First$(EO)	: First$(EI)	; $(MI) First$(SI)
+First$(EO)	: First$(ES)
+First$(EO)	: Derivabl$(ES)
+First$(EO)	: Scanner$(ES)
+First$(EO)	: Table$(ES)
+First$(EO)	: Types$(ES)
+First$(EO)	: Tree$(ES)
+
+Follow$(ES)	: Follow$(ED)	; $(MD) Follow$(SD)
+
+Follow$(EO)	: Follow$(EI)	; $(MI) Follow$(SI)
+Follow$(EO)	: Follow$(ES)
+Follow$(EO)	: Scanner$(ES)
+Follow$(EO)	: Table$(ES)
+Follow$(EO)	: Tree$(ES)
+Follow$(EO)	: Types$(ES)
+
+Info$(ES)	: Info$(ED)	; $(MD) Info$(SD)
+
+Info$(EO)	: Info$(EI)	; $(MI) Info$(SI)
+Info$(EO)	: Info$(ES)
+
+Nullable$(ES)	: Nullable$(ED)	; $(MD) Nullable$(SD)
+
+Nullable$(EO)	: Nullable$(EI)	; $(MI) Nullable$(SI)
+Nullable$(EO)	: Nullable$(ES)
+Nullable$(EO)	: Table$(ES)
+Nullable$(EO)	: Tree$(ES)
+Nullable$(EO)	: Types$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+Parser$(ES)	: Tree$(ES)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Tree$(ES)
+
+Reachabl$(ES)	: Reachabl$(ED)	; $(MD) Reachabl$(SD)
+
+Reachabl$(EO)	: Reachabl$(EI)	; $(MI) Reachabl$(SI)
+Reachabl$(EO)	: Reachabl$(ES)
+Reachabl$(EO)	: Table$(ES)
+Reachabl$(EO)	: Types$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: ArgCheck$(ES)
+
+Semantic$(ES)	: Semantic$(ED)	; $(MD) Semantic$(SD)
+Semantic$(ES)	: Tree$(ES)
+
+Semantic$(EO)	: Semantic$(EI)	; $(MI) Semantic$(SI)
+Semantic$(EO)	: Semantic$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: ArgCheck$(ES)
+Semantic$(EO)	: Codes$(ES)
+Semantic$(EO)	: Derivabl$(ES)
+Semantic$(EO)	: First$(ES)
+Semantic$(EO)	: Follow$(ES)
+Semantic$(EO)	: Reachabl$(ES)
+Semantic$(EO)	: Scanner$(ES)
+Semantic$(EO)	: Table$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Types$(ES)
+
+Table$(ES)	: Table$(ED)	; $(MD) Table$(SD)
+Table$(ES)	: Tree$(ES)
+
+Table$(EO)	: Table$(EI)	; $(MI) Table$(SI)
+Table$(EO)	: Table$(ES)
+Table$(EO)	: Tree$(ES)
+Table$(EO)	: Types$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+Tree$(EO)	: Info$(ES)
+
+Types$(ES)	: Types$(ED)	; $(MD) Types$(SD)
+
+Types$(EO)	: Types$(EI)	; $(MI) Types$(SI)
+Types$(EO)	: Types$(ES)
+
+all	: ell
+ell$(EO)	: ell$(EP)	; $(MP) ell$(SP)
+ell$(EO)	: ArgCheck$(ES)
+ell$(EO)	: CodeC$(ES)
+ell$(EO)	: CodeM2$(ES)
+ell$(EO)	: Info$(ES)
+ell$(EO)	: Parser$(ES)
+ell$(EO)	: Tree$(ES)
+ell$(EO)	: Semantic$(ES)
+
+ell	: ell$(EO) Tree$(EO) Info$(EO) ArgCheck$(EO) Scanner$(EO) Semantic$(EO) Types$(EO) Table$(EO) Reachabl$(EO) Follow$(EO) First$(EO) Derivabl$(EO) Codes$(EO) Parser$(EO) CodeM2$(EO) CodeC$(EO)	; $(ML) ell $(OUT) ell
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

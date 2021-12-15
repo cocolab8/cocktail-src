@@ -1,0 +1,728 @@
+(* $Id: Match.mi,v 4.2 2021/10/09 11:02:51 grosch Exp $ *)
+
+IMPLEMENTATION MODULE Match;
+
+FROM ArgCheck	IMPORT	BU;
+FROM Automaton	IMPORT	BeginAutomaton, DefineTransition, CloseAutomaton;
+FROM Characte	IMPORT	Concatenate;
+FROM Convert	IMPORT	IdToAdr;
+FROM DynArray	IMPORT	MakeArray, ExtendArray, ReleaseArray;
+FROM Environs	IMPORT	MaxDirective, GetPattern;
+FROM Errors	IMPORT	ERROR;
+FROM General	IMPORT	Max;
+FROM Grammar	IMPORT	tLayout, Arity, ClassesOfNode, SonClass, MainClass,
+			Layout, Subclasses, NodesOfClass,
+			MaxArity;
+FROM Idents	IMPORT	tIdent, GetString;
+FROM Parser	IMPORT	AST;
+FROM Patterns	IMPORT	tPattern, tRelation, GetPatternId, GetPatternSon,
+			SynthesizePatterns, NormPattern, Relation,
+			PatternClasses, MakePattern, ReleasePattern;
+FROM Queues	IMPORT	tQueue, MakeQueue, Append, ReleaseQueue, ClearLast,
+			Insert, ClearHead, GetElement;
+FROM Scanner	IMPORT	MaxIdent, NoIdent;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsElement, IsEmpty,
+			Include, Assign, AssignEmpty, IsEqual, Exclude,
+			Extract, Intersection, IsSubset, Union;
+FROM Stack	IMPORT	tStack, MakeStack, ReleaseStack, Pop, IsEmptyStack;
+FROM Strings	IMPORT	tString, StringToArray;
+FROM rSystem	IMPORT	tFile, rWrite;
+FROM SYSTEM	IMPORT	TSIZE, ADDRESS, ADR;
+FROM Types	IMPORT	tType, Type, AllNodes;
+FROM Pack	IMPORT  PackHandle, BeginPackCard, PackCard, EndPack;
+
+IMPORT	Patterns, Strings;
+
+(* MATCH_ *)
+FROM ArgCheck	IMPORT	AUTO, MATCH, TEST;
+FROM Automaton	IMPORT	WriteAutomaton, WriteFunction, WriteComb;
+FROM Idents	IMPORT	WriteIdent;
+FROM IO		IMPORT	StdOutput;
+FROM Patterns	IMPORT	WritePattern;
+FROM Queues	IMPORT	Length;
+FROM Sets	IMPORT	WriteSet;
+FROM StdIO	IMPORT	WriteS, WriteI, WriteNl;
+(* _MATCH *)
+
+CONST
+  cTabPost = '.tab';
+  InitPatternTableSize = 100;
+  InitMatchSetTableSize = 100;
+  NoIndex = -1;
+  BitsPerBitset = 32;
+
+TYPE
+  tPatternTableEntry =
+    RECORD
+      Pat: tPattern;
+      Numbers: tSet;
+      SonNumbers: POINTER TO ARRAY [0..100] OF INTEGER;
+    END;
+  
+  tMatchSetTableEntry =
+    RECORD
+      Set: tSet;
+    END;
+
+VAR
+  PatternTable: POINTER TO ARRAY [0..1000] OF tPatternTableEntry;
+  PatternTableSize, PatternTableCount: LONGINT;
+
+  MatchSetTable: POINTER TO ARRAY [0..1000] OF tMatchSetTableEntry;
+  MatchSetTableSize, MatchSetTableCount: LONGINT;
+
+  SonMatchSets: POINTER TO ARRAY [0..100] OF tSet;
+  ClassToPattern: POINTER TO ARRAY [0..1000] OF INTEGER;
+
+  mIndex: LONGINT;
+
+
+(* ---------- patterns ---------- *)
+
+PROCEDURE PutPattern (pat: tPattern; no: INTEGER): INTEGER;
+  VAR
+    index: LONGINT;
+    size: LONGINT;
+    ident: tIdent;
+  BEGIN
+    FOR index := 0 TO PatternTableCount DO
+      IF Patterns.IsEqual (pat, PatternTable^[index].Pat) THEN
+	IF no # NoIndex THEN
+	  Include (PatternTable^[index].Numbers, no);
+	END;
+	RETURN index;
+      END;
+    END;
+    INC (PatternTableCount);
+    IF PatternTableSize = 0 THEN
+      PatternTableSize := InitPatternTableSize;
+      MakeArray (PatternTable, PatternTableSize, TSIZE (tPatternTableEntry));
+    ELSIF PatternTableCount = PatternTableSize THEN
+      ExtendArray (PatternTable, PatternTableSize, TSIZE (tPatternTableEntry));
+    END;
+    WITH PatternTable^[PatternTableCount] DO
+      Pat := pat;
+      MakeSet (Numbers, MaxDirective ());
+      IF no # NoIndex THEN
+	Include (Numbers, no);
+      END;
+      IF (pat = NIL) THEN
+	SonNumbers := NIL;
+      ELSE
+	ident := GetPatternId (pat);
+	IF (Type (ident) = cNode) THEN
+	  size := Arity (ident) + 1;
+	  MakeArray (SonNumbers, size, TSIZE (INTEGER));
+	ELSE
+	  SonNumbers := NIL;
+	  ClassToPattern^ [ident] := PatternTableCount;
+	END;
+      END;
+    END;
+    RETURN PatternTableCount;
+  END PutPattern;
+
+PROCEDURE Defined (pat: tPattern): BOOLEAN;
+  VAR
+    index: LONGINT;
+  BEGIN
+    FOR index := 0 TO PatternTableCount DO
+      IF Patterns.IsEqual (pat, PatternTable^[index].Pat) THEN
+	RETURN TRUE;
+      END;
+    END;
+    RETURN FALSE;
+  END Defined;
+
+PROCEDURE CollectPatterns;
+  VAR
+    no: INTEGER;
+    index: INTEGER;
+  BEGIN
+    IF MaxDirective () = 0 THEN
+      index := PutPattern (NIL, NoIndex);
+    ELSE
+      FOR no := 1 TO MaxDirective () DO
+	index := PutPattern (GetPattern (no), no);
+      END;
+    END;
+  END CollectPatterns;
+
+PROCEDURE CollectSubPatterns;
+  VAR
+    index, i: LONGINT;
+    id: tIdent;
+    pos: INTEGER;
+    pat, sub: tPattern;
+    pats: tStack;
+
+  BEGIN
+    index := -1;
+    MakeStack (pats);
+    WHILE index < PatternTableCount DO
+      INC (index);
+      pat := PatternTable^[index].Pat;
+      IF pat # NIL THEN
+	id := GetPatternId (pat);
+	IF Type (id) = cNode THEN
+	  FOR pos := 1 TO Arity (id) DO
+	    sub := GetPatternSon (pat, pos);
+            PatternTable^[index].SonNumbers^[pos]
+	      := PutPattern (sub, NoIndex);
+	  END;
+	ELSE
+	  SynthesizePatterns (id, pats);
+	  WHILE NOT IsEmptyStack (pats) DO
+	    i := PutPattern (NormPattern (Pop (pats)), NoIndex);
+	  END;
+	END;
+      END;
+    END;
+    ReleaseStack (pats);
+  END CollectSubPatterns;
+
+
+(* ---------- match sets ---------- *)
+
+PROCEDURE PutMatchSet (set: tSet);
+  BEGIN
+    INC (MatchSetTableCount);
+    IF MatchSetTableSize = 0 THEN
+      MatchSetTableSize := InitMatchSetTableSize;
+      MakeArray (MatchSetTable, MatchSetTableSize, TSIZE (tMatchSetTableEntry));
+    ELSIF MatchSetTableCount = MatchSetTableSize THEN
+      ExtendArray (MatchSetTable, MatchSetTableSize, TSIZE (tMatchSetTableEntry));
+    END;
+    WITH MatchSetTable^[MatchSetTableCount] DO
+      MakeSet (Set, PatternTableCount);
+      Assign (Set, set);
+    END;
+  END PutMatchSet;
+
+PROCEDURE MatchSetIndex (set: tSet): INTEGER;
+  BEGIN
+    IF IsEqual (set, MatchSetTable^[mIndex].Set) THEN
+      RETURN mIndex;
+    END;
+    mIndex := 0;
+    LOOP
+      IF mIndex > MatchSetTableCount THEN EXIT END;
+      IF IsEqual (set, MatchSetTable^[mIndex].Set) THEN
+	RETURN mIndex;
+      END;
+      INC (mIndex);
+    END;
+    (* MATCH1_   
+    WriteS ('MatchSetIndex:  set '); 
+    WriteSet (StdOutput, set);
+    WriteS (' missing'); 
+    WriteNl;
+    ERROR ('MatchSetIndex'); 
+       _MATCH1 *)
+    RETURN NoIndex;
+  END MatchSetIndex;
+
+
+PROCEDURE InMatchSet (elmt: INTEGER; set: INTEGER): BOOLEAN;
+  BEGIN
+    RETURN IsElement (elmt, MatchSetTable^[set].Set);
+  END InMatchSet;
+  
+
+PROCEDURE MakeMatchSets;
+  VAR
+    set: tSet;
+  BEGIN
+    MakeSet (set, PatternTableCount);
+    SynthesizeMatchSets (-1, set);
+    ReleaseSet (set);
+  END MakeMatchSets;
+
+PROCEDURE SynthesizeMatchSets (last: LONGINT; VAR set: tSet);
+  VAR
+    i, index: LONGINT;
+    pat, oldpat: tPattern;
+    in, notin: BOOLEAN;
+  BEGIN
+    IF last = PatternTableCount THEN
+      
+      (* set is complete *)
+      PutMatchSet (set);
+
+    ELSE
+      index := last + 1;
+      pat := PatternTable^[index].Pat;
+
+
+      IF pat = NIL THEN
+	in := TRUE;
+	notin := FALSE;
+      ELSE
+
+	in := TRUE;
+	notin := TRUE;
+
+	FOR i := 0 TO last DO
+	  oldpat := PatternTable^[i].Pat;
+	  IF IsElement (i, set) THEN
+	    CASE Relation (oldpat, pat) OF
+	    | cIndependent:	;
+	    | cInconsistent:	in := FALSE;
+	    | cSubsumes:	notin := FALSE;
+	    | cSupersumes:	;
+	    | cEqual:		ERROR ('SynthesizeMatchSets');
+	    END;
+	  ELSE
+	    CASE Relation (oldpat, pat) OF
+	    | cIndependent:	;
+	    | cInconsistent:	;
+	    | cSubsumes:	;
+	    | cSupersumes:	in := FALSE;
+	    | cEqual:		ERROR ('SynthesizeMatchSets');
+	    END;
+	  END;
+	END;
+
+      END;
+
+      IF in THEN
+	Include (set, index);
+	SynthesizeMatchSets (index, set);
+	Exclude (set, index);
+      END;
+
+      IF notin THEN
+	SynthesizeMatchSets (index, set);
+      END;
+
+    END;
+  END SynthesizeMatchSets;
+
+
+PROCEDURE OutputMatchSets (f: tFile);
+  VAR
+    lindex, index: LONGINT;
+    bitset: BITSET;
+    elmtno, bitno, setno: INTEGER;
+    i, max: INTEGER;
+    directives: tSet;
+  BEGIN
+    max := MaxDirective ();
+    MakeSet (directives, max);
+    FOR index := 0 TO MatchSetTableCount DO
+      AssignEmpty (directives);
+      FOR lindex := 0 TO PatternTableCount DO
+	IF IsElement (lindex, MatchSetTable^[index].Set) THEN
+	  Union (directives, PatternTable^[lindex].Numbers);
+        END;
+      END;
+      FOR setno := 0 TO MaxDirective () DIV BitsPerBitset DO
+        bitset := BITSET {};
+	FOR bitno := 0 TO BitsPerBitset - 1  DO
+	  elmtno := setno * BitsPerBitset + bitno;
+	  IF (elmtno <= max) & IsElement (elmtno, directives) THEN
+	    INCL (bitset, bitno);
+	  END;
+	END;
+	i := rWrite (f, ADR (bitset), TSIZE (BITSET));
+      END;
+    END;
+    ReleaseSet (directives);
+  END OutputMatchSets;
+
+
+(* --------- match tables --------- *)
+
+PROCEDURE MakeMatchTables;
+  VAR
+    nodes: tSet;
+    node: tIdent;
+    size: LONGINT;
+    pos: INTEGER;
+  BEGIN
+    size := MaxArity () + 1;
+    MakeArray (SonMatchSets, size, TSIZE (tSet));
+    FOR pos := 1 TO MaxArity () DO
+      MakeSet (SonMatchSets^[pos], MatchSetTableCount);
+    END;
+    MakeSet (nodes, MaxIdent);
+    AllNodes (nodes);
+    WHILE NOT IsEmpty (nodes) DO
+      node := Extract (nodes);
+      MakeMatchTable (node);
+    END;
+    ReleaseSet (nodes);
+    ReleaseArray (SonMatchSets, size, TSIZE (tSet));
+  END MakeMatchTables;
+
+PROCEDURE MakeMatchTable (node: tIdent);
+  VAR
+    pos: INTEGER;
+    set: tSet;
+    arity, index: INTEGER;
+    indexes: tQueue;
+    pat: tPattern;
+    layout: tLayout;
+  BEGIN
+    MakeSet (set, PatternTableCount);
+    FOR index := 0 TO PatternTableCount DO
+      pat  := PatternTable^[index].Pat;
+      IF (pat # NIL) 
+       & (GetPatternId (pat) = node) THEN
+      	Include (set, index);
+      END;
+    END;
+
+    IF MainClass (node) # NoIdent THEN
+      arity := Arity (node);
+      layout := Layout (node, MainClass (node));
+      MakeQueue (indexes);
+      DefineSonMatchSets (0, arity, layout);
+      DefineMatchTable (node, set, 0, arity, indexes, layout);
+      ReleaseQueue (indexes);
+    END;
+    ReleaseSet (set);
+  END MakeMatchTable;
+
+PROCEDURE DefineSonMatchSets (pos: INTEGER; arity: INTEGER; layout: tLayout);
+  VAR
+    class: tIdent;
+    classpat, pat: tPattern;
+    IndexSet: tSet;
+    lindex: LONGINT;
+  BEGIN
+
+    IF pos = arity THEN RETURN END;
+
+    INC (pos);
+    
+    MakeSet (IndexSet, PatternTableCount);
+
+    (* compute possible patterns for son at actual position *)
+
+    class := SonClass (layout, pos);
+    classpat := NormPattern (MakePattern (class));
+    FOR lindex := 0 TO PatternTableCount DO
+      pat := PatternTable^[lindex].Pat;
+      IF Relation (classpat, pat) # cInconsistent THEN
+	Include (IndexSet, lindex);
+      END;
+    END;
+    ReleasePattern (classpat);
+
+    (* compute possible match sets indexes for son at actual position *)
+
+    AssignEmpty (SonMatchSets^[pos]);
+    FOR lindex := 0 TO MatchSetTableCount DO
+      IF IsSubset (MatchSetTable^[lindex].Set, IndexSet) THEN
+	Include (SonMatchSets^[pos], lindex);
+      END;
+    END;
+
+    ReleaseSet (IndexSet);
+    
+    DefineSonMatchSets (pos, arity, layout);
+
+  END DefineSonMatchSets;
+
+PROCEDURE DefineMatchTable (node: tIdent; set: tSet;
+			    pos: INTEGER; arity: INTEGER;
+			    VAR indexes: tQueue; layout: tLayout);
+  VAR
+    lindex: LONGINT;
+    index: INTEGER;
+    MatchSet, set2: tSet;
+    pat: tPattern;
+  BEGIN
+    IF pos = arity THEN
+      FOR lindex := 0 TO PatternTableCount DO
+	pat  := PatternTable^[lindex].Pat;
+	IF (pat = NIL) THEN
+	  Include (set, lindex);
+	ELSIF Type (GetPatternId (pat)) = cClass THEN
+	  IF MatchClass (node, layout, indexes, GetPatternId (pat)) THEN
+	    Include (set, lindex);
+	  END;
+	END;
+      END;
+      DefineEntry (node, indexes, set);
+    ELSE
+      INC (pos);
+      
+      MakeSet (MatchSet, MatchSetTableCount);
+      Assign (MatchSet, SonMatchSets^ [pos]);
+
+      MakeSet (set2, PatternTableCount);
+
+      (* compute possible patterns (at all) for each match set *)
+
+      WHILE NOT IsEmpty (MatchSet) DO
+	index := Extract (MatchSet);
+
+	(* compute possible patterns by copying set in set2 
+	   and then checking set2 *)
+
+	Assign (set2, set);
+	lindex := -1;
+	LOOP
+	  IF lindex = PatternTableCount THEN EXIT END;
+	  INC (lindex);
+	  IF IsElement (lindex, set2) THEN
+	    
+	    (* up to now lindex is possible *)
+	    
+	    (* assertion: there must be a node pattern at lindex! *)
+	    IF NOT IsElement (PatternTable^[lindex].SonNumbers^[pos],
+			      MatchSetTable^[index].Set) THEN
+	      Exclude (set2, lindex);
+	    END;
+
+	  END;
+	END;
+	
+	(* go into recursion *)
+        
+	Append (indexes, ADDRESS (index));
+	DefineMatchTable (node, set2, pos, arity, indexes, layout);
+	ClearLast (indexes);
+        
+      END;
+      ReleaseSet (set2);
+      ReleaseSet (MatchSet);
+    END;
+  END DefineMatchTable;
+
+PROCEDURE DefineEntry (node: tIdent; VAR indexes: tQueue; set: tSet);
+  VAR
+    matchindex: INTEGER;
+  BEGIN
+    matchindex := MatchSetIndex (set);
+    (* MATCH1_   
+    IF matchindex = NoIndex THEN
+      WriteEntry (node, indexes, set);
+    END;
+       _MATCH1 *)
+    Insert (indexes, IdToAdr (node));
+    DefineTransition (indexes, matchindex);
+    ClearHead (indexes);
+  END DefineEntry;
+
+PROCEDURE MatchClass (node: tIdent; layout: tLayout;
+		      indexes: tQueue; class: tIdent): BOOLEAN;
+  VAR
+    mainclass: tIdent;
+    classes, nodes: tSet;
+    nodelayout: tLayout;
+    sonclass: tIdent;
+    match: BOOLEAN;
+    set, index, pos: INTEGER;
+  BEGIN
+    mainclass := MainClass (node);
+    IF class = mainclass THEN RETURN TRUE END;
+    MakeSet (classes, MaxIdent);
+    MakeSet (nodes, MaxIdent);
+    Subclasses (class, classes);
+    match := FALSE;
+    LOOP
+      NodesOfClass (class, nodes);
+      IF IsElement (node, nodes) THEN
+	match := TRUE;
+        nodelayout := Layout (node, class);
+	FOR pos := 1 TO Arity (node) DO
+	  IF match THEN
+	    sonclass := SonClass (nodelayout, pos);
+	    IF sonclass # SonClass (layout, pos) THEN
+	      set := INTEGER (GetElement (indexes, pos));
+	      index := ClassToPattern^[sonclass];
+	      IF index = NoIndex THEN
+		(* MATCH_ *)
+		WriteS ('MatchClass: ');
+		WriteIdent (StdOutput, sonclass);
+		WriteS (' is not defined');
+		WriteNl;
+		(* _MATCH *)
+		ERROR ('MatchClass');
+	      END;
+	      match := IsElement (index, MatchSetTable^[set].Set);
+	    END;
+	  END;
+	END;
+	IF match THEN EXIT END;
+      END;
+      IF IsEmpty (classes) THEN EXIT; END;
+      class := Extract (classes);
+    END;
+
+    ReleaseSet (nodes);
+    ReleaseSet (classes);
+    RETURN match;
+  END MatchClass;
+
+
+
+(* --------- tables --------- *)
+
+PROCEDURE MakeTables;
+  VAR
+    size: LONGINT;
+    id: tIdent;
+
+  BEGIN
+    IF BU THEN
+      size := MaxIdent + 1;
+      MakeArray (ClassToPattern, size, TSIZE (INTEGER));
+      FOR id := 0 TO MaxIdent DO
+	ClassToPattern^ [id] := NoIndex;
+      END;
+      CollectPatterns;
+      CollectSubPatterns;
+      MakeMatchSets;
+
+      (* MATCH_ *)
+      IF MATCH THEN
+	WritePatternTable;
+	WriteMatchSetTable;
+      END;
+      (* _MATCH *)
+
+      BeginAutomaton (MatchSetTableCount, Max (MatchSetTableCount, MaxIdent));
+      MakeMatchTables;
+
+      (* MATCH_ *)
+      IF AUTO THEN
+	WriteAutomaton;
+      END;
+      (* _MATCH *)
+
+      CloseAutomaton (CombSize);
+      MaxMatchIndex := MatchSetTableCount;
+
+      (* MATCH_ *)
+      IF AUTO THEN
+	WriteAutomaton;
+      END;
+      IF MATCH THEN
+	WriteFunction;
+	WriteComb;
+      END;
+      (* _MATCH *)
+    END;
+  END MakeTables;
+
+  PROCEDURE PackMatchSets (f: tFile);
+  VAR
+    max, index, lindex, i,
+    count			: INTEGER;
+    directives		  	: tSet;
+    p				: PackHandle;
+
+  BEGIN
+    max := MaxDirective ();
+    BeginPackCard (p, f);
+    MakeSet (directives, max);
+    FOR index := 0 TO MatchSetTableCount DO
+      AssignEmpty (directives);
+      FOR lindex := 0 TO PatternTableCount DO
+	IF IsElement (lindex, MatchSetTable^[index].Set) THEN
+	  Union (directives, PatternTable^[lindex].Numbers);
+        END;
+      END;
+      count := 0;
+      FOR i := 0 TO max DO
+	IF IsElement (i, directives) THEN INC (count); END;
+      END;
+      PackCard (p, count);
+      FOR i := 0 TO max DO
+        IF IsElement (i, directives) THEN PackCard (p, i); END;
+      END;
+    END;
+    ReleaseSet (directives);
+    EndPack (p);
+  END PackMatchSets;
+  
+(* --------- test --------- *)
+
+(* MATCH_ *)
+
+PROCEDURE WritePatternTable;
+  VAR
+    index: LONGINT;
+    pos: INTEGER;
+  BEGIN
+    WriteS (' Pattern Table ');
+    WriteNl;
+    FOR index := 0 TO PatternTableCount DO
+      WITH PatternTable^[index] DO
+	WriteI (index, 3);
+	WriteS ('  ');
+	WritePattern (StdOutput, Pat);
+	WriteNl;
+	WriteS ('     ');
+	WriteSet (StdOutput, Numbers);
+	WriteS (' - ');
+	IF (Pat # NIL) & (Type (GetPatternId (Pat)) = cNode) THEN
+	  FOR pos := 1 TO Arity (GetPatternId (Pat)) DO
+	    WriteS (' ');
+	    WriteI (SonNumbers^[pos], 1);
+	  END;
+	END;
+	WriteNl;
+      END;
+    END;
+    WriteNl;
+  END WritePatternTable;
+
+PROCEDURE WriteMatchSetTable;
+  VAR
+    lindex, index: LONGINT;
+    directives: tSet;
+  BEGIN
+    WriteS (' Match-Set Table ');
+    WriteNl;
+    MakeSet (directives, MaxDirective ());
+    FOR index := 0 TO MatchSetTableCount DO
+      WriteI (index, 3);
+      WITH MatchSetTable^[index] DO
+	WriteS (' ');
+	WriteSet (StdOutput, Set);
+      END;
+      WriteS ('    ');
+      AssignEmpty (directives);
+      FOR lindex := 0 TO PatternTableCount DO
+	IF IsElement (lindex, MatchSetTable^[index].Set) THEN
+	  Union (directives, PatternTable^[lindex].Numbers);
+        END;
+      END;
+      WriteSet (StdOutput, directives);
+      WriteNl;
+    END;
+    ReleaseSet (directives);
+    WriteNl;
+  END WriteMatchSetTable;
+
+PROCEDURE WriteEntry (node: tIdent; indexes: tQueue; set: tSet);
+  VAR
+    pos: INTEGER;
+    index: INTEGER;
+  BEGIN
+    index := MatchSetIndex (set);
+    WriteIdent (StdOutput, node);
+    WriteS ('( ');
+    FOR pos := 1 TO Length (indexes) DO
+      WriteI (INTEGER (GetElement (indexes, pos)), 1);
+      WriteS (' ');
+    END;
+    WriteS (')  = ');
+    WriteI (index, 1);
+    WriteNl;
+  END WriteEntry;
+
+(* _MATCH *)
+
+BEGIN
+  PatternTableSize := 0;
+  PatternTableCount := -1;
+  MatchSetTableSize := 0;
+  MatchSetTableCount := -1;
+  mIndex := 0;
+END Match.

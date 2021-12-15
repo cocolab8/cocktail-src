@@ -1,0 +1,108 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Nullable.mi,v $
+ *	
+ *	purpose:	check the nullability of the nonterminals
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+
+IMPLEMENTATION MODULE Nullable;
+
+FROM Idents	IMPORT	tIdent;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsElement, IsEmpty,
+			Include, Exclude, Maximum, Minimum;
+FROM Table	IMPORT	Expr, MaxId;
+FROM Tree	IMPORT	tTree, Option, Times, Plus, List, Action, Leaf,
+			Alternative0, Alternative, Sequence0, Sequence;
+FROM Types	IMPORT	Terminals, Nonterminals;
+
+(* NULL_ )*
+FROM Info	IMPORT	WriteIdentSet;
+FROM IO		IMPORT	StdOutput;
+FROM StdIO	IMPORT	WriteS, WriteNl;
+*( _NULL *)
+
+VAR
+  vNullables: tSet;
+
+PROCEDURE TestNullable;
+  VAR
+    todo: tSet;
+    nt: tIdent;
+    success: BOOLEAN;
+  BEGIN
+    MakeSet (vNullables, MaxId);
+    MakeSet (todo, MaxId);
+    Nonterminals (todo);		(* noterminals must be checked	*)
+    nt := Maximum (todo);
+    success := TRUE;
+    LOOP
+      IF IsEmpty (todo) THEN EXIT; END; (* nothing more to check	*)
+      IF nt >= Maximum (todo) THEN	
+	IF NOT success THEN		(* no further success possible	*)
+	  EXIT;
+	ELSE				(* start a new pass		*)
+	  nt := Minimum (todo);
+	  success := FALSE;
+	END;
+      ELSE				(* find next element		*)
+	REPEAT
+	  INC (nt);
+	UNTIL IsElement (nt, todo);
+      END;
+      IF YetNullable (Expr (nt)) THEN	(* check it			*)
+	Include (vNullables, nt);
+	Exclude (todo, nt);
+	success := TRUE;
+      END;
+    END;
+    ReleaseSet (todo);
+  END TestNullable;
+
+PROCEDURE YetNullable (t: tTree): BOOLEAN;
+  BEGIN
+    CASE t^.Kind OF
+    | Option:
+	RETURN TRUE;
+    | Times:
+	RETURN TRUE;
+    | Plus:
+	RETURN YetNullable (t^.Plus.expr);
+    | List:
+	RETURN YetNullable (t^.List.body);
+    | Action:
+	RETURN TRUE;
+    | Leaf:
+	RETURN IsElement (t^.Leaf.id^.Id.ident, vNullables);
+    | Alternative0:
+	RETURN FALSE;
+    | Alternative:
+	RETURN YetNullable (t^.Alternative.alternative)
+	  OR YetNullable (t^.Alternative.expr);
+    | Sequence0:
+	RETURN TRUE;
+    | Sequence:
+	RETURN YetNullable (t^.Sequence.sequence)
+	  & YetNullable (t^.Sequence.expr);
+    END;
+  END YetNullable;
+
+PROCEDURE IsNullable	(Nonterm: tIdent): BOOLEAN;
+  BEGIN
+    RETURN IsElement (Nonterm, vNullables);
+  END IsNullable;
+
+(* NULL_ )*
+PROCEDURE WriteNullables;
+  BEGIN
+    WriteS ('Nullables: '); WriteNl;
+    WriteIdentSet (StdOutput, vNullables); WriteNl;
+    WriteNl;
+  END WriteNullables;
+*( _NULL *)
+
+END Nullable.

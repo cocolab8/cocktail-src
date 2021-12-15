@@ -1,0 +1,1106 @@
+/* $Id: opt.puma,v 1.16 2010/07/07 09:46:22 grosch Exp $ */
+
+/*
+ * $Log: opt.puma,v $
+ * Revision 1.16  2010/07/07 09:46:22  grosch
+ * fixed bug in Java code generation related to elimination of tail recursion
+ *
+ * Revision 1.15  2008/09/12 13:29:04  grosch
+ * added new kinds of FOR loops for iteration over lists of tree nodes
+ * extended pattern matching in IF statements by optional conditions
+ *
+ * Revision 1.14  2004/01/05 16:40:33  grosch
+ * allow statements after RETURN statement
+ * added new statement for IMPORT of external routine declarations
+ * allow pattern matching in IF statements
+ * a FOR loop can declare its loop variable
+ * added new scopes and changed scoping rules:
+ *    THEN and ELSE parts of the IF statement and the FOR and WHILE loops
+ *
+ * Revision 1.13  2003/06/26 14:28:09  grosch
+ * fixed bug: fixed crash in optimizer at erroneous input
+ *
+ * Revision 1.12  2002/08/07 12:19:15  grosch
+ * added explicit initialization of attributes
+ * improved handling of files cg.cg and puma.cg
+ *
+ * Revision 1.11  2002/07/30 09:53:58  grosch
+ * added keyword CONDITION to conditions
+ *
+ * Revision 1.10  2002/04/23 12:55:25  grosch
+ * fixed bug in recursion elimination of predicates
+ *
+ * Revision 1.9  2001/12/17 12:05:56  grosch
+ * added GLOBAL and LOCAL declarations for variables with node types
+ * added WHILE loop
+ * added EXTERN attribute to routine declarations
+ * added TRIP as new kind of routine providing automatic tree traversal
+ *
+ * Revision 1.8  2001/09/20 14:26:47  grosch
+ * fixed bug at code generation for FAIL and REJECT inside IF
+ * added attribute grammar for control flow analysis
+ *
+ * Revision 1.7  2001/08/28 21:04:23  grosch
+ * added keyword CONDITION to conditions
+ *
+ * Revision 1.6  2001/08/01 14:43:52  grosch
+ * delivery of Trevor Nash for generation of Java
+ *
+ * Revision 1.5  2001/01/05 19:32:19  grosch
+ * commented unnecessary IMPORT
+ *
+ * Revision 1.4  1999/12/18 00:00:16  grosch
+ * fixed bug in routine RuleProperties2
+ *
+ * Revision 1.3  1999/08/16 16:58:41  grosch
+ * fixed bug in CollectTests2 concerning TargetType
+ *
+ * Revision 1.2  1999/06/03 08:23:36  grosch
+ * add source window
+ *
+ * Revision 1.1  1998/04/21 10:07:05  grosch
+ * truncation of file and module names to 8.3 format
+ * added many language extensions
+ *
+ * Revision 1.0  1993/08/17  15:48:14  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 10.12.1991 */
+
+TRAFO Optimize PUBLIC Optimize RuleProperties NeedsTempo NeedsMatch NeedsNoFinale GetRule
+
+GLOBAL {
+
+FROM IO		IMPORT StdOutput, WriteB, WriteS, WriteI, WriteNl;
+FROM Idents	IMPORT tIdent, NoIdent, WriteIdent, MaxIdent;
+(* FROM Mod	IMPORT ImplMod; *)
+FROM Tree	IMPORT tTree, NoTree, mTestIsType, mNodeTypes, ForallTree,
+			Options, HasTempos, HasExit, HasAssign,
+			HasTailRecursion, HasTailRecursionStmt;
+FROM Scanner	IMPORT Warning;
+FROM Position	IMPORT tPosition, WritePosition;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, AssignEmpty	,
+   IsEmpty	, Difference	, IsSubset	, Assign	,
+   IsEqual	, IsNotEqual	, Intersection	, Union		,
+   Include	, IsElement	, Size		, WriteSet	;
+
+IMPORT Sets;
+
+VAR
+   gHasExit, gHasAssign, gHasTailRecursion: BOOLEAN;
+   gRule, nNoDecision, nNoTest	: tTree;
+   CurName		: tIdent;
+   Changed		: tSet;
+   gHasDependencies	: BOOLEAN;
+   ExitCount		: INTEGER;
+   Modula		: BOOLEAN;
+		(* Modula-2: elimination of tail recursion does work only
+		   if there aren't any EXITs in the rule *)
+
+(*
+PROCEDURE dbg (b: BOOLEAN; i: INTEGER);
+BEGIN
+  WriteS (StdOutput, "TR = ");
+  WriteB (StdOutput, b);
+  WriteS (StdOutput, " at");
+  WriteI (StdOutput, i, 0);
+  WriteNl (StdOutput);
+END dbg;
+*)
+
+PROCEDURE IsDisjoint (s1, s2: tSet): BOOLEAN;
+   VAR s: tSet; Result: BOOLEAN;
+   BEGIN
+      MakeSet (s, Size (s1));
+      Assign (s, s1);
+      Intersection (s, s2);
+      Result := IsEmpty (s);
+      ReleaseSet (s);
+      RETURN Result;
+   END IsDisjoint;
+}
+
+PROCEDURE Optimize (t: Tree)
+
+Spec (..) :-
+   Modula	:=
+	 NOT (IsElement (ORD ('c'), Options) OR IsElement (ORD ('J'), Options));
+   nNoDecision	:= NoDecision ();
+   nNoTest	:= NoTest ();
+   MakeSet (Changed, MaxIdent ());
+   IF NOT IsElement (ORD ('b'), Options) THEN
+      ForallTree (Routines, TailRecursion);
+   END;
+   Optimize (Routines);
+   .
+p: Predicate (..) :-
+   gHasTailRecursion := FALSE;
+   RuleProperties (Rules);
+   CollectTests (Rules, InObjects);
+   BuildTree (Rules, nNoDecision => decisions);
+   Decisions := decisions;
+   IF NOT IsElement (ORD ('b'), Options) THEN
+      TailRecursion2 (p);
+      gHasTailRecursion := FALSE;
+      RuleProperties2 (Rules);
+      HasTailRecursion := gHasTailRecursion;
+   END;
+   ElimDeadTests (Decisions, _, (FALSE), _);
+   FindCases (Decisions => _, n, s2);
+   MarkCases (Decisions, n, s2);
+   Optimize (Next);
+   .
+Routine (..) :-
+   gHasTailRecursion := FALSE;
+   RuleProperties (Rules);
+   HasTailRecursion := gHasTailRecursion;
+   CollectTests (Rules, InObjects);
+   BuildTree (Rules, nNoDecision => decisions);
+   Decisions := decisions;
+   ElimDeadTests (Decisions, _, (FALSE), _);
+   FindCases (Decisions => _, n, s2);
+   MarkCases (Decisions, n, s2);
+   Optimize (Next);
+   .
+
+/*===========================================================================:
+// Description:
+//---------------------------------------------------------------------------:
+// Determine the properties HasExit and HasAssign
+//---------------------------------------------------------------------------:
+// Parameter:                : syntax tree
+// Result   :                : properties HasExit and HasAssign
+//---------------------------------------------------------------------------:*/
+
+PROCEDURE RuleProperties (Tree)
+
+Spec (..) :-
+   RuleProperties (Routines);
+   .
+Routine (..) :-
+   RuleProperties (Rules);
+   RuleProperties (Next);
+   .
+Rule (..) :-
+   gHasExit		:= FALSE;
+   gHasAssign		:= FALSE;
+   RuleProperties (Statements);
+   RuleProperties (Exprs);
+   RuleProperties (Expr);
+   IF gHasExit		THEN INCL (Properties, HasExit		); END;
+   IF gHasAssign	THEN INCL (Properties, HasAssign	); END;
+   REJECT;
+   .
+Rule (Expr := Call (TailRecursion := TailRecursion)) :-
+   CONDITION TailRecursion;
+   IF Modula AND gHasExit THEN
+      TailRecursion := FALSE;
+      EXCL (Properties, HasTailRecursion);
+   END;
+   REJECT;
+   .
+Rule (..) :-
+   gHasTailRecursion := gHasTailRecursion OR (HasTailRecursion IN Properties)
+				      OR (HasTailRecursionStmt IN Properties);
+   RuleProperties (Next);
+   .
+ProcCall (Call := Call (TailRecursion := TailRecursion)) :-
+   CONDITION TailRecursion;
+   TailRecursion := NOT (Modula AND gHasExit);
+   .
+ProcCall (..) :-
+   RuleProperties (Call);
+   RuleProperties (Next);
+   .
+Assignment (..) :-
+   gHasAssign := TRUE;
+   RuleProperties (Adr);
+   RuleProperties (Expr);
+   RuleProperties (Next);
+   .
+DeclStmt (..) :-
+   RuleProperties (Declarations);
+   RuleProperties (Next);
+   .
+InitDecl (..) :-
+   gHasAssign := TRUE;
+   RuleProperties (Expr);
+   RuleProperties (Next);
+   .
+Declaration (..) :-
+   RuleProperties (Next);
+   .
+MatchStmt (..) :-
+   gHasExit := TRUE;
+   RuleProperties (Exprs);
+   RuleProperties (Patterns);
+   RuleProperties (Next);
+   .
+IfMatch (..) :-
+   RuleProperties (Expr);
+   RuleProperties (Exprs);
+   RuleProperties (Patterns);
+   RuleProperties (Then);
+   RuleProperties (Else);
+   RuleProperties (Next);
+   .
+If (..) :-
+   RuleProperties (Expr);
+   RuleProperties (Then);
+   RuleProperties (Else);
+   RuleProperties (Next);
+   .
+For (..) :-
+   RuleProperties (Init);
+   RuleProperties (Expr);
+   RuleProperties (Step);
+   RuleProperties (Statements);
+   RuleProperties (Next);
+   .
+ForEach (..) :-
+   RuleProperties (Var);
+   RuleProperties (Expr);
+   RuleProperties (Statements);
+   RuleProperties (Next);
+   .
+Return (Expr := Call (TailRecursion := TailRecursion)) :-
+   CONDITION TailRecursion;
+   TailRecursion := NOT (Modula AND gHasExit);
+   .
+Return (..) :-
+   RuleProperties (Expr);
+   .
+Condition (Expr := Call (TailRecursion := TailRecursion)) :-
+   CONDITION TailRecursion;
+   TailRecursion := NOT (Modula AND gHasExit);
+   .
+Condition (..) :-
+   gHasExit := TRUE;
+   RuleProperties (Next);
+   .
+Reject (..) :-
+   gHasExit := TRUE;
+   RuleProperties (Next);
+   .
+Fail (..) :-
+   RuleProperties (Next);
+   .
+Statement (..) :-
+   RuleProperties (Next);
+   .
+OneExpr (..) :-
+   RuleProperties (Expr);
+   RuleProperties (Next);
+   .
+Expr: Expr (..) :-
+   gHasExit := gHasExit OR NeedsMatch (Expr);
+   .
+
+/*===========================================================================:
+// Description:
+//---------------------------------------------------------------------------:
+// Determine the property ExitCount/HasExit
+//---------------------------------------------------------------------------:
+// Parameter:                : list of rules
+// Result   :                : property ExitCount/HasExit
+//---------------------------------------------------------------------------:*/
+
+PROCEDURE RuleProperties2 ([Rules, Statements, Declarations, Expr, Exprs])
+
+Rule (..) :-
+   ExitCount := 0;
+   RuleProperties2 (Statements);
+   gHasTailRecursion := gHasTailRecursion OR (HasTailRecursion IN Properties);
+   IF ExitCount = 0 THEN EXCL (Properties, HasExit); END;
+   RuleProperties2 (Next);
+   .
+ProcCall (..) :-
+   RuleProperties2 (Call);
+   RuleProperties2 (Next);
+   .
+Condition (Expr := Call (TailRecursion := TailRecursion)) :-
+   CONDITION TailRecursion;
+   TailRecursion := NOT (Modula AND (ExitCount > 0));
+   .
+Condition (..) ;
+Reject (..) :-
+   INC (ExitCount);
+   RuleProperties2 (Next);
+   .
+Assignment (..) :-
+   RuleProperties2 (Adr);
+   RuleProperties2 (Expr);
+   RuleProperties2 (Next);
+   .
+MatchStmt (..) :-
+   INC (ExitCount);
+   RuleProperties2 (Next);
+   .
+DeclStmt (..) :-
+   RuleProperties2 (Declarations);
+   RuleProperties2 (Next);
+   .
+InitDecl (..) :-
+   RuleProperties2 (Expr);
+   RuleProperties2 (Next);
+   .
+Declaration (..) :-
+   RuleProperties2 (Next);
+   .
+IfMatch (..) :-
+   RuleProperties2 (Then);
+   RuleProperties2 (Else);
+   RuleProperties2 (Next);
+   .
+If (..) :-
+   RuleProperties2 (Expr);
+   RuleProperties2 (Then);
+   RuleProperties2 (Else);
+   RuleProperties2 (Next);
+   .
+For (..) :-
+   RuleProperties2 (Init);
+   RuleProperties2 (Expr);
+   RuleProperties2 (Step);
+   RuleProperties2 (Statements);
+   RuleProperties2 (Next);
+   .
+ForEach (..) :-
+   RuleProperties2 (Var);
+   RuleProperties2 (Expr);
+   RuleProperties2 (Statements);
+   RuleProperties2 (Next);
+   .
+Return (..) :-
+   RuleProperties2 (Expr);
+   .
+Statement (..) :-
+   RuleProperties2 (Next);
+   .
+Compose (Expr := Expr, Exprs := Exprs) :-
+   RuleProperties2 (Expr);
+   RuleProperties2 (Exprs);
+   .
+Call (Expr := Expr, Exprs := Exprs, Patterns := Patterns) :-
+   RuleProperties2 (Expr);
+   RuleProperties2 (Exprs);
+   .
+Binary (Lop := Lop: Expr, Rop := Rop: Expr) :-
+   RuleProperties2 (Lop);
+   RuleProperties2 (Rop);
+   .
+PreOperator (Expr := Expr) ;
+PostOperator (Expr := Expr) ;
+Parents (Expr := Expr) :-
+   RuleProperties2 (Expr);
+   .
+Index (Expr := Expr, Exprs := Exprs) :-
+   RuleProperties2 (Expr);
+   RuleProperties2 (Exprs);
+   .
+Guard (Tempo := (NoIdent), Expr := Expr) :-
+   RuleProperties2 (Expr);
+   .
+Guard (Expr := Expr) :-
+   INC (ExitCount);
+   RuleProperties2 (Expr);
+   .
+OneExpr (..) :-
+   RuleProperties2 (Expr);
+   RuleProperties2 (Next);
+   .
+
+PREDICATE NeedsMatch ([Tests, Exprs, Expr])
+
+TestValue (..) :- CONDITION NeedsMatch (Expr) OR NeedsMatch (Next);
+   .
+OneTest	(..) :- CONDITION NeedsMatch (Next);
+   .
+OneExpr	(..) :- CONDITION NeedsMatch (Expr) OR NeedsMatch (Next);
+   .
+Compose (..) :- CONDITION NeedsMatch (Exprs);
+   .
+Call	(..) :- CONDITION NeedsMatch (Expr) OR NeedsMatch (Exprs) OR
+       (Object # NoTree) AND NeedsMatch2 (Patterns, Object^.Routine.OutObjects);
+   .
+Binary	(..) :- CONDITION NeedsMatch (Lop) OR NeedsMatch (Rop);
+   .
+Parents		(..) ;
+Guard		(Tempo := (NoIdent)) ;
+PreOperator	(..) ;
+PostOperator	(..) :- CONDITION NeedsMatch (Expr);
+   .
+Index	(..) :- CONDITION NeedsMatch (Expr) OR NeedsMatch (Exprs);
+   .
+Guard	(..) :-
+   .
+
+PREDICATE NeedsMatch2 ([Patterns, Pattern], Objects)
+
+_, NoObject (..) :-
+   FAIL
+   .
+OnePattern (Next := Next), Objects: Object (Next := NextFormal) :-
+   CONDITION NeedsMatch2 (Pattern, Objects) OR
+      NeedsMatch2 (Next, NextFormal);
+   .
+Decompose (..), Object (_, _, typeDesc, _, _) :-
+   CONDITION (typeDesc^.Kind # Tree.NodeTypes) OR
+      IsNotEqual (Object^.Class.TypeDesc^.NodeTypes.Types, typeDesc^.NodeTypes.Types) OR
+      NeedsMatch2 (Patterns, Object^.Class.Objects);
+   .
+VarDef	(..), _ :- CONDITION Object # NoTree; .
+NilTest	(..), _ :- .
+Value	(..), _ :- .
+
+PREDICATE NeedsTempo (Decisions => Rule)
+
+Decision (Then, ..) => Rule :- NeedsTempo (Then => Rule); .
+Decided (_, rule: Rule (Properties := Properties)) => rule :- CONDITION HasTempos IN Properties; .
+
+PREDICATE NeedsNoFinale (Decisions)
+
+Decision (_, Else, ..) :- NeedsNoFinale (Else); .
+Decided (_, Rule (Properties := Properties)) :- CONDITION NOT (HasExit IN Properties); .
+Decided (Else, _) :- NeedsNoFinale (Else); .
+
+PROCEDURE GetRule (Decisions => Rule)
+
+Decision (Then, ..) => Rule :- GetRule (Then => Rule); .
+Decided (_, Rule) => Rule :- .
+
+PROCEDURE CollectTests (Rules, Objects)
+
+Rule (..), Objects :-
+   CollectTests2 (Patterns, Objects, nNoTest => tests);
+   Tests := tests;
+   CollectTests (Next, Objects);
+   .
+
+PROCEDURE CollectTests2 (Tree, Objects, Tests => Tests)
+
+OnePattern (Pattern, NextP), Objects: Object (NextF, ..),
+   TestsIn => TestsOut :-
+   CollectTests2 (NextP, NextF, TestsIn => Tests);
+   CollectTests2 (Pattern, Objects, Tests => TestsOut);
+   .
+Decompose (..), Object (_, _, typeDesc, _, _),
+   TestsIn => TestsOut :-
+   CONDITION (typeDesc^.Kind = Tree.NodeTypes) AND
+      IsEqual (Object^.Class.TypeDesc^.NodeTypes.Types, typeDesc^.NodeTypes.Types);
+   CollectTests2 (Patterns, Object^.Class.Objects, TestsIn => TestsOut);
+   .
+Decompose (_, _, _, Path, _, _, Patterns, _, Object), Object (_, _, typeDesc, _, _),
+   TestsIn => TestKind (TestsOut, Path, Object^.Class.TypeDesc, Object^.Class.Name) :-
+   CONDITION Object^.Class.Extensions^.Kind = Tree.NoClass;	/* Low ? */
+   CollectTests2 (Patterns, Object^.Class.Objects, TestsIn => TestsOut);
+   .
+Decompose (_, _, _, Path, _, _, Patterns, _, Object), _,
+   TestsIn => TestIsType (TestsOut, Path, Object^.Class.TypeDesc, Object^.Class.Name) :-
+   CollectTests2 (Patterns, Object^.Class.Objects, TestsIn => TestsOut);
+   .
+VarDef (Path := path), _,
+   Tests => TestNonlin (Tests, Object^.Object.Path, path, Object^.Object.TypeDesc) :-
+   CONDITION Object # NoTree;
+   .
+NilTest (_, _, _, Path, _), _,
+   Tests => TestNil (Tests, Path) :-
+   .
+Value (_, _, _, Path, Expr), Objects: Object,
+   Tests => TestValue (Tests, Path, Expr, Objects^.Object.TypeDesc) :-
+   .
+_, _, Tests => Tests :-
+   .
+
+PREDICATE IsSamePath (Path, Path)
+
+Var (Name, ..)		, Var (Name, ..)	:- .
+ConsType (Path1, Name:=Name)	, ConsType (Path2, Name:=Name);
+Field (Path1, Name:=Name)	, Field (Path2, Name:=Name)	:- IsSamePath (Path1, Path2); .
+
+PREDICATE IsSameType (TypeDesc, TypeDesc)
+
+NodeTypes (TreeName := TreeName (Name, ..), Types := Types),
+ NodeTypes (TreeName := TreeName (Name, ..), Types := Types) :- .
+UserType (Type:=Type), UserType (Type:=Type) :- .
+
+PREDICATE IsSameTest (Tests, Tests)
+
+TestKind   (_, Path1, TypeDesc1, _), TestKind   (_, Path2, TypeDesc2, _) ;
+TestIsType (_, Path1, TypeDesc1, _), TestIsType (_, Path2, TypeDesc2, _) :-
+   IsSamePath (Path1, Path2);
+   IsSameType (TypeDesc1, TypeDesc2);
+   .
+TestNil (_, Path1), TestNil (_, Path2) :-
+   IsSamePath (Path1, Path2);
+   .
+TestNonlin (_, Path11, Path12, _), TestNonlin (_, Path21, Path22, _) :-
+   IsSamePath (Path11, Path21);
+   IsSamePath (Path12, Path22);
+   .
+
+PROCEDURE BuildTree (Rules, Decisions => Decisions)
+
+r: Rule (..), DecisionsIn => DecisionsOut :-
+   gRule := r;
+   BuildTree2 (Tests, DecisionsIn => Decisions);
+   UpdateChange (Decisions, gRule);
+   BuildTree (Next, Decisions => DecisionsOut);
+   .
+NoRule (..), Decisions => Decisions :-
+   .
+
+PROCEDURE BuildTree2 (t: Tests, d: Decisions => Decisions)
+
+o: OneTest (Next, _), NoDecision () => Decision (Decisions, d, o, 0, TRUE) :-
+   BuildTree2 (Next, d => Decisions);
+   UpdateChange (Decisions, gRule);
+   .
+OneTest (Next, _), Decision (Then, Else, Test, _, (TRUE)) => d /* Decision (Decisions, Else, Test, 0, TRUE) */ :-
+   IsSameTest (t, Test);
+   CONDITION NOT HasInterference (t, Else);
+   BuildTree2 (Next, Then => Decisions);
+   Then := Decisions;
+   UpdateChange (Decisions, gRule);
+   .
+OneTest (..), Decision (Then, Else, Test, _, _) => d /* Decision (Then, Decisions, Test, 0, TRUE) */ :-
+   BuildTree2 (t, Else => Decisions);
+   Else := Decisions;
+   UpdateChange (Decisions, gRule);
+   .
+OneTest (..), Decided (Else, Rule) => d /* Decided (Decisions, Rule) */ :-
+   BuildTree2 (t, Else => Decisions);
+   Else := Decisions;
+   UpdateChange (Decisions, gRule);
+   .
+NoTest (), NoDecision () => Decided (d, gRule) :-
+   .
+NoTest (), Decision (Then, Else, Test, _, _) => d /* Decision (Then, Decisions, Test, 0, TRUE) */ :-
+   BuildTree2 (t, Else => Decisions);
+   Else := Decisions;
+   .
+NoTest (), Decided (Else, Rule) => d /* Decided (Decisions, Rule) */ :-
+   BuildTree2 (t, Else => Decisions);
+   Else := Decisions;
+   .
+
+PREDICATE HasInterference (Tests, Decisions)
+
+_, Decided (..) :-
+   .
+		   OneTest (_, Path1),
+   Decision (_, _, OneTest (_, Path2), ..) :-
+   CONDITION NOT IsSamePath (Path1, Path2);
+   .
+		   TestKind   (_, Path1, NodeTypes (Types := Types1), _),
+   Decision (_, _, TestKind   (_, Path2, NodeTypes (Types := Types2), _), ..) ;
+		   TestKind   (_, Path1, NodeTypes (Types := Types1), _),
+   Decision (_, _, TestIsType (_, Path2, NodeTypes (Types := Types2), _), ..) ;
+		   TestIsType (_, Path1, NodeTypes (Types := Types1), _),
+   Decision (_, _, TestKind   (_, Path2, NodeTypes (Types := Types2), _), ..) ;
+		   TestIsType (_, Path1, NodeTypes (Types := Types1), _),
+   Decision (_, _, TestIsType (_, Path2, NodeTypes (Types := Types2), _), ..) :-
+   CONDITION NOT IsDisjoint (Types1, Types2);
+   .
+t, Decision (_, Else, ..) :-
+   HasInterference (t, Else);
+   .
+
+PROCEDURE UpdateChange (Decisions, Rule)
+
+Decision (_, _, TestKind (_, Path, ..), _, IsUnchanged),
+   Rule (Properties := Properties, Statements := s) ;
+Decision (_, _, TestIsType (_, Path, ..), _, IsUnchanged),
+   Rule (Properties := Properties, Statements := s) :-
+   CONDITION (HasExit IN Properties) AND (HasAssign IN Properties);
+   IsChanged (Path, s);
+   IsUnchanged := FALSE;
+   .
+
+PREDICATE IsChanged (Path, Statements)
+
+path, Assignment (Object := Obj) :-
+   CONDITION Object # NIL; IsSamePath (path, Obj^.Object.Path); .
+Path, Statement (Next := Next) :-
+   IsChanged (Path, Next); .
+
+PROCEDURE FindCases (Decisions => Path, SHORTCARD, tSet)
+
+Decision (Then, Else, TestKind (_, Path, NodeTypes (
+   TreeName := TreeName (ClassCount := ClassCount), Types := Types), _), _, _) ;
+Decision (Then, Else, TestIsType (_, Path, NodeTypes (
+   TreeName := TreeName (ClassCount := ClassCount), Types := Types), _), _, _) => Path, k, s :-
+   FindCases (Then => _, m, s1);
+   MarkCases (Then, m, s1);
+   FindCases (Else => Path2, n, s2);
+k: SHORTCARD, s: tSet;
+   IF n = 0 THEN
+      k := 1;
+      MakeSet (s, ClassCount);
+    { Assign (s, Types); };
+   ELSIF IsSamePath (Path, Path2) AND IsDisjoint (s2, Types) THEN
+      k := n + 1;
+      s := s2;
+      Union (s, Types);
+   ELSE
+      MarkCases (Else, n, s2);
+      k := 1;
+      MakeSet (s, ClassCount);
+    { Assign (s, Types); };
+   END;
+   .
+Decision (Then, Else, _, _, _) => _, 0, _ :-
+   FindCases (Then => _, m, s1);
+   MarkCases (Then, m, s1);
+   FindCases (Else => _, n, s2);
+   MarkCases (Else, n, s2);
+   .
+Decided (Else, _) => _, 0, _ :-
+   FindCases (Else => _, n, s2);
+   MarkCases (Else, n, s2);
+   .
+NoDecision () => _, 0, _ :- .
+
+PROCEDURE MarkCases (Decisions, SHORTCARD, tSet)
+
+Decision (_, _, _, Cases, _), n, s :- CONDITION n >= 7; Cases := n; ReleaseSet (s); .
+
+PROCEDURE ElimDeadTests (Decisions, Path, BOOLEAN, tSet)
+
+Decision (Then, Else, TestKind (_, Path, NodeTypes (
+   TreeName := TreeName (ClassCount := ClassCount), Types := Types), _), _, _), _, (FALSE), _ ;
+Decision (Then, Else, TestIsType (_, Path, NodeTypes (
+   TreeName := TreeName (ClassCount := ClassCount), Types := Types), _), _, _), _, (FALSE), _ :-
+
+s: tSet;
+   MakeSet (s, ClassCount); IF IsDeadEnd (Then) THEN { Assign (s, Types); }; END;
+   ElimDeadTests (Else, Path, (TRUE), s);
+   ElimDeadTests (Then, _, (FALSE), _);
+   .
+Decision (Then, Else, Test: TestKind (Next, Path, NodeTypes (
+   TreeName := Tree: TreeName (ClassCount := ClassCount), Types := Types, BaseTypes := BaseTypes), Name), _, _), Path2, b, s ;
+Decision (Then, Else, Test: TestIsType (Next, Path, NodeTypes (
+   TreeName := Tree: TreeName (ClassCount := ClassCount), Types := Types, BaseTypes := BaseTypes), Name), _, _), Path2, b, s :-
+
+types: tSet, baseTypes: tSet, s2: tSet;
+   s2 := s;
+   IF IsSamePath (Path, Path2) THEN
+      IF NOT IsDisjoint (Types, s) THEN
+	 types := Types;
+	 baseTypes := BaseTypes;
+	 Test := mTestIsType (Next, Path, mNodeTypes (Tree, types, baseTypes), Name);
+	 MakeSet (Types, ClassCount);
+       { Assign (Types, types); };
+	 Difference (Types, s);
+	 MakeSet (BaseTypes, ClassCount);
+       { Assign (BaseTypes, baseTypes); };
+	 Difference (BaseTypes, s);
+      END;
+   ELSE
+      AssignEmpty (s2);
+   END;
+   IF IsDeadEnd (Then) THEN Union (s2, Types); END;
+   ElimDeadTests (Else, Path, (TRUE), s2);
+   ElimDeadTests (Then, _, (FALSE), _);
+   .
+Decision (Then, Else, _, _, _), _, b, s :-
+   IF b THEN ReleaseSet (s); END;
+   ElimDeadTests (Else, _, (FALSE), _);
+   ElimDeadTests (Then, _, (FALSE), _);
+   .
+Decided (Else, Rule (Properties := Properties)), _, b, s :-
+   IF b THEN ReleaseSet (s); END;
+   IF NOT (HasExit IN Properties) THEN ReportWarning (Else); END;
+   ElimDeadTests (Else, _, (FALSE), _);
+   .
+NoDecision (), _, (TRUE), s :-
+   ReleaseSet (s);
+   .
+
+PREDICATE IsDeadEnd (Decisions)
+
+Decided (Else, Rule (Properties := Properties)) :-
+   CONDITION NOT (HasExit IN Properties) OR IsDeadEnd (Else); .
+
+PROCEDURE ReportWarning (Decisions)
+
+Decided (Else, Rule (Pos, ..)) :-
+   IF Pos.Column > 0 THEN
+      Warning ("unreachable code", Pos);
+   END
+   ReportWarning (Else);
+   .
+Decision (Then, Else, ..) :-
+   ReportWarning (Then);
+   ReportWarning (Else);
+   .
+
+/*
+PROCEDURE WriteTests (Tests)
+
+o: OneTest (Next, _) :- WriteTest (o); WriteTests (Next); .
+
+PROCEDURE WriteTest (OneTest)
+
+TestKind (Next, Path, TypeDesc, _) :-
+   "TestKind	"; ImplMod (Path); "	"; WriteType (TypeDesc); NL .
+TestIsType (Next, Path, TypeDesc, _) :-
+   "TestIsType	"; ImplMod (Path); "	"; WriteType (TypeDesc); NL .
+TestNil (Next, Path) :-
+   "TestNil	"; ImplMod (Path); "	"; NL .
+TestNonlin (Next, Path, Path2, _) :-
+   "TestNonlin	"; ImplMod (Path); "	"; ImplMod (Path2); NL .
+TestValue (Next, ..) :-
+   "TestValue	"; NL .
+
+PROCEDURE WriteType (TypeDesc)
+
+NodeTypes (TreeName (Name, ..), Types) :-
+   WriteIdent (StdOutput, Name); WriteSet (StdOutput, Types); .
+UserType (Type) :-
+   WriteIdent (StdOutput, Type); .
+TargetType (Type) :-
+   .
+
+PROCEDURE WriteDecisions (Decisions, SHORTCARD) LOCAL { VAR i: SHORTCARD; }
+
+Decision (Then, Else, Test, _, _), n :-
+   { FOR i := 1 TO n DO WriteS (StdOutput, "	"); END; };
+   WriteTest (Test);
+   WriteDecisions (Then, n + 1);
+   WriteDecisions (Else, n);
+   .
+Decided (Else, rule), n :-
+   { FOR i := 1 TO n DO WriteS (StdOutput, "	"); END; };
+   WriteI (StdOutput, rule^.Rule.Line.Line, 3); NL
+   WriteDecisions (Else, n);
+   .
+*/
+
+/*===========================================================================:
+// Description:
+//---------------------------------------------------------------------------:
+// Determine the property HasTailRecursion for Procedures and Functions
+//---------------------------------------------------------------------------:
+// Parameter:                : list of routines
+// Result   :                : property HasTailRecursion
+//---------------------------------------------------------------------------:*/
+
+PROCEDURE TailRecursion (Routines)
+
+Procedure (_, Name, OutParams := NoDeclaration ()) :-
+   CONDITION IsElement (ORD ('c'), Options) OR NOT HasRefParameters (InParams);
+   CurName := Name;
+   ForallTree (Rules, TailProcedure);
+   .
+Function  (_, Name, OutParams := NoDeclaration ()) :-
+   CONDITION IsElement (ORD ('c'), Options) OR NOT HasRefParameters (InParams);
+   CurName := Name;
+   ForallTree (Rules, TailFunction);
+   .
+
+/*===========================================================================:
+// Description:
+//---------------------------------------------------------------------------:
+// Determine the property HasTailRecursion for a Predicate
+//---------------------------------------------------------------------------:
+// Parameter:                : predicate
+// Result   :                : property HasTailRecursion
+//---------------------------------------------------------------------------:*/
+
+PROCEDURE TailRecursion2 (Predicate)
+
+Predicate (_, Name, OutParams := NoDeclaration ()) :-
+   CONDITION IsElement (ORD ('c'), Options) OR NOT HasRefParameters (InParams);
+   CurName := Name;
+   TailPredicate (Decisions);
+   .
+
+PROCEDURE TailProcedure ([Rules, Statements])
+
+Rule (Properties := Properties) :-
+   gHasTailRecursion := FALSE;
+   ForallTree (Statements, TailProcedure);
+   CONDITION gHasTailRecursion;
+   INCL (Properties, HasTailRecursion);
+   .
+ProcCall (Next := NoStatement (...), Call := Expr: Call (_, VarUse (_, Name, _), Exprs, Patterns, Object, TailRecursion)) :-
+   CONDITION (CurName = Name) AND NOT NeedsMatch (Expr) AND NOT NeedsTempos (Expr);
+   AssignEmpty (Changed);
+   gHasDependencies := FALSE;
+   CheckExpressions (Exprs, Object^.Routine.InObjects);
+   CheckPatterns (Patterns, Object^.Routine.OutObjects);
+   CONDITION NOT gHasDependencies;
+   TailRecursion := TRUE;
+   gHasTailRecursion := TRUE;
+   .
+If (Then := Then, Else := Else) :-
+   ForallTree (Then, TailProcedure2);
+   ForallTree (Else, TailProcedure2);
+   .
+For (Statements := Statements) :-
+   ForallTree (Statements, TailProcedure2);
+   .
+ForEach (Statements := Statements) :-
+   ForallTree (Statements, TailProcedure2);
+   .
+
+PROCEDURE TailProcedure2 (Statements)
+
+ProcCall (Next := Return (...), Call := Expr: Call (_, VarUse (_, Name, _), Exprs, Patterns, Object, TailRecursion)) :-
+   CONDITION CurName = Name;
+   AssignEmpty (Changed);
+   gHasDependencies := FALSE;
+   CheckExpressions (Exprs, Object^.Routine.InObjects);
+   CheckPatterns (Patterns, Object^.Routine.OutObjects);
+   CONDITION NOT gHasDependencies;
+   TailRecursion := TRUE;
+   gHasTailRecursion := TRUE;
+   .
+
+PROCEDURE TailFunction ([Rules, Statements])
+
+Rule (Statements := Statements) :-
+   gHasTailRecursion := FALSE;
+   ForallTree (Statements, TailFunction);
+   CONDITION gHasTailRecursion;
+   INCL (Properties, HasTailRecursionStmt);
+   REJECT;
+   .
+Rule (Expr := Call (_, VarUse (_, Name, _), Exprs, Patterns, Object, TailRecursion), Properties := Properties) :-
+   CONDITION (CurName = Name) AND NOT NeedsMatch (Expr) AND NOT NeedsTempos (Expr);
+   AssignEmpty (Changed);
+   gHasDependencies := FALSE;
+   CheckExpressions (Exprs, Object^.Routine.InObjects);
+   CheckPatterns (Patterns, Object^.Routine.OutObjects);
+   CONDITION NOT gHasDependencies;
+   TailRecursion := TRUE;
+   INCL (Properties, HasTailRecursion);
+   .
+If (Then := Then, Else := Else) :-
+   ForallTree (Then, TailFunction2);
+   ForallTree (Else, TailFunction2);
+   .
+For (Statements := Statements) :-
+   ForallTree (Statements, TailFunction2);
+   .
+ForEach (Statements := Statements) :-
+   ForallTree (Statements, TailFunction2);
+   .
+
+PROCEDURE TailFunction2 ([Rules, Statements])
+
+Return (Expr := Call (_, VarUse (_, Name, _), Exprs, Patterns, Object, TailRecursion), Properties := Properties) :-
+   CONDITION (CurName = Name) AND NOT NeedsMatch (Expr) AND NOT NeedsTempos (Expr);
+   AssignEmpty (Changed);
+   gHasDependencies := FALSE;
+   CheckExpressions (Exprs, Object^.Routine.InObjects);
+   CheckPatterns (Patterns, Object^.Routine.OutObjects);
+   CONDITION NOT gHasDependencies;
+   TailRecursion := TRUE;
+   gHasTailRecursion := TRUE;
+   INCL (Properties, HasTailRecursion);
+   .
+
+PROCEDURE TailPredicate ([Rules, Statements, Decisions])
+
+Decision (Then, Else, OneTest := OneTest) :-
+   CONDITION NOT HasInterference (OneTest, Else);
+   TailPredicate (Then);
+   TailPredicate (Else);
+   .
+Decision (Then, Else, OneTest := OneTest) :-
+   TailPredicate (Else);
+   .
+Decided (NoDecision (), Rule) :-
+   TailPredicate (Rule);
+   .
+Decided (Else, _) :-
+   TailPredicate (Else);
+   .
+Rule (Properties := Properties) :-
+   gHasTailRecursion := FALSE;
+   ForallTree (Statements, TailPredicate);
+   CONDITION gHasTailRecursion;
+   INCL (Properties, HasTailRecursion);
+   .
+Condition (Next := NoStatement (...), Expr := Expr: Call (_, VarUse (_, Name, _), Exprs, Patterns, Object, TailRecursion)) :-
+   CONDITION (CurName = Name) AND NOT NeedsMatch (Expr) AND NOT NeedsTempos (Expr);
+   AssignEmpty (Changed);
+   gHasDependencies := FALSE;
+   CheckExpressions (Exprs, Object^.Routine.InObjects);
+   CheckPatterns (Patterns, Object^.Routine.OutObjects);
+   CONDITION NOT gHasDependencies;
+   TailRecursion := TRUE;
+   gHasTailRecursion := TRUE;
+   .
+
+PREDICATE HasRefParameters (Declarations)
+
+ParamDecl (IsRef := (TRUE)) :- .
+ParamDecl (..) :- HasRefParameters (Next); .
+
+PROCEDURE CheckExpressions ([Exprs, Objects], Objects)
+
+OneExpr (Expr, ..), Objects :-
+   CONDITION Expr^.Kind = Tree.DontCare;
+   CheckExpressions (Expr^.DontCare.Tempos, Objects);
+   .
+Object (NextT, ..), Object (NextF, Name, _, Var (IsOutput := (TRUE)), _) :-
+   Include (Changed, Name);
+   CheckExpressions (NextT, NextF);
+   .
+Object (NextT, ..), Object (NextF, ..) :-
+   CheckExpressions (NextT, NextF);
+   .
+OneExpr (VarUse (_, _, Obj), NextE), Object (NextF, NameF, ..) :-
+   CONDITION (Obj # NoTree) AND (Obj^.Object.Path^.Kind = Tree.Var) AND
+      (Obj^.Object.Path^.Var.Name = NameF);
+   CheckExpressions (NextE, NextF);
+   .
+OneExpr (Expr, NextE), Object (NextF, Name, _, Var (IsOutput := (FALSE)), _) :-
+   CONDITION Expr^.Kind = Tree.DontCare1;
+   CheckExpressions (NextE, NextF);
+   .
+OneExpr (Expr, NextE), Object (NextF, Name, ..) :-
+   CheckExpression (Expr);
+   Include (Changed, Name);
+   CheckExpressions (NextE, NextF);
+   .
+
+PROCEDURE CheckPatterns ([Patterns, Objects], Objects)
+
+OnePattern (DontCare (Tempos := Tempos), ..), Objects :-
+   CheckPatterns (Tempos, Objects);
+   .
+Object (NextT, ..), Object (NextF, Name, ..) :-
+   Include (Changed, Name);
+   CheckPatterns (NextT, NextF);
+   .
+OnePattern (DontCare1 (_, Tempo, ..), NextP), Object (NextF, Name, ..) :-
+   Include (Changed, Name);
+   CheckPatterns (NextP, NextF);
+   .
+OnePattern (VarDef (Path := Var (NameV, ..)), NextP), Object (NextF, NameF, ..) :-
+   CONDITION NameV = NameF;
+   CheckPatterns (NextP, NextF);
+   .
+OnePattern (VarDef (Path := Path), NextP), Object (NextF, Name, ..) :-
+   CheckExpression (Path);
+   Include (Changed, Name);
+   CheckPatterns (NextP, NextF);
+   .
+
+PROCEDURE CheckExpression ([Exprs, Expr, Patterns, Pattern, Designators, Object, Path])
+
+NIL :- .
+
+VarUse		(..) ;
+AttrDesc	(..) :-
+   CheckExpression (Object);
+   .
+Call		(..) :-
+   CheckExpression (Expr);
+   CheckExpression (Exprs);
+   CheckExpression (Patterns);
+   .
+Compose		(..) ;
+Index		(..) :-
+   CheckExpression (Expr);
+   CheckExpression (Exprs);
+   .
+Binary		(..) :-
+   CheckExpression (Lop);
+   CheckExpression (Rop);
+   .
+PreOperator	(..) ;
+PostOperator	(..) ;
+Parents		(..) ;
+Guard		(..) ;
+TargetExpr	(..) :-
+   CheckExpression (Expr);
+   .
+Designator	(..) :-
+   CheckExpression (Object);
+   CheckExpression (Next);
+   .
+Ident		(..) :-
+   CheckExpression (Object);
+   CheckExpression (Next);
+   .
+Any		(..) ;
+Anys		(..) :-
+   CheckExpression (Next);
+   .
+OneExpr		(..) :-
+   CheckExpression (Expr);
+   CheckExpression (Next);
+   .
+Object		(..) :-
+   CheckExpression (Path);
+   .
+Var		(..) :-
+   CONDITION IsElement (Name, Changed);
+   gHasDependencies := TRUE;
+   .
+ConsType	(..) ;
+Field		(..) :-
+   CheckExpression (Next);
+   .
+OnePattern	(..) :-
+   CheckExpression (Pattern);
+   CheckExpression (Next);
+   .
+Decompose	(..) :-
+   CheckExpression (Expr);
+   CheckExpression (Patterns);
+   .
+Value		(..) :-
+   CheckExpression (Expr);
+   .
+
+PREDICATE NeedsTempos ([Exprs, Expr, Patterns, Pattern])
+
+OneExpr (Expr := Expr, Next := Next: Exprs) :-
+   CONDITION NeedsTempos (Expr) OR NeedsTempos (Next);
+   .
+Compose (Pos := Pos, Selector := Selector, Expr := Expr, Exprs := Exprs, Widen := Widen, Object := Object, Tempo := Tempo, TypeDesc := TypeDesc) :-
+   NeedsTempos (Exprs);
+   .
+Call (Pos := Pos, Expr := Expr, Exprs := Exprs, Patterns := Patterns, Object := Object, TailRecursion := TailRecursion) :-
+   CONDITION NeedsTempos (Expr) OR NeedsTempos (Exprs) OR NeedsTempos (Patterns);
+   .
+Binary (Pos := Pos, Lop := Lop: Expr, Operator := Operator, Rop := Rop: Expr) :-
+   CONDITION NeedsTempos (Lop) OR NeedsTempos (Rop);
+   .
+PreOperator (Pos := Pos, Operator := Operator, Expr := Expr) :-
+   NeedsTempos (Expr);
+   .
+PostOperator (Pos := Pos, Operator := Operator, Expr := Expr) :-
+   NeedsTempos (Expr);
+   .
+Index (Pos := Pos, Expr := Expr, Exprs := Exprs) :-
+   CONDITION NeedsTempos (Expr) OR NeedsTempos (Exprs);
+   .
+Parents (Pos := Pos, Expr := Expr) :-
+   NeedsTempos (Expr);
+   .
+Guard (Pos := Pos, Expr := Expr, Tempo := Tempo) :-
+   CONDITION (Tempo # NoIdent) OR NeedsTempos (Expr);
+   .
+OnePattern (Pattern := Pattern, Next := Next: Patterns) :-
+   CONDITION NeedsTempos (Pattern) OR NeedsTempos (Next);
+   .
+Decompose (Pos := Pos, Tempo := Tempo, TypeDesc := TypeDesc, Path := Path, Selector := Selector, Expr := Expr, Patterns := Patterns, Widen := Widen, Object := Object) :-
+   CONDITION (Tempo # NoIdent) OR NeedsTempos (Patterns);
+   .
+Value (Pos := Pos, Tempo := Tempo, TypeDesc := TypeDesc, Path := Path, Expr := Expr) :-
+   CONDITION (Tempo # NoIdent) OR NeedsTempos (Expr);
+   .
+Pattern (Pos := Pos, Tempo := Tempo, TypeDesc := TypeDesc, Path := Path) :-
+   CONDITION Tempo # NoIdent;
+   .

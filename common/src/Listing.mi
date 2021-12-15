@@ -1,0 +1,208 @@
+(* $Id: Listing.mi,v 1.4 1997/05/27 14:58:14 grosch rel $ *)
+
+(*
+ * $Log: Listing.mi,v $
+ * Revision 1.4  1997/05/27 14:58:14  grosch
+ * cosmetic changes
+ *
+ * Revision 1.3  1993/08/18 15:09:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 1.2  1990/06/12  18:33:37  grosch
+ * layout improvements
+ * 
+ * Revision 1.1  89/01/31	15:57:28  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE Listing;
+
+FROM	IO		IMPORT	StdInput,	StdError,	tFile,
+				EndOfFile,	WriteNl,	WriteC;
+FROM	rMemory		IMPORT	Alloc,		Free;
+FROM	Strings		IMPORT	tString,	ReadL,		WriteL;
+FROM	SYSTEM		IMPORT	ADDRESS,	TSIZE;
+
+
+CONST
+  
+  ColFlag  = '^';
+  LineFlag = '@';
+
+TYPE
+
+  tErrPtr  =  POINTER TO tErrElmt;
+
+  tErrElmt =  RECORD
+		code, class: SHORTINT;
+		line, column: SHORTINT;
+		infcl	: SHORTINT;
+		info	: ADDRESS;
+		next	: tErrPtr;
+	      END;
+  
+
+VAR
+
+  start, stop, last, read: tErrPtr;
+  SourceLine : INTEGER;
+
+
+PROCEDURE PutError (Code,Class,Line,Column,InfoClass: INTEGER; Info: ADDRESS);
+
+  VAR
+    err : tErrPtr;
+
+  BEGIN
+    err := Alloc (TSIZE (tErrElmt));
+    WITH err^ DO
+      code    := Code;
+      class   := Class;
+      line    := Line;
+      column  := Column;
+      infcl   := InfoClass;
+      info    := Info;
+    END;
+
+    IF start = NIL THEN
+						 (* list is emty *)
+      start := err;
+      read  := err;
+      stop  := err;
+      err^.next := NIL;
+      last  := err;
+
+    ELSIF (Line < start^.line) OR
+    (  (Line = start^.line) & (Column < start^.column) ) THEN
+						(* insert before start *)
+      err^.next := start;
+      start := err;
+      read  := err;
+    
+    ELSE				
+      IF (Line > stop^.line) OR
+      (	 (Line = stop^.line) & (Column >= stop^.column)	 )  THEN
+						(* insert after stop	*)
+	last := stop;
+	stop := err;
+      ELSIF (Line > last^.line) OR
+      (	 (Line = last^.line) & (Column >= last^.column)	 )  THEN
+						(* insert after last	*)
+	;
+      ELSE
+						(* insert after start	*)
+	last := start;
+      END;
+
+
+      WHILE (last^.next # NIL) &		
+       (   (Line > last^.next^.line) OR
+	 ( (Line = last^.next^.line) & (Column >= last^.next^.column) )	 ) DO
+						(* find exact position *)
+	last := last^.next;
+      END;
+
+      err^.next := last^.next;
+      last^.next := err;
+      last := err;
+
+    END;
+
+
+  END PutError;
+
+
+
+PROCEDURE HasError (): BOOLEAN;
+
+  VAR
+    Buf : tString;
+
+  BEGIN
+    IF start = NIL THEN
+      IF LongListing THEN
+	WHILE NOT EndOfFile (SourceFile) DO
+	  ReadL (SourceFile, Buf);
+	  WriteL (ListFile, Buf);
+	END;
+      END;
+      WriteC (ListFile, LineFlag);
+    END;
+    RETURN start # NIL;
+  END HasError;
+
+
+
+PROCEDURE GetError (VAR Code,Class,Line,Column,InfoClass: INTEGER;
+		    VAR Info: ADDRESS);
+
+  VAR
+    Next : tErrPtr;
+    col	 : INTEGER;
+    Buf : tString;
+ 
+  BEGIN
+    WITH start^ DO
+      Code	 := code;
+      Class	 := class;
+      Line	 := line;
+      Column	 := column;
+      InfoClass	 := infcl;
+      Info	 := info;
+      Next	 := next;
+    END;
+
+    IF LongListing THEN
+      IF read = start THEN
+	LOOP
+	  IF EndOfFile (SourceFile) THEN EXIT END;
+	  IF SourceLine >= Line THEN EXIT END;
+	  ReadL (SourceFile, Buf);
+	  WriteL (ListFile, Buf);
+	  INC (SourceLine);
+	END;
+	WriteC (ListFile, LineFlag);
+	col := 2;
+	WHILE (read # NIL) & (read^.line = Line) DO
+	  WHILE (col < read^.column) DO
+	    WriteC (ListFile, ' ');
+	    INC (col);
+	  END;
+	  IF col = read^.column THEN
+	    WriteC (ListFile, ColFlag);
+	    INC (col);
+	  END;
+	  read := read^.next;
+	END;
+	WriteNl (ListFile);
+      END;
+      WriteC (ListFile, LineFlag);
+    END;
+
+    IF last = start THEN
+      last := Next;
+    END;
+
+    IF stop = start THEN
+      stop := Next;
+    END;
+
+    Free (TSIZE (tErrElmt), start);
+
+    start := Next;
+
+  END GetError;
+
+
+
+BEGIN
+  start := NIL;
+  read	:= NIL;
+  stop	:= NIL;
+  last	:= NIL;
+  SourceFile := StdInput;
+  ListFile := StdError;
+  LongListing := FALSE;
+  SourceLine := 0;
+END Listing.

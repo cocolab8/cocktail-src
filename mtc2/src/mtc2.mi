@@ -1,0 +1,225 @@
+(*
+ *	M T C  -  Modula-2 to C Translator
+ *      ----------------------------------
+ *
+ *	Purpose: main program
+ *
+ *	$Author: grosch $
+ *	$Date: 1998/05/29 10:46:13 $
+ *	$Revision: 1.0 $
+ *
+ ***)
+
+MODULE mtc2;
+
+FROM rSystem	IMPORT
+  rExit		;
+
+FROM IO		IMPORT
+  StdOutput	, WriteS	, WriteI	, WriteNl	,
+  WriteFlush	, CloseIO	;
+
+FROM Strings	IMPORT
+  AssignEmpty	;
+
+FROM Base	IMPORT
+  CheckArguments, MtcDestination, SourceFile	, OptionIsSet	;
+
+FROM Scanner	IMPORT
+  BeginFile	;
+
+FROM Parser	IMPORT
+  Parser	, ParsAttribute	, CloseParser	;
+
+FROM Tree	IMPORT
+  BeginTree	, CloseTree	, TreeRoot	(* , WriteTree *) ;
+
+FROM DefMods	IMPORT
+  GetDefinitionModules;
+
+FROM Defs	IMPORT
+  BeginDefs	, CloseDefs	;
+
+FROM Semantic	IMPORT
+  BeginSemantic, Eval		, CloseSemantic;
+
+FROM Code	IMPORT
+  BeginCode	, CodeCompUnits	, CloseCode	;
+
+FROM Errors	IMPORT
+  NumberOfErrors, PrintMessages	;
+
+IMPORT Times, Tree, Defs, rMemory;
+
+IMPORT Idents;
+
+VAR
+  ParseErrors	: CARDINAL;
+  t, m, f (* , predump, dump *)	: BOOLEAN;
+
+MODULE TestOutput;
+
+IMPORT	StdOutput, WriteS, WriteI, WriteNl, WriteFlush;
+
+IMPORT	Times, Tree, Defs, rMemory;
+
+EXPORT QUALIFIED WritePhase, WriteMemory, WriteCompleteTime;
+
+VAR
+  StartTime	,
+  StopTime	: LONGINT;
+
+PROCEDURE WritePhase (Phase: ARRAY OF CHAR);
+(* print compiler phase		*)
+BEGIN
+  WriteS (StdOutput, Phase); WriteNl (StdOutput);
+  WriteFlush (StdOutput);
+END WritePhase;
+
+PROCEDURE WriteMemory;
+(* print storage requirements	*)
+BEGIN
+  WriteS (StdOutput, "Memory "); WriteI (StdOutput, rMemory.MemoryUsed, 7);
+  WriteS (StdOutput, "  Heap (Tree) "); WriteI (StdOutput, Tree.HeapUsed, 7);
+  WriteS (StdOutput, "  Heap (Defs) "); WriteI (StdOutput, Defs.HeapUsed, 7);
+  WriteNl (StdOutput);
+  WriteFlush (StdOutput);
+END WriteMemory;
+
+PROCEDURE WriteCompleteTime (Text: ARRAY OF CHAR);
+(* print execution time of mtc	*)
+BEGIN
+  StopTime := Times.CpuTime ();
+  WriteS (StdOutput, Text);
+  WriteI (StdOutput, StopTime - StartTime, 5);
+  WriteNl (StdOutput);
+END WriteCompleteTime;
+
+BEGIN
+  StartTime := Times.CpuTime ();
+END TestOutput;
+
+PROCEDURE Halt (Status: CARDINAL);
+(* print error messages, close io, and terminate program with	*)
+(* exit status 'Status'.					*)
+BEGIN
+  PrintMessages (OptionIsSet ('w'));
+  CloseIO;
+  rExit (Status);
+END Halt;
+
+BEGIN
+  SourceFile [0] := 0C;
+  AssignEmpty (MtcDestination);
+
+  (* handling of arguments	*)
+  CheckArguments;
+
+  IF OptionIsSet ('h') THEN
+    WriteS (StdOutput, "usage: mtc2 [-options] [file]"			);
+    WriteNl (StdOutput);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-w suppress warning diagnostics"		);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-i generate header files for imported modules"	);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-c generate type casts to make programs lint free");
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-r generate runtime checks"			);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-u generate obfuscated code"			);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-ddir allow import from modules in directory dir");
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-odir write output to directory dir"		);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-h print help information"			);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-t print test output (time)"			);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-m print test output (memory)"			);
+    WriteNl (StdOutput);
+    WriteS (StdOutput, "-D print the parse tree"			);
+    WriteNl (StdOutput);
+    Halt (0);
+  END; (* IF *)
+
+  t := OptionIsSet ('t');
+  m := OptionIsSet ('m');
+  f := OptionIsSet ('f');
+(*  predump := OptionIsSet ('P');
+  dump := OptionIsSet ('D'); *)
+
+  IF SourceFile [0] # 0C THEN BeginFile (SourceFile); END;
+
+(*
+  BeginTree;	(* automatically called during initialization of module Tree *)
+  BeginDefs;	(* automatically called during initialization of module Defs *)
+*)
+
+  IF m THEN TestOutput.WriteMemory; END;
+  IF t OR m THEN TestOutput.WritePhase ("Parser"); END;
+
+  (* parse compilation unit and construct an abstract	*)
+  (* tree for it					*)
+  ParseErrors := Parser ();
+
+  IF t THEN Times.WriteStepTime ("Parser "); END;
+
+  IF (NumberOfErrors () = 0) OR f THEN
+    IF m THEN TestOutput.WriteMemory; END;
+    IF t OR m THEN TestOutput.WritePhase ("GetDefinitionModules"); END;
+
+    (* get all definition modules on which the current	*)
+    (* compilation unit depends and construct an ab-	*)
+    (* stract tree for them				*)
+    GetDefinitionModules (ParsAttribute.Tree, TreeRoot);
+
+    IF t THEN Times.WriteStepTime ("GetDefinitionModules  "); END;
+  END; (* IF *)
+
+  CloseParser;
+
+  IF (NumberOfErrors () = 0) OR f THEN
+    IF m THEN TestOutput.WriteMemory; END;
+    IF t OR m THEN TestOutput.WritePhase ("Eval"); END;
+
+(*  IF predump THEN
+      Tree.WriteTree(StdOutput, TreeRoot);
+    END; *)
+    
+    (* semantic analysis and computation of code	*)
+    (* generation attributes				*)
+    BeginSemantic;
+    Eval (TreeRoot);
+    CloseSemantic;
+
+(*  IF dump THEN
+      Tree.WriteTree(StdOutput, TreeRoot);
+    END; *)
+
+    IF t THEN Times.WriteStepTime ("Eval  "); END;
+
+    IF m THEN TestOutput.WriteMemory; END;
+    IF t OR m THEN TestOutput.WritePhase ("Code"); END;
+
+    (* generate C code					*)
+    BeginCode;
+    CodeCompUnits (TreeRoot);
+    CloseCode;
+
+    IF t THEN Times.WriteStepTime ("Code  "); END;
+  END; (* IF *)
+
+  CloseTree;
+  CloseDefs;
+
+  IF t THEN TestOutput.WriteCompleteTime ("mtc2  "); END;
+  IF m THEN TestOutput.WriteMemory; END;
+
+  IF NumberOfErrors () # 0 THEN
+    Halt (1);
+  ELSE
+    Halt (0);
+  END;
+END mtc2.

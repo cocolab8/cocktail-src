@@ -1,0 +1,1630 @@
+/* Jemand anderes als er, Doktor Josef Grosch, Informatiker, 21.6.1991 */
+
+/* Reference and output parameters are not supported in this version.
+   For the purposes of test coverage instrumentation, lines of code which
+   are only used when such parameters are present have !!~ appended.
+   All instances of this should be removed when ref/output arguments are
+   implemented.
+ */
+
+TRAFO Java
+TREE Tree
+PUBLIC ImplJava MacroJava
+
+GLOBAL {
+
+FROM Position	IMPORT tPosition, NoPosition;
+FROM IO		IMPORT tFile, StdOutput;
+FROM Strings	IMPORT tString, IntToString, Concatenate, ArrayToString,
+			AssignEmpty, Append;
+FROM StringM	IMPORT tStringRef, Length, IsEqual, NoString;
+FROM Idents	IMPORT tIdent, NoIdent, MakeIdent, GetStringRef, WriteIdent;
+FROM Texts	IMPORT tText;
+FROM Sets	IMPORT IsElement, IsNotEqual, Minimum, Maximum, IsEmpty, Select,
+			ForallDo, Card;
+FROM Semantic	IMPORT UserTypes, LookupClass;
+FROM Optimize	IMPORT NeedsTempo, NeedsMatch, NeedsNoFinale, GetRule;
+FROM Scanner	IMPORT Error;
+FROM Tree	IMPORT NoTree, tTree, Options, f,
+			HasExit, HasTailRecursion, HasTempos,
+			HasPatterns, tIndexToClass, GetPackage, NoExpression;
+
+IMPORT StringM, Idents, Texts, Lists, Position;
+
+VAR
+   RoutineKind	: (kProcedure, kFunction, kPredicate);
+   WithCount	,
+   RuleCount	,
+   ActualCount	,
+   ListCount	,
+   MatchScope	: INTEGER;
+   LineCount	,
+   ColumnCount	,
+   i, j		: CARDINAL;
+   rule		,
+   TheClass	,
+   gInObjects	,
+   gOutObjects	,
+   gReturnObjects: tTree;
+   TheName	: tIdent;
+   TemposDone	: BOOLEAN;
+   Newline	: tString;
+   IndexToClass	: tIndexToClass;
+   GenExit	: PROC;
+   AltTreeName	: tIdent;
+   iPackage	,
+   iClass	: tIdent;
+
+PROCEDURE WriteS (File: tFile; Text: ARRAY OF CHAR);
+   BEGIN IO.WriteS (File, Text); INC (ColumnCount, HIGH (Text) + 1); END WriteS;
+
+PROCEDURE WN (Value: INTEGER);
+   BEGIN IO.WriteI (f, Value, 0); INC (ColumnCount, 6); END WN;
+
+PROCEDURE WriteNl (File: tFile);
+   BEGIN IO.WriteNl (File); INC (LineCount); ColumnCount := 0; END WriteNl;
+
+PROCEDURE WI (Ident: tIdent);
+   BEGIN WriteIdent (f, Ident); INC (ColumnCount, Length (GetStringRef (Ident))); END WI;
+
+PROCEDURE WriteString (File: tFile; String: tStringRef);
+   BEGIN
+      StringM.WriteString (File, String);
+      INC (ColumnCount, Length (String));
+   END WriteString;
+
+PROCEDURE WriteText (File: tFile; Text: tText);
+   BEGIN
+      Texts.WriteText (File, Text); INC (LineCount, Lists.Length (Text));
+      ColumnCount := 0;
+   END WriteText;
+
+PROCEDURE WriteDirective (Pos: tPosition);
+   BEGIN
+      IF Pos.Line # 0 THEN
+	 !/* line ! WN (Pos.Line); @ "@ WI (Pos.File); @" */@
+      END;
+   END WriteDirective;
+
+PROCEDURE NewLabel (): INTEGER;
+   BEGIN
+      INC (MatchScope);
+      RETURN MatchScope;
+   END NewLabel;
+
+PROCEDURE GenRuleExit;
+   BEGIN
+      ! break yyL! WN (RuleCount); !;!
+   END GenRuleExit;
+
+PROCEDURE GenMatchExit;
+   BEGIN
+      ! break yyM! WN (MatchScope); !;!
+   END GenMatchExit;
+
+PROCEDURE Match (t, Objects: tTree);
+   VAR Pattern	: tTree;
+   BEGIN
+      IF (t^.Kind = Tree.NoPattern) OR (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      Pattern := t^.OnePattern.Pattern;
+      CASE Pattern^.Kind OF
+      | Tree.Decompose: WITH Pattern^.Decompose DO
+	    IF (Objects^.Object.TypeDesc^.Kind = Tree.UserType) OR
+	       IsNotEqual (Object^.Class.TypeDesc^.NodeTypes.Types,
+		  Objects^.Object.TypeDesc^.NodeTypes.Types) THEN
+	       IF Object^.Class.Extensions^.Kind = Tree.NoClass THEN	(* Low ? *)
+		  @   if (@ ImplJava (Path); @.yyKind () != @ 
+		  WTreeName (Object^.Class.TypeDesc);
+		  !.k! WI (Object^.Class.Name);
+	       ELSE
+		  @   if (! @ ImplJava (Path); @.isType (@ 
+		  WTreeName (Object^.Class.TypeDesc);
+		  !.k! WI (Object^.Class.Name); @)@ 
+	       END;
+	       !)! GenExit;
+	    END;
+	    Match (Patterns, Object^.Class.Objects);
+	 END;
+
+      | Tree.VarDef: WITH Pattern^.VarDef DO
+	    IF Object # NoTree THEN
+	       WITH Object^.Object DO
+		  @   if (! (equal@ CppName (TypeDesc); @ (@ ImplJava (Path);
+		  !, ! ImplJava (Pattern^.VarDef.Path); !)))! GenExit;
+	       END;
+	    END;
+	 END;
+
+      | Tree.NilTest:
+	 !   if (! ImplJava (Pattern^.NilTest.Path); @ != null)@ GenExit;
+
+      | Tree.DontCare1:
+      | Tree.DontCare: RETURN;
+
+      | Tree.Value: WITH Pattern^.Value DO
+	    AssignTempo (Expr);
+	    IF (Objects^.Object.TypeDesc^.Kind = Tree.UserType) AND
+	       IsElement (Objects^.Object.TypeDesc^.UserType.Type, UserTypes) THEN
+	       !  {! DefJava (Objects^.Object.TypeDesc); ! yyT; yyT = ! Expression (Expr); !;!
+	       @   if (! (equal@ DefJava (Objects^.Object.TypeDesc);
+	       ! (! ImplJava (Path); !, yyT)))! GenExit;
+	       !  }!
+	    ELSE
+	       @   if (! (equal@ DefJava (Objects^.Object.TypeDesc);
+	       ! (! ImplJava (Path); !, ! Expression (Expr); !)))! GenExit;
+	    END;
+	    MatchExpr (Expr);
+	 END;
+      END;
+      Match (t^.OnePattern.Next, Objects^.Object.Next);
+   END Match;
+
+PROCEDURE MatchExprs (t: tTree);
+   BEGIN
+      IF t^.Kind = Tree.NoExpr THEN RETURN; END;
+      IF t^.OneExpr.Expr^.Kind = Tree.DontCare THEN RETURN; END;
+      MatchExpr (t^.OneExpr.Expr);
+      MatchExprs (t^.OneExpr.Next);
+   END MatchExprs;
+
+PROCEDURE MatchExpr (t: tTree);
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.Compose:
+	 MatchExprs (t^.Compose.Exprs);
+
+      | Tree.VarUse	:
+      | Tree.Nil	:
+      | Tree.DontCare1	:
+      | Tree.TargetExpr	:
+      | Tree.StringExpr	:
+      | Tree.AttrDesc	:
+
+      | Tree.Call	: WITH t^.Call DO
+	    MatchExpr (Expr);
+	    MatchExprs (Exprs);
+	    IF Object # NoTree THEN
+	       Match (Patterns, Object^.Routine.OutObjects);
+	    END;
+	 END;
+
+      | Tree.Binary	: WITH t^.Binary DO
+	    MatchExpr (Lop);
+	    MatchExpr (Rop);
+	 END;
+
+      | Tree.PreOperator, Tree.PostOperator	:
+	 MatchExpr (t^.PreOperator.Expr);
+
+      | Tree.Index	:
+	 MatchExpr (t^.Index.Expr);
+	 MatchExprs (t^.Index.Exprs);
+
+      | Tree.Parents	:
+	 MatchExpr (t^.Parents.Expr);
+
+      | Tree.Guard	:
+	 MatchExpr (t^.Guard.Expr);
+      END;
+   END MatchExpr;
+
+PROCEDURE AssignTempos (t: tTree);
+   BEGIN
+      IF t^.Kind = Tree.NoExpr THEN RETURN; END;
+      IF t^.OneExpr.Expr^.Kind = Tree.DontCare THEN RETURN; END;
+      AssignTempo (t^.OneExpr.Expr);
+      AssignTempos (t^.OneExpr.Next);
+   END AssignTempos;
+
+PROCEDURE AssignTempo (t: tTree);
+   VAR
+      n		: CARDINAL;
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.Compose: WITH t^.Compose DO
+	    !   ! WI (Tempo); ! = new ! WTreeName (Object^.Class.TypeDesc);
+	       !.! WI (Object^.Class.Name); !();!
+	    AssignSubFormals (Exprs, Object^.Class.Objects, Tempo,
+	       Object^.Class.Name,
+	       Object^.Class.TypeDesc^.NodeTypes.TreeName^.TreeName.Name);
+	 END;
+
+      | Tree.VarUse	:
+      | Tree.Nil	:
+      | Tree.DontCare1	:
+      | Tree.TargetExpr	:
+      | Tree.StringExpr	:
+      | Tree.AttrDesc	:
+
+      | Tree.Call	: WITH t^.Call DO
+	    AssignTempo (Expr);
+	    AssignTempos (Exprs);
+	 END;
+
+      | Tree.Binary	: WITH t^.Binary DO
+	    AssignTempo (Lop);
+	    AssignTempo (Rop);
+	 END;
+
+      | Tree.PreOperator, Tree.PostOperator	:
+	 AssignTempo (t^.PreOperator.Expr);
+
+      | Tree.Index	:
+	 AssignTempo (t^.Index.Expr);
+	 AssignTempos (t^.Index.Exprs);
+
+      | Tree.Parents	:
+	 AssignTempo (t^.Parents.Expr);
+
+      | Tree.Guard	: WITH t^.Guard DO
+	    AssignTempo (Expr);
+	    IF Tempo # NoIdent THEN
+	       !   ! WI (Tempo); ! = ! Expression (Expr); !;!
+	       IF (Object^.Kind = Tree.Object) AND
+		  (Object^.Object.TypeDesc^.Kind = Tree.NodeTypes) THEN
+		  WITH Object^.Object.TypeDesc^.NodeTypes DO
+		     IndexToClass := TreeName^.TreeName.IndexToClass;
+		     n := Card (Types);
+		     IF n = 1 THEN
+			@   if (@ WI (Tempo); @.yyKind () != @ 
+			WTreeName (IndexToClass^ [Select (Types)]^.Class.TypeDesc);
+			!.k! WI (IndexToClass^ [Select (Types)]^.Class.Name);
+			!)! GenExit;
+		     ELSE
+			@   switch (@ WI (Tempo); @.yyKind ()) {@
+			AltTreeName := TreeName^.TreeName.Name;
+			ForallDo (Types, GenCase);
+			!     break;!
+			!    default:! GenExit;
+			!   }!
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END AssignTempo;
+
+PROCEDURE GenCase (i: CARDINAL);
+   BEGIN
+      !    case ! WI (AltTreeName); !.k! WI (IndexToClass^ [i]^.Class.Name); !:!
+   END GenCase;
+
+PROCEDURE AssignFormals (t, Objects: tTree);
+   BEGIN
+      IF (t^.Kind = Tree.NoExpr) OR (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.OneExpr.Expr^.Kind = Tree.DontCare THEN
+	 BeginFormals (Objects);
+	 RETURN;
+      END;
+      AssignFormal (t^.OneExpr.Expr, Objects);
+      MatchExpr (t^.OneExpr.Expr);
+      AssignFormals (t^.OneExpr.Next, Objects^.Object.Next);
+   END AssignFormals;
+
+PROCEDURE AssignFormal (t, Objects: tTree);
+   VAR With	: tIdent;
+   BEGIN
+      IF t^.Kind = Tree.Compose THEN
+	 WITH t^.Compose DO
+	    With := MakeWith ();
+	    !   { ! WTreeName (Object^.Class.TypeDesc); ! ! WI (With); !;!!!~
+	    WI (With); ! = ! WTreeName (Object^.Class.TypeDesc); !.make (!;
+	    WTreeName (Object^.Class.TypeDesc); !.! WI (Object^.Class.Name); !);!!!~
+	    !    /***/ ! WI (Objects^.Object.Name); !.ref = ! WI (With); !;!!!~
+	    AssignSubFormals (Exprs, Object^.Class.Objects, With,
+			      Object^.Class.Name,
+			      Object^.Class.TypeDesc^.NodeTypes.TreeName^.TreeName.Name);
+	    !   }!!!~
+	 END;
+      ELSE
+	 AssignTempo (t);
+      END;
+
+      CASE t^.Kind OF
+      | Tree.VarUse, Tree.Nil, Tree.Call, Tree.Binary, Tree.PreOperator,
+	Tree.PostOperator, Tree.Index, Tree.Parents, Tree.TargetExpr,
+	Tree.StringExpr, Tree.Guard, Tree.AttrDesc:
+	 !   /***/ ! WI (Objects^.Object.Name); !.ref = ! Expression (t); !;!!!~
+      | Tree.DontCare1:
+	 !    begin! DefJava (Objects^.Object.TypeDesc); ! (/***/ ! WI (Objects^.Object.Name); !.ref)!!!~
+      ELSE
+      END;
+   END AssignFormal;
+
+PROCEDURE AssignSubFormals (t, Objects: tTree; PrevWith, Composer: tIdent; TreeName: tIdent);
+   BEGIN
+      IF (t^.Kind = Tree.NoExpr) OR (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.OneExpr.Expr^.Kind = Tree.DontCare THEN
+	 BeginSubFormals (Objects, PrevWith, Composer);
+	 RETURN;
+      END;
+      AssignSubFormal (t^.OneExpr.Expr, Objects, PrevWith, Composer, TreeName);
+      AssignSubFormals (t^.OneExpr.Next, Objects^.Object.Next, PrevWith, Composer, TreeName);
+   END AssignSubFormals;
+
+PROCEDURE AssignSubFormal (t, Objects: tTree; PrevWith, Composer: tIdent; AltTreeName: tIdent);
+   VAR With	: tIdent;
+   BEGIN
+      IF t^.Kind = Tree.Compose THEN
+	 WITH t^.Compose DO
+	    With := MakeWith ();
+	    !   { ! WTreeName (Object^.Class.TypeDesc); !.! WI (Object^.Class.Name); ! ! WI (With); !;!
+	    !    ! WI (With); ! = new ! WTreeName (Object^.Class.TypeDesc);
+	       !.! WI (Object^.Class.Name); !();!
+	    !    ((! WTreeName (Object^.Class.TypeDesc); !.! WI (Composer); !) ! 
+	    WI (PrevWith); !).! WI (Objects^.Object.Name); ! = ! WI (With); !;!
+	    AssignSubFormals (Exprs, Object^.Class.Objects, With, Object^.Class.Name, Object^.Class.TypeDesc^.NodeTypes.TreeName^.TreeName.Name);
+	    !   }!
+	 END;
+      ELSE
+	 AssignTempo (t);
+      END;
+
+      CASE t^.Kind OF
+      | Tree.VarUse, Tree.Nil, Tree.Call, Tree.Binary, Tree.PreOperator,
+	Tree.PostOperator, Tree.Index, Tree.Parents, Tree.TargetExpr,
+	Tree.StringExpr, Tree.Guard, Tree.AttrDesc:
+	 !    ((! WI (AltTreeName); !.! WI (Composer); !) ! WI (PrevWith);
+	 !).! WI (Objects^.Object.Name); ! = ! Expression (t); !;!
+      | Tree.DontCare1:
+	 WITH Objects^.Object DO
+	    IF (AttrOrChild # NoTree) AND (AttrOrChild^.Attribute.Init # NoString) THEN
+	       !    ((! WI (AltTreeName); !.! WI (Composer); !) ! WI (PrevWith); !).! 
+	       WI (Name); ! = ! WriteString (f, AttrOrChild^.Attribute.Init); !;!
+	    ELSE
+	       !    begin! CppName (TypeDesc); ! (((! WI (AltTreeName);
+	       !.! WI (Composer); !) ! WI (PrevWith); !).! WI (Name); !)!
+	    END;
+	 END;
+      ELSE
+      END;
+   END AssignSubFormal;
+
+PROCEDURE BeginFormals (Objects: tTree);
+   BEGIN
+      IF Objects^.Kind = Tree.Object THEN
+	 WITH Objects^.Object DO
+	    !    begin! CppName (TypeDesc); ! (/***/ ! WI (Name); !.ref)!!!~
+	    BeginFormals (Next);
+	 END;
+      END;
+   END BeginFormals;
+
+PROCEDURE BeginSubFormals (Objects: tTree; PrevWith, Composer: tIdent);
+   BEGIN
+      IF Objects^.Kind = Tree.Object THEN
+	 WITH Objects^.Object DO
+	    IF (AttrOrChild # NoTree) AND (AttrOrChild^.Attribute.Init # NoString) THEN
+	       !    ((! WI (Composer); !) ! WI (PrevWith); !).! WI (Name);
+	       ! = ! WriteString (f, AttrOrChild^.Attribute.Init); !;!
+	    ELSE
+	       !    begin! CppName (TypeDesc); ! (((! WI (Composer); !) ! 
+	       WI (PrevWith); !).! WI (Name); !)!
+	    END;
+	    BeginSubFormals (Next, PrevWith, Composer);
+	 END;
+      END;
+   END BeginSubFormals;
+
+PROCEDURE ConsPatterns (t: tTree; ListCount: INTEGER): INTEGER;
+   BEGIN
+      IF t^.Kind = Tree.NoPattern THEN RETURN ListCount; END;
+      WITH t^.OnePattern DO
+	 IF Pattern^.Kind = Tree.DontCare THEN
+	    RETURN ConsTempos (Pattern^.DontCare.Tempos, ListCount, TRUE);
+	 ELSE
+	    IF ListCount > 0 THEN !, ! END;
+	    !*&* ! WI (Pattern^.Pattern.Tempo);
+	    RETURN ConsPatterns (Next, ListCount + 1);
+	 END;
+      END;
+   END ConsPatterns;
+
+PROCEDURE RefType (t: tTree);
+   BEGIN
+      WITH t^ DO
+	 CASE Kind OF
+	 | Tree.NodeTypes:  WTreeName (t);
+	 | Tree.UserType:   WI (UserType.Type);
+	 | Tree.TargetType: !???TargetType???!!!~
+	 END;
+      END;
+      !Ref!;
+   END RefType;
+
+PROCEDURE PreCall (t: tTree);
+   BEGIN
+      WHILE t^.Kind = Tree.OnePattern DO
+	 WITH t^.OnePattern DO
+	    IF Pattern^.Kind # Tree.DontCare THEN
+	       RefType (Pattern^.Pattern.TypeDesc);
+	       ! ! WI (Pattern^.Pattern.Tempo); !Ref = new ! RefType (Pattern^.Pattern.TypeDesc); !();!!!~
+	    END;
+	    t := t^.OnePattern.Next;
+	 END;
+      END;
+   END PreCall;
+
+PROCEDURE ConsTempos (t: tTree; ListCount: INTEGER; IsRef: BOOLEAN): INTEGER;
+   BEGIN
+      IF t^.Kind = Tree.Object THEN
+	 IF ListCount > 0 THEN !, ! END;
+	 IF IsRef THEN !*&* !!!~
+	 END;
+	 WI (t^.Object.Name);
+	 RETURN ConsTempos (t^.Object.Next, ListCount + 1, IsRef);
+      ELSE
+	 RETURN ListCount;
+      END;
+   END ConsTempos;
+
+PROCEDURE Expressions (t: tTree; ListCount: INTEGER): INTEGER;
+   BEGIN
+      IF t^.Kind = Tree.NoExpr THEN RETURN ListCount; END;
+      WITH t^.OneExpr DO
+	 IF Expr^.Kind = Tree.DontCare THEN
+	    RETURN ConsTempos (Expr^.DontCare.Tempos, ListCount, FALSE);
+	 ELSE
+	    IF ListCount > 0 THEN !, ! END;
+	    Expression (Expr);
+	    RETURN Expressions (Next, ListCount + 1);
+	 END;
+      END;
+   END Expressions;
+
+PROCEDURE Expressions2 (t: tTree; ListCount: INTEGER; Objects: tTree): INTEGER;
+   BEGIN
+      IF t^.Kind = Tree.NoExpr THEN RETURN ListCount; END;
+      WITH t^.OneExpr DO
+	 IF Expr^.Kind = Tree.DontCare THEN
+	    RETURN ConsTempos (Expr^.DontCare.Tempos, ListCount, FALSE);
+	 ELSE
+	    IF ListCount > 0 THEN !, ! END;
+	    IF Objects^.Object.Path^.Var.IsOutput THEN !(! END;
+	    Expression (Expr);
+	    IF Objects^.Object.Path^.Var.IsOutput THEN !).ref! END;
+	    RETURN Expressions2 (Next, ListCount + 1, Objects^.Object.Next);
+	 END;
+      END;
+   END Expressions2;
+
+PROCEDURE Expression (t: tTree);
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.Compose	: WI (t^.Compose.Tempo);
+
+      | Tree.Nil	: !null! 
+
+      | Tree.VarUse	: WITH t^.VarUse DO
+	    IF Object # NoTree THEN
+	       ImplJava (Object^.Object.Path);
+	    ELSE
+	       WI (Name);
+	    END;
+	 END;
+
+      | Tree.DontCare1	: WI (t^.DontCare1.Tempo);
+
+      | Tree.Call	: WITH t^.Call DO
+	    IF TailRecursion THEN
+	       TailExpressions (Exprs, Object^.Routine.InObjects);
+	       TailPatterns (Patterns, Object^.Routine.OutObjects);
+	       !   continue yyRecursion;!
+	    ELSE
+	       Expression (Expr); ! (! 
+	       IF Object # NoTree THEN
+		  ListCount := Expressions2 (Exprs, 0, Object^.Routine.InObjects);
+		  ListCount := ConsPatterns (Patterns, ListCount);
+	       ELSE
+		  ListCount := Expressions (Exprs, 0);
+		  ListCount := Expressions (Patterns, ListCount);
+	       END;
+	       !)! 
+	    END;
+	 END;
+
+      | Tree.Binary	: WITH t^.Binary DO
+	    Expression (Lop); ! ! WI (Operator); ! ! Expression (Rop);
+	 END;
+
+      | Tree.PreOperator	:
+	 WI (t^.PreOperator.Operator); ! ! Expression (t^.PreOperator.Expr);
+
+      | Tree.PostOperator	:
+	 Expression (t^.PostOperator.Expr); ! ! WI (t^.PostOperator.Operator);
+
+      | Tree.Index	:
+	 Expression (t^.Index.Expr); ! [! ListCount := Expressions (t^.Index.Exprs, 0); !]! 
+
+      | Tree.Parents	: !(! Expression (t^.Parents.Expr); !)! 
+
+      | Tree.Guard	: WITH t^.Guard DO
+	    !(! TypeOf (Object, Object); !) ! 
+	    IF Tempo = NoIdent THEN
+	       Expression (t^.Guard.Expr);
+	    ELSE
+	       WI (Tempo);
+	    END;
+	 END;
+
+      | Tree.TargetExpr	: ImplJava (t^.TargetExpr.Expr);
+
+      | Tree.StringExpr	: WriteString (f, t^.StringExpr.String);
+
+      | Tree.AttrDesc	: WITH t^.AttrDesc DO
+	    TypedPath (Object^.Object.Path, Object^.Object.TypeDesc); !.! WI (Attribute);
+	 END;
+      END;
+   END Expression;
+
+PROCEDURE MakeWith (): tIdent;
+   VAR String1, String2	: tString;
+   BEGIN
+      INC (WithCount);
+      ArrayToString ("yyW", String1);
+      IntToString (WithCount, String2);
+      Concatenate (String1, String2);
+      RETURN MakeIdent (String1);
+   END MakeWith;
+
+(* not used *)
+PROCEDURE TreePrefix (TreeName: tIdent);
+   BEGIN
+      WI (TreeName);
+   END TreePrefix;
+}
+
+BEGIN {
+   ColumnCount	:= 0;
+   MatchScope	:= 0;
+   GenExit	:= GenRuleExit;
+   AssignEmpty (Newline); Append (Newline, 12C);
+}
+
+PROCEDURE TypeOf (t: Tree, default: Tree)
+
+t := AttrDesc (...) :-
+	TypeOf (TypeDesc, default);
+	.
+t := VarUse (...) :-
+	TypeOf (Object, default);
+	.
+t := Call (...) :-
+	TypeOf (Object, default);
+	.
+t := PreOperator (...) :-
+	TypeOf (Expr, default);
+	.
+t := PostOperator (...) :-
+	TypeOf (Expr, default);
+	.
+t := Parents (...) :-
+	TypeOf (Expr, default);
+	.
+t := Object (...) :-
+	TypeOf (TypeDesc, default);
+	.
+t := Function (...) :-
+	TypeOf (ReturnObjects, default);
+	.
+t := NodeTypes (...) :-
+	WTreeName (t);
+	IF Card (BaseTypes) = 1 THEN
+	   !.! WI (TreeName^.TreeName.IndexToClass^ [Minimum (BaseTypes)]^.Class.Name); 
+	END;
+	.
+t := UserType (...) :-
+	WI (Type);
+	.
+t := TargetType (...) :-
+	ImplJava (Type);
+	.
+t := TargetExpr (...) :-
+	ImplJava (default);
+	.
+t := Expr (...) :-
+	Error ("unable to identify type of expression", Pos);
+	Tree.WriteTreeNode (IO.StdError, t);
+	.
+
+PROCEDURE PostCall (t: Tree)
+
+Call (...) :-
+	PostCall (Patterns);
+.
+OnePattern (...) :-
+	PostCall (Pattern);
+.
+Pattern (...) :-
+.
+
+PROCEDURE MacroJava (t: Tree)
+
+Spec (..) :-
+	MacroJava (TreeNames);
+	.
+TreeName (..) :-
+	!# ifndef begin! WI (Name); !!
+	!# define begin! WI (Name); !(a)	a = null;!
+	!# endif!
+	!# ifndef equal! WI (Name); !!
+	!# define equal! WI (Name); !(a, b)	(a.equals (b))!
+	!# endif!
+	MacroJava (Next);
+	.
+
+PROCEDURE DefJava (t: Tree)
+
+.. :-
+   CONDITION ColumnCount > 50;
+   CONDITION IsElement (ORD (':'), Options);
+   WriteNl (f);
+   REJECT;
+   .
+TreeName (..) :-
+//	!import ! IF Package # NoIdent THEN WI (Package); !.! END; WI (Name); !;!
+//	!import ! IF Package # NoIdent THEN WI (Package); !.! END; WI (Name); !.*;!
+	DefJava (Next);
+	.
+Object (..) :-
+	IF ListCount > 0 THEN !, ! END;
+	DefJava (TypeDesc);
+	IF Path^.Var.IsOutput THEN !***! END;
+	! ! WI (Name);
+	IF NOT Path^.Var.IsOutput THEN !.ref! END;!//!!!~
+	INC (ListCount);
+	DefJava (Next);
+	.
+NodeTypes (..) :-
+	WTreeName (t);
+/*
+	!//! 
+     IF Card (BaseTypes) > 1 THEN
+	WI (TreeName^.TreeName.IndexToClass^ [Minimum (BaseTypes)]^.Class.Name);
+	!-! 
+	WI (TreeName^.TreeName.IndexToClass^ [Maximum (BaseTypes)]^.Class.Name);
+	! ! 
+     END;
+	WN (Card (BaseTypes));
+	!!
+*/
+	IF Card (BaseTypes) = 1 THEN
+	   !.! WI (TreeName^.TreeName.IndexToClass^ [Minimum (BaseTypes)]^.Class.Name); 
+	END;
+	.
+UserType (..) :-
+	WI (Type);
+	.
+TargetType (..) :-
+	ImplJava (Type);
+	.
+
+PROCEDURE CppName (t: Tree)
+
+NodeTypes (..) :-
+	WI (TreeName^.TreeName.Name);
+	.
+UserType (..) :-
+	WI (CppType);
+	.
+TargetType (..) :-
+	ImplJava (Type);
+	.
+
+PROCEDURE DefRef (t : Tree)
+
+NodeTypes (..) :-
+	WTreeName (t); !.t! WI (TreeName^.TreeName.Name); !Ref!!!~
+	.
+UserType (..) :-
+	WI (Type); !Ref!!!~
+	.
+
+PROCEDURE ProcHead1 (t: Tree)
+
+Object (..) :-
+	IF ListCount > 0 THEN !, ! END;
+	WI (Name);
+	INC (ListCount);
+	ProcHead1 (Next);
+	.
+
+/* Not used */
+PROCEDURE ProcHead2 (t: Tree)
+
+Object (..) :-
+	! ! 
+	ImplJava (TypeDesc);
+	IF Path^.Var.IsOutput THEN
+	   !Ref **decl*!!!~
+	END;
+	! ! WI (Name); !;!!!~
+	ProcHead2 (Next);
+	.
+
+PROCEDURE ProcHead3 (t: Tree)
+
+Object (..) :-
+	IF ListCount > 0 THEN !, ! END;
+	ImplJava (TypeDesc); IF Path^.Var.IsOutput THEN !Ref **decl*! END; ! ! WI (Name);
+	INC (ListCount);
+	ProcHead3 (Next);
+	.
+
+PROCEDURE ImplJava (t: Tree)
+
+_ :-
+	CONDITION ColumnCount > 50;
+	CONDITION IsElement (ORD (':'), Options);
+	WriteNl (f);
+	REJECT;
+	.
+Spec (..) :-
+	LineCount := 0;
+	GetPackage (TrafoName, iPackage, iClass);
+	IF iPackage # NoIdent THEN
+	   !package ! WI (iPackage); !;!
+	END;
+	!!
+	WriteDirective (Codes^.Codes.ImportLine);
+	WriteText (f, Codes^.Codes.Import);
+	!!
+	!# ifndef yyNoDefaultImport!
+	!import de.cocolab.reuse.CocktailWriter;!
+	!import de.cocolab.reuse.TrafoAbortException;!
+	DefJava (TreeNames);
+	!# endif!
+	!!
+	WriteDirective (Codes^.Codes.GlobalLine);
+	WriteText (f, Codes^.Codes.Global);
+	!!
+	!# ifndef yyWrite!
+	!# define yyWrite(s) yyf.write (s)!
+	!# endif!
+	!# ifndef yyWriteNl!
+	!# define yyWriteNl yyf.writeNl ()!
+	!# endif!
+	!# ifndef YYTHROWS!
+	!# define YYTHROWS!
+	!# endif!
+	!!
+	@# include "yy@ WI (iClass); @.h"@
+	!!
+	!public class ! WI (iClass); ! {!
+	WriteDirective (Codes^.Codes.ExportLine);
+	WriteText (f, Codes^.Codes.Export);
+	!!
+	DeclareGlobalVars (Declarations);
+	!   static CocktailWriter yyf = new CocktailWriter (System.out);!
+	!   static boolean yyb;!
+	!!
+	!# ifndef yyAbort!
+	!# define yyAbort(yyFunction) \!
+	@   throw new TrafoAbortException ("@ WI (TrafoName); @", yyFunction)@~
+	!# endif!
+	!!
+	ImplJava (Routines);
+	! void begin! WI (iClass); !() {!
+	WriteDirective (Codes^.Codes.BeginLine);
+	WriteText (f, Codes^.Codes.Begin);
+	! }!
+	!!
+	! void close! WI (iClass); !() {!
+	WriteDirective (Codes^.Codes.CloseLine);
+	WriteText (f, Codes^.Codes.Close);
+	! }!
+	!}!
+	.
+Procedure (..) :-
+	ListCount := 0;
+	IF IsPublic THEN ! public! ELSE ! private! END; ! static void ! 
+	WI (Name); ! (! ProcHead3 (InObjects); ProcHead3 (OutObjects); !) YYTHROWS!
+	! {!
+	WriteDirective (LocalLine);
+	WriteText (f, Local);
+	Declare (Declarations);
+	GenInit (Declarations);
+	RoutineKind := kProcedure;
+	gInObjects := InObjects;
+	gOutObjects := OutObjects;
+	IF HasTailRecursion THEN
+	   !  yyRecursion: while (true) {!
+	END;
+      IF IsElement (ORD ('n'), Options) THEN
+	Tg1 (InObjects);
+      END;
+      IF IsElement (ORD ('b'), Options) THEN
+	ImplJava (Rules);
+        IF IsElement (ORD ('f'), Options) AND NOT IsTrip THEN
+	   @  yyAbort ("@ WI (Name); @");@
+        END;
+      ELSE
+	TemposDone := FALSE;
+	CommonTestElim (Decisions);
+        IF IsElement (ORD ('f'), Options) AND NOT IsTrip AND NOT NeedsNoFinale (Decisions) THEN
+	   @ yyAbort ("@ WI (Name); @");@
+	END;
+      END;
+	IF HasTailRecursion THEN
+	   IF NOT NeedsNoFinale (Decisions) AND NOT IsElement (ORD ('f'), Options) THEN
+	      !   return;!
+	   END;
+	   !  }!
+	END;
+	! }!
+	!!
+	ImplJava (Next);
+	.
+Function (..) :-
+	ListCount := 0;
+	IF NOT IsPublic THEN ! private! ELSE ! public! END; ! static ! 
+	DefJava (ReturnObjects^.Object.TypeDesc); ! ! WI (Name);
+	! (! ProcHead3 (InObjects); ProcHead3 (OutObjects); !) YYTHROWS!
+	! {!
+	WriteDirective (LocalLine);
+	WriteText (f, Local);
+	Declare (Declarations);
+	GenInit (Declarations);
+	RoutineKind := kFunction;
+	gInObjects := InObjects;
+	gOutObjects := OutObjects;
+	gReturnObjects := ReturnObjects;
+	IF HasTailRecursion THEN
+	   !  yyRecursion: while (true) {!
+	END;
+      IF IsElement (ORD ('b'), Options) THEN
+	ImplJava (Rules);
+	@  yyAbort ("@ WI (Name); @");@
+      ELSE
+	TemposDone := FALSE;
+	CommonTestElim (Decisions);
+	IF NOT NeedsNoFinale (Decisions) THEN
+	   @  yyAbort ("@ WI (Name); @");@
+	END;
+      END;
+	IF HasTailRecursion THEN
+	   !  }!
+	END;
+	! }!
+	!!
+	ImplJava (Next);
+	.
+Predicate (..) :-
+	ListCount := 0;
+	IF NOT IsPublic THEN ! private! ELSE ! public! END; ! static boolean ! 
+	WI (Name); ! (! ProcHead3 (InObjects); ProcHead3 (OutObjects); !) YYTHROWS!
+	! {!
+	WriteDirective (LocalLine);
+	WriteText (f, Local);
+	Declare (Declarations);
+	GenInit (Declarations);
+	RoutineKind := kPredicate;
+	gInObjects := InObjects;
+	gOutObjects := OutObjects;
+	IF HasTailRecursion THEN
+	   !  yyRecursion: while (true) {!
+	END;
+      IF IsElement (ORD ('n'), Options) THEN
+	Tg1 (InObjects);
+      END;
+      IF IsElement (ORD ('b'), Options) THEN
+	ImplJava (Rules);
+	!   return false;!
+      ELSE
+	TemposDone := FALSE;
+	CommonTestElim (Decisions);
+	IF NOT NeedsNoFinale (Decisions) THEN
+	   !   return false;!
+	END;
+      END;
+	IF HasTailRecursion THEN
+	   !  }!
+	END;
+	! }!
+	!!
+	ImplJava (Next);
+	.
+Rule (Statements := Statements) :- {
+	WriteDirective (Line);
+	RuleCount := Index;
+	WithCount := 0;
+	!yyL! WN (RuleCount); !: {!
+	Declare (Patterns);
+	Declare (Exprs);
+	Declare (Expr);
+	Declare (Statements);
+	Match (Patterns, gInObjects);
+	IF Statements^.Kind # Tree.NoStatement THEN
+	   !  {!
+	   !# ifdef YYTRACE!
+	   @      System.out.println ("Rule line @ WN (Line.Line); @");@
+	   !# endif!
+	   ImplJava (Statements);
+	   !  }!
+	END;
+	IF HasTailRecursion IN Properties THEN
+	   IF RoutineKind = kFunction THEN
+	      AssignFormals (Exprs, gOutObjects);
+	      AssignTempo (Expr);
+	      Expression (Expr);
+	   END;
+	ELSIF NOT Statements::DoesStop THEN
+	   AssignFormals (Exprs, gOutObjects);
+	   CASE RoutineKind OF
+	   | kProcedure: !   return;!
+
+	   | kFunction :
+	      IF (HasPatterns IN Properties) AND (Expr^.Kind # Tree.Compose) AND (t^.Kind # Tree.DontCare1) THEN
+		 !  {! DefJava (gReturnObjects^.Object.TypeDesc); ! ! WI (Tempo); !;!
+		 AssignTempo (Expr);
+		 !   ! WI (Tempo); ! = ! Expression (Expr); !;!
+		 MatchExpr (Expr);
+		 !   return ! WI (Tempo); !;!
+		 !  }!
+	      ELSE
+		 AssignTempo (Expr);
+		 MatchExpr (Expr);
+		 !   return ! Expression (Expr); !;!
+	      END;
+
+	   | kPredicate: !   return true;!
+	   END;
+	END;
+};
+	!  }!
+	!!
+	ImplJava (Next);
+	.
+ProcCall (..) :-
+	WriteDirective (Pos);
+	AssignTempo (Call);
+	IF (Call^.Kind = Tree.Call) AND Call^.Call.TailRecursion THEN
+	   Expression (Call);
+	ELSE
+	   !   ! Expression (Call); !;!
+	   MatchExpr (Call);
+	   ImplJava (Next);
+	END;
+	.
+Condition (..) :-
+	WriteDirective (Pos);
+	AssignTempo (Expr);
+	IF (Expr^.Kind = Tree.Call) AND Expr^.Call.TailRecursion THEN
+	   Expression (Expr);
+	ELSE
+	   @   if (! (@ Expression (Expr); @))@ GenExit ();
+	   MatchExpr (Expr);
+	   IF Next^.Kind # Tree.NoStatement THEN
+	      !  {!
+	      ImplJava (Next);
+	      !  }!
+	   END;
+	END;
+	.
+Statement (IsReachable := (FALSE)) :-
+	.
+Assignment (..) :-
+	WriteDirective (Pos);
+	AssignTempo (Adr);
+	AssignTempo (Expr);
+	IF Object # NoTree THEN
+	   !   ! ImplJava (Object^.Object.Path);
+	ELSE
+	   !   ! Expression (Adr);
+	END;
+	! ! WI (Operator); ! ! Expression (Expr); !;!
+	MatchExpr (Adr);
+	MatchExpr (Expr);
+	ImplJava (Next);
+	.
+VarDecl (..) :-
+	ImplJava (Next);
+	.
+InitDecl (..) :-
+	WriteDirective (Pos);
+	AssignTempo (Expr);
+	!   ! WI (Name); ! = ! Expression (Expr); !;!
+	MatchExpr (Expr);
+	ImplJava (Next);
+	.
+MatchStmt (..) :-
+	WriteDirective (Pos);
+	IF Tempo # NoIdent THEN
+	   AssignTempos (Exprs);
+	   !   ! ImplJava (Object^.Object.Path); ! = ! Expression (Exprs^.OneExpr.Expr); !;!
+	   MatchExprs (Exprs);
+	END;
+	Match (Patterns, Object);
+	ImplJava (Next);
+	.
+IfMatch (..) :-				// declares scopes
+	WriteDirective (Pos);
+	PrevGenExit	: PROC := GenExit;
+	Label		: INTEGER := NewLabel ();
+	   !   yyb = false;!
+	IF Expr^.Kind # NoExpression THEN
+	   AssignTempo (Expr);
+	   @   if (@ Expression (Expr); @) {@
+	   MatchExpr (Expr);
+	END
+	IF Tempo # NoIdent THEN
+	   AssignTempos (Exprs);
+	   !   ! ImplJava (Object^.Object.Path); ! = ! Expression (Exprs^.OneExpr.Expr); !;!
+	   MatchExprs (Exprs);
+	END
+	   !yyM! WN (Label); !: {!
+	   GenExit := GenMatchExit;
+	   Match (Patterns, Object);
+	   GenExit := PrevGenExit;
+	   !   yyb = true; break yyM! WN (Label); !;!
+	   !   }!
+	IF Expr^.Kind # NoExpression THEN
+	   !   }!
+	END
+	   !   if (yyb) {!
+	   Declare (Then);
+	   ImplJava (Then);
+	IF Else^.Kind # Tree.NoStatement THEN
+	   !   } else {!
+	   Declare (Else);
+	   ImplJava (Else);
+	END
+	   !   }!
+	ImplJava (Next);
+	.
+If (..) :-				// declares scopes
+	WriteDirective (Pos);
+	AssignTempo (Expr);
+	IF NeedsMatch (Expr) THEN
+	   !   yyb = ! Expression (Expr); !;!
+	   MatchExpr (Expr);
+	   !   if (yyb) {!
+	ELSE
+	   !   if (! Expression (Expr); !) {!
+	END
+	   Declare (Then);
+	   ImplJava (Then);
+	IF Else^.Kind = Tree.If THEN
+	   !   } else!
+	   Declare (Else);
+	   ImplJava (Else);
+	ELSIF Else^.Kind # Tree.NoStatement THEN
+	   !   } else {!
+	   Declare (Else);
+	   ImplJava (Else);
+	   !   }!
+	ELSE
+	   !   }!
+	END
+	ImplJava (Next);
+	.
+For (Init := Init) :-			// declares scopes
+	WriteDirective (Pos);
+	IF Init ?= DeclStmt (...) THEN
+	   !   {!
+	   Declare (Init);
+	END
+	   ImplJava (Init);
+	   AssignTempo (Expr);
+	   !   while (! Expression (Expr); !) {!
+	   Declare (Step);
+	   Declare (Statements);
+	   MatchExpr (Expr);
+	   ImplJava (Statements);
+	   ImplJava (Step);
+	IF Init ?= DeclStmt (...) THEN
+	   !   }}!
+	ELSE
+	   !   }!
+	END
+	ImplJava (Next);
+	.
+ForEach (Var := Var) :-			// declares scopes
+	WriteDirective (Pos);
+	id: tIdent;
+	IF Var ?= DeclStmt (Declarations := d: VarDecl (...)) THEN
+	   !   {!
+	   Declare (Var);
+	   id := d::Name;
+	ELSIF Var ?= ProcCall (Call := u: VarUse (...)) THEN
+	   id := u::Name;
+	END
+	   AssignTempo (Expr);
+	   !   ! WI (id); ! = (! ImplJava (TypeDesc); !) ! Expression (Expr); !;!
+	   MatchExpr (Expr);
+	   !   while (! WI (id); !.isType (! WTreeName (TypeDesc); !.k! WI (Type); !)) {!
+	   Declare (Statements);
+	   ImplJava (Statements);
+	   !   ! WI (id); ! = (! ImplJava (TypeDesc); !) ! WI (id); !.! WI (Iterator); !;!
+	IF Var ?= DeclStmt (...) THEN
+	   !   }}!
+	ELSE
+	   !   }!
+	END
+	ImplJava (Next);
+	.
+Return (..) :-
+	CONDITION Expr^.Kind = Tree.NoExpr;
+	IF NOT (HasTailRecursion IN Properties) THEN
+	   AssignFormals (Rule^.Rule.Exprs, gOutObjects);
+	   WriteDirective (Pos);
+	   !   return;!
+	END;
+	.
+Return (..) :-
+	AssignFormals (Rule^.Rule.Exprs, gOutObjects);
+	WriteDirective (Pos);
+	IF HasTailRecursion IN Properties THEN
+	   Expression (Expr);
+	ELSIF (HasPatterns IN Properties) AND (Expr^.Kind # Tree.Compose) AND (t^.Kind # Tree.DontCare1) THEN
+	   !  {! DefJava (gReturnObjects^.Object.TypeDesc); ! ! WI (Tempo); !;!
+	   AssignTempo (Expr);
+	   !   ! WI (Tempo); ! = ! Expression (Expr); !;!
+	   MatchExpr (Expr);
+	   !   return ! WI (Tempo); !;!
+	   !  }!
+	ELSE
+	   AssignTempo (Expr);
+	   MatchExpr (Expr);
+	   !   return ! Expression (Expr); !;!
+	END;
+	.
+Reject (..) :-
+	WriteDirective (Pos);
+	!  ! GenExit ();
+	.
+Fail (..) :-
+	WriteDirective (Pos);
+	!   return! IF RoutineKind = kPredicate THEN ! false! END; !;!
+	.
+DeclStmt (..) :-
+	ImplJava (Declarations);
+	ImplJava (Next);
+	.
+TargetStmt (..) :-
+	WriteDirective (Pos);
+	ImplJava (Stmt); !!
+	ImplJava (Next);
+	.
+Nl (..) :-
+	WriteDirective (Pos);
+	!   yyWriteNl;!
+	ImplJava (Next);
+	.
+WriteStr (..) :-
+	WriteDirective (Pos);
+	!   yyWrite (! WriteString (f, String); !);!
+	ImplJava (Next);
+	.
+Ident (..) :-
+	IF Object # NoTree THEN ImplJava (Object^.Object.Path); ELSE WI (Attribute); END;
+	ImplJava (Next);
+	.
+Any (..) :-
+	WriteString (f, Code);
+	IF (Length (Code) = 1) AND IsEqual (Code, Newline) THEN
+	   INC (LineCount); ColumnCount := 0;
+	END;
+	ImplJava (Next);
+	.
+Anys (..) :-
+	ImplJava (Layouts);
+	ImplJava (Next);
+	.
+LayoutAny (..) :-
+	WriteString (f, Code);
+	ImplJava (Next);
+	.
+Designator (..) :-
+	TypedPath (Object^.Object.Path, Object^.Object.TypeDesc); !.! WI (Attribute);
+	ImplJava (Next);
+	.
+Field (..) :-
+	ImplJava (Next);
+	!.! WI (Name);
+	.
+
+	// The following rules try to omit casts where they are not required.
+	// There may be more possible cases here, these are the common ones.
+	// Note: we look for cases which do not need a cast, then default to
+	// using one; this is failing safe.
+
+ConsType (Class := Class (TypeDesc := NodeTypes (Types := requiredType)),
+	Next := Field (Object := Object (TypeDesc :=
+	NodeTypes (BaseTypes := declaredType)))) :-
+	CONDITION Card (declaredType) = 1;
+	CONDITION IsElement (Minimum (declaredType), requiredType);
+	ImplJava (Next);
+	.
+ConsType (..) :-
+	!((! ImplJava (Class^.Class.TypeDesc); !) ! ImplJava (Next); !)! 
+	.
+Var (..) :-
+	WI (Name);
+//???	IF NOT IsOutput THEN
+//???	   !.ref!;
+//???	END;
+	.
+NodeTypes (..) :-
+	WTreeName (t);
+	IF Card (BaseTypes) = 1 THEN
+	   !.! WI (TreeName^.TreeName.IndexToClass^ [Minimum (BaseTypes)]^.Class.Name); 
+	END;
+	.
+UserType (..) :-
+	IF NOT IsElement (Type, UserTypes) THEN !! END; WI (Type);
+	.
+TargetType (..) :-
+	ImplJava (Type);
+	.
+
+PROCEDURE WTreeName (t: Tree)
+
+NodeTypes (..) :-
+	IF TreeName^.TreeName.Package # NoIdent THEN
+	   WI (TreeName^.TreeName.Package); !.!;
+	END;
+	WI (TreeName^.TreeName.Name);
+	.
+
+// Print 'path' with a cast to convert to 'type' if required.
+
+PROCEDURE TypedPath (path: Path, type: TypeDesc)
+
+// required type is a node type, and is a subclass of the actual type: no cast
+Field (Object := Object (TypeDesc := NodeTypes (BaseTypes := declaredType))),
+NodeTypes (Types := requiredType) :-
+	CONDITION Card (declaredType) = 1;
+	CONDITION IsElement (Minimum (declaredType), requiredType);
+	ImplJava (path);
+	.
+// Default: print with cast
+... :-
+	!((! ImplJava (type); !) ! ImplJava (path); !)! 
+	.
+
+PROCEDURE GenInit (Declarations)
+
+VarDecl (..) :-
+	GenInit (Next);
+	.
+InitDecl (..) :-
+	WriteDirective (Pos);
+	AssignTempo (Expr);
+	! ! WI (Name); ! = ! Expression (Expr); !;!
+	GenInit (Next);
+	.
+
+PROCEDURE DeclareGlobalVars (Declarations)
+
+VarDecl (..) :-
+	WriteDirective (Pos);
+	!   static ! DefJava (Object^.Object.TypeDesc); ! ! WI (Name); !;!
+	DeclareGlobalVars (Next);
+	.
+InitDecl (..) :-
+	WriteDirective (Pos);
+	!   static ! DefJava (Object^.Object.TypeDesc); ! ! WI (Name); ! = ! Expression (Expr); !;!
+	DeclareGlobalVars (Next);
+	.
+
+TRIP Declare ([Objects, Declarations, Statements, Patterns, Exprs, Pattern, Expr])
+
+Object (..) :-
+	!   ! DefJava (TypeDesc); ! ! WI (Name); !;!
+	REJECT
+	.
+Declaration (..) :-
+	WriteDirective (Pos);
+	!   ! DefJava (Object^.Object.TypeDesc); ! ! WI (Name); !;!
+	REJECT
+	.
+MatchStmt (..) :-
+	CONDITION Tempo # NoIdent;
+	!   ! DefJava (Object^.Object.TypeDesc); ! ! WI (Tempo); !;!
+	REJECT
+	.
+IfMatch (..) :-				// declares scopes
+	IF Tempo # NoIdent THEN
+	   !   ! DefJava (Object^.Object.TypeDesc); ! ! WI (Tempo); !;!
+	END
+	Declare (Expr);
+	Declare (Exprs);
+	Declare (Patterns);
+//	Declare (Then);
+//	Declare (Else);
+	Declare (Next);
+	.
+If (..) :-				// declares scopes
+	Declare (Expr);
+//	Declare (Then);
+//	Declare (Else);
+	Declare (Next);
+	.
+For (..) :-				// declares scopes
+//	Declare (Init);
+	Declare (Expr);
+//	Declare (Step);
+//	Declare (Statements);
+	Declare (Next);
+	.
+ForEach (..) :-				// declares scopes
+//	Declare (Var);
+	Declare (Expr);
+//	Declare (Statements);
+	Declare (Next);
+	.
+Return (..) :-
+	CONDITION Tempo # NoIdent;
+	!   ! DefJava (gReturnObjects^.Object.TypeDesc); ! ! WI (Tempo); !;!
+	REJECT
+	.
+OnePattern (..) :-
+	CONDITION Pattern^.Pattern.Tempo # NoIdent;
+	CONDITION Pattern^.Kind # Tree.DontCare1;
+	! /*DefJava*/ ! DefRef (Pattern^.Pattern.TypeDesc);
+	   ! ! WI (Pattern^.Pattern.Tempo);
+	   ! = new ! DefRef (Pattern^.Pattern.TypeDesc); !();!
+	REJECT
+	.
+DontCare (..) :-
+	Declare (Tempos);
+	.
+DontCare1 (..) :-
+	CONDITION Tempo # NoIdent;
+	!   ! DefJava (TypeDesc); ! ! WI (Tempo); !;!
+	.
+Compose (..) :-
+	CONDITION Tempo # NoIdent;
+	!   ! DefJava (TypeDesc); ! ! WI (Tempo); !;!
+	REJECT
+	.
+Guard (Object := Object (TypeDesc := TypeDesc)) :-
+	CONDITION Tempo # NoIdent;
+	Declare (Expr);
+	!   ! TypeOf (Expr, TypeDesc); ! ! WI (Tempo); !;!
+	.
+
+PROCEDURE Tg1 (t: Tree)
+
+Object (..) :-
+	TheName := Name;
+	Tg1 (TypeDesc);
+	Tg1 (Next);
+	.
+NodeTypes (..) :-
+	!  if (! WI (TheName); ! == null) return!
+	IF RoutineKind = kPredicate THEN ! false! END; !;!
+	.
+
+PROCEDURE CommonTestElim (t: Tree)
+
+Decision (..) :-
+	IF Cases = 0 THEN
+	   IF NOT TemposDone AND (OneTest^.Kind = Tree.TestValue) AND NeedsTempo (Then, rule) THEN
+	      ! {!
+	      TemposDone := TRUE;
+{	      WITH rule^.Rule DO
+		 RuleCount := Index;
+		 Declare (Patterns);
+		 Declare (Exprs);
+		 Declare (Expr);
+		 Declare (Statements);
+	      END;
+};
+	      CommonTestElim (OneTest);
+	      CommonTestElim (Then);
+	      !  }!
+	      ! }!
+	   ELSE
+	      GetRule (Then, rule);
+	      CommonTestElim (OneTest);
+	      CommonTestElim (Then);
+	      !  }!
+	   END;
+	   IF (OneTest^.Kind = Tree.TestValue) AND
+	      (OneTest^.TestValue.TypeDesc^.Kind = Tree.UserType) AND
+	       IsElement (OneTest^.TestValue.TypeDesc^.UserType.Type, UserTypes) THEN
+	      !  }!
+	   END;
+	   TemposDone := FALSE;
+	   CommonTestElim (Else);
+	ELSE
+	   i := Cases; Case (t);
+	END;
+	.
+Decided (..) :-
+	CommonTestElim (Rule);
+	CONDITION HasExit IN Rule^.Rule.Properties;
+	TemposDone := FALSE;
+	CommonTestElim (Else);
+	.
+TestKind (..) :-
+	!  if (! ImplJava (Path); !.yyKind () == ! 
+	WTreeName (TypeDesc); !.k! WI (Name); !) {!
+	.
+TestIsType (..) :-
+	!  if (! ImplJava (Path); !.isType (! 
+	   WTreeName (TypeDesc); !.k! WI (Name); !)) {!
+	.
+TestNil (..) :-
+	!  if (! ImplJava (Path); ! == null) {!
+	.
+TestNonlin (..) :-
+	!  if (equal! CppName (TypeDesc); ! (! ImplJava (Path); !, ! ImplJava (Path2); !)) {!
+	.
+TestValue (_, _, _, UserType (Type:=Type)) :-
+	CONDITION IsElement (Type, UserTypes);
+	AssignTempo (Expr);
+	!  {! DefJava (TypeDesc); ! yyT; yyT = ! Expression (Expr); !;!
+	MatchExpr (Expr);
+	!  if (equal! DefJava (TypeDesc); ! (! ImplJava (Path); !, yyT)) {!
+	.
+TestValue (..) :-
+	AssignTempo (Expr);
+	!  if (equal! DefJava (TypeDesc); ! (! ImplJava (Path); !, ! Expression (Expr); !)) {!
+	MatchExpr (Expr);
+	.
+Rule (Statements := Statements) :- {
+	WriteDirective (Line);
+	RuleCount := Index;
+	WithCount := 0;
+	!yyL! WN (RuleCount);!: {!
+	IF (HasTempos IN Properties) AND NOT TemposDone THEN
+	   Declare (Patterns);
+	   Declare (Exprs);
+	   Declare (Expr);
+	   Declare (Statements);
+	END;
+	IF Statements^.Kind # Tree.NoStatement THEN
+	   !  {!
+	   ImplJava (Statements);
+	   !  }!
+	END;
+	IF HasTailRecursion IN Properties THEN
+	   IF RoutineKind = kFunction THEN
+	      AssignFormals (Exprs, gOutObjects);
+	      AssignTempo (Expr);
+	      Expression (Expr);
+	   END;
+	ELSIF NOT Statements::DoesStop THEN
+	   AssignFormals (Exprs, gOutObjects);
+	   CASE RoutineKind OF
+	   | kProcedure: !   return;!
+
+	   | kFunction :
+	      IF (HasPatterns IN Properties) AND (Expr^.Kind # Tree.Compose) AND (t^.Kind # Tree.DontCare1) THEN
+		 !  {! DefJava (gReturnObjects^.Object.TypeDesc); ! ! WI (Tempo); !;!
+		 AssignTempo (Expr);
+		 !   ! WI (Tempo); ! = ! Expression (Expr); !;!
+		 MatchExpr (Expr);
+		 !   return ! WI (Tempo); !;!
+		 !  }!
+	      ELSE
+		 AssignTempo (Expr);
+		 MatchExpr (Expr);
+		 !   return ! Expression (Expr); !;!
+	      END;
+
+	   | kPredicate: !   return true;!
+	   END;
+	END;
+	!  }!
+	!!
+}; .
+
+PROCEDURE Case (t: Tree)	/* reads GLOBAL i */
+
+Decision (..) :- n: CARDINAL; {
+	!!
+	!  switch (! ImplJava (OneTest^.OneTest.Path); !.yyKind ()) {!
+	n := i;
+	WHILE n > 0 DO
+	   IF NOT IsEmpty (t^.Decision.OneTest^.TestIsType.TypeDesc^.NodeTypes.Types) THEN
+	      Case (t^.Decision.OneTest);
+	      CommonTestElim (t^.Decision.Then);
+	      IF NOT NeedsNoFinale (t^.Decision.Then) THEN
+		 !  break;!
+	      END;
+	   END;
+	   t := t^.Decision.Else;
+	   DEC (n);
+	END;
+	!  }!
+	!!
+	CommonTestElim (t);
+}; .
+TestKind (..) :-
+	!  case ! WTreeName (TypeDesc); !.k! WI (Name); !:!
+	.
+TestIsType (..) :-
+	Case (TypeDesc);
+	.
+NodeTypes (..) :- {
+	FOR j := Minimum (Types) TO Maximum (Types) DO
+	   IF IsElement (j, Types) THEN
+	      TheClass := LookupClass (TreeName^.TreeName.Classes, j);
+	      !  case ! WTreeName (t); !.k! WI (TheClass^.Class.Name); !:!
+	   END;
+	END;
+}; .
+
+PROCEDURE TailExpressions ([Exprs, Objects], Objects)
+
+.. :-
+   CONDITION ColumnCount > 50;
+   CONDITION IsElement (ORD (':'), Options);
+   WriteNl (f);
+   REJECT;
+   .
+OneExpr (Expr, ..), Objects :-
+   CONDITION Expr^.Kind = Tree.DontCare;
+   TailExpressions (Expr^.DontCare.Tempos, Objects);
+   .
+Object (NextT, NameT, ..), Object (NextF, NameF, _, Var (IsOutput := (TRUE)), _) :-
+   !   ! WI (NameF); ! = *&* ! WI (NameT); !;!!!~
+   TailExpressions (NextT, NextF);
+   .
+Object (NextT, ..), Object (NextF, ..) :-
+   TailExpressions (NextT, NextF);
+   .
+OneExpr (VarUse (_, _, Obj), NextE), Object (NextF, NameF, ..) :-
+   CONDITION (Obj # NoTree) AND (Obj^.Object.Path^.Kind = Tree.Var) AND
+      (Obj^.Object.Path^.Var.Name = NameF);
+   TailExpressions (NextE, NextF);
+   .
+OneExpr (Expr, NextE), Object (NextF, Name, _, Var (IsOutput := (FALSE)), _) :-
+   CONDITION Expr^.Kind = Tree.DontCare1;
+   TailExpressions (NextE, NextF);
+   .
+OneExpr (Expr, NextE), Object (NextF, Name, _, Var (IsOutput := (TRUE)), _) :-
+   !   ! WI (Name); ! = *&* ! Expression (Expr); !;!!!~
+   TailExpressions (NextE, NextF);
+   .
+OneExpr (Expr, NextE), Object (NextF, Name, ..) :-
+   !   ! WI (Name); ! = ! Expression (Expr); !;!
+   TailExpressions (NextE, NextF);
+   .
+
+PROCEDURE TailPatterns ([Patterns, Objects], Objects)
+
+.. :-
+   CONDITION ColumnCount > 50;
+   CONDITION IsElement (ORD (':'), Options);
+   WriteNl (f);
+   REJECT;
+   .
+OnePattern (DontCare (Tempos := Tempos), ..), Objects :-
+   TailPatterns (Tempos, Objects);
+   .
+Object (NextT, NameT, ..), Object (NextF, NameF, ..) :-
+   !   ! WI (NameF); ! = *&* ! WI (NameT); !;!!!~
+   TailPatterns (NextT, NextF);
+   .
+OnePattern (DontCare1 (_, Tempo, ..), NextP), Object (NextF, NameF, ..) :-
+   !   ! WI (NameF); ! = *&* ! WI (Tempo); !;!!!~
+   TailPatterns (NextP, NextF);
+   .
+OnePattern (VarDef (Path := Var (NameV, ..)), NextP), Object (NextF, NameF, ..) :-
+   CONDITION NameV = NameF;
+   TailPatterns (NextP, NextF);
+   .
+OnePattern (VarDef (Path := Path), NextP), Object (NextF, NameF, ..) :-
+   !   ! WI (NameF); ! = *&* ! ImplJava (Path); !;!!!~
+   TailPatterns (NextP, NextF);
+   .
+
+PROCEDURE WriteDecls (Objects)
+
+NIL :-
+   IO.WriteS (StdOutput, "NIL"); IO.WriteNl (StdOutput);
+   IO.WriteNl (StdOutput);
+   .
+Object (..) :-
+   WriteIdent (StdOutput, Name); IO.WriteNl (StdOutput);
+   WriteDecls (Next);
+   .
+NoObject (..) :-
+   IO.WriteNl (StdOutput);
+   .

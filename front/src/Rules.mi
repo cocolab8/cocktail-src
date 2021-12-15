@@ -1,0 +1,731 @@
+(* handle rule section *)
+
+(* $Id: Rules.mi,v 2.5 1997/05/27 15:04:18 grosch rel $ *)
+
+(*
+ * $Log: Rules.mi,v $
+ * Revision 2.5  1997/05/27 15:04:18  grosch
+ * truncated module names to 8 characters:
+ * Characte, StringM, Position
+ *
+ * Revision 2.4  1994/02/23 22:14:51  grosch
+ * deleted unused objects
+ *
+ * Revision 2.3  1993/08/18  15:11:56  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 2.2  1992/08/07  15:13:51  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 2.1  1991/11/21  14:47:50  grosch
+ * new version of RCS on SPARC
+ *
+ * Revision 2.0  91/03/08  18:26:28  grosch
+ * turned tables into initialized arrays (in C)
+ * moved mapping tokens -> strings from Errors to Parser
+ * changed interface for source position
+ * 
+ * Revision 1.4  90/06/11  18:45:25  grosch
+ * layout improvements
+ * 
+ * Revision 1.3	 89/03/15  18:30:52  vielsack
+ * Fixed two bugs in AppendArtificialNode:
+ * If Expr = NIL now a tree with one empty alternative is build
+ * A local variable is used instead of Expr for searching in the tree
+ * 
+ * Revision 1.2	 89/01/26  19:01:51  vielsack
+ * better position handling for nonterminals
+ * 
+ * Revision 1.1	 89/01/23  15:50:27  vielsack
+ * by using AppendArtificialNode instead of MakeArtificialNode
+ * the tree order is the same as that of the input,
+ * this is necessary to handle LL(1) conflicts correctly
+ * 
+ * Revision 1.0	 88/10/04  14:27:09  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE Rules;
+
+FROM Lists	IMPORT MakeList, tList;
+FROM TokenTab	IMPORT Terminal, NonTerminal, Vocabulary, TokenType, MakeVoc,
+			SetNontermPos, MakeTerm, GetTokenType, SymbolToToken,
+			TokenError, PosType, GetPrio;
+FROM SYSTEM	IMPORT ADR, ADDRESS;
+FROM rMemory	IMPORT Alloc;
+FROM Idents	IMPORT tIdent;
+FROM SYSTEM	IMPORT TSIZE;
+FROM Errors	IMPORT eFatal, eError, eIdent, eString, eInternal, ErrorMessageI;
+FROM Strings	IMPORT tString, ArrayToString;
+FROM Position	IMPORT NoPosition;
+
+CONST eNoOperator = 41; eTermLeft = 42; eTokenNotDecl = 32;
+
+TYPE
+    Expression = POINTER TO Node;
+
+    Node = 
+      RECORD
+	CASE Type: Operation OF
+	  Plus, Star, Optional, Bracket:     (* unitaere Operationen *)
+	    Son:    Expression;
+	| Separator, Alternative, Sequence:  (* binaere Operationen *)
+	    LeSon,
+	    RiSon:  Expression; 
+	| Action:
+	    Act:    tList;
+	| TermLeaf, NonTermLeaf:
+	    Token : Vocabulary;
+	END;
+	Position, 
+	SecondPos : PosType;
+	Special	  : ADDRESS; 
+
+	HasPrio	  : BOOLEAN;   (* Erweiterung fuer Alternative *)
+	PRIOPos	  : PosType;   (* zur Aufnahme einer Prioritaet *)
+	PrioSym	  : tIdent;
+	PrioSymPos: PosType;
+      END;
+
+    MRules = POINTER TO Rule;
+
+    Rule = RECORD
+	Left	 : NonTerminal;
+	LeftPos	 : PosType;
+	ColonPos : PosType;
+	Right	 : Expression;
+	PointPos : PosType;
+	Comment	 : tList;
+	CommPos	 : PosType;
+	CASE HasPrio : BOOLEAN OF
+	  TRUE:
+	    PRIOPos    : PosType;
+	    Priority   : SHORTCARD;
+	    PrioSym    : Terminal;
+	    PrioSymPos : PosType;
+	END;
+	Next	 : MRules;
+      END;
+
+  VAR
+    RulesVars:
+      RECORD
+	RULESPos   : PosType;	   (* Position von 'RULES' *)
+	Comment	   : tList;
+	CommPos	   : PosType;
+      END;
+
+    StartMRule, (* zeigt auf 1. Regel *)
+    RMRule,	(* zeigt auf zuletzt gelesene Regel *)
+    WMRule    : MRules; (* zeigt auf zuletzt geschreibene Regel *)
+    OpenForReading : BOOLEAN; (* TRUE : GetRule erlaubt,
+				 FALSE : GetRule nur nach neuem InitRulesReading *)
+
+  PROCEDURE MakeLeafNode
+     (sym: tIdent;
+      Pos: PosType) : Expression;
+ 
+  (* Lege neuen Blattknoten an und liefere den Zeiger auf ihn
+     zurueck. *)
+
+  VAR HNode : Expression;
+      voc   : Vocabulary;
+
+  BEGIN
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ERROR ('MakeLeafNode: Heap overflow');
+    END;
+    HNode^.Position := Pos;
+    HNode^.Special  := NIL;
+    voc := MakeVoc(sym,Pos);
+    IF GetTokenType(voc) = Term THEN
+      HNode^.Type    := TermLeaf;
+      HNode^.Token   :=	 voc;
+    ELSE 
+      HNode^.Type    := NonTermLeaf ;
+      HNode^.Token   :=	 voc;
+    END;
+    RETURN HNode;
+  END MakeLeafNode;
+
+
+  PROCEDURE MakeActionNode (Act: tList; Pos: PosType) : Expression;
+  
+  (* Lege neuen Actionknoten an und liefere den Zeiger auf ihn 
+     zurueck *)
+  VAR HNode : Expression;
+      s	    : tString;
+
+  BEGIN
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ArrayToString ('MakeActionNode : Heap overflow', s);
+      ErrorMessageI(eInternal, eFatal, Pos, eString, ADR(s));
+    END;
+    HNode^.Special  := NIL;
+    HNode^.Type := Action;
+    HNode^.Act := Act;
+    HNode^.Position := Pos;
+    RETURN HNode;
+  END MakeActionNode;
+
+  
+  PROCEDURE MakeUnaryNode (Type: UnaryOperation; Pos: PosType; Son: Expression) : Expression;
+
+  (* Bilde neuen Knoten der angegebenen Type mit gegebenem Sohn, 
+     und liefere den Zeiger auf ihn zurueck *)
+  VAR HNode : Expression;
+      s	    : tString;
+
+  BEGIN
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ArrayToString(' MakeUnaryNode : Heap overflow', s);
+      ErrorMessageI (eInternal,eFatal, Pos, eString, ADR(s));
+    END;
+    HNode^.Special  := NIL;
+    HNode^.Type	       := Type;
+    HNode^.Position   := Pos;
+    HNode^.Son	 := Son;
+    RETURN HNode;
+  END MakeUnaryNode;
+
+
+  PROCEDURE MakeBracketNode
+    (Type   : BracketOperation;
+     Pos,
+     SecPos : PosType;
+     Son    : Expression) : Expression;
+
+  (* Bilde neuen Knoten der angegebenen Type mit gegebenem Sohn,
+     und liefere den Zeiger auf ihn zurueck *)
+  VAR HNode : Expression;
+      s	    : tString;
+
+  BEGIN
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ArrayToString ('MakeBracketNode : Heap overflow', s);
+      ErrorMessageI (eInternal,eFatal,Pos, eString, ADR (s));
+    END;
+    HNode^.Special  := NIL;
+    HNode^.Type	       := Type;
+    HNode^.Position   := Pos;
+    HNode^.SecondPos	 := SecPos;
+    HNode^.Son	 := Son;
+    RETURN HNode;
+  END MakeBracketNode;
+  
+
+  PROCEDURE MakeBinaryNode
+    (Type : BinaryOperation;
+     Pos : PosType;
+     LSon,
+     RSon: Expression) : Expression;
+
+  (* Bilde neuen Knoten der angegebenen Type mit gegebenen Soehnen,
+     und liefere den Zeiger auf ihn zurueck *)
+  VAR HNode : Expression;  
+      s	    : tString;
+
+  BEGIN
+
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ArrayToString ('MakeBinaryNode : Heap overflow', s);
+      ErrorMessageI(eInternal,eFatal, Pos, eString, ADR (s));
+    END;
+    HNode^.Special  := NIL;
+    HNode^.Type	       := Type;
+    HNode^.Position   := Pos;
+    HNode^.LeSon := LSon;
+    HNode^.RiSon := RSon;
+    IF Type = Alternative THEN
+      HNode^.HasPrio := FALSE;
+    END;
+    RETURN HNode;
+  END MakeBinaryNode;
+
+  PROCEDURE MakePrioAlternativeNode
+     (Pos	 : PosType;
+      LSon,
+      RSon	 : Expression;
+      HasPrio	 : BOOLEAN;
+      PRIOPos	 : PosType;
+      PrioSym	 : tIdent;
+      PrioSymPos : PosType) : Expression;
+  
+  VAR HNode : Expression;  
+      s : tString;
+
+  BEGIN
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ArrayToString ('MakePrioAlternativeNode : Heap overflow', s);
+      ErrorMessageI(eInternal,eFatal,Pos, eString, ADR(s));
+    END;
+    HNode^.HasPrio := HasPrio;
+    HNode^.PRIOPos := PRIOPos;
+    HNode^.PrioSym := PrioSym;
+    HNode^.PrioSymPos := PrioSymPos;
+    HNode^.Special  := NIL;
+    HNode^.Type	       := Alternative;
+    HNode^.Position   := Pos;
+    HNode^.LeSon := LSon;
+    HNode^.RiSon := RSon;
+    RETURN HNode;
+  END MakePrioAlternativeNode;
+
+
+  PROCEDURE AppendArtificialNode (Pos, Pos2: PosType;
+				  VAR Expr: Expression; New: Expression);
+
+  VAR
+    last, expr: Expression;
+
+  BEGIN
+    IF (Expr = NoExpression) OR (GetNodeOperation (Expr) # ArtAlternative) THEN
+      Expr := MakeArtificialNode (Pos, Pos2, Expr, New);
+    ELSE
+      expr := Expr;
+      LOOP
+	last := expr^.RiSon;
+	IF GetNodeOperation (last) # ArtAlternative THEN EXIT END;
+	expr := last;
+      END;
+      expr^.RiSon := MakeArtificialNode (last^.Position, Pos2, last, New);
+    END;
+  END AppendArtificialNode;
+
+
+  PROCEDURE MakeArtificialNode
+     (Pos    : PosType;
+     SecPos : PosType;
+     LSon,
+     RSon: Expression) : Expression;
+
+  (* Bilde neuen Knoten vom Typ ArtAlternative mit gegebenen Soehnen,
+     und liefere den Zeiger auf ihn zurueck *)
+  VAR HNode : Expression;  
+      s	    : tString;
+
+  BEGIN
+    HNode := Alloc(TSIZE(Node));
+    IF HNode = NIL THEN
+      ArrayToString ('MakeArtificialNode : Heap overflow', s);
+      ErrorMessageI(eInternal,eFatal,Pos,eString, ADR(s));
+    END;
+    HNode^.Special  := NIL;
+    HNode^.Type	       := ArtAlternative;
+    HNode^.Position   := Pos;
+    HNode^.SecondPos  := SecPos;
+    HNode^.LeSon := LSon;
+    HNode^.RiSon := RSon;
+    RETURN HNode;
+  END MakeArtificialNode;
+
+
+  PROCEDURE PutNodeSpecial
+    (Expr:  Expression;
+     Spec: ADDRESS);
+  
+  (* Trage Knotensonderinformation ein *)
+
+  BEGIN
+    IF Expr # NIL THEN
+      Expr^.Special := Spec;
+    ELSE
+      ERROR ('PutNodeSpecial : You tried to access an empty node');
+    END;
+  END PutNodeSpecial;
+     
+
+  PROCEDURE MakeRule
+    (Left	: tIdent;
+     LeftPos	: PosType;
+     ColonPos	: PosType;
+     Right	: Expression;
+     Comment	: tList;
+     CommPos	: PosType;
+     PointPos	: PosType;
+     HasPrio	: BOOLEAN;
+     PRIOPos	: PosType;
+     PrioSym	: tIdent;
+     PrioSymPos : PosType);
+
+  (* Trage eine neue Regel in die Datenstruktur ein *)
+  VAR HRule : MRules;
+      Error   : TokenError;
+      Leftvoc : Vocabulary;
+      voc     : Vocabulary;
+      s	      : tString;
+
+  BEGIN
+    OpenForReading := FALSE;
+    Leftvoc := MakeVoc(Left,LeftPos);
+    IF GetTokenType(Leftvoc) = Term THEN
+      (* Error: Links steht Terminal , Regel wird nicht eingetragen *) 
+      ErrorMessageI(eTermLeft ,eError,LeftPos, eIdent, ADR(Left));
+    ELSE
+      SetNontermPos (Left,LeftPos);
+      HRule := Alloc(TSIZE(Rule));
+      IF HRule = NIL THEN
+	ArrayToString('MakeRule : Heap overflow', s);
+	ErrorMessageI(eInternal,eFatal,LeftPos, eString, ADR (s));
+      END;
+      HRule^.Left     := Leftvoc;
+      HRule^.LeftPos  := LeftPos;
+      HRule^.ColonPos := ColonPos;
+      HRule^.PointPos := PointPos;
+      HRule^.Right    := Right;
+      HRule^.Comment  := Comment;
+      HRule^.CommPos  := CommPos;
+      HRule^.HasPrio  := HasPrio;
+      HRule^.Priority := 0; 
+      IF HasPrio THEN
+	HRule^.PRIOPos	  := PRIOPos;
+	HRule^.PrioSymPos := PrioSymPos;
+	voc := SymbolToToken(PrioSym,Error);
+	IF Error # NoError THEN
+	  ErrorMessageI(eTokenNotDecl,eError,PrioSymPos, eIdent, ADR(PrioSym));
+	ELSE
+	  HRule^.PrioSym    := voc;
+	  HRule^.Priority := GetPrio(voc);
+	  IF HRule^.Priority = 0 THEN
+	    ErrorMessageI(eNoOperator,eError,PrioSymPos,eIdent,ADR(PrioSym));
+	  END;
+	END;
+      END;
+      IF WMRule <> NIL THEN
+	(* Nicht ListenAnfang *)
+	WMRule^.Next := HRule;
+      ELSE
+	StartMRule  := HRule;
+      END;
+      HRule^.Next := NIL;
+      WMRule	   := HRule;
+    END;
+  END MakeRule;
+
+
+  PROCEDURE MakeRulesHeader
+    (RULESPos	: PosType;
+     Comment	: tList;
+     CommPos	: PosType);
+
+  (* Speichere globale Information zum Abschnitt RULES ab *)
+
+  BEGIN
+    RulesVars.RULESPos := RULESPos;
+    RulesVars.Comment  := Comment;
+    RulesVars.CommPos  := CommPos;
+  END MakeRulesHeader;
+
+
+  PROCEDURE InitRulesReading();
+
+    (* Bereitet das Lesen vor. Der Lesezeiger wird auf die erste 
+       Regel eingestellt. Gibt es ueberhaupt keine Regeln, wird 
+       FALSE zurueck geliefert, sonst TRUE *)
+
+    BEGIN
+      OpenForReading := TRUE;
+      RMRule := StartMRule;
+    END InitRulesReading; 
+
+
+
+  PROCEDURE GetNodeOperation(Expr: Expression) : Operation;
+    BEGIN
+      IF Expr = NIL THEN
+	RETURN NoOperation;
+      ELSE
+	RETURN Expr^.Type;
+      END;
+    END GetNodeOperation;
+
+
+
+  PROCEDURE GetLeafNode
+     (	Expr: Expression;
+     VAR Voc: Vocabulary;
+     VAR Pos: PosType);
+ 
+  (* Liefere Information aus Blattknoten. *)
+
+  BEGIN
+    IF (GetNodeOperation(Expr) # TermLeaf) AND 
+       (GetNodeOperation(Expr) # NonTermLeaf) THEN
+      ERROR ('GetLeafNode : Wrong Node Type');
+    END;
+    IF Expr <> NIL THEN
+      Voc := Expr^.Token;
+      Pos := Expr^.Position;
+    ELSE
+      ERROR ('GetLeafNode : Node empty');
+    END;
+  END GetLeafNode;
+
+
+  PROCEDURE GetActionNode
+     (	 Expr:Expression;
+     VAR Act: tList;
+     VAR Pos: PosType);
+  
+  (* Liefere Information aus Actionknoten *)
+
+  BEGIN
+    IF GetNodeOperation(Expr) # Action THEN
+      ERROR ('GetActionNode : Wrong Node Type');
+    END;
+    IF Expr <> NIL THEN
+      Act := Expr^.Act;
+      Pos := Expr^.Position;
+    ELSE
+      ERROR ('GetActionNode : Node empty');
+    END;
+  END GetActionNode;
+
+  
+  PROCEDURE GetUnaryNode
+     (	 Expr:Expression;
+     VAR Pos: PosType;
+     VAR Son: Expression);
+
+  (* Liefere Information aus unaerem Knoten *) 
+
+  BEGIN
+    IF (GetNodeOperation(Expr) # Star) AND 
+       (GetNodeOperation(Expr) # Plus) THEN
+      ERROR ('GetUnaryNode : Wrong Node Type');
+    END ;
+    IF Expr <> NIL THEN
+      Pos := Expr^.Position;
+      Son := Expr^.Son;
+    ELSE
+      ERROR ('GetUnaryNode : Node empty');
+    END;
+  END GetUnaryNode;
+  
+
+  PROCEDURE GetBracketNode
+     (	 Expr	: Expression;
+     VAR Pos,
+	 SecPos : PosType;
+     VAR Son	: Expression);
+
+  (* Liefere Information aus unaerem Knoten *) 
+
+  BEGIN
+    IF (GetNodeOperation(Expr) # Bracket) AND 
+       (GetNodeOperation(Expr) # Optional) THEN
+      ERROR ('GetBracketNode : Wrong Node Type');
+    END ;
+    IF Expr <> NIL THEN
+      Pos := Expr^.Position;
+      SecPos := Expr^.SecondPos;
+      Son := Expr^.Son;
+    ELSE
+      ERROR ('GetBracketNode : Node empty');
+    END;
+  END GetBracketNode;
+  
+
+  PROCEDURE GetBinaryNode
+     (	 Expr: Expression;
+     VAR Pos : PosType;
+     VAR LSon,
+     RSon: Expression);
+
+  (* Liefere Information aus binaerem Knoten *)
+
+  BEGIN
+    IF (GetNodeOperation(Expr) # Sequence) AND 
+       (GetNodeOperation(Expr) # Separator) AND
+       (GetNodeOperation(Expr) # Alternative) AND
+       (GetNodeOperation(Expr) # ArtAlternative) THEN
+      ERROR ('GetBinaryNode : Wrong Node Type');
+    END ;
+    IF Expr <> NIL THEN
+      Pos  := Expr^.Position;
+      LSon := Expr^.LeSon;
+      RSon := Expr^.RiSon;
+    ELSE
+      ERROR ('GetBinaryNode : Node empty');
+    END; 
+  END GetBinaryNode;
+
+  PROCEDURE GetPrioAlternativeNode
+     (	  Expr	     : Expression;
+      VAR Pos	     : PosType;
+      VAR LSon	     : Expression;
+      VAR RSon	     : Expression;
+      VAR HasPrio    : BOOLEAN;
+      VAR PRIOPos    : PosType;
+      VAR PrioSym    : tIdent;
+      VAR PrioSymPos : PosType);
+
+  BEGIN
+    IF (GetNodeOperation(Expr) # Alternative) THEN
+      ERROR ('GetPrioAlternativeNode : Wrong Node Type');
+    END ;
+    IF Expr <> NIL THEN
+      Pos  := Expr^.Position;
+      LSon := Expr^.LeSon;
+      RSon := Expr^.RiSon;
+      HasPrio := Expr^.HasPrio;
+      PRIOPos := Expr^.PRIOPos;
+      PrioSym := Expr^.PrioSym;
+      PrioSymPos := Expr^.PrioSymPos;
+    ELSE
+      ERROR ('GetPrioAlternativeNode : Node empty');
+    END; 
+  END GetPrioAlternativeNode;
+
+
+  PROCEDURE GetArtificialNode
+     (	 Expr	: Expression;
+     VAR Pos	: PosType;
+     VAR SecPos : PosType;
+     VAR LSon,
+	 RSon	: Expression);
+
+  (* Liefere Information aus kuenstlichem Knoten *)
+
+  BEGIN
+    IF (GetNodeOperation(Expr) # ArtAlternative) THEN
+      ERROR ('GetArtificialNode : Wrong Node Type');
+    END ;
+    IF Expr <> NIL THEN
+      Pos  := Expr^.Position;
+      SecPos := Expr^.SecondPos;
+      LSon := Expr^.LeSon;
+      RSon := Expr^.RiSon;
+    ELSE
+      ERROR ('GetArtificialNode : Node empty');
+    END; 
+  END GetArtificialNode;
+
+
+  PROCEDURE GetNodeSpecial
+    (Expr:  Expression) : ADDRESS;
+  
+  (* Liefere Knotensonderinformation *)
+
+  BEGIN
+    IF Expr <> NIL THEN
+      RETURN Expr^.Special;
+    ELSE
+      ERROR ('GetNodeSpecial : Node empty');
+      RETURN NIL;
+    END
+  END GetNodeSpecial;
+     
+
+  PROCEDURE GetRule
+    (VAR Left	    : NonTerminal;
+     VAR LeftPos    : PosType;
+     VAR ColonPos   : PosType;
+     VAR Right	    : Expression;
+     VAR Comment    : tList;
+     VAR CommPos    : PosType;
+     VAR PointPos   : PosType;
+     VAR HasPrio    : BOOLEAN;
+     VAR PRIOPos    : PosType;
+     VAR PrioSym    : Terminal;
+     VAR PrioSymPos : PosType) : BOOLEAN;
+
+  (* Liefere naechste Regel bzw. FALSE falls es keine naechste Regel
+     mehr gibt. Die erste Regel kann nach Aufruf von  InitRuleReading
+     gelesen werden *)
+
+  BEGIN
+    IF NOT OpenForReading THEN
+      ERROR ('GetRule : You must not read here');
+    END;
+    IF RMRule = NIL THEN
+      (* Am Ende der Liste angelangt *)
+      RETURN FALSE
+    ELSE
+      Left     := RMRule^.Left;
+      LeftPos  := RMRule^.LeftPos;
+      ColonPos := RMRule^.ColonPos;
+      PointPos := RMRule^.PointPos;
+      Right    := RMRule^.Right;
+      Comment  := RMRule^.Comment;
+      CommPos  := RMRule^.CommPos;
+      IF RMRule^.HasPrio THEN
+	PRIOPos	   := RMRule^.PRIOPos;
+	PrioSym	   := RMRule^.PrioSym;
+	PrioSymPos := RMRule^.PrioSymPos;
+      ELSE
+	PRIOPos .Line	:= 0;
+	PRIOPos .Column := 0;
+	PrioSym	 := 0;
+	PrioSymPos.Line	  := 0;
+	PrioSymPos.Column := 0;
+      END;
+      HasPrio  := RMRule^.HasPrio;
+      (* Weiterschalten *)
+      RMRule := RMRule^.Next;
+      RETURN TRUE;
+    END;
+  END GetRule;
+
+  PROCEDURE GetEssentialRule
+    (VAR Left	    : NonTerminal;
+     VAR Right	    : Expression;
+     VAR HasPrio    : BOOLEAN) : BOOLEAN;
+
+  (* Liefere naechste Regel bzw. FALSE falls es keine naechste Regel
+     mehr gibt. Die erste Regel kann nach Aufruf von  InitRuleReading
+     gelesen werden. Die Prozedur kann im Wechsel mit GetRule ver-
+     wendet werden.*)
+
+  BEGIN
+    IF NOT OpenForReading THEN
+      ERROR ('GetEssentialRule : You must not read here');
+    END;
+    IF RMRule = NIL THEN
+      (* Am Ende der Liste angelangt *)
+      RETURN FALSE
+    ELSE
+      Left     := RMRule^.Left;
+      Right    := RMRule^.Right;
+      HasPrio  := RMRule^.HasPrio ;
+      (* Weiterschalten *)
+      RMRule := RMRule^.Next;
+      RETURN TRUE;
+    END;
+  END GetEssentialRule;
+
+  PROCEDURE GetRulesHeader (VAR RULESPos: PosType; VAR Comment: tList; VAR CommPos: PosType);
+
+  (* Liefere globale Information zum Abschnitt RULES *)
+
+  BEGIN
+    RULESPos := RulesVars.RULESPos;
+    Comment  := RulesVars.Comment;
+    CommPos  := RulesVars.CommPos;
+  END GetRulesHeader;
+
+  PROCEDURE ERROR (a : ARRAY OF CHAR);
+  VAR s : tString;
+  BEGIN
+    ArrayToString (a, s);
+    ErrorMessageI (eInternal, eFatal, NoPosition, eString, ADR(s));
+  END ERROR;
+
+BEGIN
+ RMRule := NIL;
+ WMRule := NIL;
+ StartMRule := NIL;
+ RulesVars.RULESPos.Line   := 0;
+ RulesVars.RULESPos.Column := 0;
+ MakeList (RulesVars.Comment);
+ RulesVars.CommPos.Line	  := 0;
+ RulesVars.CommPos.Column := 0;
+ NoExpression := NIL;
+END Rules.

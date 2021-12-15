@@ -1,0 +1,169 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: ell.mi,v $
+ *	
+ *	purpose:	main program
+ *
+ *	$Author: grosch $
+ *	$Date: 2008/09/03 09:23:39 $
+ *)
+
+MODULE ell;
+
+FROM rSystem	IMPORT	rExit, tArrayChar, DirectorySeparator, rtpqx, rtpqy;
+FROM ArgCheck	IMPORT	CheckArgs, tLanguage, LANGUAGE, DEF, IMP, PAR, EllLib;
+FROM CodeC	IMPORT	BeginCodeC, DoCodeC, CloseCodeC, ParC;
+FROM CodeM2	IMPORT	BeginCodeM2, DoCodeM2, CloseCodeM2, ParM2;
+FROM Position	IMPORT	NoPosition;
+FROM Errors	IMPORT	Fatal, Error, Restriction, Message, GetCount,
+			CloseErrors;
+FROM Strings	IMPORT	tString, Assign, AssignEmpty, Append, Concatenate,
+			IsInOrder, StringToArray, ArrayToString;
+FROM Idents	IMPORT	MaxIdent;
+FROM IO		IMPORT	tFile, StdOutput, WriteI, WriteNl, CloseIO, ReadOpen,
+			ReadClose, EndOfFile, ReadC;
+FROM Parser	IMPORT	Parser, CloseParser;
+FROM Tree	IMPORT	TreeRoot;
+FROM Semantic	IMPORT	BeginSemantic, DoSemantic, CloseSemantic;
+
+(* ELL_ )*
+FROM ArgCheck	IMPORT	TABLE, CODES, TREE, QUERY;
+FROM Codes	IMPORT	WriteCodes;
+FROM IO		IMPORT	StdOutput;
+FROM Table	IMPORT	WriteTable;
+FROM Tree	IMPORT	WriteTree, QueryTree;
+*( _ELL *)
+
+VAR
+   Errors		: INTEGER;
+   PathS, String	: tString;
+
+PROCEDURE ToBin (ch: CHAR): INTEGER;
+   BEGIN
+      CASE ch OF
+      | '0' .. '9': RETURN ORD (ch) - ORD ('0');
+      | 'A' .. 'F': RETURN ORD (ch) - ORD ('A') + 10;
+      | 'a' .. 'f': RETURN ORD (ch) - ORD ('a') + 10;
+      END;
+      RETURN 0;
+   END ToBin;
+
+PROCEDURE WriteMessage (n: INTEGER);
+   BEGIN
+      CASE n OF
+      | 1: Message ("cannot open license file: ctlicens.dat", Fatal, NoPosition);
+      | 2: Message ("sorry, the license is expired", Fatal, NoPosition);
+      | 3: Message ("sorry, the problem is too big for demo version", Restriction, NoPosition);
+      | 4: Message ("license file ctlicens.dat seems corrupted", Fatal, NoPosition);
+      END;
+   END WriteMessage;
+
+PROCEDURE CheckLicense (tool: ARRAY OF CHAR; Limit: CARDINAL): BOOLEAN;
+   VAR
+      PathS, String	: tString;
+      PathA		: ARRAY [0..128] OF CHAR;
+      In		: tFile;
+      b			: ARRAY [0..10] OF CHAR;
+      p			: tArrayChar;
+      y			: ARRAY [0..32] OF BITSET;
+      z			: ARRAY [0..32] OF CHAR;
+      ch 		: CHAR;
+      i, k		: CARDINAL;
+      s, t		: BITSET;
+   BEGIN
+      IF rtpqy () THEN RETURN TRUE; END;		(* check WIBU-KEY *)
+      Assign		(PathS, EllLib);
+      Append		(PathS, '.');
+      Append		(PathS, '.');
+      Append		(PathS, DirectorySeparator ());
+      ArrayToString	("ctlicens.dat", String);
+      Concatenate	(PathS, String);
+      Append		(PathS, 0C);
+      StringToArray	(PathS, PathA);
+      In := ReadOpen	(PathA);
+      IF In < 0 THEN WriteMessage (1); RETURN FALSE; END;
+
+      LOOP
+	 IF EndOfFile (In) THEN WriteMessage (4); RETURN FALSE; END;
+	 i := 0;
+	 ch := ReadC (In);
+	 WHILE (ch # 12C) AND (ch # 15C) DO
+	    y [i] := BITSET (ToBin (ch) * 16 + ToBin (ReadC (In)));
+	    INC (i); ch := ReadC (In);
+	 END;
+	 IF ch = 15C THEN ch := ReadC (In); END;
+	 IF ch # 12C THEN WriteMessage (4); RETURN FALSE; END;
+	 k := i - 1;
+
+	 s := BITSET (ORD ('j'));
+	 FOR i := 0 TO k DO
+	    t := y [i] / s; s := s / t; z [i] := CHR (CARDINAL (t));
+	 END;
+	 IF (z [0] = tool [0]) AND (z [1] = tool [1]) AND (z [2] = tool [2]) THEN EXIT; END;
+      END;
+      ReadClose (In);
+
+      AssignEmpty (String);
+      FOR i := 5 TO 12 DO Append (String, z [i]); END;	(* get license date *)
+      b := "%Y%m%d";
+      p := rtpqx (b);					(* get current date *)
+      i := 0;
+      LOOP
+	 b [i] := p^ [i];
+	 IF (b [i] = 0C) OR (i = 10) THEN EXIT; END;
+	 INC (i);
+      END;
+      ArrayToString (b, PathS);
+      IF NOT IsInOrder (PathS, String) THEN WriteMessage (2); RETURN FALSE; END;
+
+      k := 0;
+      FOR i := 14 TO 19 DO				(* get license size *)
+         IF z [i] # ' ' THEN k := k * 10 + ORD (z [i]) - ORD ('0'); END;
+      END;
+      IF Limit > k THEN WriteMessage (3); RETURN FALSE; END;
+      RETURN TRUE;
+   END CheckLicense;
+
+BEGIN
+  CheckArgs;
+
+  IF DEF OR IMP THEN
+    Errors := Parser (); 
+    CloseParser;
+    BeginSemantic;
+    DoSemantic (TreeRoot);
+    CloseSemantic;
+
+    (* ELL_ )*
+    IF CODES THEN WriteCodes (StdOutput); END;
+    IF TABLE THEN WriteTable (StdOutput); END;
+    IF TREE  THEN WriteTree  (StdOutput, TreeRoot); END;
+    IF QUERY THEN QueryTree  (TreeRoot); END;
+    *( _ELL *)
+  END;
+
+  IF GetCount (Error) > 0 THEN CloseErrors; CloseIO; rExit (1); END;
+  IF NOT CheckLicense ("ell", MaxIdent ()) THEN CloseErrors; CloseIO; rExit (1); END;
+
+  CASE LANGUAGE OF
+  | C:
+    IF DEF OR IMP THEN
+      BeginCodeC;
+      DoCodeC (TreeRoot);
+      CloseCodeC;
+    END;
+    IF PAR THEN ParC; END;
+
+  | MODULA2:
+    IF DEF OR IMP THEN
+      BeginCodeM2;
+      DoCodeM2 (TreeRoot);
+      CloseCodeM2;
+    END;
+    IF PAR THEN ParM2; END;
+  END;
+
+  CloseErrors;
+  CloseIO;
+END ell.

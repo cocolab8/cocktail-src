@@ -1,0 +1,38 @@
+| '#' : IF Language = Java THEN
+| '*' : WriteItems2		(Out);
+| '+' : WriteNontermNames	(Out);
+| '-' : WriteCode (In, Out, Line, ImportPos, Import);
+| '/' : WriteItems1		(Out);
+| '4' : IF IsElement (ORD ('6'), Options) THEN
+| '5' : IF IsElement (ORD ('6'), Options) THEN
+| '6' : IF IsElement (ORD ('f'), Options) THEN
+| '7' : WriteC	(Out, '"');
+| '@' : ExpandLine		(Out, Line);
+| 'A' : PutCondition		(Out);
+| 'B' : WriteCode (In, Out, Line, BeginPos, Begin);
+| 'C' : WriteCode (In, Out, Line, ClosePos, Close);
+| 'D' : IF NOT IsElement (ORD ('u'), Options) THEN
+| 'E' : WriteCode (In, Out, Line, ExportPos, Export);
+| 'F' : PutFinalToProd	(Out);
+| 'G' : WriteCode (In, Out, Line, GlobalPos, Global);
+| 'H' : PutLeftHandSide	(Out);
+| 'I' : WriteStartSymbols	(Out);
+| 'J' : WriteStartLines	(Out);
+| 'K' : PutLength		(Out);
+| 'L' : WriteCode (In, Out, Line, LocalPos, Local);
+| 'M' : PutTComb		(Out);
+| 'N' : IF IsElement (ORD ('o'), Options) THEN
+| 'O' : PutContinuation	(Out);
+| 'P' : PutTBase		(Out);
+| 'Q' : PutNBase		(Out);
+| 'R' : WriteReduceCase	(Out);
+| 'S' : IF NOT IsElement (ORD ('C'), Options) THEN
+| 'T' : WriteConstants	(Out);
+| 'U' : WriteNonterminals	(Out);
+| 'V' : IF NOT IsElement (ORD ('o'), Options) THEN
+| 'W' : WriteTokenName	(Out);
+| 'X' : IF IsElement (ORD ('n'), Options) THEN
+| 'Y' : IF NOT IsElement (ORD ('o'), Options) THEN
+| 'Z' : WriteCode (In, Out, Line, TailPos, Tail);
+| ']' : Message ("unpaired $] in skeleton", Fatal, NoPosition);
+| '|' : IF IsElement (ORD ('O'), Options) THEN

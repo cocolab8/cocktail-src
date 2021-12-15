@@ -1,0 +1,224 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: ell.ell,v $
+ *	
+ *	purpose:	parser specification
+ *
+ *	$Author: grosch $
+ *	$Date: 2008/09/03 09:23:39 $
+ *)
+
+EXPORT {
+FROM Tree	IMPORT	tTree;
+
+TYPE tParsAttribute = tTree;
+}
+
+GLOBAL {
+FROM Idents	IMPORT	tIdent, MakeIdent, NoIdent;
+FROM Strings	IMPORT	tString, ArrayToString;
+FROM Errors	IMPORT	Message, Warning;
+FROM Scanner	IMPORT	BeginScanner, CloseScanner, NoValue, Attribute;
+FROM Tree	IMPORT	tTree, TreeRoot, ReverseTree,
+			mGrammar, mSections0, mSections, mExport, mGlobal,
+			mLocal, mBegin, mClose, mCodes0, mCodes, mCode,
+			mTokens0, mTokens, mToken, mId, mRules0,
+			mRules, mRule, mOption, mTimes, mPlus, mList,
+			mAction, mLeaf, mAlternative0, mAlternative,
+			mSequence0, mSequence, ScannerName, ParserName;
+			
+VAR string: tIdent;
+
+PROCEDURE MI (VAR Array: ARRAY OF CHAR): tIdent;
+  VAR String: tString;
+  BEGIN
+    ArrayToString (Array, String);
+    RETURN MakeIdent (String);
+  END MI;
+}
+
+BEGIN { BeginScanner; }
+
+CLOSE { CloseScanner; }
+
+TOKEN
+  '='		= 1
+  COLON		= 2, ':'
+  '.'		= 3
+  '|'		= 4
+  ASTERISK	= 5, '*'
+  PLUS		= 6, '+'
+  DOUBLEBAR	= 7, '||'
+  '('		= 8
+  ')'		= 9
+  LEFTBRACKET	= 10, '['
+  ']'		= 11
+  \EXPORT	= 12
+  \GLOBAL	= 13
+  \LOCAL	= 14
+  \BEGIN	= 15
+  \CLOSE	= 16
+  \TOKEN	= 17
+  \OPER		= 18
+  \NONE		= 19
+  \LEFT		= 20
+  \RIGHT	= 21
+  \RULE		= 22
+  \PREC		= 23
+  Number	= 24
+  CodeLine	= 25
+  LastCodeLine	= 26
+  Identifier	= 27
+  String	= 28
+  \SCANNER	= 29
+  \PARSER	= 30
+  ','		= 31
+
+RULE
+
+Grammar:
+  Names Sections Tokens Oper Rules
+				{ TreeRoot := mGrammar (Sections1, Tokens1, Rules1); }
+  .
+Names:
+  [ \SCANNER			{ ScannerName := MI ("Scanner"); }
+	     [ Identifier	{ ScannerName := Identifier1.ident; } ] ]
+  [ \PARSER  [ Identifier	{ ParserName  := Identifier2.ident; } ] ]
+  .
+Sections: 
+				{ Sections0 := mSections0 (); }
+  ( \EXPORT CodeOption		{ Sections0 := mSections (Sections0, mExport (CodeOption1)); }
+  | \GLOBAL CodeOption		{ Sections0 := mSections (Sections0, mGlobal (CodeOption2)); }
+  | \LOCAL CodeOption		{ Sections0 := mSections (Sections0, mLocal (CodeOption3)); }
+  | \BEGIN CodeOption		{ Sections0 := mSections (Sections0, mBegin (CodeOption4)); }
+  | \CLOSE CodeOption		{ Sections0 := mSections (Sections0, mClose (CodeOption5)); }
+  ) *				{ Sections0 := ReverseTree (Sections0); }
+  .
+CodeOption:
+    CodeLines			{ CodeOption0 := CodeLines1; }
+  |				{ CodeOption0 := mCodes0 (); }
+  .
+CodeLines:
+				{ CodeLines0 := mCodes0 (); }
+  ( CodeLine			{ CodeLines0 := mCodes (CodeLines0, mCode (CodeLine1.Position, CodeLine1.ref)); }
+  ) * LastCodeLine		{ CodeLines0 := mCodes (CodeLines0, mCode (LastCodeLine1.Position, LastCodeLine1.ref)); }
+				{ CodeLines0 := ReverseTree (CodeLines0); }
+  .
+Tokens:
+  \TOKEN			{ Tokens0 := mTokens0 (); }
+  ( Token			{ Tokens0 := mTokens (Tokens0, Token1); }
+  ) *				{ Tokens0 := ReverseTree (Tokens0); }
+  .
+Token:
+  ( TokId			{ Token0 := TokId1; }
+  | Str 			{ Token0 := Str1; }
+  )
+  ( '='
+    ( Number			{ string := Token0^.Id.ident; }
+	     [ ',' String	{ string := String1.ident; } ]
+	{ Token0 := mToken (Token0, string, Number1.Position, Number1.value); }
+    |      ',' String
+	{ Token0 := mToken (Token0, String2.ident, Attribute.Position, NoValue); }
+    |
+	{ Token0 := mToken (Token0, Token0^.Id.ident, Attribute.Position, NoValue); }
+    )
+  |			
+	{ Token0 := mToken (Token0, Token0^.Id.ident, Attribute.Position, NoValue); }
+  )
+  .
+Oper:
+  [ \OPER 
+    ( ( \LEFT | \RIGHT | \NONE )
+    ( Identifier | String ) +) *
+		                { Message ("OPER part ignored", Warning, OPER1.Position); }
+  ]
+  .
+Rules:
+  \RULE				{ Rules0 := mRules0 (); }
+  (Rule				{ Rules0 := mRules (Rules0, Rule1); }
+  ) *				{ Rules0 := ReverseTree (Rules0); }
+  .
+Rule:
+  Id COLON LocalOption RightSide '.'
+				{ Rule0 := mRule (COLON1.Position, Id1, LocalOption1, RightSide1); }
+  .
+LocalOption:
+  \LOCAL CodeLines 		{ LocalOption0 := CodeLines1; }
+  |				{ LocalOption0 := mCodes0 (); }
+  .
+RightSide:
+  PrecAlternative		{ RightSide0 := PrecAlternative1; }
+  [				{ RightSide0 := mAlternative (PrecAlternative1^.expr.pos, mAlternative0 (Attribute.Position), PrecAlternative1); }
+  ( '|' PrecAlternative		{ RightSide0 := mAlternative (PrecAlternative2^.expr.pos, RightSide0, PrecAlternative2); }
+  ) +				{ RightSide0 := ReverseTree (RightSide0); }
+  ]
+  .
+PrecAlternative:
+  (				{ PrecAlternative0 := mSequence0 (Attribute.Position); }
+  | Expression			{ PrecAlternative0 := Expression1; }
+    [				{ PrecAlternative0 := mSequence (Expression1^.expr.pos, mSequence0 (Attribute.Position), Expression1); }
+      ( Expression		{ PrecAlternative0 := mSequence (Expression2^.expr.pos, PrecAlternative0, Expression2); }
+      ) + 			{ PrecAlternative0 := ReverseTree (PrecAlternative0); }
+    ]
+  ) PrecPart
+  .
+PrecPart:
+  [ \PREC
+    ( Identifier | String )	{ Message ("PREC part ignored", Warning, PREC1.Position); }
+  ]
+  .
+Expression:
+  Unit
+  ( ASTERISK			{ Expression0 := mTimes (ASTERISK1.Position, Unit1); }
+  | PLUS			{ Expression0 := mPlus (PLUS1.Position, Unit1); }
+  | DOUBLEBAR Unit		{ Expression0 := mList (DOUBLEBAR1.Position, Unit1, Unit2); }
+  |				{ Expression0 := Unit1; }
+  )
+  .
+Unit:
+    LEFTBRACKET Alternative ']'	{ Unit0 := mOption (LEFTBRACKET1.Position, Alternative1); }
+  | '(' Alternative ')'		{ Unit0 := Alternative1; }
+  | Id				{ Unit0 := mLeaf (Id1^.Id.pos, Id1); }
+  | Str				{ Unit0 := mLeaf (Str1^.Id.pos, Str1); }
+  | CodeLines			{ Unit0 := mAction (CodeLines1^.Codes.code^.Code.pos, CodeLines1); }
+  .
+Alternative:
+  Expressions			{ Alternative0 := Expressions1; }
+  [				{ Alternative0 := mAlternative (Expressions1^.expr.pos, mAlternative0 (Attribute.Position), Expressions1); }
+  ( '|' Expressions		{ Alternative0 := mAlternative (Expressions2^.expr.pos, Alternative0, Expressions2); }
+  ) +				{ Alternative0 := ReverseTree (Alternative0); }
+  ]
+  .
+Expressions:
+  (				{ Expressions0 := mSequence0 (Attribute.Position); }
+  | Expression			{ Expressions0 := Expression1; }
+    [				{ Expressions0 := mSequence (Expression1^.expr.pos, mSequence0 (Attribute.Position), Expression1); }
+      ( Expression		{ Expressions0 := mSequence (Expression2^.expr.pos, Expressions0, Expression2); }
+      ) +	 		{ Expressions0 := ReverseTree (Expressions0); }
+    ]
+  )
+  .
+TokId: Identifier{ TokId0 := mId (Identifier1.Position, Identifier1.ident, FALSE); }
+  | KW		{ TokId0 := KW1; }
+  | \LOCAL	{ TokId0 := mId (LOCAL1	.Position, MI ("LOCAL"	), FALSE); }
+  | \PREC	{ TokId0 := mId (PREC1	.Position, MI ("PREC"	), FALSE); }
+  .
+Id: Identifier	{ Id0 := mId (Identifier1.Position, Identifier1.ident, FALSE); }
+  | KW		{ Id0 := KW1; }
+  | \OPER	{ Id0 := mId (OPER1	.Position, MI ("OPER"	), FALSE); }
+  | \RULE	{ Id0 := mId (RULE1	.Position, MI ("RULE"	), FALSE); }
+  .
+KW: \BEGIN	{ KW0 := mId (BEGIN1	.Position, MI ("BEGIN"	), FALSE); }
+  | \CLOSE	{ KW0 := mId (CLOSE1	.Position, MI ("CLOSE"	), FALSE); }
+  | \EXPORT	{ KW0 := mId (EXPORT1	.Position, MI ("EXPORT"	), FALSE); }
+  | \GLOBAL	{ KW0 := mId (GLOBAL1	.Position, MI ("GLOBAL"	), FALSE); }
+  | \LEFT	{ KW0 := mId (LEFT1	.Position, MI ("LEFT"	), FALSE); }
+  | \NONE	{ KW0 := mId (NONE1	.Position, MI ("NONE"	), FALSE); }
+  | \PARSER	{ KW0 := mId (PARSER1	.Position, MI ("PARSER"	), FALSE); }
+  | \RIGHT	{ KW0 := mId (RIGHT1	.Position, MI ("RIGHT"	), FALSE); }
+  | \SCANNER	{ KW0 := mId (SCANNER1	.Position, MI ("SCANNER"), FALSE); }
+  | \TOKEN	{ KW0 := mId (TOKEN1	.Position, MI ("TOKEN"	), FALSE); }
+  .
+Str: String	{ Str0 := mId (String1.Position, String1.ident, TRUE); }
+  .

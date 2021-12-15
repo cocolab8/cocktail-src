@@ -1,0 +1,513 @@
+(* $Id: Automaton.mi,v 4.0 1993/08/26 16:06:46 grosch rel $ *)
+
+IMPLEMENTATION MODULE Automaton;
+
+FROM DynArray	IMPORT	MakeArray, ExtendArray, ReleaseArray;
+FROM Errors	IMPORT	ERROR;
+FROM IO		IMPORT	tFile;
+FROM rMemory	IMPORT	Alloc;
+FROM Queues	IMPORT	tQueue, Length, GetElement;
+FROM rSystem	IMPORT	rWrite;
+FROM SYSTEM	IMPORT	ADR, TSIZE;
+FROM Pack	IMPORT  PackHandle, BeginPackInt, PackInt, EndPack;
+
+(* AUTO_ *)
+FROM Info	IMPORT	WriteIdentSet;
+FROM IO		IMPORT	StdOutput;
+FROM Queues	IMPORT	MakeQueue, ReleaseQueue, Append, ClearLast;
+FROM StdIO	IMPORT	WriteS, WriteI, WriteNl;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, Include,
+			Exclude, IsElement, WriteSet, AssignEmpty;
+(* _AUTO *)
+
+CONST
+  NoState = -1;
+  StartState = 0;
+  InitCombSize = 100;
+
+TYPE
+  tState = INTEGER;
+
+  tStateTable = POINTER TO ARRAY [0..1000] OF tState;
+
+  tComb = POINTER TO ARRAY [0..1000] OF INTEGER;
+
+  tTransition = POINTER TO tTransitionR;
+
+  tTransitionR =
+    RECORD
+      Input: INTEGER;
+      Target: tState;
+      Next: tTransition;
+    END;
+
+  tStateR =
+    RECORD
+      Trans: tTransition;
+      MainState: tState;
+    END;
+
+  tAutomaton =
+    RECORD
+      StopStates: tState;
+      LastState: tState;
+      MaxInput: INTEGER;
+      TransitionTable: POINTER TO ARRAY [0..1000] OF tStateR;
+      TableSize: INTEGER; TableSizeL: LONGINT;
+      IndexArray: POINTER TO ARRAY [0..1000] OF INTEGER;
+      IndexArraySize: LONGINT;
+    END;
+
+VAR
+  Automaton: tAutomaton;
+  Comb: tComb;
+  CombSizeL: LONGINT;
+  CombSize: INTEGER;
+  CombCount: INTEGER;
+
+PROCEDURE BeginAutomaton	(stopstates: INTEGER; maxinput: INTEGER);
+  VAR
+    state: tState;
+  BEGIN
+    WITH Automaton DO
+      StopStates := stopstates;
+      LastState := stopstates;
+      MaxInput := maxinput;
+      TableSizeL := 4 * stopstates + 4;
+      MakeArray (TransitionTable, TableSizeL, TSIZE (tStateR));
+      TableSize := TableSizeL;
+      FOR state := 0 TO TableSize - 1 DO
+	TransitionTable^[state].Trans := NIL;
+	TransitionTable^[state].MainState := NoState;
+      END;
+    END;
+  END BeginAutomaton;
+
+(* -------------------- *)
+
+PROCEDURE DefineTransition	(path: tQueue; stop: INTEGER);
+  VAR
+    state: tState;
+    input, length, pos: INTEGER;
+
+  BEGIN
+    state := StartState;
+    pos := 0;
+    length := Length (path);
+    LOOP
+      INC (pos);
+      input := INTEGER (GetElement (path, pos));
+      IF pos = length THEN EXIT; END;
+      state := MakeTarget (state, input);
+    END;
+    SetTarget (state, input, stop);
+  END DefineTransition;
+
+PROCEDURE NewState (): tState;
+  VAR
+    state, size: tState;
+  BEGIN
+    WITH Automaton DO
+      INC (LastState);
+      IF LastState >= TableSize THEN
+	ExtendArray (TransitionTable, TableSizeL, TSIZE (tStateR));
+      END;
+      size := TableSizeL;
+      FOR state := TableSize TO size - 1 DO
+	TransitionTable^[state].Trans := NIL;
+	TransitionTable^[state].MainState := NoState;
+      END;
+      TableSize := TableSizeL;
+      RETURN LastState;
+    END;
+  END NewState;
+
+PROCEDURE MakeTarget (state: tState; input: INTEGER): tState;
+  VAR
+    t: POINTER TO tTransition;
+  BEGIN
+    t := ADR (Automaton.TransitionTable^[state].Trans);
+    LOOP
+      IF t^ = NIL THEN EXIT END;
+      IF t^^.Input = input THEN
+	RETURN (t^^.Target);
+      END;
+      t := ADR (t^^.Next);
+    END;
+    t^ := Alloc (TSIZE (tTransitionR));
+    t^^.Input := input;
+    t^^.Target := NewState ();
+    t^^.Next := NIL;
+    RETURN t^^.Target;
+  END MakeTarget;
+
+PROCEDURE SetTarget (state: tState; input: INTEGER; stop: tState);
+  VAR
+    t: POINTER TO tTransition;
+  BEGIN
+    t := ADR (Automaton.TransitionTable^[state].Trans);
+    LOOP
+      IF t^ = NIL THEN EXIT END;
+      IF t^^.Input = input THEN
+	ERROR ('Automaton.SetTarget: already defined');
+      END;
+      t := ADR (t^^.Next);
+    END;
+    t^ := Alloc (TSIZE (tTransitionR));
+    t^^.Input := input;
+    t^^.Target := stop;
+    t^^.Next := NIL;
+  END SetTarget;
+
+(* -------------------- *)
+
+PROCEDURE ReduceAutomaton;
+  VAR
+    actual, state: tState;
+    input: INTEGER;
+    T: tStateTable;
+    s: LONGINT;
+  BEGIN
+    WITH Automaton DO
+      s := MaxInput + 1;
+      MakeArray (T, s, TSIZE (tState));
+      FOR actual := LastState - 1 TO StopStates + 1 BY -1 DO
+	DefineTable (T, actual);
+	FOR state := actual + 1 TO LastState DO
+	  IF Compatible (T, state) THEN
+	    Melt (actual, state, T);
+	  END;
+	END;
+      END;
+      ReleaseArray (T, s, TSIZE (tState));
+    END;
+  END ReduceAutomaton;
+
+PROCEDURE DefineTable (T: tStateTable; state: tState);
+  VAR
+    input: tState;
+    t: tTransition;
+  BEGIN
+    WITH Automaton DO
+      FOR input := 0 TO MaxInput DO
+        T^ [input] := NoState;
+      END;
+      t := TransitionTable^[state].Trans;
+      WHILE t # NIL DO
+	T^ [t^.Input] := MainState (t^.Target);
+	t := t^.Next;
+      END;
+    END;
+  END DefineTable;
+
+PROCEDURE Compatible (T: tStateTable; state: tState): BOOLEAN;
+  VAR
+    t: tTransition;
+  BEGIN
+    WITH Automaton DO
+      IF TransitionTable^[state].MainState # NoState THEN
+	RETURN FALSE;		(* only main states may be compatible *)
+      END;
+      t := TransitionTable^[state].Trans;
+      WHILE t # NIL DO
+	IF (T^[t^.Input] # NoState)
+	 & (MainState (T^[t^.Input]) # MainState (t^.Target)) THEN
+	  RETURN FALSE;
+	END;
+	t := t^.Next;
+      END;
+      RETURN TRUE;
+    END;
+  END Compatible;
+
+PROCEDURE Melt (actual, state: tState; T: tStateTable);
+  VAR
+    t: tTransition;
+    input: INTEGER;
+    target: tState;
+  BEGIN
+    WITH Automaton DO
+      t := TransitionTable^[state].Trans;
+      WHILE t # NIL DO
+	input := t^.Input;
+	IF T^ [input] = NoState THEN		(* transition must be defined *)
+	  target := MainState (t^.Target);
+	  T^ [input] := target;
+	  SetTarget (actual, input, target);
+	END;
+	t := t^.Next;
+      END;
+      TransitionTable^[state].MainState := actual;
+    END;
+  END Melt;
+
+(* -------------------- *)
+
+PROCEDURE MakeComb;
+  VAR 
+    state, main: tState;
+    index: INTEGER;
+  BEGIN
+    CombCount := -1;
+    CombSize := 0;
+    WITH Automaton DO
+      FOR state := StartState TO StopStates DO
+	IndexArray^[state] := state;
+      END;
+      FOR state := StopStates + 1 TO LastState DO
+	main := TransitionTable^[state].MainState;
+	IF main = NoState THEN
+	  index := 0;
+	  WHILE NOT Fits (index, state) DO;
+	    INC (index);
+	  END;
+	  Embed (index, state);
+	ELSE
+	  index := IndexArray^[main];
+	END;
+	IndexArray^[state] := index;
+      END;
+      FOR index := 0 TO CombCount DO
+        state := Comb^[index];
+	IF state > StopStates THEN
+	  Comb^[index] := IndexArray^[state]
+	END;
+      END;
+    END;
+  END MakeComb;
+
+PROCEDURE Fits (index: INTEGER; state: tState): BOOLEAN;
+  VAR
+    t: tTransition;
+    i: INTEGER;
+    old, j: INTEGER;
+  BEGIN
+    t := Automaton.TransitionTable^[state].Trans;
+    WHILE t # NIL DO
+      i := index + t^.Input;
+      IF i > CombCount THEN
+	WHILE i >= CombSize DO
+	  old := CombSize;
+	  IF CombSize = 0 THEN
+	    CombSizeL := InitCombSize;
+	    MakeArray (Comb, CombSizeL, TSIZE (INTEGER));
+	  ELSE
+	    ExtendArray (Comb, CombSizeL, TSIZE (INTEGER));
+	  END;
+	  CombSize := CombSizeL;
+	  FOR j := old TO CombSize - 1 DO
+	    Comb^ [j] := NoState;
+	  END;
+	END;
+	CombCount := i;
+      END;
+      IF (Comb^[i] # NoState) & (Comb^[i] # t^.Target) THEN
+	RETURN FALSE;
+      END;
+      t := t^.Next;
+    END;
+    RETURN TRUE;
+  END Fits;
+
+PROCEDURE Embed (index: INTEGER; state: tState);
+  VAR
+    t: tTransition;
+  BEGIN
+    t := Automaton.TransitionTable^[state].Trans;
+    WHILE t # NIL DO
+      Comb^[index + t^.Input] := t^.Target;
+      t := t^.Next;
+    END;
+  END Embed;
+
+(* -------------------- *)
+
+PROCEDURE CloseAutomaton	(VAR CombSize: INTEGER);
+  BEGIN
+    ReduceAutomaton;
+    WITH Automaton DO
+      IndexArraySize := LastState + 1;
+      MakeArray (IndexArray, IndexArraySize, TSIZE (INTEGER));
+    END;
+    MakeComb;
+    CombSize := CombCount;
+  END CloseAutomaton;
+
+PROCEDURE PackComb (f: tFile);
+VAR
+  i	: INTEGER;
+  p	: PackHandle;
+BEGIN
+  BeginPackInt (p, f);
+  FOR i := 0 TO CombCount DO
+    PackInt (p, Comb^[i]);
+  END;
+  EndPack (p);
+END PackComb;
+
+PROCEDURE ReleaseAutomaton;
+  BEGIN
+    WITH Automaton DO
+      ReleaseArray (IndexArray, IndexArraySize, TSIZE (INTEGER));
+    END;
+  END ReleaseAutomaton;
+
+(* -------------------- *)
+PROCEDURE StartIndex		(input: INTEGER): INTEGER;
+  VAR
+    trans: tTransition;
+  BEGIN
+    WITH Automaton DO
+      trans := TransitionTable^[StartState].Trans;
+      LOOP
+	IF trans = NIL THEN EXIT END;
+	IF trans^.Input = input THEN
+	  RETURN IndexArray^[trans^.Target];
+	END;
+	trans := trans^.Next;
+      END;
+      ERROR ('Automaton.StartIndex: not defined');
+    END;
+  END StartIndex;
+
+PROCEDURE MainState (state: tState): tState;
+  BEGIN
+    WITH Automaton DO
+      WHILE (state > StopStates)
+	  & (TransitionTable^[state].MainState # NoState) DO
+	state := TransitionTable^[state].MainState;
+      END;
+      RETURN state;
+    END;
+  END MainState;
+
+(* -------------------- *)
+
+
+(* AUTO_ *)
+PROCEDURE WriteFunction;
+  VAR
+    q: tQueue;
+  BEGIN
+    MakeQueue (q);
+    WriteTrans (StartState, q);
+    ReleaseQueue (q);
+  END WriteFunction;
+
+PROCEDURE WriteTrans (state: tState; VAR q: tQueue);
+  VAR
+    done: tSet;
+    trans, t: tTransition;
+    inputs: tSet;
+    in: POINTER TO tSet;
+    pos: INTEGER;
+    target: tState;
+  BEGIN
+    WITH Automaton DO
+      MakeSet (done, LastState);
+      MakeSet (inputs, MaxInput);
+      Append (q, ADR (inputs));
+      trans := TransitionTable^[state].Trans;
+      LOOP
+        IF trans = NIL THEN EXIT END;
+	target := MainState (trans^.Target);
+	IF NOT IsElement (target, done) THEN
+	  AssignEmpty (inputs);
+	  Include (inputs, trans^.Input);
+	  t := trans^.Next;
+	  WHILE t # NIL DO
+	    IF MainState (t^.Target) = target THEN
+	      Include (inputs, t^.Input);
+	    END;
+	    t := t^.Next;
+	  END;
+	  IF target > StopStates THEN
+	    WriteTrans (target, q);
+	  ELSE
+	    in := GetElement (q, 1);
+	    WriteIdentSet (StdOutput, in^);
+	    WriteS (' ');
+	    FOR pos := 2 TO Length (q) DO
+	      in := GetElement (q, pos);
+	      WriteSet (StdOutput, in^);
+	      WriteS (' ');
+	    END;
+	    WriteS (' = ');
+	    WriteI (target, 1);
+	    WriteNl;
+	  END;
+	  Include (done, target);
+	END;
+	trans := trans^.Next;
+      END;
+      ClearLast (q);
+      ReleaseSet (inputs);
+      ReleaseSet (done);
+    END;
+  END WriteTrans;
+
+PROCEDURE WriteAutomaton;
+  VAR
+    state: tState;
+  BEGIN
+    WriteS ('Automaton');
+    WriteNl;
+    FOR state := 0 TO Automaton.LastState DO
+      WriteState (state);
+    END;
+    WriteNl;
+  END WriteAutomaton;
+
+PROCEDURE WriteState (state: tState);
+  VAR
+    t: tTransition;
+    m: tState;
+  BEGIN
+
+    m := Automaton.TransitionTable^[state].MainState;
+    IF m # NoState THEN
+      WriteI (state, 3);
+      WriteS (' -> ');
+      WriteI (m, 3);
+      WriteNl;
+    ELSE
+      t := Automaton.TransitionTable^[state].Trans;
+      IF t # NIL THEN
+	WriteI (state, 3);
+	WHILE t # NIL DO
+	  WriteS ('  (');
+	  WriteI (t^.Input, 1);
+	  WriteS (', ');
+	  WriteI (t^.Target, 1);
+	  WriteS (')');
+	  t := t^.Next;
+	END;
+	WriteNl;
+      END;
+    END;
+  END WriteState;
+
+PROCEDURE WriteComb;
+  VAR
+    index: INTEGER;
+  BEGIN
+    WriteS ('Comb');
+    WriteNl;
+    WriteS ('       ');
+    FOR index := 0 TO 9 DO
+      WriteI (index, 5);
+    END;
+    FOR index := 0 TO CombCount DO
+      IF index MOD 10 = 0 THEN
+	WriteNl;
+	WriteI (index, 5);
+	WriteS ('  ');
+      END;
+      WriteI (Comb^[index], 5);
+    END;
+    WriteNl;
+    WriteNl;
+  END WriteComb;
+(* _AUTO *)
+
+END Automaton.

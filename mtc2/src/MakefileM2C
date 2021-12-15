@@ -1,0 +1,239 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+AssocTab$(ES)	: AssocTab$(ED)	; $(MD) AssocTab$(SD)
+
+AssocTab$(EO)	: AssocTab$(EI)	; $(MI) AssocTab$(SI)
+AssocTab$(EO)	: AssocTab$(ES)
+
+Base$(ES)	: Base$(ED)	; $(MD) Base$(SD)
+
+Base$(EO)	: Base$(EI)	; $(MI) Base$(SI)
+Base$(EO)	: Base$(ES)
+
+Code$(ES)	: Code$(ED)	; $(MD) Code$(SD)
+Code$(ES)	: Tree$(ES)
+
+Code$(EO)	: Code$(EI)	; $(MI) Code$(SI)
+Code$(EO)	: Code$(ES)
+Code$(EO)	: Tree$(ES)
+Code$(EO)	: Base$(ES)
+Code$(EO)	: Tree$(ES)
+Code$(EO)	: Defs$(ES)
+Code$(EO)	: Values$(ES)
+Code$(EO)	: Types$(ES)
+Code$(EO)	: AssocTab$(ES)
+Code$(EO)	: GenIdent$(ES)
+Code$(EO)	: Errors$(ES)
+Code$(EO)	: GenIdent$(ES)
+Code$(EO)	: Defs$(ES)
+Code$(EO)	: Values$(ES)
+
+DefMods$(ES)	: DefMods$(ED)	; $(MD) DefMods$(SD)
+DefMods$(ES)	: Tree$(ES)
+
+DefMods$(EO)	: DefMods$(EI)	; $(MI) DefMods$(SI)
+DefMods$(EO)	: DefMods$(ES)
+DefMods$(EO)	: Base$(ES)
+DefMods$(EO)	: Scanner$(ES)
+DefMods$(EO)	: Parser$(ES)
+DefMods$(EO)	: Errors$(ES)
+DefMods$(EO)	: Position$(ES)
+DefMods$(EO)	: Tree$(ES)
+DefMods$(EO)	: Defs$(ES)
+DefMods$(EO)	: AssocTab$(ES)
+
+Defs$(ES)	: Defs$(ED)	; $(MD) Defs$(SD)
+Defs$(ES)	: Values$(ES)
+
+Defs$(EO)	: Defs$(EI)	; $(MI) Defs$(SI)
+Defs$(EO)	: Defs$(ES)
+Defs$(EO)	: Position$(ES)
+Defs$(EO)	: Values$(ES)
+Defs$(EO)	: Values$(ES)
+Defs$(EO)	: Tree$(ES)
+Defs$(EO)	: GenIdent$(ES)
+
+Errors$(ES)	: Errors$(ED)	; $(MD) Errors$(SD)
+Errors$(ES)	: Position$(ES)
+
+Errors$(EO)	: Errors$(EI)	; $(MI) Errors$(SI)
+Errors$(EO)	: Errors$(ES)
+Errors$(EO)	: Scanner$(ES)
+Errors$(EO)	: Position$(ES)
+
+GenIdent$(ES)	: GenIdent$(ED)	; $(MD) GenIdent$(SD)
+
+GenIdent$(EO)	: GenIdent$(EI)	; $(MI) GenIdent$(SI)
+GenIdent$(EO)	: GenIdent$(ES)
+GenIdent$(EO)	: Base$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+Parser$(ES)	: Tree$(ES)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Position$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Position$(ES)
+Parser$(EO)	: Tree$(ES)
+Parser$(EO)	: Defs$(ES)
+
+Position$(ES)	: Position$(ED)	; $(MD) Position$(SD)
+
+Position$(EO)	: Position$(EI)	; $(MI) Position$(SI)
+Position$(EO)	: Position$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+Scanner$(ES)	: Tokens$(ES)
+Scanner$(ES)	: Position$(ES)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Position$(ES)
+Scanner$(EO)	: Source$(ES)
+Scanner$(EO)	: Errors$(ES)
+Scanner$(EO)	: Tokens$(ES)
+
+Semantic$(ES)	: Semantic$(ED)	; $(MD) Semantic$(SD)
+Semantic$(ES)	: Tree$(ES)
+
+Semantic$(EO)	: Semantic$(EI)	; $(MI) Semantic$(SI)
+Semantic$(EO)	: Semantic$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: UniqueId$(ES)
+Semantic$(EO)	: Values$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: GenIdent$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Types$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Types$(ES)
+Semantic$(EO)	: Errors$(ES)
+Semantic$(EO)	: Values$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Values$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: UniqueId$(ES)
+Semantic$(EO)	: GenIdent$(ES)
+Semantic$(EO)	: Errors$(ES)
+Semantic$(EO)	: Errors$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: GenIdent$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Tree$(ES)
+Semantic$(EO)	: Code$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: GenIdent$(ES)
+Semantic$(EO)	: Defs$(ES)
+Semantic$(EO)	: Defs$(ES)
+
+Source$(ES)	: Source$(ED)	; $(MD) Source$(SD)
+
+Source$(EO)	: Source$(EI)	; $(MI) Source$(SI)
+Source$(EO)	: Source$(ES)
+Source$(EO)	: Scanner$(ES)
+
+Tokens$(ES)	: Tokens$(ED)	; $(MD) Tokens$(SD)
+
+Tokens$(EO)	: Tokens$(EI)	; $(MI) Tokens$(SI)
+Tokens$(EO)	: Tokens$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+Tree$(ES)	: Position$(ES)
+Tree$(ES)	: Defs$(ES)
+Tree$(ES)	: Values$(ES)
+Tree$(ES)	: UniqueId$(ES)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+Tree$(EO)	: Position$(ES)
+Tree$(EO)	: Position$(ES)
+Tree$(EO)	: Defs$(ES)
+
+Types$(ES)	: Types$(ED)	; $(MD) Types$(SD)
+Types$(ES)	: Values$(ES)
+Types$(ES)	: Defs$(ES)
+
+Types$(EO)	: Types$(EI)	; $(MI) Types$(SI)
+Types$(EO)	: Types$(ES)
+Types$(EO)	: Base$(ES)
+Types$(EO)	: Tree$(ES)
+Types$(EO)	: Defs$(ES)
+Types$(EO)	: Values$(ES)
+Types$(EO)	: Code$(ES)
+Types$(EO)	: Defs$(ES)
+
+UniqueId$(ES)	: UniqueId$(ED)	; $(MD) UniqueId$(SD)
+
+UniqueId$(EO)	: UniqueId$(EI)	; $(MI) UniqueId$(SI)
+UniqueId$(EO)	: UniqueId$(ES)
+UniqueId$(EO)	: Errors$(ES)
+
+Values$(ES)	: Values$(ED)	; $(MD) Values$(SD)
+
+Values$(EO)	: Values$(EI)	; $(MI) Values$(SI)
+Values$(EO)	: Values$(ES)
+Values$(EO)	: Tree$(ES)
+Values$(EO)	: Defs$(ES)
+Values$(EO)	: Types$(ES)
+Values$(EO)	: Defs$(ES)
+Values$(EO)	: Tree$(ES)
+
+all	: mtc2
+mtc2$(EO)	: mtc2$(EP)	; $(MP) mtc2$(SP)
+mtc2$(EO)	: Base$(ES)
+mtc2$(EO)	: Scanner$(ES)
+mtc2$(EO)	: Parser$(ES)
+mtc2$(EO)	: Tree$(ES)
+mtc2$(EO)	: DefMods$(ES)
+mtc2$(EO)	: Defs$(ES)
+mtc2$(EO)	: Semantic$(ES)
+mtc2$(EO)	: Code$(ES)
+mtc2$(EO)	: Errors$(ES)
+mtc2$(EO)	: Tree$(ES)
+mtc2$(EO)	: Defs$(ES)
+
+mtc2	: mtc2$(EO) Defs$(EO) GenIdent$(EO) Base$(EO) Tree$(EO) Position$(EO) UniqueId$(EO) Errors$(EO) Scanner$(EO) Tokens$(EO) Source$(EO) Values$(EO) Types$(EO) Code$(EO) AssocTab$(EO) Semantic$(EO) DefMods$(EO) Parser$(EO)	; $(ML) mtc2 $(OUT) mtc2
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

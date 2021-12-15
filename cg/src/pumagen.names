@@ -1,0 +1,27 @@
+Tree2_GetTree2			-
+BEGIN_Tree2			-
+
+Idents_MakeIdent		extern Zfb3DLQ_0 Zfb3DLQ_2 ARGS ((Zp1PEAFD_2 *Z124));
+Idents_tIdent			typedef SHORTCARD Zfb3DLQ_0;
+
+Strings_tString			typedef struct Strings_1 {
+				struct Strings_2 {
+				CHAR A[Zp1PEAFD_0 + 1];
+				} Z0;
+				Zp1PEAFD_1 Z1;
+				} Zp1PEAFD_2;
+Chars				Z0
+Length				Z1
+
+Tree_Class			#define Zq0A4_55 3
+Tree_mAttribute			extern Zq0A4_171 Zq0A4_368 ARGS ((Zq0A4_171 Z567, Zfb3DLQ_0 Z563, Zfb3DLQ_0 Z572, Zq0A4_197 Z564));	11.
+Tree_mChild			extern Zq0A4_171 Zq0A4_367 ARGS ((Zq0A4_171 Z567, Zfb3DLQ_0 Z563, Zfb3DLQ_0 Z572, Zq0A4_197 Z564));	10.
+Tree_mClass			extern Zq0A4_171 Zq0A4_363 ARGS ((Zfb3DLQ_0 Z563, Zq0A4_198 Z564, Zq0A4_171 Z565, Zq0A4_171 Z566, Zq0A4_171 Z567));	6.
+Tree_mNoAttribute		extern Zq0A4_171 Zq0A4_365 ARGS ((void));	8.
+Tree_mNoClass			extern Zq0A4_171 Zq0A4_362 ARGS ((void));	5.
+Tree_tTree			typedef struct Tree_122 *Zq0A4_171;	1.
+
+t->U_1.V_1.Kind			SHORTCARD Z0;
+t->U_1.V_5.Class.BaseClass	Zq0A4_235 Z4;	Zq0A4_171 Z6;	5./7.
+t->U_1.V_5.Class.Extensions	Zq0A4_235 Z4;	Zq0A4_171 Z4;	5./5.
+t->U_1.V_5.Class.Next		Zq0A4_235 Z4;	Zq0A4_171 Z5;	5./6.

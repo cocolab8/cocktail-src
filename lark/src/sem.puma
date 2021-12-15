@@ -1,0 +1,1814 @@
+/* $Id: sem.puma,v 1.18 2005/05/23 13:19:46 grosch rel $ */
+
+/*
+ * $Log: sem.puma,v $
+ * Revision 1.18  2005/05/23 13:19:46  grosch
+ * update to new version of puma wrt. type checking of REF parameters
+ *
+ * Revision 1.17  2005/05/23 13:05:44  grosch
+ * improved handling of options for conflict explanation
+ *
+ * Revision 1.16  2002/07/19 08:42:03  grosch
+ * added keyword CONDITION to conditions
+ *
+ * Revision 1.15  2000/09/12 17:50:52  grosch
+ * checked in update for generation of Java from Trevor Nash
+ *
+ * Revision 1.14  1999/11/16 16:01:27  grosch
+ * fixed bug in HandleRules
+ *
+ * Revision 1.13  1999/11/11 11:29:41  grosch
+ * bug fix: wrong order of rules caused crash in generation of examples
+ * bug fix in processing of selector names in case rules begin with action
+ *
+ * Revision 1.12  1999/11/04 16:10:04  grosch
+ * fixed bug concerning message "nonterminal not used"
+ *
+ * Revision 1.11  1999/10/01 14:56:19  grosch
+ * fixed bug in CompContinuation
+ *
+ * Revision 1.10  1999/06/03 07:59:15  grosch
+ * added Distance computation to nonterminals
+ *
+ * Revision 1.9  1999/05/20 09:22:01  grosch
+ * bug fix: stop processing after error 'nonterminal does not terminate'
+ *
+ * Revision 1.8  1999/02/18 15:49:03  grosch
+ * added function IsRecursive
+ *
+ * Revision 1.7  1998/04/21 13:09:36  grosch
+ * truncation of file and module names to 8.3 format
+ * introduced efficient variants of procedure CompNullable and CompFirst
+ * removed unused computations concerning variable L
+ * some other improvements
+ *
+ * Revision 1.6  1995/11/07  09:28:12  grosch
+ * added missing initialization of Properties of Nonterminals
+ * fixed bug in CompMin0
+ * optimized procedure Identify
+ *
+ * Revision 1.5  1994/11/13  12:48:35  grosch
+ * added missing initialization of Delta
+ *
+ * Revision 1.4  1994/08/30  12:10:50  grosch
+ * added negation of predicates
+ * optimization called ReachableTrial
+ * added option for choice of whether warning or error
+ * improved generation of internal names
+ *
+ * Revision 1.3  1994/04/13  10:01:34  grosch
+ * added missing initializations of Properties
+ *
+ * Revision 1.2  1994/03/23  15:10:14  grosch
+ * allow several start symbols
+ * accept Yacc input as well as Lark input
+ *
+ * Revision 1.1  1994/03/17  22:23:31  grosch
+ * added cost and repr specs for terminals
+ *
+ * Revision 1.0  1994/02/01  14:05:55  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 26.1.1993 */
+
+TRAFO Semantic PUBLIC Semantics Semantics2
+
+EXPORT {
+FROM IO		IMPORT tFile;
+FROM Idents	IMPORT tIdent;
+FROM Sets	IMPORT tSet;
+FROM Tree	IMPORT tTree;
+
+VAR
+   TermCount, NontermCount, RuleCount, MaxTerminalCode, RootCount, StartCount	: CARDINAL;
+   PathCount	: LONGINT;
+
+PROCEDURE WriteSymSet (File: tFile; Set: tSet);
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT TSIZE, ADR, ADDRESS;
+FROM General	IMPORT Min, Max;
+FROM rMemory	IMPORT Alloc;
+FROM IO		IMPORT tFile, StdOutput, WriteN, WriteS, WriteI, WriteC, WriteB,
+			WriteNl, WriteFlush;
+FROM DynArray	IMPORT MakeArray, ReleaseArray;
+FROM Strings	IMPORT tString, IntToString, Concatenate, ArrayToString, Length, Char;
+FROM Idents	IMPORT WriteIdent, tIdent, NoIdent, MakeIdent, MaxIdent, GetString;
+FROM Texts	IMPORT tText, IsEmpty, MakeText, WriteText;
+FROM Position	IMPORT tPosition, NoPosition, WritePosition;
+FROM Errors	IMPORT MessageI, Message, Ident, Short, Error, Warning, Fatal;
+FROM LarkTime	IMPORT WriteStepTime;
+FROM Parser	IMPORT Encode;
+
+FROM Queue	IMPORT
+   MakeQueue	, ReleaseQueue	, Enqueue	, Dequeue	;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, ResizeSet	,
+   IsElement	, Include	, Extract	, Union		,
+   Select	, Difference	, Complement	, Assign	,
+   IsSubset	, Minimum	, Maximum	, Size		,
+   AssignEmpty	, Exclude	, Intersection	, WriteSet	;
+
+FROM Relation	IMPORT
+   tRelation	, MakeRelation	, Closure	, WriteRelation	, IsRelated	,
+   Project2	;
+
+FROM Tree	IMPORT
+   tTree	, NoTree	, TreeRoot	, NoAssoc	, Identify	,
+   ForallTree	, ReverseTree	, Reachable	, Complete	, Active	,
+   Nullable	, Rule		, NoElement	, Terminal	, Options	,
+   FirstTerm	, LastTerm	, FirstNonterm	, LastNonterm	, Epsilon	,
+   ToSymbolSize	, ToSymbolPtr	, ToRuleSize	, ToRulePtr	, tRule		,
+   Nonterminal	, Recursive	, WriteProperties, LS		,
+   tPath	, tpSet		, QueryTree	, IsType	, Look		,
+   ErrorCount	, DefaultCost	, PrecDef	, ReachableTrial, InitIdentify	,
+   Declare	;
+
+IMPORT Strings, Idents, Sets, Relation, Queue;
+
+CONST
+   Infinite	= MAX (SHORTCARD);
+   EvalLimit	= 300;
+
+VAR
+   RightMostTerminal, CurNonterm, gRuleOrig, gNonterminals, gCheck, Start: tTree;
+   LastCode, PrecLevel, CurrentAssoc, NontermGen	: CARDINAL;
+   SymbolCount, ElmtCount, CurIndex	: CARDINAL;
+   NameSet, CodeSet, Users, B, C	: tSet;
+   NoAction				: tText;
+   DependsOn, UsedBy			: tRelation;
+   gElmtsPtr				: tRule;
+   CurPathPtr				: tPath;
+   CurMinPath				: SHORTCARD;
+   DistanceLHS				: SHORTCARD;
+   gMinStep				: SHORTCARD;
+   gIndex				: SHORTCARD;
+
+   NPtr		: POINTER TO ARRAY [0..1000000] OF SHORTCARD;
+   NSize	: LONGINT;
+   StackPtr	: POINTER TO ARRAY [0..1000000] OF SHORTCARD;
+   StackSize	: LONGINT;
+
+(*
+PROCEDURE CompNullable (n: tTree);
+   VAR
+      Success	: BOOLEAN;
+      r, e	: tTree;
+      i		: CARDINAL;
+   BEGIN
+      WITH n^.Nonterminal DO
+	 r := Rules;
+	 WHILE IsType (r, Rule) DO
+	    Success := TRUE;
+	    e := r^.Rule.Elements;
+	    LOOP
+	       IF e^.Kind = NoElement THEN EXIT; END;
+	       IF (e^.Ident.Object^.Kind = Terminal) OR
+	          NOT (Nullable IN e^.Ident.Object^.Nonterminal.Properties) THEN
+		  Success := FALSE; EXIT;
+	       END;
+	       e := e^.Element.Next;
+	    END;
+	    IF Success THEN
+	       INCL (Properties, Nullable);
+	       Project2 (UsedBy, Index - FirstNonterm, Users);
+	       FOR i := Minimum (Users) TO Maximum (Users) DO
+		  IF IsElement (i, Users) AND
+		     NOT (Nullable IN ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.Properties) THEN
+		     Enqueue (i + FirstNonterm);
+		  END;
+	       END;
+	       RETURN;
+	    END;
+	    r := r^.Rule.Next;
+	 END;
+      END;
+   END CompNullable;
+
+PROCEDURE CompNullable2;		(* efficient variant of CompNullable *)
+   VAR StackTop, i	: SHORTCARD;
+
+   PROCEDURE Traverse (x: CARDINAL);
+      CONST Infinite	= MAX (SHORTCARD);
+      VAR y, Depth	: SHORTCARD;
+	 Success	: BOOLEAN;
+	 r, e		: tTree;
+      BEGIN							(* Digraph *)
+	 WITH ToSymbolPtr^ [x + FirstNonterm]^.Nonterminal DO
+	    INC (StackTop);
+	    StackPtr^ [StackTop] := x;
+	    Depth := StackTop;
+	    NPtr^ [x] := Depth;
+	    r := Rules;
+	    LOOP
+	       IF NOT IsType (r, Rule) THEN EXIT; END;
+	       Success := TRUE;
+	       e := r^.Rule.Elements;
+	       LOOP
+		  IF e^.Kind = NoElement THEN EXIT; END;
+		  IF e^.Ident.Object^.Kind = Terminal THEN
+		     Success := FALSE; EXIT;
+		  ELSE
+		     y := e^.Ident.Object^.Nonterminal.Index - FirstNonterm;
+		     IF NPtr^ [y] = 0 THEN Traverse (y); END;
+		     NPtr^ [x] := Min (NPtr^ [x], NPtr^ [y]);
+		     IF NOT (Nullable IN e^.Ident.Object^.Nonterminal.Properties) THEN
+			Success := FALSE; EXIT;
+		     END;
+		  END;
+		  e := e^.Element.Next;
+	       END;
+	       IF Success THEN INCL (Properties, Nullable); EXIT; END;
+	       r := r^.Rule.Next;
+	    END;
+	    IF NPtr^ [x] = Depth THEN
+	       LOOP
+		  y := StackPtr^ [StackTop];
+		  DEC (StackTop);
+		  NPtr^ [y] := Infinite;
+		  IF y = x THEN EXIT; END;
+		  WITH ToSymbolPtr^ [y + FirstNonterm]^.Nonterminal DO
+		     r := Rules;
+		     LOOP
+			IF NOT IsType (r, Rule) THEN EXIT; END;
+			Success := TRUE;
+			e := r^.Rule.Elements;
+			LOOP
+			   IF e^.Kind = NoElement THEN EXIT; END;
+			   IF (e^.Ident.Object^.Kind = Terminal) OR
+			      NOT (Nullable IN e^.Ident.Object^.Nonterminal.Properties) THEN
+			      Success := FALSE; EXIT;
+			   END;
+			   e := e^.Element.Next;
+			END;
+			IF Success THEN INCL (Properties, Nullable); EXIT; END;
+			r := r^.Rule.Next;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END Traverse;
+
+   BEGIN							(* Digraph *)
+      NSize := LastNonterm - FirstNonterm + 1;
+      MakeArray (NPtr, NSize, TSIZE (SHORTCARD));
+      StackSize := NSize + 1;
+      MakeArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+      StackTop := 0;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO NPtr^ [i] := 0; END;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO
+	 IF (NPtr^ [i] = 0) AND (Reachable IN ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.Properties) THEN
+	    Traverse (i);
+	 END;
+      END;
+      ReleaseArray (NPtr, NSize, TSIZE (SHORTCARD));
+      ReleaseArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+   END CompNullable2;
+*)
+
+PROCEDURE CompMin (n: tTree);
+   VAR
+      l, o	: SHORTCARD;
+      r, e	: tTree;
+      i		: CARDINAL;
+   BEGIN
+      WITH n^.Nonterminal DO
+	 o := MinLen;
+	 r := Rules;
+	 WHILE IsType (r, Rule) DO
+	    l := 0;
+	    e := r^.Rule.Elements;
+	    LOOP
+	       IF e^.Kind = NoElement THEN EXIT; END;
+	       WITH e^.Ident DO
+		  IF Object^.Kind = Terminal THEN
+		     INC (l, Object^.Terminal.Cost);
+		  ELSIF Object^.Nonterminal.MinLen < Infinite - l THEN
+		     INC (l, Object^.Nonterminal.MinLen);
+		  ELSE
+		     l := Infinite; EXIT;
+		  END;
+		  e := Next;
+	       END;
+	    END;
+	    MinLen := Min (MinLen, l);
+	    r := r^.Rule.Next;
+	 END;
+	 IF MinLen # o THEN
+	    Project2 (UsedBy, Index - FirstNonterm, Users);
+	    IF NOT Sets.IsEmpty (Users) THEN
+	       FOR i := Minimum (Users) TO Maximum (Users) DO
+		  IF IsElement (i, Users) AND
+		     (ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.MinLen > 0) THEN
+		     Enqueue (i + FirstNonterm);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END CompMin;
+
+(* IT DOES NOT WORK
+PROCEDURE CompMin22;			(* efficient variant of CompMin *)
+   VAR StackTop, i	: SHORTCARD;
+
+   PROCEDURE Traverse (x: CARDINAL);
+      CONST Infinite	= MAX (SHORTCARD);
+      VAR y, Depth, l	: SHORTCARD;
+	 r, e		: tTree;
+      BEGIN							(* Digraph *)
+	 WITH ToSymbolPtr^ [x + FirstNonterm]^.Nonterminal DO
+	    INC (StackTop);
+	    StackPtr^ [StackTop] := x;
+	    Depth := StackTop;
+	    NPtr^ [x] := Depth;
+	    r := Rules;
+	    WHILE IsType (r, Rule) DO
+	       l := 0;
+	       e := r^.Rule.Elements;
+	       LOOP
+		  IF e^.Kind = NoElement THEN EXIT; END;
+		  WITH e^.Ident DO
+		     IF Object^.Kind = Terminal THEN
+			INC (l, Object^.Terminal.Cost);
+		     ELSE
+			y := Object^.Nonterminal.Index - FirstNonterm;
+			IF NPtr^ [y] = 0 THEN Traverse (y); END;
+			NPtr^ [x] := Min (NPtr^ [x], NPtr^ [y]);
+			IF Object^.Nonterminal.MinLen < Infinite - l THEN
+			   INC (l, Object^.Nonterminal.MinLen);
+			ELSE
+			   l := Infinite; EXIT;
+			END;
+		     END;
+		     e := Next;
+		  END;
+	       END;
+	       MinLen := Min (MinLen, l);
+	       r := r^.Rule.Next;
+	    END;
+	    IF NPtr^ [x] = Depth THEN
+	       LOOP
+		  y := StackPtr^ [StackTop];
+		  DEC (StackTop);
+		  NPtr^ [y] := Infinite;
+		  IF y = x THEN EXIT; END;
+		  WITH ToSymbolPtr^ [y + FirstNonterm]^.Nonterminal DO
+		     r := Rules;
+		     WHILE IsType (r, Rule) DO
+			l := 0;
+			e := r^.Rule.Elements;
+			LOOP
+			   IF e^.Kind = NoElement THEN EXIT; END;
+			   WITH e^.Ident DO
+			      IF Object^.Kind = Terminal THEN
+				 INC (l, Object^.Terminal.Cost);
+			      ELSIF Object^.Nonterminal.MinLen < Infinite - l THEN
+				 INC (l, Object^.Nonterminal.MinLen);
+			      ELSE
+				 l := Infinite; EXIT;
+			      END;
+			      e := Next;
+			   END;
+			END;
+			MinLen := Min (MinLen, l);
+			r := r^.Rule.Next;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END Traverse;
+
+   BEGIN							(* Digraph *)
+      NSize := LastNonterm - FirstNonterm + 1;
+      MakeArray (NPtr, NSize, TSIZE (SHORTCARD));
+      StackSize := NSize + 1;
+      MakeArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+      StackTop := 0;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO NPtr^ [i] := 0; END;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO
+	 IF (NPtr^ [i] = 0) AND (Reachable IN ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.Properties) THEN
+	    Traverse (i);
+	 END;
+      END;
+      ReleaseArray (NPtr, NSize, TSIZE (SHORTCARD));
+      ReleaseArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+   END CompMin22;
+*)
+
+(*
+PROCEDURE CompMax (n: tTree);
+   VAR
+      l, o	: SHORTCARD;
+      r, e	: tTree;
+      i		: CARDINAL;
+   BEGIN
+      WITH n^.Nonterminal DO
+	 o := MaxLen;
+	 r := Rules;
+	 WHILE IsType (r, Rule) DO
+	    l := 0;
+	    e := r^.Rule.Elements;
+	    WHILE e^.Kind # NoElement DO
+	       WITH e^.Ident DO
+		  IF Object^.Kind = Terminal THEN
+		     INC (l);
+		  ELSIF Recursive IN Object^.Nonterminal.Properties THEN
+		     MaxLen := Infinite; RETURN;
+		  ELSIF Object^.Nonterminal.MaxLen # Infinite THEN
+		     INC (l, Object^.Nonterminal.MaxLen);
+		  ELSE
+		     MaxLen := Infinite; RETURN;
+		  END;
+		  e := Next;
+	       END;
+	    END;
+	    MaxLen := Max (MaxLen, l);
+	    r := r^.Rule.Next;
+	 END;
+	 IF MaxLen # o THEN
+	    Project2 (UsedBy, Index - FirstNonterm, Users);
+	    IF NOT Sets.IsEmpty (Users) THEN
+	       FOR i := Minimum (Users) TO Maximum (Users) DO
+		  IF IsElement (i, Users) AND
+		     (ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.MaxLen # Infinite) THEN
+		     Enqueue (i + FirstNonterm);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END CompMax;
+*)
+
+(*
+PROCEDURE CompFirst (n: tTree);
+   VAR
+      Success	: BOOLEAN;
+      r, e	: tTree;
+   BEGIN
+      WITH n^.Nonterminal DO
+	 IF ({Complete, Active}) * Properties # {} THEN RETURN; END;
+	 INCL (Properties, Active);
+	 Success := TRUE;
+	 r := Rules;
+	 WHILE IsType (r, Rule) DO
+	    e := r^.Rule.Elements;
+	    LOOP
+	       IF e^.Kind = NoElement THEN EXIT; END;
+	       WITH e^.Ident DO
+		  IF Object^.Kind = Terminal THEN
+		     Include (First, Object^.Terminal.Index); EXIT;
+		  ELSE
+		     CompFirst (Object);
+		     Success := Success AND (Complete IN Object^.Nonterminal.Properties);
+		     Union (First, Object^.Nonterminal.First);
+		     IF NOT IsElement (Epsilon, Object^.Nonterminal.First) THEN EXIT;
+		     ELSIF NOT (Nullable IN Properties) THEN Exclude (First, Epsilon); END;
+		  END;
+		  e := Next;
+	       END;
+	    END;
+	    r := r^.Rule.Next;
+	 END;
+	 EXCL (Properties, Active);
+	 IF (n = CurNonterm) OR Success THEN INCL (Properties, Complete); END;
+      END;
+   END CompFirst;
+*)
+
+PROCEDURE CompFirst2;			(* efficient variant of CompFirst *)
+   VAR StackTop, i	: SHORTCARD;
+
+   PROCEDURE Traverse (x: CARDINAL);
+      CONST Infinite	= MAX (SHORTCARD);
+      VAR y, Depth	: SHORTCARD;
+	 r, e		: tTree;
+      BEGIN							(* Digraph *)
+	 WITH ToSymbolPtr^ [x + FirstNonterm]^.Nonterminal DO
+	    INC (StackTop);
+	    StackPtr^ [StackTop] := x;
+	    Depth := StackTop;
+	    NPtr^ [x] := Depth;
+	    r := Rules;
+	    WHILE IsType (r, Rule) DO
+	       e := r^.Rule.Elements;
+	       LOOP
+		  IF e^.Kind = NoElement THEN EXIT; END;
+		  WITH e^.Ident DO
+		     IF Object^.Kind = Terminal THEN
+			Include (First, Object^.Terminal.Index); EXIT;
+		     ELSE
+			y := Object^.Nonterminal.Index - FirstNonterm;
+			IF NPtr^ [y] = 0 THEN Traverse (y); END;
+			NPtr^ [x] := Min (NPtr^ [x], NPtr^ [y]);
+			Union (First, Object^.Nonterminal.First);
+			IF NOT IsElement (Epsilon, Object^.Nonterminal.First) THEN EXIT;
+			ELSIF NOT (Nullable IN Properties) THEN Exclude (First, Epsilon); END;
+		     END;
+		     e := Next;
+		  END;
+	       END;
+	       r := r^.Rule.Next;
+	    END;
+	    IF NPtr^ [x] = Depth THEN
+	       LOOP
+		  y := StackPtr^ [StackTop];
+		  DEC (StackTop);
+		  NPtr^ [y] := Infinite;
+		  IF y = x THEN EXIT; END;
+		  WITH ToSymbolPtr^ [y + FirstNonterm]^.Nonterminal DO
+		     r := Rules;
+		     WHILE IsType (r, Rule) DO
+			e := r^.Rule.Elements;
+			LOOP
+			   IF e^.Kind = NoElement THEN EXIT; END;
+			   WITH e^.Ident DO
+			      IF Object^.Kind = Terminal THEN
+				 Include (First, Object^.Terminal.Index); EXIT;
+			      ELSE
+				 Union (First, Object^.Nonterminal.First);
+				 IF NOT IsElement (Epsilon, Object^.Nonterminal.First) THEN EXIT;
+				 ELSIF NOT (Nullable IN Properties) THEN Exclude (First, Epsilon); END;
+			      END;
+			      e := Next;
+			   END;
+			END;
+			r := r^.Rule.Next;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END Traverse;
+
+   BEGIN							(* Digraph *)
+      NSize := LastNonterm - FirstNonterm + 1;
+      MakeArray (NPtr, NSize, TSIZE (SHORTCARD));
+      StackSize := NSize + 1;
+      MakeArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+      StackTop := 0;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO NPtr^ [i] := 0; END;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO
+	 IF (NPtr^ [i] = 0) AND (Reachable IN ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.Properties) THEN
+	    Traverse (i);
+	 END;
+      END;
+      ReleaseArray (NPtr, NSize, TSIZE (SHORTCARD));
+      ReleaseArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+   END CompFirst2;
+
+(* References:
+
+   J. C. H. Park, K. M. Choe, C. H. Chang:
+   A New Analysis of LALR Formalism,
+   TOPLAS 7, 1 (Jan. 1985), 159-175.
+
+   F. DeRemer, T. Pennello:
+   Efficient Computation of LALR(1) Look-Ahead Sets
+   TOPLAS 4, 4 (Oct. 1982), 615-649.
+*)
+
+PROCEDURE CompPath;
+   VAR z, StackTop, i	: SHORTCARD;
+   VAR Z, Path		: tSet;
+
+   PROCEDURE Traverse (x: CARDINAL);
+      CONST Infinite	= MAX (SHORTCARD);
+      VAR y, Depth	: SHORTCARD;
+      VAR Y		: tSet;
+      BEGIN							(* Digraph *)
+	 WITH ToSymbolPtr^ [x + FirstNonterm]^.Nonterminal DO
+	    INC (StackTop);
+	    StackPtr^ [StackTop] := x;
+	    Depth := StackTop;
+	    NPtr^ [x] := Depth;
+	    MakeSet (Y, LastNonterm - FirstNonterm);
+	    Project2 (LS, x, Y);
+	    WHILE NOT Sets.IsEmpty (Y) DO
+	       y := Sets.Extract (Y);
+	       IF NPtr^ [y] = 0 THEN Traverse (y); END;
+	       NPtr^ [x] := Min (NPtr^ [x], NPtr^ [y]);
+	       Project2 (LS, y, Z);
+	       WHILE NOT Sets.IsEmpty (Z) DO
+		  z := Sets.Extract (Z);
+		  WITH ToSymbolPtr^ [y + FirstNonterm]^.Nonterminal DO
+		     Assign (Path, PathPtr^ [z - MinPath]^);
+		  END;
+		  IF IsElement (Epsilon, Path) THEN
+		     Exclude (Path, Epsilon);
+		     Union (Path, PathPtr^ [y - MinPath]^);
+		  END;
+		  Union (PathPtr^ [z - MinPath]^, Path);
+	       END;
+	    END;
+	    Sets.ReleaseSet (Y);
+	    IF NPtr^ [x] = Depth THEN
+	       LOOP
+		  y := StackPtr^ [StackTop];
+		  DEC (StackTop);
+		  NPtr^ [y] := Infinite;
+		  IF y = x THEN EXIT; END;
+		  Project2 (LS, y, Z);
+		  WHILE NOT Sets.IsEmpty (Z) DO
+		     z := Sets.Extract (Z);
+		     WITH ToSymbolPtr^ [y + FirstNonterm]^.Nonterminal DO
+			Assign (Path, PathPtr^ [z - MinPath]^);
+		     END;
+		     IF IsElement (Epsilon, Path) THEN
+			Exclude (Path, Epsilon);
+			Union (Path, PathPtr^ [y - MinPath]^);
+		     END;
+		     Union (PathPtr^ [z - MinPath]^, Path);
+		  END;
+	       END;
+	    END;
+	 END;
+      END Traverse;
+
+   BEGIN							(* Digraph *)
+      NSize := LastNonterm - FirstNonterm + 1;
+      MakeArray (NPtr, NSize, TSIZE (SHORTCARD));
+      StackSize := NSize + 1;
+      MakeArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+      MakeSet (Z, LastNonterm - FirstNonterm);
+      MakeSet (Path, Epsilon);
+      StackTop := 0;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO NPtr^ [i] := 0; END;
+      FOR i := 0 TO LastNonterm - FirstNonterm DO
+	 IF (NPtr^ [i] = 0) AND (Reachable IN ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.Properties) THEN
+	    Traverse (i);
+	 END;
+      END;
+      ReleaseArray (NPtr, NSize, TSIZE (SHORTCARD));
+      ReleaseArray (StackPtr, StackSize, TSIZE (SHORTCARD));
+      ReleaseSet (Z);
+      ReleaseSet (Path);
+   END CompPath;
+
+PROCEDURE GenIdent (): tIdent;
+   VAR s1, s2	: tString;
+   BEGIN
+      IntToString (NontermGen, s1); INC (NontermGen);
+      ArrayToString ("_intern", s2);
+      Concatenate (s1, s2);
+      RETURN MakeIdent (s1);
+   END GenIdent;
+
+PROCEDURE GenIdent2 (Nonterm, ElmtType: tTree; Rule, Elmt: CARDINAL): tIdent;
+   VAR s1, s2	: tString;
+   BEGIN
+      IntToString (Rule, s1); Strings.Append (s1, '_');
+      GetString (Nonterm^.Nonterminal.Name, s2); Concatenate (s1, s2);
+      CASE ElmtType^.Kind OF
+      | Tree.Action		: ArrayToString ("_Act_"	, s2);
+      | Tree.UCAction		: ArrayToString ("_UCAct_"	, s2);
+      | Tree.ILCheck		: ArrayToString ("_Pred_"	, s2);
+      | Tree.ILTrialParse	: ArrayToString ("_Trial_"	, s2);
+      | Tree.Prec		: ArrayToString ("_Prec_"	, s2);
+      END;
+      Concatenate (s1, s2);
+      IntToString (Elmt, s2); Concatenate (s1, s2);
+      RETURN MakeIdent (s1);
+   END GenIdent2;
+
+PROCEDURE WriteSymSet (File: tFile; Set: tSet);
+   VAR i, j	: CARDINAL;
+   BEGIN
+      WriteS (File, "{");
+      IF NOT Sets.IsEmpty (Set) THEN
+	 j := 0;
+	 FOR i := Minimum (Set) TO Maximum (Set) DO
+	    IF IsElement (i, Set) THEN
+	       IF i < Epsilon THEN
+		  WriteIdent (File, ToSymbolPtr^ [i]^.Terminal.Name);
+	       ELSIF i > Epsilon THEN
+		  WriteIdent (File, ToSymbolPtr^ [i]^.Nonterminal.Name);
+	       ELSE
+		  WriteS (File, "Epsilon");
+	       END;
+	       WriteS (File, " ");
+	       INC (j);
+	       IF j = 10 THEN j := 0; WriteNl (File); WriteS (File, "	"); END;
+	    END;
+	 END;
+      END;
+      WriteS (File, "}");
+   END WriteSymSet;
+
+PROCEDURE StoreCode (Code: SHORTINT);
+   VAR size	: SHORTINT;
+   BEGIN
+      IF Code >= 0 THEN
+	 size := Size (CodeSet);
+	 IF Code > size THEN ResizeSet (CodeSet, Max (2 * size, Code)); END;
+	 Include (CodeSet, Code);
+      END;
+   END StoreCode;
+
+PROCEDURE ErrorMessageI (Text: ARRAY OF CHAR; Pos: tPosition; InfoClass: CARDINAL; Info: ADDRESS);
+   BEGIN
+      MessageI (Text, Error, Pos, InfoClass, Info);
+      INC (ErrorCount);
+   END ErrorMessageI;
+}
+
+BEGIN {
+   NontermGen	:= 0;
+   MakeText (NoAction);
+   PathCount	:= 0;
+   RootCount	:= 0;
+   StartCount	:= 0;
+}
+
+PROCEDURE Semantics (Grammar)
+
+Grammar (..) :-					/* semantic analysis */
+String: tString; ident: tIdent;
+   ArrayToString ("_EOF_", String);		/* add terminal: EOF */
+   ident := MakeIdent (String);
+   Terminals := Terminal (Terminals, ident, NoPosition, 0, 0, NoAssoc, {{}}, DefaultCost, ident, ..);
+   LastCode := 0;
+   MakeSet (NameSet, MaxIdent ());
+   MakeSet (CodeSet, 200);
+   InitIdentify (MaxIdent ());
+   ForallTree (Terminals, CheckTerminals);
+   Terminals := ReverseTree (Terminals);
+   PrecLevel := 0;
+   ForallTree (Precedences, HandlePrecs);
+   ForallTree (Rules, CheckNonterminals);
+   Nonterminals := ReverseTree (Nonterminals);
+   ForallTree (Nonterminals, CheckSelectors);
+   ReleaseSet (NameSet);
+   ForallTree (Nonterminals, ImplicitTerminals);
+   Terminals := ReverseTree (Terminals);
+   ForallTree (Terminals, CodeTerminals);
+   MaxTerminalCode := Maximum (CodeSet);
+   ReleaseSet (CodeSet);
+						/* add nonterminal: 0_intern */
+   Start := Nonterminal (_, GenIdent (), NoPosition, NoRule (), {{}}, .. );
+   ForallTree (Starts, CheckStarts);
+
+{ IF StartCount = 0 THEN };
+   Start^.Nonterminal.Rules :=		/* add rule: 0_intern: <start> _EOF_ . */
+      Rule (Start^.Nonterminal.Rules,
+	 Ident (
+	    Ident (NoElement (), Terminals^.Terminal.Name, NoPosition, NoIdent, NoPosition, Terminals),
+		Nonterminals^.Nonterminal.Name, NoPosition, NoIdent, NoPosition, Nonterminals),
+	    NoIdent, NoPosition, NoAction, NoPosition, NoAction, NoPosition,
+	    0, NoAssoc, NoPosition, 2, Delta := 0);
+   Start^.Nonterminal.Rules^.Rule.LHS := Start;
+   Start^.Nonterminal.Rules^.Rule.RuleOrig := Start^.Nonterminal.Rules;
+   INC (StartCount);
+{ END; };
+   RootCount := StartCount;
+
+   gNonterminals := ReverseTree (Nonterminals);
+   HandleRules (gNonterminals);
+   Nonterminals := ReverseTree (gNonterminals);
+   ForallTree (Nonterminals, HandleTrialParse);
+   Start^.Nonterminal.Rules := ReverseTree (Start^.Nonterminal.Rules);
+   Start^.Nonterminal.Next := Nonterminals;
+   Nonterminals := Start;
+   ForallTree (Nonterminals, CopyPrecs);
+{
+   IF IsElement (ORD ('Y'), Options) THEN
+      WriteS (StdOutput, "Terminals"); WriteNl (StdOutput); WriteNl (StdOutput);
+      ForallTree (Terminals   , Print0); WriteNl (StdOutput);
+      WriteFlush (StdOutput);
+   END;
+   IF IsElement (ORD ('Z'), Options) THEN
+      WriteS (StdOutput, "Nonterminals and Rules"); WriteNl (StdOutput); WriteNl (StdOutput);
+      ForallTree (Nonterminals, Print0);
+      WriteFlush (StdOutput);
+   END;
+};
+WriteStepTime ("CompSemantics0	");
+   CheckReachable (Nonterminals);
+
+   TermCount	:= 0;				/* map symbols and rules to numbers */
+   NontermCount	:= 0;
+   RuleCount	:= 0;
+   ForallTree (Terminals   , CountObjects);
+   ForallTree (Nonterminals, CountObjects);
+   FirstTerm	:= 0;
+   LastTerm	:= TermCount - 1;
+   Epsilon	:= TermCount;
+   FirstNonterm	:= TermCount + 1;
+   LastNonterm	:= TermCount + NontermCount;
+   ToSymbolSize	:= LastNonterm + 1;
+   MakeArray (ToSymbolPtr, ToSymbolSize, TSIZE (tTree));
+   ToRuleSize	:= RuleCount + 1;
+   MakeArray (ToRulePtr, ToRuleSize, TSIZE (tTree));
+   SymbolCount	:= 0;
+   RuleCount	:= 0;
+   ForallTree (Terminals   , StoreIndex);
+   INC (SymbolCount);				/* Epsilon */
+   ForallTree (Nonterminals, StoreIndex);
+   ForallTree (Nonterminals, StoreElmts);
+
+						/* relations between nonterminals */
+
+   MakeRelation (LS, LastNonterm - FirstNonterm, LastNonterm - FirstNonterm);
+   MakeRelation (DependsOn, LastNonterm - FirstNonterm, LastNonterm - FirstNonterm);
+   MakeRelation (UsedBy   , LastNonterm - FirstNonterm, LastNonterm - FirstNonterm);
+   ForallTree (Nonterminals, CompRelations);
+   Closure (LS);
+   Closure (DependsOn);
+/* ForallTree (Nonterminals, CheckRecursive); */
+
+   MakeQueue (LastNonterm);
+   MakeSet (Users, LastNonterm - FirstNonterm);
+{
+(*
+   ForallTree (Nonterminals, CompNullable0);
+   WHILE NOT Queue.IsEmpty () DO
+      CompNullable (ToSymbolPtr^ [Dequeue ()]);
+   END;
+
+   CompNullable2;			(* efficient variant of CompNullable *)
+*)
+
+   ForallTree (Nonterminals, CompMin0);
+   WHILE NOT Queue.IsEmpty () DO
+      CompMin (ToSymbolPtr^ [Dequeue ()]);
+   END;
+(*
+   CompMin22;				(* efficient variant of CompMin *)
+*)
+   ForallTree (Nonterminals, CompMin1);
+(* ForallTree (Nonterminals, CompRecursive); *)
+   ForallTree (Nonterminals, InitMinStep);
+   WHILE NOT Queue.IsEmpty () DO
+      CompMinStep (ToSymbolPtr^ [Dequeue ()]);
+   END;
+   ForallTree (Nonterminals, CompSort0);
+
+(*
+   ForallTree (Nonterminals, CompMax0);
+   WHILE NOT Queue.IsEmpty () DO
+      CompMax (ToSymbolPtr^ [Dequeue ()]);
+   END;
+*)
+
+   ForallTree (Nonterminals, InitDistance);
+   Nonterminals^.Nonterminal.Distance := 0;
+   WHILE NOT Queue.IsEmpty () DO
+      CompDistance (ToSymbolPtr^ [Dequeue ()]);
+   END;
+};
+   ReleaseQueue ();
+
+   ForallTree (Nonterminals, CompFirst0);
+/*
+   ForallTree (Nonterminals, CompFirst1);
+   ForallTree (Nonterminals, ResetComplete);
+*/
+   CompFirst2 ();			/* efficient variant of CompFirst1 */
+
+   MakeSet (B, LastNonterm - FirstNonterm);
+   MakeSet (C, Epsilon);
+   ForallTree (Nonterminals, CompPath0);
+/* ForallTree (Nonterminals, PrintPath); */
+   ReleaseSet (B);
+   ReleaseSet (C);
+   CompPath ();
+
+   ForallTree (Terminals   , CheckReduced);
+   ForallTree (Nonterminals, CheckReduced);
+   IF IsElement (ORD ('x'), Options) THEN
+      WriteS (StdOutput, "Terminals"); WriteNl (StdOutput); WriteNl (StdOutput);
+      ForallTree (Terminals   , Print); WriteNl (StdOutput);
+      WriteFlush (StdOutput);
+   END;
+   IF IsElement (ORD ('z'), Options) THEN
+      WriteS (StdOutput, "Nonterminals and Rules"); WriteNl (StdOutput); WriteNl (StdOutput);
+      ForallTree (Nonterminals, Print);
+      WriteFlush (StdOutput);
+   END;
+   IF IsElement (ORD ('%'), Options) AND
+      ((TermCount > EvalLimit) OR (NontermCount > EvalLimit) OR (RuleCount > EvalLimit)) THEN
+      Message ("grammar too large", Fatal, NoPosition);
+   END;
+   .
+
+PROCEDURE Semantics2 (Tree)
+
+Grammar (..) :-
+   ForallTree (Nonterminals, Semantics2);
+   .
+Nonterminal (..) :-
+   ForallTree (Rules, Semantics2);
+   .
+Cond (Used := (FALSE)) :-
+   CONDITION NOT IsElement (ORD ('s'), Options);
+   Message ("predicate not used", Warning, CondPos);
+   .
+Look (Used := (FALSE)) :-
+   CONDITION NOT IsElement (ORD ('s'), Options);
+   Message ("predicate not used", Warning, NamePos);
+   .
+
+PROCEDURE CheckTerminals (t: Terminals)
+
+Terminal (..) :-
+   Declare (Name, t);
+{
+   IF IsElement (Name, NameSet) THEN
+      ErrorMessageI ("token multiply declared", Pos, Ident, ADR (Name));
+   END;
+   Include (NameSet, Name);
+   IF (0 <= Code) AND (Code <= INTEGER (Size (CodeSet))) AND IsElement (Code, CodeSet) THEN
+      ErrorMessageI ("code multiply used", Pos, Short, ADR (Code));
+   END;
+   StoreCode (Code);
+   IF Repr = NoIdent THEN Repr := Name; END;
+};
+   .
+
+PROCEDURE HandlePrecs (t: [Precedences, Terminals])
+
+Precedence (..) :-
+   INC (PrecLevel);
+   CurrentAssoc := t^.Kind;
+   ForallTree (Terminals, HandlePrecs);
+   .
+Terminal (..) :-
+Object: tTree;
+   Object := Identify (Name);
+   CONDITION Object # NoTree;
+{
+   IF Object^.Terminal.Assoc = NoAssoc THEN
+      WITH Object^.Terminal DO
+	 Prec  := PrecLevel;
+	 Assoc := CurrentAssoc;
+      END;
+   ELSE
+      ErrorMessageI ("precedence multiply declared", Pos, Ident, ADR (Name));
+   END;
+};
+   .
+Terminal (_, name, pos, code, _, _, properties, cost, ..) :-
+   TreeRoot^.Grammar.Terminals := Terminal (TreeRoot^.Grammar.Terminals, name, pos,
+      code, PrecLevel, CurrentAssoc, properties + {{PrecDef}}, cost, name, ..);
+   StoreCode (code);
+   .
+
+PROCEDURE CheckNonterminals (Nonterminals)
+
+Nonterminal (..) :-
+Object: tTree;
+   Object := Identify (Name);
+   CONDITION Object # NoTree;
+{
+   IF Object^.Kind = Terminal THEN
+      ErrorMessageI ("symbol is declared as token", Pos, Ident, ADR (Name));
+   ELSE
+      Append (Object^.Nonterminal.Rules, Rules);
+      IF IsElement (ORD ('2'), Options) THEN
+	 IF IsElement (ORD ('J'), Options) THEN
+	    ErrorMessageI ("nonterminal multiply declared", Pos, Ident, ADR (Name));
+	 ELSIF NOT IsElement (ORD ('s'), Options) THEN
+	    MessageI ("nonterminal multiply declared", Warning, Pos, Ident, ADR (Name));
+	 END;
+      END;
+   END;
+};
+   .
+Nonterminal (_, name, pos, alternatives, properties, ..) :-
+   TreeRoot^.Grammar.Nonterminals := Nonterminal (TreeRoot^.Grammar.Nonterminals, name, pos, alternatives, properties, ..);
+   .
+
+PROCEDURE Append (Rules, Rules)
+
+Rule (t:> NoRule (), ..), a	:- t := a; .
+Rule (t, ..), a			:- Append (t, a); .
+t:> NoRule (), a		:- t := a; .	/* ! */
+
+PROCEDURE CheckSelectors ([Nonterminals, Rules, Elements])
+
+Nonterminal (..) :-
+   ForallTree (Rules, CheckSelectors);
+   .
+Rule (..) :-
+   Delta := 0;
+   AssignEmpty (NameSet);
+   ForallTree (Elements, CheckSelectors);
+   .
+Ident	 (..) ;
+Action	 (..) ;
+UCAction (..) :-
+   CONDITION Selector # NoIdent;
+   IF IsElement (Selector, NameSet) THEN
+      ErrorMessageI ("selector multiply declared", SlctPos, Ident, ADR (Selector));
+   END
+   Include (NameSet, Selector);
+   .
+
+PROCEDURE ImplicitTerminals ([Nonterminals, Rules, Elements])
+
+Nonterminal (..) :-
+   ForallTree (Rules, ImplicitTerminals);
+   .
+Rule (..) :-
+   ForallTree (Elements, ImplicitTerminals);
+   .
+Ident (_, name, pos, _, _, Object) :-
+code: SHORTINT; size: SHORTINT;
+   Object := Identify (Name);
+   CONDITION Object = NoTree;
+   IF IsElement (ORD ('.'), Options) THEN
+      code := Encode (name);
+      StoreCode (code);
+   ELSE
+      code := -1;
+   END
+   Object := Terminal (TreeRoot^.Grammar.Terminals, name, pos, code, 0, NoAssoc, {{}}, DefaultCost, name, ..);
+   TreeRoot^.Grammar.Terminals := Object;
+   IF IsElement (ORD ('J'), Options) THEN
+      ErrorMessageI ("token not declared", Pos, Ident, ADR (Name));
+   ELSIF NOT IsElement (ORD ('s'), Options) AND NOT IsElement (ORD ('.'), Options) THEN
+      MessageI ("token implicitly declared", Warning, Pos, Ident, ADR (Name));
+   END
+   .
+
+PROCEDURE CodeTerminals (Terminals)
+
+Terminal (..) :-
+size: CARDINAL;
+   CONDITION Code = -1;
+   size := Size (CodeSet);
+{  REPEAT INC (LastCode); UNTIL (LastCode > size) OR NOT IsElement (LastCode, CodeSet); };
+   Code := LastCode;
+   StoreCode (Code);
+   .
+
+PROCEDURE CheckStarts (Elements)
+
+Ident (..) :-
+   Object := Identify (Name);
+   CONDITION Object = NoTree;
+   ErrorMessageI ("symbol not declared", Pos, Ident, ADR (Name));
+   .
+Ident (Object := Terminal (..)) :-
+   Object := NoTree;
+   ErrorMessageI ("nonterminal required", Pos, Ident, ADR (Name));
+   .
+Ident (Name := name, Object := object) :-
+   Start^.Nonterminal.Rules :=			/* add rule: 0: <start> _EOF_ . */
+      Rule (Start^.Nonterminal.Rules,
+	 Ident (
+	    Ident (NoElement (), TreeRoot^.Grammar.Terminals^.Terminal.Name,
+		   NoPosition, NoIdent, NoPosition, TreeRoot^.Grammar.Terminals),
+		name, NoPosition, NoIdent, NoPosition, object),
+	    NoIdent, NoPosition, NoAction, NoPosition, NoAction, NoPosition,
+	    0, NoAssoc, NoPosition, 2, Delta := 0);
+   Start^.Nonterminal.Rules^.Rule.LHS := Start;
+   Start^.Nonterminal.Rules^.Rule.RuleOrig := Start^.Nonterminal.Rules;
+   INC (StartCount);
+   .
+
+PROCEDURE HandleTrialParse ([Nonterminals, Rules])
+
+Nonterminal (..) :-
+   ForallTree (Rules, HandleTrialParse);
+   .
+t: TrialParse (..) :-
+   Object := Identify (Name);
+{
+   IF Object = NoTree THEN
+      ErrorMessageI ("symbol not declared", NamePos, Ident, ADR (Name));
+   ELSIF Object^.Kind = Terminal THEN
+      t^.Kind := Look;
+   ELSE
+      HandleTrialParse2 (t);
+   END;
+};
+   .
+
+PROCEDURE HandleTrialParse2 (TrialParse)
+
+TrialParse (Name := name, Object:= object, RulePos := RulePos) :-
+   RuleState := Rule (Start^.Nonterminal.Rules,		/* add rule: 0: <Name> . */
+		   Ident (NoElement (), name, NamePos, NoIdent, NoPosition, object),
+		      NoIdent, NoPosition, NoAction, NoPosition, NoAction, NoPosition,
+		      0, NoAssoc, RulePos, 1, Delta := 0, LHS := Start);
+   RuleState^.Rule.RuleOrig := Start^.Nonterminal.Rules;
+   Start^.Nonterminal.Rules := RuleState;
+   INC (RootCount);
+   .
+
+PROCEDURE HandleRules (REF t: [Nonterminals, Rules])
+
+Nonterminal (..) :-
+   CurNonterm	:= t;
+   RuleCount	:= 0;
+   HandleRules (Rules);
+   HandleRules (Next);
+   .
+r: Rule (Next := Next, Length := Length, Elements := Elements) :-
+   INC (RuleCount);
+   LHS := CurNonterm;
+   gCheck := NIL;
+   Elements := HandleElements (Elements, r);
+   r := HandleRules2 (gCheck, r);   /* this might replace the current node ! */
+   gRuleOrig := r;
+   ElmtCount := 0;
+   HandleElements3 (Elements);
+   Length := ElmtCount;
+   HandleRules ({Next});
+   .
+
+/* convert node type Rule to Cond or TrialParse if exists trailing predicate
+   in global variable gCheck
+*/
+
+FUNCTION HandleRules2 (Element, Rule) Rule
+
+NIL, r :-
+   RETURN r;
+   .
+ILCheck (_, Value, pos, Not), Rule (Next, Elements, PrecId, Pos, UCAction, UCActPos, Action, ActPos, Prec, Assoc, RulePos, LHS := LHS) :-
+   r: Rule := Cond (Next, Elements, PrecId, Pos, UCAction, UCActPos,
+   Action, ActPos, Prec, Assoc, RulePos, Cond := Value, CondPos := pos,
+   LHS := LHS, Used := FALSE, Not:= Not, Delta := 0);
+   r::RuleOrig := r;
+   RETURN r;
+   .
+ILTrialParse (_, Ident, pos, Not), Rule (Next, Elements, PrecId, Pos, UCAction, UCActPos, Action, ActPos, Prec, Assoc, RulePos, LHS := LHS) :-
+   r: Rule := TrialParse (Next, Elements, PrecId, Pos, UCAction, UCActPos,
+   Action, ActPos, Prec, Assoc, RulePos, Name := Ident, NamePos := pos,
+   LHS := LHS, Used := FALSE, Not:= Not, Delta := 0);
+   r::RuleOrig := r;
+   RETURN r;
+   .
+
+/*
+  move trailing nodes of types Action, UCAction, Prec from Elements to Rule node
+  move trailing nodes of types ILCheck, ILTrialParse to global variable gCheck
+*/
+
+FUNCTION HandleElements (t: Elements, r: Rule) Elements
+
+Action (Next, Value, Pos, ..), Rule (UCAction := UCAction, Action := Action, ActPos := ActPos) :-
+   CONDITION IsEmpty (Action) AND IsEmpty (UCAction);
+   Action := Value;
+   ActPos := Pos;
+   RETURN HandleElements (Next, r);
+   .
+UCAction (Next, Value, Pos, ..), Rule (UCAction := UCAction, UCActPos := UCActPos) :-
+   CONDITION IsEmpty (UCAction);
+   UCAction := Value;
+   UCActPos := Pos;
+   RETURN HandleElements (Next, r);
+   .
+Prec (Next, Ident, pos), Rule (PrecId := PrecId, Pos := Pos) :-
+   CONDITION PrecId = NoIdent;
+   PrecId := Ident;
+   Pos := pos;
+   RETURN HandleElements (Next, r);
+   .
+ILCheck		(Next, ..), _ ;
+ILTrialParse	(Next, ..), _ :-
+   CONDITION gCheck = NIL;
+   gCheck := t;
+   RETURN HandleElements (Next, r);
+   .
+Elements, _ :-
+   RETURN ReverseTree (Elements);
+   .
+
+/* introduce additional nonterminals for node types Action, UCAction, Prec,
+   ILCheck, ILTrialParse in Elements */
+
+PROCEDURE HandleElements3 (REF t: Elements)
+
+Ident (..) :-
+   INC (ElmtCount);
+   HandleElements3 (Next);
+   .
+Action (Next, Value, Pos, ..) :-
+   MakeRule (Rule (NoRule (), NoElement (), NoIdent, NoPosition, NoAction, NoPosition,
+      Value, Pos, 0, NoAssoc, Pos, 0, RuleOrig := gRuleOrig, Delta := ElmtCount), t);
+   .
+UCAction (Next, Value, Pos, ..) :-
+   MakeRule (Rule (NoRule (), NoElement (), NoIdent, NoPosition, Value, Pos, NoAction,
+      NoPosition, 0, NoAssoc, Pos, 0, RuleOrig := gRuleOrig, Delta := ElmtCount), t);
+   .
+Prec (Next, Ident, Pos) :-
+   MakeRule (Rule (NoRule (), NoElement (), Ident, Pos, NoAction, NoPosition, NoAction,
+      NoPosition, 0, NoAssoc, Pos, 0, RuleOrig := gRuleOrig, Delta := ElmtCount), t);
+   .
+ILCheck (Next, Value, Pos, Not) :-
+   MakeRule (Cond (NoRule (), NoElement (), NoIdent, NoPosition, NoAction, NoPosition,
+      NoAction, NoPosition, 0, NoAssoc, Pos, 0, Cond := Value, CondPos := Pos,
+      RuleOrig := gRuleOrig, Delta := ElmtCount, Used := FALSE, Not:= Not), t);
+   .
+ILTrialParse (Next, Ident, Pos, Not) :-
+   MakeRule (TrialParse (NoRule (), NoElement (), NoIdent, NoPosition, NoAction, NoPosition,
+      NoAction, NoPosition, 0, NoAssoc, Pos, 0, Name := Ident, NamePos := Pos,
+      RuleOrig := gRuleOrig, Delta := ElmtCount, Used := FALSE, Not:= Not), t);
+   .
+
+PROCEDURE MakeRule (Rule, REF t: Elements)
+
+r,   Action (Next, Selector := Selector, SlctPos := SlctPos) ;
+r, UCAction (Next, Selector := Selector, SlctPos := SlctPos) :-
+   INC (ElmtCount);
+   i: tIdent := GenIdent2 (CurNonterm, t, RuleCount, ElmtCount);
+   gNonterminals := Nonterminal (gNonterminals, i, NoPosition, r, {{}}, ..);
+   gNonterminals^.Nonterminal.Rules^.Rule.LHS := gNonterminals;
+   t := Ident (Next, i, NoPosition, Selector, SlctPos, gNonterminals);
+   HandleElements3 (Next);
+   .
+r, Element (Next) :-
+   INC (ElmtCount);
+   i: tIdent := GenIdent2 (CurNonterm, t, RuleCount, ElmtCount);
+   gNonterminals := Nonterminal (gNonterminals, i, NoPosition, r, {{}}, ..);
+   gNonterminals^.Nonterminal.Rules^.Rule.LHS := gNonterminals;
+   t := Ident (Next, i, NoPosition, NoIdent, NoPosition, gNonterminals);
+   HandleElements3 (Next);
+   .
+
+PROCEDURE CopyPrecs (t: [Nonterminals, Rules, Elements])
+
+Nonterminal (..) :-
+   ForallTree (Rules, CopyPrecs);
+   .
+Rule (..) :-
+Object: tTree;
+   CONDITION PrecId # NoIdent;
+   Object := Identify (PrecId);
+{
+   IF Object = NoTree THEN
+      ErrorMessageI ("token not declared", Pos, Ident, ADR (PrecId));
+   ELSIF Object^.Kind = Nonterminal THEN
+      ErrorMessageI ("token required", Pos, Ident, ADR (PrecId));
+   ELSE
+      Prec  := Object^.Terminal.Prec;
+      Assoc := Object^.Terminal.Assoc;
+      INCL (Object^.Terminal.Properties, Reachable);
+   END;
+};
+   .
+Rule (..) :-
+   RightMostTerminal := NoTree;
+   ForallTree (Elements, CopyPrecs);
+   CONDITION RightMostTerminal # NoTree;
+   Prec  := RightMostTerminal^.Terminal.Prec;
+   Assoc := RightMostTerminal^.Terminal.Assoc;
+   .
+Ident (Object := Terminal (Prec := Prec)) :-
+   CONDITION Prec # 0;
+   RightMostTerminal := Object;
+   .
+
+PROCEDURE CheckReachable (Tree)
+
+Nonterminal (..) :-
+   CONDITION NOT (Reachable IN Properties);
+   INCL (Properties, Reachable);
+   ForallTree (Rules, CheckReachable);
+   .
+Terminal (..) :-
+   INCL (Properties, Reachable);
+   .
+TrialParse (..) :-
+   ForallTree (Elements, CheckReachable);
+   CONDITION Object # NoTree;
+   CheckReachable (Object);
+   CheckReachableTrial (Object);
+   .
+Rule (..) :-
+   ForallTree (Elements, CheckReachable);
+   .
+Ident (..) :-
+   CheckReachable (Object);
+   .
+
+PROCEDURE CheckReachableTrial (Tree)
+
+Nonterminal (..) :-
+   CONDITION NOT (ReachableTrial IN Properties);
+   INCL (Properties, ReachableTrial);
+   ForallTree (Rules, CheckReachableTrial);
+   .
+Terminal (..) :-
+   INCL (Properties, ReachableTrial);
+   .
+TrialParse (..) :-
+   ForallTree (Elements, CheckReachableTrial);
+   CONDITION Object # NoTree;
+   CheckReachableTrial (Object);
+   .
+Rule (..) :-
+   ForallTree (Elements, CheckReachableTrial);
+   .
+Ident (..) :-
+   CheckReachableTrial (Object);
+   .
+
+/*
+PROCEDURE CompNullable0 (Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   Enqueue (Index);
+   .
+*/
+
+PROCEDURE CompMin0 (Nonterminals)
+
+Nonterminal (..) :-
+   MinLen := Infinite;
+   CONDITION Reachable IN Properties;
+   Enqueue (Index);
+   .
+
+PROCEDURE CompMin1 ([Nonterminals, Rules])
+
+Nonterminal (..) :-
+   ForallTree (Rules, CompMin1);
+   CONDITION MinLen = 0;
+   INCL (Properties, Nullable);
+   .
+Rule (..) :-
+   MinLen := CompMin2 (Elements);
+   .
+
+FUNCTION CompMin2 (Elements) SHORTCARD
+
+Ident (Next, Object := Terminal (Cost := Cost))		:- RETURN CompMin2 (Next) + Cost; .
+Ident (Object := Nonterminal (MinLen := (Infinite)))	:- RETURN Infinite; .
+Ident (Next, Object := Nonterminal (MinLen := MinLen))	:- RETURN CompMin2 (Next) + MinLen; .
+NoElement ()						:- RETURN 0; .
+
+/*
+PROCEDURE CompMax0 (Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   MaxLen := 0;
+   Enqueue (Index);
+   .
+*/
+
+/*
+PROCEDURE CompRecursive ([Nonterminals, Rules])
+
+Nonterminal (Rules := Rules) :-
+   CONDITION Reachable IN Properties;
+   ForallTree (Rules, CompRecursive);
+   .
+r:
+Rule (Recursive := Recursive) :-
+   Recursive := IsRecursive (r);
+   .
+*/
+
+/* Reference:
+
+   J. Roehrich:
+   Methods for the Automatic Construction of Error Correcting Parsers,
+   Acta Informatica 13 (1980), 115-139.
+*/
+
+PROCEDURE CompSort0 (Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   CompSort1 (Rules => SortedRules);
+   Rules := SortedRules;
+   .
+
+PROCEDURE CompSort1 (In: Rules => Rules)
+
+NoRule (..) => In :-
+   .
+Elmt: Rule (Tail, ..) => SortedRules :-
+   CompSort1 (Tail => SortedTail);
+   CompSort2 (Elmt, SortedTail => SortedRules);
+   .
+
+PROCEDURE CompSort2 (Elmt: Rule, In: Rules => Rules)
+
+Rule (Tail, ..), NoRule (..) => Elmt :-
+   Tail := In;
+   .
+Rule (Tail, MinLen := MinLen1, MinStep := MinStep1),
+Rule (MinLen := MinLen2, MinStep := MinStep2) => Elmt :-
+   CONDITION (MinLen1 < MinLen2) OR ((MinLen1 = MinLen2) AND (MinStep1 < MinStep2));
+   Tail := In;
+   .
+Rule (..), Rule (Tail, ..) => In :-
+   CompSort2 (Elmt, Tail => SortedTail);
+   Tail := SortedTail;
+   .
+
+/*
+FUNCTION IsRecursive (Rule) BOOLEAN
+
+Rule (LHS := LHS, ElmtsPtr := ElmtsPtr, Length := Length) :-
+   lhs	: SHORTCARD := LHS^.Nonterminal.Index - FirstNonterm;
+   i	: CARDINAL;
+   FOR i := 1; i <= Length; INC (i); DO
+      IF (ElmtsPtr^ [i] > Epsilon) AND
+	 IsRelated (ElmtsPtr^ [i] - FirstNonterm, lhs, DependsOn) THEN
+         RETURN TRUE;
+      END;
+   END;
+   RETURN FALSE;
+   .
+*/
+
+PROCEDURE CountObjects ([Nonterminals, Terminals, Rules])
+
+Terminal	(..) :- CONDITION Reachable IN Properties; INC (TermCount); .
+Nonterminal	(..) :- CONDITION Reachable IN Properties; INC (NontermCount);
+			ForallTree (Rules, CountObjects); .
+Rule		(..) :- INC (RuleCount); .
+
+PROCEDURE CheckReduced ([Nonterminals, Terminals])
+
+Nonterminal (..) :-
+   CONDITION NOT (Reachable IN Properties);
+   IF NOT IsElement (ORD ('s'), Options) THEN
+      MessageI ("nonterminal not used", Warning, Pos, Ident, ADR (Name));
+   END;
+   .
+Nonterminal (..) :-
+   CONDITION MinLen = Infinite;
+   ErrorMessageI ("nonterminal does not terminate", Pos, Ident, ADR (Name));
+   .
+Terminal (..) :-
+   CONDITION NOT (Reachable IN Properties);
+   CONDITION NOT IsElement (ORD ('s'), Options);
+   IF PrecDef IN Properties THEN
+      MessageI ("precedence not used", Warning, Pos, Ident, ADR (Name));
+   ELSE
+      MessageI ("token not used", Warning, Pos, Ident, ADR (Name));
+   END
+   .
+
+PROCEDURE StoreIndex (t: [Nonterminals, Terminals, Rules])
+
+Terminal (..) :-
+   CONDITION Reachable IN Properties;
+   Index := SymbolCount;
+   ToSymbolPtr^ [SymbolCount] := t;
+   INC (SymbolCount);
+   .
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   Index := SymbolCount;
+   ToSymbolPtr^ [SymbolCount] := t;
+   INC (SymbolCount);
+   ForallTree (Rules, StoreIndex);
+   .
+Rule (..) :-
+   INC (RuleCount);
+   Index := RuleCount;
+   ToRulePtr^ [RuleCount] := t;
+   .
+
+PROCEDURE StoreElmts ([Nonterminals, Rules, Elements])
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   ForallTree (Rules, StoreElmts);
+   .
+Rule (..) :-
+   CONDITION Length > 0;
+   ElmtsSize: LONGINT := Length + 1;
+   MakeArray (ElmtsPtr, ElmtsSize, TSIZE (SHORTCARD));
+   ElmtCount := 0;
+   gElmtsPtr := ElmtsPtr;
+   ForallTree (Elements, StoreElmts);
+   .
+Ident (Object := Terminal    (Index := Index)) ;
+Ident (Object := Nonterminal (Index := Index)) :-
+   INC (ElmtCount);
+   gElmtsPtr^ [ElmtCount] := Index;
+   .
+
+PROCEDURE CompFirst0 (t: Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   MakeSet (First, Epsilon);
+   CONDITION Nullable IN Properties;
+   Include (First, Epsilon);
+   .
+
+/*
+PROCEDURE CompFirst1 (t: Nonterminals)
+
+Nonterminal (..) :-
+   Reachable IN Properties;
+   CurNonterm := t;
+   CompFirst (t);
+   .
+
+PROCEDURE ResetComplete (Nonterminals)
+
+Nonterminal (..) :- EXCL (Properties, Complete); .
+*/
+
+PROCEDURE CompRelations ([Nonterminals, Rules, Elements])
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   CurIndex := Index - FirstNonterm;
+   Relation.Include (LS, CurIndex, CurIndex);
+   ForallTree (Rules, CompRelations);
+   .
+Rule (Elements := Ident (Object := Nonterminal (Index := Index))) :-
+   Relation.Include (LS, CurIndex, Index - FirstNonterm);
+   REJECT;
+   .
+Rule (..) :-
+   ForallTree (Elements, CompRelations);
+   .
+Ident (Object := Nonterminal (Index := Index)) :-
+   Relation.Include (DependsOn, CurIndex, Index - FirstNonterm);
+   Relation.Include (UsedBy, Index - FirstNonterm, CurIndex);
+   .
+
+/*
+PROCEDURE CheckRecursive (Nonterminals)
+
+Nonterminal (..) :-
+   Reachable IN Properties;
+   (IsRelated (Index - FirstNonterm, Index - FirstNonterm, DependsOn));
+   INCL (Properties, Recursive);
+   .
+*/
+
+PROCEDURE CompPath0 ([Nonterminals, Rules])
+
+n: Nonterminal (..) :-
+PathSize: LONGINT; SetPtr: tpSet;
+   CONDITION Reachable IN Properties;
+   Project2 (LS, Index - FirstNonterm, B);
+   MinPath := Minimum (B);
+   PathSize := Maximum (B) - MinPath + 1;
+   MakeArray (PathPtr, PathSize, TSIZE (tpSet));
+   INC (PathCount, PathSize * TSIZE (tpSet));
+{
+   WHILE NOT Sets.IsEmpty (B) DO
+      SetPtr := Alloc (TSIZE (tSet));
+      MakeSet (SetPtr^, Epsilon);
+      PathPtr^ [Extract (B) - MinPath] := SetPtr;
+   END;
+};
+   CurPathPtr := PathPtr;
+   CurMinPath := MinPath + FirstNonterm;
+   Include (PathPtr^ [Index - CurMinPath]^, Epsilon);
+   ForallTree (Rules, CompPath0);
+   .
+Rule (Elements := Ident (Next, Object := Nonterminal (Index := Index))) :-
+   SeqFirst (Next, CurPathPtr^ [Index - CurMinPath]^);
+   .
+
+PROCEDURE SeqFirst (Elements, REF F: tSet)
+
+Ident (Object := Terminal (Index := Index))	, _ :- Include (F, Index); .
+Ident (Object := Nonterminal (First := First))	, _ :-
+   CONDITION IsElement (Epsilon, First);
+   Assign (C, First);
+   Exclude (C, Epsilon);
+   Union (F, C);
+   SeqFirst (Next, F);
+   .
+Ident (Object := Nonterminal (First := First))	, _ :- Union (F, First); .
+NoElement (..)					, _ :- Include (F, Epsilon); .
+
+PROCEDURE Print0 ([Terminals, Nonterminals, Rules, Elements])
+
+NIL :- "NIL"; NL; .
+
+Terminal (..) :-
+   WriteIdent (StdOutput, Name); "	";
+   WriteI (StdOutput, Code, 3);
+{
+   IF IsElement (ORD ('P'), Options) THEN
+      WriteI (StdOutput, Index, 4);
+      WriteI (StdOutput, Prec , 3);
+      WriteI (StdOutput, Assoc, 3);
+      WriteI (StdOutput, Cost , 6);
+      WriteS (StdOutput, " ");
+      WriteIdent (StdOutput, Repr);
+      WriteProperties (StdOutput, Properties);
+   END;
+};
+   NL;
+   .
+Nonterminal (..) :-
+   WriteIdent (StdOutput, Name);
+{
+   IF IsElement (ORD ('P'), Options) THEN
+      WriteI (StdOutput, Index, 4);
+      WriteI (StdOutput, MinLen, 6);
+      WriteI (StdOutput, MaxLen, 6);
+      WriteI (StdOutput, Distance, 4);
+      WriteProperties (StdOutput, Properties);
+   END;
+};
+   NL;
+   ForallTree (Rules, Print0);
+   NL;
+   .
+Rule (..) :-
+   WriteI (StdOutput, Index, 4);
+{
+   IF IsElement (ORD ('P'), Options) THEN
+      WriteC (StdOutput, ' ');
+      WritePosition (StdOutput, RulePos);
+      WriteI (StdOutput, Prec, 3);
+      WriteI (StdOutput, Assoc, 3);
+      WriteI (StdOutput, Length, 3);
+      WriteI (StdOutput, MinLen, 6);
+      WriteI (StdOutput, MinStep, 3);
+   END;
+};
+   " "; ForallTree (Elements, Print0); NL;
+   .
+Ident (..) :-
+   WriteIdent (StdOutput, Name); " ";
+   .
+
+PROCEDURE Print ([Terminals, Nonterminals, Rules, Elements])
+
+LOCAL { VAR i: SHORTCARD; }
+
+NIL :- "NIL"; NL; .
+
+Terminal (..) :-
+   WriteIdent (StdOutput, Name); "	";
+   WriteI (StdOutput, Code, 3);
+   IF IsElement (ORD ('P'), Options) THEN
+      WriteI (StdOutput, Index, 4);
+      WriteI (StdOutput, Prec , 3);
+      WriteI (StdOutput, Assoc, 3);
+      WriteI (StdOutput, Cost , 6);
+      WriteC (StdOutput, ' ');
+      WriteIdent (StdOutput, Repr);
+      WriteProperties (StdOutput, Properties);
+   END
+   NL;
+   .
+Nonterminal (..) :-
+   WriteIdent (StdOutput, Name);
+   IF IsElement (ORD ('P'), Options) THEN
+      WriteI (StdOutput, Index, 4);
+      WriteI (StdOutput, MinLen, 6);
+      WriteI (StdOutput, MaxLen, 6);
+      WriteI (StdOutput, Distance, 4);
+      WriteI (StdOutput, gRule, 4);
+      WriteI (StdOutput, gDot, 4);
+      WriteProperties (StdOutput, Properties);
+   END
+   IF Reachable IN Properties THEN WriteS (StdOutput, ", FIRST: "); WriteSymSet (StdOutput, First); END
+   NL;
+   ForallTree (Rules, Print);
+{
+   IF IsElement (ORD ('P'), Options) AND (Reachable IN Properties) THEN
+      FOR i := FirstNonterm TO LastNonterm DO
+	 IF IsRelated (Index - FirstNonterm, i - FirstNonterm, LS) THEN
+	    WriteS (StdOutput, "	");
+	    WriteIdent (StdOutput, ToSymbolPtr^ [i]^.Nonterminal.Name);
+	    WriteS (StdOutput, "	");
+	    WriteSymSet (StdOutput, PathPtr^ [i - FirstNonterm - MinPath]^);
+	    WriteNl (StdOutput);
+	 END;
+      END;
+   END;
+};
+   NL;
+   .
+Rule (..) :-
+   WriteI (StdOutput, Index, 4);
+   IF IsElement (ORD ('P'), Options) THEN
+      WriteC (StdOutput, ' ');
+      WritePosition (StdOutput, RulePos);
+      WriteI (StdOutput, Prec, 3);
+      WriteI (StdOutput, Assoc, 3);
+      WriteI (StdOutput, Length, 3);
+      WriteI (StdOutput, MinLen, 6);
+      WriteI (StdOutput, MinStep, 3);
+   END
+   " "; ForallTree (Elements, Print);
+/* " = ";
+{  FOR i := 1 TO Length DO WriteI (StdOutput, ElmtsPtr^ [i], 3); END; };
+   "["; WriteText (StdOutput, UCAction); "]";
+   "{"; WriteText (StdOutput, Action); "}";
+*/
+   NL;
+   .
+Ident (..) :-
+   WriteIdent (StdOutput, Name); " ";
+   .
+
+/*
+PROCEDURE PrintPath (Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   WriteIdent (StdOutput, Name); WriteI (StdOutput, MinPath, 5); NL;
+   Project2 (LS, Index - FirstNonterm, B);
+i: SHORTCARD;
+   WHILE NOT Sets.IsEmpty (B) DO
+      i := Extract (B);
+      WriteS (StdOutput, "	");
+      WriteIdent (StdOutput, ToSymbolPtr^ [i + FirstNonterm]^.Nonterminal.Name);
+      WriteS (StdOutput, "	");
+      WriteSymSet (StdOutput, PathPtr^ [i - MinPath]^);
+      WriteNl (StdOutput);
+   END
+   .
+*/
+
+PROCEDURE InitDistance (Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   Distance := NontermCount;
+   Enqueue (Index);
+   .
+
+PROCEDURE CompDistance ([Nonterminals, Rules])
+
+LOCAL { VAR i: SHORTCARD; }
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   DistanceLHS := Distance + 1;
+   ForallTree (Rules, CompDistance);
+   .
+Rule (Index := idx) :-
+   FOR i := 1; i <= Length; INC (i) DO
+      IF ElmtsPtr^ [i] > Epsilon THEN
+{	 WITH ToSymbolPtr^ [ElmtsPtr^ [i]]^.Nonterminal DO };
+	    IF Distance > DistanceLHS THEN	(* Minimum *)
+	       Distance := DistanceLHS;
+	       gRule := idx;
+	       gDot := i - 1;
+	       Enqueue (Index);
+	    END
+{	 END; };
+      END
+   END
+   .
+
+PROCEDURE InitMinStep (Nonterminals)
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   MinStep := NontermCount;
+   Enqueue (Index);
+   .
+
+PROCEDURE CompMinStep ([Nonterminals, Rules])
+
+LOCAL { VAR i: SHORTCARD; }
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   gMinStep := MinStep;
+   gIndex := Index;
+   ForallTree (Rules, CompMinStep);
+   MinStep := gMinStep;
+   .
+Rule (MinStep := minStep) :-
+   minStep := 0;
+   FOR i := 1; i <= Length; INC (i) DO
+      IF ElmtsPtr^ [i] > Epsilon THEN
+{	 WITH ToSymbolPtr^ [ElmtsPtr^ [i]]^.Nonterminal DO };
+	    IF minStep < MinStep THEN		(* Maximum *)
+	       minStep := MinStep;
+	    END
+{	 END; };
+      END
+   END
+   IF minStep < NontermCount THEN
+      IF gMinStep > minStep + 1 THEN		(* Minimum *)
+	 gMinStep := minStep + 1;
+
+	 Project2 (UsedBy, gIndex - FirstNonterm, Users);
+	 IF NOT Sets.IsEmpty (Users) THEN
+{	    FOR i := Minimum (Users) TO Maximum (Users) DO };
+	       IF IsElement (i, Users) THEN
+		  Enqueue (i + FirstNonterm);
+	       END
+{	    END; };
+	 END
+      END
+   END
+   .

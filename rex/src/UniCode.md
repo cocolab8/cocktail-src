@@ -1,0 +1,15 @@
+DEFINITION MODULE UniCode;
+
+FROM IO	IMPORT tFile;
+
+CONST
+   MaxUCHAR2	= MAX (SHORTCARD);
+   MaxUCHAR4	= MAX (LONGCARD);
+   MaxUCHAR	= MaxUCHAR4;
+
+TYPE
+   UCHAR	= CARDINAL [0 .. MaxUCHAR];
+
+PROCEDURE WriteChar (f: tFile; Ch: UCHAR);
+
+END UniCode.

@@ -1,0 +1,294 @@
+/* $Id: lark.ast,v 1.15 2021/10/10 19:40:05 grosch Exp $ */
+
+/*
+ * $Log: lark.ast,v $
+ * Revision 1.15  2021/10/10 19:40:05  grosch
+ * made # work in macro definition (tribute to Microsoft's C preprocessor)
+ *
+ * Revision 1.14  2002/08/07 12:38:32  grosch
+ * added generation of named constants for all tokens (option -f)
+ *
+ * Revision 1.13  2001/08/08 15:01:15  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 1.12  1999/12/01 11:27:17  grosch
+ * added generation of Java
+ *
+ * Revision 1.11  1999/11/11 11:29:41  grosch
+ * bug fix: wrong order of rules caused crash in generation of examples
+ * bug fix in processing of selector names in case rules begin with action
+ *
+ * Revision 1.10  1999/10/01 14:56:19  grosch
+ * fixed bug in CompContinuation
+ *
+ * Revision 1.9  1999/06/03 07:58:57  grosch
+ * added Distance computation to nonterminals
+ *
+ * Revision 1.8  1998/04/21 13:03:07  grosch
+ * truncation of file and module names to 8.3 format
+ *
+ * Revision 1.7  1995/11/07  09:24:16  grosch
+ * optimized procedure Identify
+ *
+ * Revision 1.6  1994/11/13  12:44:26  grosch
+ * added initialization of various line counters
+ *
+ * Revision 1.5  1994/09/13  12:52:19  grosch
+ * added generation of Ada code
+ *
+ * Revision 1.4  1994/08/30  12:09:25  grosch
+ * added negation of predicates
+ * optimization called ReachableTrial
+ *
+ * Revision 1.3  1994/07/14  12:25:36  grosch
+ * deleted superfluous variables
+ *
+ * Revision 1.2  1994/03/23  15:09:56  grosch
+ * allow several start symbols
+ * accept Yacc input as well as Lark input
+ *
+ * Revision 1.1  1994/03/17  22:23:08  grosch
+ * added generation of C++
+ * added cost and repr specs for terminals
+ *
+ * Revision 1.0  1994/02/01  14:05:52  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 25.1.1993 */
+
+MODULE lark
+
+TREE IMPORT {
+
+FROM IO		IMPORT tFile;
+FROM Position	IMPORT tPosition;
+FROM Strings	IMPORT tString;
+FROM Idents	IMPORT tIdent;
+FROM Texts	IMPORT tText;
+FROM Sets	IMPORT tSet;
+FROM Relation	IMPORT tRelation;
+}
+
+EXPORT {
+
+CONST
+   NoAssoc		= 0;
+   String		= 0;
+   Reachable		= 1;
+   Complete		= 2;
+   Active		= 3;
+   Nullable		= 4;
+   Recursive		= 5;
+   PrecDef		= 6;
+   ReachableTrial	= 7;
+   ReUsed		= 8;
+
+   DefaultCost	= 10;
+
+TYPE
+   tLanguage	= (C, Cpp, Modula2, Eiffel, Ada, Java);
+   tpSet	= POINTER TO tSet;
+   tRule	= POINTER TO ARRAY [0..10000] OF SHORTCARD;
+   tPath	= POINTER TO ARRAY [0..10000] OF tpSet;
+   tProperties	= BITSET;
+
+VAR
+   Options	: tSet;
+   Language	: tLanguage;
+   LarkLib	,
+   Prefix	: tString;
+   SourceFile	,
+   SourceFile2	: ARRAY [0..255] OF CHAR;
+   WarningCount	,
+   ErrorCount	: CARDINAL;
+   ScannerPackageName, ParserPackageName	: tIdent;
+   ScannerName, ParserName			: tIdent;
+   Import, Export, Global, Local, Begin, Close, Tail	: tText;
+   ImportPos, ExportPos, GlobalPos, LocalPos, BeginPos, ClosePos, TailPos: tPosition;
+   FirstTerm, LastTerm, FirstNonterm, LastNonterm, Epsilon	: CARDINAL;
+   ToSymbolSize	: LONGINT;
+   ToSymbolPtr	: POINTER TO ARRAY [0..100000] OF tTree;
+   ToRuleSize	: LONGINT;
+   ToRulePtr	: POINTER TO ARRAY [0..100000] OF tTree;
+   LS		: tRelation;
+   Tags		: tTree;
+
+PROCEDURE InitIdentify		(size: CARDINAL);
+PROCEDURE Declare		(Ident: tIdent; Symbol: tTree);
+PROCEDURE Identify		(Ident: tIdent): tTree;
+PROCEDURE WriteProperties	(f: tFile; Properties: tProperties);
+}
+
+GLOBAL {
+# define hash #
+# define writetProperties(a)	WriteProperties (yyf, a);
+# define writetSet(a)	IF a.BitsetPtr hash NIL THEN Sets.WriteSet (yyf, a); END;
+
+FROM SYSTEM	IMPORT TSIZE;
+FROM IO		IMPORT tFile, WriteS;
+FROM Position	IMPORT tPosition, NoPosition;
+FROM Idents	IMPORT tIdent;
+FROM Texts	IMPORT tText, MakeText;
+FROM Sets	IMPORT MakeSet;
+FROM DynArray	IMPORT MakeArray, ExtendArray;
+
+VAR
+   IdentToSymbolSize	: LONGINT;
+   IdentToSymbolPtr	: POINTER TO ARRAY [0..100000] OF tTree;
+   max_ident		: tIdent;
+
+PROCEDURE InitIdentify (size: CARDINAL);
+   VAR i: CARDINAL;
+   BEGIN
+      max_ident := size;
+      IdentToSymbolSize := size + 1;
+      MakeArray (IdentToSymbolPtr, IdentToSymbolSize, TSIZE (tTree));
+      FOR i := 0 TO size DO IdentToSymbolPtr^ [i] := NoTree; END;
+   END InitIdentify;
+
+PROCEDURE Declare (Ident: tIdent; Symbol: tTree);
+   BEGIN
+      IF Ident <= max_ident THEN IdentToSymbolPtr^ [Ident] := Symbol; END;
+   END Declare;
+
+PROCEDURE Identify (Ident: tIdent): tTree;
+   VAR t: tTree;
+   BEGIN
+      IF (Ident <= max_ident) AND (IdentToSymbolPtr^ [Ident] # NoTree) THEN
+	 RETURN IdentToSymbolPtr^ [Ident];
+      END;
+      t := TreeRoot^.Grammar.Nonterminals;
+      WHILE t^.Kind = Nonterminal DO
+	 IF t^.Nonterminal.Name = Ident THEN
+	    IF Ident <= max_ident THEN IdentToSymbolPtr^ [Ident] := t; END;
+	    RETURN t;
+	 END;
+	 t := t^.Nonterminal.Next;
+      END;
+      t := TreeRoot^.Grammar.Terminals;
+      WHILE t^.Kind = Terminal DO
+	 IF t^.Terminal.Name = Ident THEN
+	    IF Ident <= max_ident THEN IdentToSymbolPtr^ [Ident] := t; END;
+	    RETURN t;
+	 END;
+	 t := t^.Terminal.Next;
+      END;
+      RETURN NoTree;
+   END Identify;
+
+PROCEDURE WriteProperties (f: tFile; Properties: tProperties);
+   BEGIN
+      IF Reachable	IN Properties THEN WriteS (f, " Reachable"	); END;
+      IF String		IN Properties THEN WriteS (f, " String"		); END;
+      IF Complete	IN Properties THEN WriteS (f, " Complete"	); END;
+      IF Active		IN Properties THEN WriteS (f, " Active"		); END;
+      IF Nullable	IN Properties THEN WriteS (f, " Nullable"	); END;
+      IF Recursive	IN Properties THEN WriteS (f, " Recursive"	); END;
+      IF PrecDef	IN Properties THEN WriteS (f, " PrecDef"	); END;
+      IF ReachableTrial	IN Properties THEN WriteS (f, " ReachableTrial"	); END;
+      IF ReUsed		IN Properties THEN WriteS (f, " ReUsed"		); END;
+   END WriteProperties;
+}
+
+BEGIN {
+   WarningCount	:= 0;
+   ErrorCount	:= 0;
+   MakeSet (Options, 127);
+   MakeText (Import);
+   MakeText (Export);
+   MakeText (Global);
+   MakeText (Local);
+   MakeText (Begin);
+   MakeText (Close);
+   MakeText (Tail);
+   ImportPos	:= NoPosition;
+   ExportPos	:= NoPosition;
+   GlobalPos	:= NoPosition;
+   LocalPos	:= NoPosition;
+   BeginPos	:= NoPosition;
+   ClosePos	:= NoPosition;
+   TailPos	:= NoPosition;
+}
+
+PROPERTY INPUT
+
+RULE
+
+Grammar		= Terminals Precedences Starts: Elements Rules: Nonterminals Nonterminals .
+
+Terminals	= <
+   NoTerminal	= .
+   Terminal	= Next: Terminals REV [Name: tIdent] [Pos: tPosition] [Code: SHORTINT]
+		  [Prec: SHORTCARD] [Assoc: SHORTCARD] [Properties: tProperties]
+		  [Cost: SHORTCARD] [Repr: tIdent] .
+> .
+Nonterminals	= <
+   NoNonterminal= .
+   Nonterminal	= Next: Nonterminals REV [Name: tIdent] [Pos: tPosition] Rules
+		  [Properties: tProperties] .
+> .
+Precedences	= <
+   NoPrecedence	= .
+   Precedence	= Next: Precedences REV Terminals <
+      Left	= .
+      Right	= .
+      None	= .
+   > .
+> .
+Rules		= <
+   NoRule	= .
+   Rule		= Next: Rules REV Elements [PrecId: tIdent] [Pos: tPosition]
+		  [UCAction: tText] [UCActPos: tPosition] [Action: tText]
+		  [ActPos: tPosition] [Prec: SHORTCARD] [Assoc: SHORTCARD]
+		  [RulePos: tPosition] <
+      Check	= [Used: BOOLEAN] [Not: BOOLEAN] <
+	 Cond	= [Cond: tText] [CondPos: tPosition] .
+	 Look	= [Name: tIdent] [NamePos: tPosition] <
+	    TrialParse	= .
+	 > .
+      > .
+   > .
+> .
+Elements	= <
+   NoElement	= .
+   Element	= Next: Elements REV <
+      Ident	= [Name: tIdent] [Pos: tPosition] [Selector: tIdent] [SlctPos: tPosition] .
+      Action	= [Value: tText] [Pos: tPosition] [Selector: tIdent] [SlctPos: tPosition] .
+      UCAction	= [Value: tText] [Pos: tPosition] [Selector: tIdent] [SlctPos: tPosition] .
+      ILCheck	= [Value: tText] [Pos: tPosition] [Not: BOOLEAN] .
+      ILTrialParse= [Ident: tIdent] [Pos: tPosition] [Not: BOOLEAN] .
+      Prec	= [Ident: tIdent] [Pos: tPosition] .
+   > .
+> .
+Tag		= Next: Tag [Name: tIdent] [Tag: tIdent] .
+
+Stop		= Next: Stop [State: SHORTCARD] [Rule: SHORTCARD] .
+
+END lark
+
+MODULE sem
+
+RULE
+
+Terminal	= [Index: SHORTCARD] .
+
+Nonterminal	= [MinLen: SHORTCARD] [MaxLen: SHORTCARD] [Index: SHORTCARD]
+		  [MinPath: SHORTCARD] [First: tSet] [PathPtr: tPath]
+		  [Distance: SHORTCARD] /* minimal # of derivation steps from start symbol */
+		  [gRule: SHORTCARD] [gDot: SHORTCARD] /* item to achieve the above */
+		  [MinStep: SHORTCARD] /* minimal height of derivation tree to arrive at terminal sequence */
+		  .
+Rule		= [Length: SHORTCARD] [MinLen: SHORTCARD] [Index: SHORTCARD]
+		  [ReadReduceIndex: SHORTCARD] [LHS: Nonterminal] [ElmtsPtr: tRule]
+		  [RuleOrig: Rule]     /* the rule which caused addition of this one */
+		  [Delta: SHORTCARD]   /* to be subtracted from attribute offsets for added rules */
+		  [MinStep: SHORTCARD] /* minimal height of derivation tree to arrive at terminal sequence */
+		  .
+
+Ident		= [Object: Tree] .
+Look		= [Object: Tree] .
+TrialParse	= [RuleState: Tree] .
+
+END sem

@@ -1,0 +1,153 @@
+/* $Id: Tree.ast,v 2.5 1998/05/27 15:23:55 grosch rel $ */
+
+TREE IMPORT	{
+
+FROM Idents	IMPORT	tIdent;
+FROM IO		IMPORT	tFile;
+FROM Environs	IMPORT	tFunction;
+FROM Patterns	IMPORT	tPattern;
+FROM Position	IMPORT	tPosition;
+FROM Sets	IMPORT	tSet;
+FROM StringM	IMPORT	tStringRef;
+FROM SYSTEM	IMPORT	ADDRESS;
+
+TYPE
+  tSelMode = (cNoSel, cSel, cTreeSel);
+  yyEstra = ADDRESS;
+}
+
+GLOBAL	{
+FROM Idents	IMPORT	tIdent;
+FROM Position	IMPORT	tPosition;
+FROM IO		IMPORT	tFile, WriteI, WriteS, WriteNl;
+FROM StringM	IMPORT	tStringRef, WriteString;
+}
+
+RULE
+
+spec		= <
+  Spec		=	[name:	tIdent]		[pos:	tPosition]
+			[grna:	tIdent]		[grpos: tPosition]
+			export: code
+			global: code
+			begin:	code
+			close:	code
+			classes
+			functions .
+> .
+
+classes		= <
+  Class0	= .
+  Class		=	[suid:	tIdent]		[supos:	tPosition]
+			[clid:	tIdent]		[clpos:	tPosition]
+			nodes
+			classes		REVERSE
+			[correct: BOOLEAN] .
+> .
+
+nodes		= <
+  Node0		= .
+  Node		=	[name:	tIdent]		[napos:	tPosition]
+			[ident:	tIdent]		[idpos:	tPosition]
+			sons
+			nodes		REVERSE
+			[correct: BOOLEAN] .
+> .
+
+sons		= <
+  Son0		= .
+  Son		=	[name:	tIdent]		[napos:	tPosition]
+			[ident:	tIdent]		[idpos:	tPosition]
+			sons		REVERSE
+			[correct: BOOLEAN] .
+> .
+
+attributes	= <
+  Attribute0	= .
+  Attribute	=	[ident:	tIdent]		[idpos:	tPosition]
+			[mod:	tIdent]		[mopos:	tPosition]
+			[type:	tIdent]		[typos: tPosition]
+			attributes	REVERSE .
+> .
+
+functions	= <
+  Function0	= .
+  Function	=	[name:	tIdent]		[napos:	tPosition]
+			in: attributes
+			out: attributes
+			result
+			domain
+			directives
+			functions	REVERSE
+			->
+			[funct: tFunction] [domainset: tSet] .
+> .
+
+result		= <
+  NoResult	= .
+  Type		=	[mod:	tIdent]		[mopos:	tPosition]
+			[type:	tIdent]		[typos: tPosition] .
+> .
+
+domain		= <
+  Ident0	= .
+  Ident		=	[ident:	tIdent]		[idpos: tPosition]
+			domain		REVERSE .
+> .
+
+directives	= <
+  Directive0	= .
+  Directive	=	pattern
+			condition
+			costs
+			decl:	code
+			instr:	code
+			directives	REVERSE
+			[correct: BOOLEAN]
+			->
+			[number: INTEGER]
+			[pat: tPattern]		[iter: BOOLEAN] .
+> .
+			
+pattern		=	[pos: tPosition] <
+  Pattern1	=	[sel:	tIdent]		[sepos: tPosition]
+			[ident:	tIdent]		[idpos: tPosition]
+			[correct: BOOLEAN] .
+  Pattern	=	[sel:	tIdent]		[sepos: tPosition]
+			[ident:	tIdent]		[idpos: tPosition]
+			patterns		[correct: BOOLEAN] .
+> .
+
+patterns	= <
+  Patterns0	= .
+  Patterns	=	pattern
+			patterns	REVERSE .
+> .
+
+condition	= <
+  CondD		= .
+  CondF		=	code .
+> .
+
+costs		= <
+  CostD		= .
+  CostN		=	[value:	INTEGER]	[vapos:	tPosition] .
+  CostF		=	code .
+> .
+
+code		=	[pos: tPosition] <
+  CdStr		=	[ident: tIdent]		code REVERSE
+			-> [mode: tSelMode] .
+  CdId		=	[ident: tIdent]		code REVERSE
+			-> [mode: tSelMode] .
+  CdDot		=	code REVERSE .
+  CdComma	=	code REVERSE .
+  CdLPar	=	code REVERSE .
+  CdRPar	=	code REVERSE .
+  CdLBra	=	code REVERSE .
+  CdRBra	=	code REVERSE .
+  CdSpa		=	[ref: tStringRef]	code REVERSE .
+  CdCom		=	[ref: tStringRef]	code REVERSE .
+  CdRst		=	[ref: tStringRef]	code REVERSE .
+  CdEnd		= .
+> .

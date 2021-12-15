@@ -1,0 +1,1190 @@
+(* $Id: Compress.mi,v 1.14 2014/01/27 23:13:42 grosch Exp $ *)
+
+(*
+ * $Log: Compress.mi,v $
+ * Revision 1.14  2014/01/27 23:13:42  grosch
+ * fixed loop termination in routine CompContinuation
+ *
+ * Revision 1.13  2013/01/15 13:37:20  grosch
+ * fixed overflow
+ *
+ * Revision 1.12  2005/05/23 13:04:37  grosch
+ * improved efficiency of table compression
+ *
+ * Revision 1.11  1999/10/01 14:56:19  grosch
+ * fixed bug in CompContinuation
+ *
+ * Revision 1.10  1998/04/21 10:39:23  grosch
+ * truncation of file and module names to 8.3 format
+ * cosmetic changes
+ *
+ * Revision 1.9  1995/11/07  09:13:53  grosch
+ * fixed alternate algorithm for table compression
+ * fix in procedure CompContinuation (ConditionPtr)
+ *
+ * Revision 1.8  1994/12/09  14:15:42  grosch
+ * added alternate algorithm for table compression
+ *
+ * Revision 1.7  1994/11/13  12:37:32  grosch
+ * increased NTableSize because of range error in Ada
+ *
+ * Revision 1.6  1994/09/13  12:53:30  grosch
+ * fixed bug concerning the determination of NTableSize
+ *
+ * Revision 1.5  1994/08/30  12:05:25  grosch
+ * fixed error in CompContinuation
+ *
+ * Revision 1.4  1994/07/14  12:17:47  grosch
+ * improved handling of nonterminal reduce actions
+ * compute lookahead sets on demand: GetLookahead
+ *
+ * Revision 1.3  1994/04/25  11:46:50  grosch
+ * added graphic runtime debugger
+ *
+ * Revision 1.2  1994/03/23  15:08:46  grosch
+ * allow several start symbols
+ * accept Yacc input as well as Lark input
+ * output several table elements on a line
+ * fix bug in memory management in CompressNTable
+ *
+ * Revision 1.1  1994/03/17  22:20:23  grosch
+ * changed element type of TBase and NBase arrays from tTableElmt to CARDINAL
+ *
+ * Revision 1.0  1994/02/01  14:05:43  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Jan. 1994 *)
+
+IMPLEMENTATION MODULE Compress;
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM General	IMPORT Min, Max;
+FROM rMemory	IMPORT Alloc;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+FROM Sets	IMPORT tSet, IsElement, MakeSet, ReleaseSet, Select, Assign, AssignEmpty,
+			AssignElmt, Card, Complement, Exclude, Extract, Include,
+			Intersection, IsEmpty, IsStrictSubset, IsSubset, Maximum,
+			Minimum, WriteSet, IsEqual;
+FROM IO		IMPORT StdOutput, WriteS, WriteI, WriteCard, WriteNl;
+FROM Position	IMPORT NoPosition;
+FROM Errors	IMPORT MessageI, Long, Warning;
+FROM Tree	IMPORT tTree, ToRulePtr, ToSymbolPtr, Epsilon, LastTerm, FirstNonterm,
+			Options;
+FROM Semantic	IMPORT RuleCount, NontermCount, MaxTerminalCode;
+FROM LR1	IMPORT StateCount, StatePtr, Invalid, ReadReduceSet, KernelItemPtr,
+			RuleBase, tStateRange, ItemPtr, GetLookahead;
+FROM Conflict	IMPORT ConditionPtr;
+FROM LarkTime	IMPORT WriteStepTime;
+FROM Sort	IMPORT Sort;
+
+CONST NoState		= 0;
+
+PROCEDURE RenumberStates;
+   VAR
+      State		: LONGINT;
+      Count		: CARDINAL;
+   BEGIN
+      Count := 0;
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       INC (Count);
+	       ReadIndex := Count;
+	    ELSE
+	       ReadIndex := 0;
+	    END;
+	 END;
+      END;
+      LastReadState := Count;
+   END RenumberStates;
+      
+PROCEDURE RenumberRules; (* renumber rules participating in read reduce actions *)
+   VAR Rule, Count	: CARDINAL;
+   BEGIN
+      Count := LastReadState;
+      FOR Rule := 1 TO RuleCount DO
+	 WITH ToRulePtr^ [Rule]^.Rule DO
+	    IF IsElement (Index, ReadReduceSet) THEN
+	       INC (Count);
+	       ReadReduceIndex := Count;
+	    ELSE
+	       ReadReduceIndex := 0;
+	    END;
+	 END;
+      END;
+      LastReadReduceState := Count;
+   END RenumberRules;
+
+PROCEDURE RecodeSymbol (Symbol: CARDINAL): CARDINAL;
+   BEGIN
+      IF Symbol < Epsilon THEN
+	 RETURN ToSymbolPtr^ [Symbol]^.Terminal.Code;
+      ELSE
+	 RETURN MaxTerminalCode + ToSymbolPtr^ [Symbol]^.Nonterminal.Index - FirstNonterm + 1;
+      END;
+   END RecodeSymbol;
+
+PROCEDURE RecodeTableElmt (TableElmt: LONGINT): tStateRange;
+   BEGIN
+      IF TableElmt <= StateCount THEN
+	 RETURN StatePtr^ [TableElmt].ReadIndex;
+      ELSIF TableElmt <= StateCount + LONGINT (RuleCount) THEN
+	 RETURN ToRulePtr^ [TableElmt - StateCount]^.Rule.ReadReduceIndex;
+      ELSE
+	 RETURN LastReadReduceState + CARDINAL (TableElmt) - RuleBase;
+      END;
+   END RecodeTableElmt;
+
+PROCEDURE RecodeDefault (TableElmt: CARDINAL): CARDINAL;
+   BEGIN
+      IF IsElement (ORD ('6'), Options) THEN
+	 RETURN RecodeTableElmt (TableElmt);
+      ELSE
+	 RETURN StatePtr^ [TableElmt].ReadIndex;
+      END;
+   END RecodeDefault;
+
+(* Reference:
+
+   J. Roehrich:
+   Methods for the Automatic Construction of Error Correcting Parsers,
+   Acta Informatica 13 (1980), 115-139.
+*)
+
+PROCEDURE CompContinuation;
+   VAR
+      State		: LONGINT;
+      Item, x, Last	: CARDINAL;
+      LASet		: tSet;
+      Success		: BOOLEAN;
+   BEGIN
+      MakeSet (LASet, Epsilon);
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       Item := Kernel;
+	       LOOP
+		  WITH ItemPtr^ [Item] DO
+		     WITH ToRulePtr^ [Rule]^.Rule DO
+			IF Dot = Length THEN
+			   GetLookahead (State, Item, LASet);
+			   LOOP	(* Exists lookahead such that action = reduce ? *)
+			      IF IsEmpty (LASet) THEN Success := FALSE; EXIT; END;
+			      x := Extract (LASet);
+			      IF TablePtr^ [x - MinSym] > RuleBase THEN
+				 IF TablePtr^ [x - MinSym] > RuleBase + RuleCount THEN
+				    ConditionPtr^ [TablePtr^ [x - MinSym] - RuleBase - RuleCount].Repair := RuleBase + Index;
+				 END;
+				 Continuation := x; Success := TRUE; EXIT;
+			      END;
+			   END;
+			   IF Success THEN EXIT; END;
+			   INC (Item);
+			ELSE
+			   x := ElmtsPtr^ [Dot + 1];
+			   IF x < Epsilon THEN Continuation := x; EXIT; END;
+			   Item := Max (Item, Kernel + KernelSize);
+			   Last := Kernel + KernelSize + ClosureSize;
+			   REPEAT INC (Item);
+			     IF Item > Last THEN	(* Uhh *)
+			       Continuation := 0; EXIT;
+			     END;
+			   UNTIL ToRulePtr^ [ItemPtr^ [Item].Rule]^.Rule.LHS^.Nonterminal.Index = x;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      ReleaseSet (LASet);
+   END CompContinuation;
+
+VAR
+   NoComb	: tComb;
+   DomainPtr	: POINTER TO ARRAY [0.. 100000] OF tSet;
+   TTEntryPtr	: POINTER TO ARRAY [0..1000000] OF tEntryPtr;
+   NTEntryPtr	: POINTER TO ARRAY [0..1000000] OF tEntryPtr;
+   TCardPtr	: POINTER TO ARRAY [0..1000000] OF SHORTCARD;
+   NCardPtr	: POINTER TO ARRAY [0..1000000] OF SHORTCARD;
+   MaxPtr	: POINTER TO ARRAY [0..1000000] OF SHORTCARD;
+   SortPtr	: POINTER TO ARRAY [0..1000000] OF tStateRange;
+
+PROCEDURE IsDefaultChain (Default: tDefault; State2, State1: CARDINAL): BOOLEAN;
+   VAR PrevState	: tStateRange;
+   BEGIN
+      PrevState := NoState;
+      REPEAT
+	 WITH StatePtr^ [State2] DO
+	    IF Default^ [ReadIndex] = State1 THEN RETURN TRUE; END;
+	    IF Default^ [ReadIndex] = PrevState THEN RETURN FALSE; END;
+	    PrevState := State2;
+	    State2 := Default^ [ReadIndex];
+	 END;
+      UNTIL State2 = NoState;
+      RETURN FALSE;
+   END IsDefaultChain;
+
+PROCEDURE Swap (a, b: INTEGER);
+   VAR c	: tStateRange;
+   BEGIN
+      c := SortPtr^ [a]; SortPtr^ [a] := SortPtr^ [b]; SortPtr^ [b] := c;
+   END Swap;
+
+PROCEDURE IsLessTD (a, b: INTEGER): BOOLEAN;
+   VAR State1, State2	: tStateRange;
+   BEGIN
+      State1 := SortPtr^ [a];
+      State2 := SortPtr^ [b];
+      RETURN (StatePtr^ [State2].Class = Invalid) OR
+	     (StatePtr^ [State1].Class # Invalid) AND
+	     (TCardPtr^ [State1] >= TCardPtr^ [State2]);
+   END IsLessTD;
+
+PROCEDURE CompTDefaults;
+   VAR
+      State, State1, State2	: tStateRange;
+      BestSavings	,
+      DefaultSavings	: SHORTCARD	;
+      x, i, j, k, d, dd	: CARDINAL	;
+      DomainSize	,
+      CardSize		,
+      MaxSize		,
+      SortSize		: LONGINT	;
+      Entry0, Entry1, Entry2, Entry3, PrevEntry	: tEntryPtr;
+   BEGIN
+      DomainSize := StateCount + 1;
+      MakeArray (DomainPtr, DomainSize, TSIZE (tSet));
+      CardSize := StateCount + 1;
+      MakeArray (TCardPtr, CardSize, TSIZE (SHORTCARD));
+      MakeArray (TTEntryPtr, CardSize, TSIZE (tEntryPtr));
+
+      FOR State := 1 TO CARDINAL (StateCount) DO	(* compute domain of all states *)
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       MakeSet (DomainPtr^ [State], LastTerm);
+	       Entry0 := NIL;
+	       FOR x := MinSym TO CARDINAL (Min (MaxSym, LastTerm)) DO
+		  IF TablePtr^ [x - MinSym] # NoState THEN
+		     Include (DomainPtr^ [State], x);
+		     Entry1 := Alloc (TSIZE (tEntry));
+		     INC (TEntryCount);
+		     WITH Entry1^ DO
+			Symbol	:= x;
+			Entry	:= TablePtr^ [x - MinSym];
+			Next	:= Entry0;
+			Entry0	:= Entry1;
+		     END;
+		  END;
+	       END;
+	       TTEntryPtr^ [State] := Entry0;
+	       TCardPtr^ [State] := Card (DomainPtr^ [State]);
+	    END;
+	 END;
+      END;
+WriteStepTime ("CompDomain	");
+
+      SortSize := StateCount + 1;
+      MakeArray (SortPtr, SortSize, TSIZE (tStateRange));
+      FOR State := 0 TO CARDINAL (StateCount) DO SortPtr^ [State] := State; END;
+      Sort (1, StateCount, IsLessTD, Swap);
+WriteStepTime ("CompSort	");
+
+   IF NOT IsElement (ORD ('u'), Options) THEN
+
+      TDefaultSize := LastReadState + 1;
+      MakeArray (TDefault, TDefaultSize, ElmtSize);
+      FOR State := 0 TO LastReadState DO TDefault^ [State] := NoState; END;
+
+      k := 1;						(* compute default relation *)
+      d := TCardPtr^ [SortPtr^ [1]];
+      i := 1;
+      LOOP
+	 IF i > LastReadState THEN EXIT; END;
+	 State1 := SortPtr^ [i];
+	 dd := TCardPtr^ [State1];
+	 IF dd = 1 THEN EXIT; END;
+	 IF dd < d THEN
+	    k := i;
+	    d := dd;
+	 END;
+	 BestSavings := 0;
+	 j := k;
+	 LOOP
+	    IF j > LastReadState THEN EXIT; END;
+	    IF j # i THEN
+	       State2 := SortPtr^ [j];
+	       IF TCardPtr^ [State2] < BestSavings THEN EXIT; END;
+	       IF IsSubset (DomainPtr^ [State2], DomainPtr^ [State1]) THEN
+		  DefaultSavings := 0;
+		  Entry1 := TTEntryPtr^ [State1];
+		  Entry2 := TTEntryPtr^ [State2];
+		  WHILE Entry2 # NIL DO
+		     WITH Entry2^ DO
+			WHILE Entry1^.Symbol # Symbol DO Entry1 := Entry1^.Next; END;
+			IF Entry1^.Entry = Entry THEN INC (DefaultSavings); END;
+			Entry2 := Next;
+		     END;
+		  END;
+
+		  IF (DefaultSavings > 0) AND (DefaultSavings > BestSavings) THEN
+		     BestSavings := DefaultSavings;
+		     TDefault^ [StatePtr^ [State1].ReadIndex] := State2;
+		     IF TCardPtr^ [State2] = BestSavings THEN EXIT; END;
+		  END;
+	       END;
+	    END;
+	    INC (j);
+	 END;
+	 INC (i);
+      END;
+WriteStepTime ("CompRelation1	");
+
+      i := 1;						(* eliminate cycles *)
+      LOOP
+	 IF i > LastReadState THEN EXIT; END;
+	 State1 := SortPtr^ [i];
+	 IF TCardPtr^ [State1] = 1 THEN EXIT; END;
+	 WITH StatePtr^ [State1] DO
+	    IF State1 = TDefault^ [StatePtr^ [TDefault^ [ReadIndex]].ReadIndex] THEN
+	       j := i + 1;
+	       BestSavings := 0;
+	       LOOP
+		  IF j > LastReadState THEN EXIT; END;
+		  State2 := SortPtr^ [j];
+		  IF TCardPtr^ [State2] < BestSavings THEN EXIT; END;
+		  IF NOT IsDefaultChain (TDefault, State2, State1) AND
+		     IsSubset (DomainPtr^ [State2], DomainPtr^ [State1]) THEN
+		     DefaultSavings := 0;
+		     Entry1 := TTEntryPtr^ [State1];
+		     Entry2 := TTEntryPtr^ [State2];
+		     WHILE Entry2 # NIL DO
+			WITH Entry2^ DO
+			   WHILE Entry1^.Symbol # Symbol DO Entry1 := Entry1^.Next; END;
+			   IF Entry1^.Entry = Entry THEN INC (DefaultSavings); END;
+			   Entry2 := Next;
+			END;
+		     END;
+
+		     IF (DefaultSavings > 0) AND (DefaultSavings > BestSavings) THEN
+			BestSavings := DefaultSavings;
+			TDefault^ [ReadIndex] := State2;
+			IF TCardPtr^ [State2] = BestSavings THEN EXIT; END;
+		     END;
+		  END;
+		  INC (j);
+	       END;
+	       IF BestSavings = 0 THEN TDefault^ [ReadIndex] := NoState; END;
+	    END;
+	 END;
+	 INC (i);
+      END;
+WriteStepTime ("CompEliminate	");
+
+      FOR j := 1 TO LastReadState DO			(* adjust tables *)
+	 State1 := SortPtr^ [j];
+	 State2 := TDefault^ [StatePtr^ [State1].ReadIndex];
+	 IF State2 # NoState THEN
+	    WITH StatePtr^ [State1] DO
+	       k := 0;
+	       Entry2 := TTEntryPtr^ [State2];
+	       WHILE Entry2 # NIL DO
+		  WITH Entry2^ DO
+		     IF TablePtr^ [Symbol - MinSym] = Entry THEN
+			TablePtr^ [Symbol - MinSym] := NoState;
+			INC (k);
+		     END;
+		     Entry2 := Next;
+		  END;
+	       END;
+	       DEC (TCardPtr^ [State1], k);
+	       INC (TDefaultSavings, k);
+	    END;
+	 END;
+      END;
+      StatePtr^ [0].ReadIndex := 0;
+
+   END;
+
+      MaxSize := StateCount + 1;
+      MakeArray (MaxPtr, MaxSize, TSIZE (SHORTCARD));
+      FOR j := 1 TO LastReadState DO
+	 State := SortPtr^ [j];
+	 ReleaseSet (DomainPtr^ [State]);		(* clean up *)
+	 WITH StatePtr^ [State] DO
+	    k := 0;
+	    Entry1 := TTEntryPtr^ [State];		(* condense lists *)
+	    Entry2 := NIL;
+	    WHILE Entry1 # NIL DO
+	       WITH Entry1^ DO
+		  IF TablePtr^ [Symbol - MinSym] # NoState THEN
+		     Entry0 := Entry1;
+		     Entry1 := Next;
+		     WITH Entry0^ DO
+			Symbol	:= RecodeSymbol (Symbol);
+			Entry	:= RecodeTableElmt (Entry);
+			k	:= Max (k, Symbol);
+			IF (Entry2 = NIL) OR (Symbol < Entry2^.Symbol) THEN
+			   Next		:= Entry2;
+			   Entry2	:= Entry0;
+			ELSE				(* sort lists *)
+			   Entry3	:= Entry2;
+			   REPEAT
+			      PrevEntry	:= Entry3;
+			      Entry3	:= Entry3^.Next;
+			   UNTIL (Entry3 = NIL) OR (Symbol < Entry3^.Symbol);
+			   Next		:= Entry3;
+			   PrevEntry^.Next := Entry0;
+			END;
+		     END;
+		  ELSE
+		     Entry1 := Next;
+		  END;
+	       END;
+	    END;
+	    TTEntryPtr^ [State] := Entry2;
+	    MaxPtr^ [State] := k;
+	 END;
+      END;
+   END CompTDefaults;
+
+PROCEDURE CompTDefaults2;
+   VAR
+      State		: tStateRange	;
+      i, j, k, x	: CARDINAL	;
+      DomainSize	,
+      CardSize		,
+      MaxSize		,
+      SortSize		: LONGINT	;
+      Entry0, Entry1, Entry2, Entry3, PrevEntry	: tEntryPtr;
+      ReduceCntPtr	: POINTER TO ARRAY [0..100000] OF SHORTCARD;
+      ReduceCntSize	: LONGINT	;
+      Rule		,
+      MaxReduceCnt	,
+      MaxReduceRule	: SHORTCARD	;
+      LookaheadSet	: tSet		;
+   BEGIN
+      DomainSize := StateCount + 1;
+      MakeArray (DomainPtr, DomainSize, TSIZE (tSet));
+      CardSize := StateCount + 1;
+      MakeArray (TCardPtr, CardSize, TSIZE (SHORTCARD));
+      MakeArray (TTEntryPtr, CardSize, TSIZE (tEntryPtr));
+      ReduceCntSize := RuleCount + 1;
+      MakeArray (ReduceCntPtr, ReduceCntSize, TSIZE (SHORTCARD));
+      MaxSize := StateCount + 1;
+      MakeArray (MaxPtr, MaxSize, TSIZE (SHORTCARD));
+      SortSize := StateCount + 1;
+      MakeArray (SortPtr, SortSize, TSIZE (tStateRange));
+      TDefaultSize := LastReadState + 1;
+      MakeArray (TDefault, TDefaultSize, ElmtSize);
+      DefaultLookSize := LastReadState + 1;
+      MakeArray (DefaultLookPtr, DefaultLookSize, TSIZE (SHORTCARD));
+      DefaultSetSize := 300;
+      MakeArray (DefaultSetPtr, DefaultSetSize, TSIZE (tSet));
+      DefaultSetCount := 0;
+      MakeSet (LookaheadSet, LastTerm);
+
+      FOR State := 0 TO LastReadState DO TDefault^ [State] := NoState; END;
+      FOR State := 0 TO CARDINAL (StateCount) DO SortPtr^ [State] := State; END;
+      StatePtr^ [0].ReadIndex := 0;
+
+      FOR State := 1 TO CARDINAL (StateCount) DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       MaxReduceCnt := 0;		(* determine default reduce action *)
+	       FOR i := 1 TO RuleCount DO ReduceCntPtr^ [i] := 0; END;
+	       Entry0 := NIL;
+	       FOR x := MinSym TO CARDINAL (Min (MaxSym, LastTerm)) DO
+		  IF TablePtr^ [x - MinSym] # NoState THEN
+		     Entry1 := Alloc (TSIZE (tEntry));
+		     INC (TEntryCount);
+		     WITH Entry1^ DO
+			Symbol	:= x;
+			Entry	:= TablePtr^ [x - MinSym];
+			Next	:= Entry0;
+			Entry0	:= Entry1;
+			IF (RuleBase < Entry) AND (Entry <= RuleBase + RuleCount) THEN
+			   Rule	:= Entry - RuleBase;
+			   INC (ReduceCntPtr^ [Rule]);
+			   IF ReduceCntPtr^ [Rule] > MaxReduceCnt THEN
+			      MaxReduceCnt := ReduceCntPtr^ [Rule];
+			      MaxReduceRule := Entry;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	       TTEntryPtr^ [State] := Entry0;
+
+	       IF MaxReduceCnt > 3 THEN
+		  TDefault^ [ReadIndex] := MaxReduceRule;
+		  AssignEmpty (LookaheadSet);
+
+		  WHILE Entry0 # NIL DO			(* adjust tables *)
+		     WITH Entry0^ DO
+			IF TablePtr^ [Symbol - MinSym] = MaxReduceRule THEN
+			   TablePtr^ [Symbol - MinSym] := NoState;
+			   Include (LookaheadSet, Symbol);
+			END;
+			Entry0 := Next;
+		     END;
+		  END;
+
+		  i := 0;
+		  LOOP
+		     INC (i);
+		     IF i > CARDINAL (DefaultSetCount) THEN
+			INC (DefaultSetCount);
+			IF DefaultSetCount >= DefaultSetSize THEN
+			   ExtendArray (DefaultSetPtr, DefaultSetSize, TSIZE (tSet));
+			END;
+			MakeSet (DefaultSetPtr^ [i], LastTerm);
+			Assign (DefaultSetPtr^ [i], LookaheadSet);
+			EXIT;
+		     END;
+		     IF IsEqual (DefaultSetPtr^ [i], LookaheadSet) THEN EXIT; END;
+		  END;
+		  DefaultLookPtr^ [ReadIndex] := i;
+		  INC (TDefaultSavings, MaxReduceCnt);
+	       ELSE
+		  DefaultLookPtr^ [ReadIndex] := 0;
+	       END;
+
+	       j := 0;
+	       k := 0;
+	       Entry1 := TTEntryPtr^ [State];		(* condense lists *)
+	       Entry2 := NIL;
+	       WHILE Entry1 # NIL DO
+		  WITH Entry1^ DO
+		     IF TablePtr^ [Symbol - MinSym] # NoState THEN
+			Entry0 := Entry1;
+			Entry1 := Next;
+			WITH Entry0^ DO
+			   Symbol	:= RecodeSymbol (Symbol);
+			   Entry	:= RecodeTableElmt (Entry);
+			   k		:= Max (k, Symbol);
+			   IF (Entry2 = NIL) OR (Symbol < Entry2^.Symbol) THEN
+			      Next	:= Entry2;
+			      Entry2	:= Entry0;
+			   ELSE				(* sort lists *)
+			      Entry3	:= Entry2;
+			      REPEAT
+				 PrevEntry	:= Entry3;
+				 Entry3		:= Entry3^.Next;
+			      UNTIL (Entry3 = NIL) OR (Symbol < Entry3^.Symbol);
+			      Next		:= Entry3;
+			      PrevEntry^.Next	:= Entry0;
+			   END;
+			END;
+			INC (j);
+		     ELSE
+			Entry1 := Next;
+		     END;
+		  END;
+	       END;
+	       TTEntryPtr^ [State] := Entry2;
+	       TCardPtr^ [State] := j;
+	       MaxPtr^ [State] := k;
+	    END;
+	 END;
+      END;
+      ReleaseSet (LookaheadSet);
+      Sort (1, StateCount, IsLessTD, Swap);
+   END CompTDefaults2;
+
+PROCEDURE IsLessT (a, b: INTEGER): BOOLEAN;
+   VAR State1, State2	: tStateRange;
+   BEGIN
+      State1 := SortPtr^ [a];
+      State2 := SortPtr^ [b];
+      RETURN ((TCardPtr^ [State1] > TCardPtr^ [State2]) OR
+	      (TCardPtr^ [State1] = TCardPtr^ [State2]) AND
+	      (MaxPtr^ [State1] <= MaxPtr^ [State2]));
+   END IsLessT;
+
+PROCEDURE CompressTTable;
+   TYPE
+      tGroup		= RECORD First, Last: SHORTCARD; END;
+      tDiff		= SHORTCARD;
+      tDiffsInfoPtr	= POINTER TO tDiffsInfo;
+      tDiffsInfo	= RECORD
+			     DiffsPtr	: POINTER TO ARRAY [1..100000] OF tDiff;
+			     DiffsSize	: LONGINT	;
+			     Base	: CARDINAL	;
+			     Collision	: tDiffsInfoPtr	;
+			  END;
+   VAR
+      Base, b, jj, PreviousSymbol, Delta: CARDINAL;
+      State, CardSize	: LONGINT;
+      Success		: BOOLEAN;
+      Entry1		: tEntryPtr;
+      i, j, k		: INTEGER;
+      sj		: SHORTCARD;
+      Hash		: CARDINAL;
+      GroupPtr		: POINTER TO ARRAY [0 .. 1000000] OF tGroup;
+      GroupSize		: LONGINT;
+      GroupCount	: INTEGER;
+      lDiffsPtr		: POINTER TO ARRAY [0 .. 1000000] OF tDiff;
+      lDiffsSize	: LONGINT;
+      HashTablePtr	: POINTER TO ARRAY [0 .. 1000000] OF tDiffsInfoPtr;
+      HashTableSize	: LONGINT;
+      Current		: tDiffsInfoPtr;
+   BEGIN
+      Sort (1, LastReadState, IsLessT, Swap);
+      CardSize := StateCount + 1;
+      ReleaseArray (MaxPtr, CardSize, TSIZE (SHORTCARD));
+WriteStepTime ("CompSort	");
+      TBaseSize := LastReadState + 1;
+      MakeArray (TBase, TBaseSize, TSIZE (CARDINAL));
+      TCombSize := Max (StateCount * 2, MaxTerminalCode + 1);
+      IF IsElement (ORD ('u'), Options) THEN TCombSize := TCombSize * 3; END;
+      MakeArray (TComb, TCombSize, TSIZE (tComb));
+      TTableMax := TCombSize - 1;
+      TTableSize := 0;
+      FOR b := 0 TO TTableMax DO TComb^ [b] := NoComb; END;
+      GroupSize	:= MaxTerminalCode DIV 2 + 2;
+      MakeArray (GroupPtr, GroupSize, TSIZE (tGroup));
+      lDiffsSize := GroupSize * 2;
+      MakeArray (lDiffsPtr, lDiffsSize, TSIZE (tDiff));
+      HashTableSize := LastReadState;
+      MakeArray (HashTablePtr, HashTableSize, TSIZE (tDiffsInfoPtr));
+      FOR i := 0 TO HashTableSize - 1 DO
+	 HashTablePtr^[i] := NIL;
+      END;
+
+      FOR jj := 1 TO LastReadState DO
+	 State := SortPtr^ [jj];
+	 WITH StatePtr^ [State] DO
+
+	    Entry1 := TTEntryPtr^ [State];
+	    IF Entry1 # NIL THEN
+						(* turn row into a list of ranges (groups) *)
+	       GroupCount := 1;
+	       GroupPtr^ [1].First := Entry1^.Symbol;
+	       PreviousSymbol := Entry1^.Symbol;
+	       Entry1 := Entry1^.Next;
+	       WHILE Entry1 # NIL DO
+		  WITH Entry1^ DO
+		     IF Symbol > PreviousSymbol + 1 THEN
+			GroupPtr^ [GroupCount].Last := PreviousSymbol;
+			INC (GroupCount);
+			GroupPtr^ [GroupCount].First := Symbol;
+		     END;
+		     PreviousSymbol := Symbol;
+		     Entry1 := Next;
+		  END;
+	       END;
+	       GroupPtr^ [GroupCount].Last := PreviousSymbol;
+
+						(* compute distances of ranges *)
+	       lDiffsPtr^[2] := GroupPtr^[1].Last - GroupPtr^[1].First;
+	       Hash := lDiffsPtr^[2];
+	       FOR j := 2 TO GroupCount DO
+		  lDiffsPtr^[j + j - 1] := GroupPtr^[j].First - GroupPtr^[j-1].Last;
+		  lDiffsPtr^[j + j    ] := GroupPtr^[j].Last - GroupPtr^[j].First;
+		  sj := j;
+		  INC (Hash, (lDiffsPtr^[j + j - 1] + lDiffsPtr^[j + j]) * sj);
+	       END;
+	       Hash := Hash MOD LastReadState;	(* hash distances *)
+
+	       Success := FALSE;		(* lookup format of row *)
+	       Current := HashTablePtr^[Hash];
+	       LOOP
+		  IF Current = NIL THEN EXIT; END;
+		  IF Current^.DiffsSize = GroupCount * 2 THEN
+		     Success := TRUE;
+		     j := 1;
+		     LOOP
+			INC (j);
+			IF Current^.DiffsPtr^[j] # lDiffsPtr^[j] THEN
+			   Success := FALSE;
+			   EXIT;
+			END;
+			IF j = Current^.DiffsSize THEN EXIT; END;
+		     END;
+		     IF Success THEN EXIT; END;
+		  END;
+		  Current := Current^.Collision;
+	       END;
+
+	       IF Success THEN			(* if found: start searching from previous base *)
+		  IF Current^.Base + Current^.DiffsPtr^[2] < GroupPtr^ [1].First THEN
+		     Base := 0;
+		  ELSE
+		     Base := Current^.Base - GroupPtr^ [1].First + Current^.DiffsPtr^[2] + 1;
+		  END;
+	       ELSE				(* if not: enter and start from zero *)
+		  Base := 0;
+		  Current := Alloc (TSIZE (tDiffsInfo));
+		  WITH Current^ DO
+		     Base := 0;
+		     Collision := HashTablePtr^[Hash];
+		     DiffsSize := GroupCount * 2;
+		     MakeArray (DiffsPtr, DiffsSize, TSIZE (tDiff));
+		     FOR j := 1 TO DiffsSize DO DiffsPtr^[j] := lDiffsPtr^[j]; END;
+		  END;
+		  HashTablePtr^[Hash] := Current;
+	       END;
+
+	       LOOP				(* search a usable base	*)
+		  IF Base > TTableMax - MaxTerminalCode THEN
+		     ExtendArray (TComb, TCombSize, TSIZE (tComb));
+(* MessageI ("extend TComb", Warning, NoPosition, Long, ADR (TCombSize)); *)
+		     FOR b := TTableMax + 1 TO CARDINAL (TCombSize - 1) DO TComb^ [b] := NoComb; END;
+		     TTableMax := TCombSize - 1;
+		  END;
+		  Success := TRUE;
+		  i := 1;			(* FORALL i IN groups *)
+		  LOOP
+		     j := GroupPtr^ [i].First;	(* FORALL j FROM First TO Last*)
+		     k := GroupPtr^ [i].Last;
+		     LOOP
+			IF TComb^ [Base + CARDINAL (j)].Check # NoState THEN
+			   REPEAT INC (j); UNTIL TComb^ [Base + CARDINAL (j)].Check = NoState;
+			   Success := FALSE; EXIT; END;
+			INC (j);
+			IF j > k THEN EXIT; END;
+		     END;
+		     IF NOT Success OR (i = GroupCount) THEN EXIT; END;
+		     INC (i);
+		  END;
+		  IF Success THEN EXIT; END;
+		  INC (Base, j);
+		  DEC (Base, GroupPtr^ [i].First);
+	       END;
+
+	       TBase^ [ReadIndex] := Base;	(* fill entries into comb *)
+	       Entry1 := TTEntryPtr^ [State];
+	       WHILE Entry1 # NIL DO
+		  WITH Entry1^ DO
+		     TComb^ [Base + Symbol].Next  := Entry;
+		     TComb^ [Base + Symbol].Check := ReadIndex;
+		     Entry1 := Next;
+		  END;
+	       END;
+	       TTableSize := Max (TTableSize, Base + MaxTerminalCode);
+						(* record base of this row *)
+	       Current^.Base := Base + GroupPtr^ [1].First;
+	    ELSE
+	       TBase^ [ReadIndex] := 0;
+	    END;
+	 END;
+      END;
+      ReleaseArray (TCardPtr	, CardSize, TSIZE (SHORTCARD	));
+      ReleaseArray (TTEntryPtr	, CardSize, TSIZE (tEntryPtr	));
+      ReleaseArray (GroupPtr	, GroupSize,TSIZE (tGroup	));
+      ReleaseArray (lDiffsPtr	, lDiffsSize, TSIZE (tDiff	));
+      ReleaseArray (HashTablePtr, HashTableSize, TSIZE (tDiffsInfoPtr));
+   END CompressTTable;
+
+PROCEDURE IsLessN (a, b: INTEGER): BOOLEAN;
+   BEGIN
+      RETURN NCardPtr^ [SortPtr^ [a]] >= NCardPtr^ [SortPtr^ [b]];
+   END IsLessN;
+
+PROCEDURE CompNDefaults;
+   VAR
+      State, State1, State2	: tStateRange;
+      BestSavings	,
+      DefaultSavings	: SHORTCARD	;
+      x, i, j, k, d, dd	: CARDINAL	;
+      DomainSize	,
+      CardSize		: LONGINT	;
+      Entry0, Entry1, Entry2	: tEntryPtr	;
+   BEGIN
+      DomainSize := StateCount + 1;
+      CardSize := StateCount + 1;
+      MakeArray (NCardPtr, CardSize, TSIZE (SHORTCARD));
+      MakeArray (NTEntryPtr, CardSize, TSIZE (tEntryPtr));
+
+      FOR State := 1 TO CARDINAL (StateCount) DO	(* compute domain of all states *)
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       MakeSet (DomainPtr^ [State], NontermCount);
+	       Entry0 := NIL;
+	       FOR x := CARDINAL (Max (MinSym, FirstNonterm)) TO MaxSym DO
+		  IF TablePtr^ [x - MinSym] # NoState THEN
+		     Include (DomainPtr^ [State], x - FirstNonterm);
+		     Entry1 := Alloc (TSIZE (tEntry));
+		     INC (NEntryCount);
+		     WITH Entry1^ DO
+			Symbol	:= x;
+			Entry	:= TablePtr^ [x - MinSym];
+			Next	:= Entry0;
+			Entry0	:= Entry1;
+		     END;
+		  END;
+	       END;
+	       NTEntryPtr^ [State] := Entry0;
+	       NCardPtr^ [State] := Card (DomainPtr^ [State]);
+	    END;
+	 END;
+      END;
+WriteStepTime ("CompDomain	");
+
+      Sort (1, LastReadState, IsLessN, Swap);
+WriteStepTime ("CompSort	");
+
+   IF NOT IsElement (ORD ('o'), Options) THEN
+
+      NDefaultSize := LastReadState + 1;
+      MakeArray (NDefault, NDefaultSize, ElmtSize);
+      FOR State := 0 TO LastReadState DO NDefault^ [State] := NoState; END;
+
+      k := 1;						(* compute default relation *)
+      d := NCardPtr^ [SortPtr^ [1]];
+      i := 1;
+      LOOP
+	 IF i > LastReadState THEN EXIT; END;
+	 State1 := SortPtr^ [i];
+	 dd := NCardPtr^ [State1];
+	 IF dd = 1 THEN EXIT; END;
+	 IF dd < d THEN
+	    k := i;
+	    d := dd;
+	 END;
+	 BestSavings := 0;
+	 j := k;
+	 LOOP
+	    IF j > LastReadState THEN EXIT; END;
+	    IF j # i THEN
+	       State2 := SortPtr^ [j];
+	       IF NCardPtr^ [State2] < BestSavings THEN EXIT; END;
+	       IF IsSubset (DomainPtr^ [State2], DomainPtr^ [State1]) THEN
+		  DefaultSavings := 0;
+		  Entry1 := NTEntryPtr^ [State1];
+		  Entry2 := NTEntryPtr^ [State2];
+		  WHILE Entry2 # NIL DO
+		     WITH Entry2^ DO
+			WHILE Entry1^.Symbol # Symbol DO Entry1 := Entry1^.Next; END;
+			IF Entry1^.Entry = Entry THEN INC (DefaultSavings); END;
+			Entry2 := Next;
+		     END;
+		  END;
+
+		  IF (DefaultSavings > 0) AND (DefaultSavings > BestSavings) THEN
+		     BestSavings := DefaultSavings;
+		     NDefault^ [StatePtr^ [State1].ReadIndex] := State2;
+		     IF NCardPtr^ [State2] = BestSavings THEN EXIT; END;
+		  END;
+	       END;
+	    END;
+	    INC (j);
+	 END;
+	 INC (i);
+      END;
+WriteStepTime ("CompRelation1	");
+
+      i := 1;						(* eliminate cycles *)
+      LOOP
+	 IF i > LastReadState THEN EXIT; END;
+	 State1 := SortPtr^ [i];
+	 IF NCardPtr^ [State1] = 1 THEN EXIT; END;
+	 WITH StatePtr^ [State1] DO
+	    IF State1 = NDefault^ [StatePtr^ [NDefault^ [ReadIndex]].ReadIndex] THEN
+	       j := i + 1;
+	       BestSavings := 0;
+	       LOOP
+		  IF j > LastReadState THEN EXIT; END;
+		  State2 := SortPtr^ [j];
+		  IF NCardPtr^ [State2] < BestSavings THEN EXIT; END;
+		  IF NOT IsDefaultChain (NDefault, State2, State1) AND
+		     IsSubset (DomainPtr^ [State2], DomainPtr^ [State1]) THEN
+		     DefaultSavings := 0;
+		     Entry1 := NTEntryPtr^ [State1];
+		     Entry2 := NTEntryPtr^ [State2];
+		     WHILE Entry2 # NIL DO
+			WITH Entry2^ DO
+			   WHILE Entry1^.Symbol # Symbol DO Entry1 := Entry1^.Next; END;
+			   IF Entry1^.Entry = Entry THEN INC (DefaultSavings); END;
+			   Entry2 := Next;
+			END;
+		     END;
+
+		     IF (DefaultSavings > 0) AND (DefaultSavings > BestSavings) THEN
+			BestSavings := DefaultSavings;
+			NDefault^ [ReadIndex] := State2;
+			IF NCardPtr^ [State2] = BestSavings THEN EXIT; END;
+		     END;
+		  END;
+		  INC (j);
+	       END;
+	       IF BestSavings = 0 THEN NDefault^ [ReadIndex] := NoState; END;
+	    END;
+	 END;
+	 INC (i);
+      END;
+WriteStepTime ("CompEliminate	");
+
+      FOR j := 1 TO LastReadState DO			(* adjust tables *)
+	 State1 := SortPtr^ [j];
+	 State2 := NDefault^ [StatePtr^ [State1].ReadIndex];
+	 IF State2 # NoState THEN
+	    WITH StatePtr^ [State1] DO
+	       k := 0;
+	       Entry2 := NTEntryPtr^ [State2];
+	       WHILE Entry2 # NIL DO
+		  WITH Entry2^ DO
+		     IF TablePtr^ [Symbol - MinSym] = Entry THEN
+			TablePtr^ [Symbol - MinSym] := NoState;
+			INC (k);
+		     END;
+		     Entry2 := Next;
+		  END;
+	       END;
+	       DEC (NCardPtr^ [State1], k);
+	       INC (NDefaultSavings, k);
+	    END;
+	 END;
+      END;
+      StatePtr^ [0].ReadIndex := 0;
+
+   END;
+
+      FOR j := 1 TO LastReadState DO
+	 State := SortPtr^ [j];				(* clean up *)
+	 ReleaseSet (DomainPtr^ [State]);
+	 WITH StatePtr^ [State] DO
+	    Entry1 := NTEntryPtr^ [State];
+	    Entry2 := NIL;
+	    WHILE Entry1 # NIL DO
+	       WITH Entry1^ DO
+		  IF TablePtr^ [Symbol - MinSym] # NoState THEN
+		     Entry0 := Entry1;
+		     Entry1 := Next;
+		     WITH Entry0^ DO
+			Symbol	:= RecodeSymbol (Symbol);
+			Entry	:= RecodeTableElmt (Entry);
+			Next	:= Entry2;
+			Entry2	:= Entry0;
+		     END;
+		  ELSE
+		     Entry1 := Next;
+		  END;
+	       END;
+	    END;
+	    NTEntryPtr^ [State] := Entry2;
+	 END;
+      END;
+      ReleaseArray (DomainPtr, DomainSize, TSIZE (tSet));
+   END CompNDefaults;
+
+(*
+PROCEDURE CompressNTable;
+   VAR
+      Base, b, j, i	: CARDINAL;
+      State, CardSize	: LONGINT;
+      Success	: BOOLEAN;
+      Entry1	: tEntryPtr;
+   BEGIN
+      NBaseSize := LastReadState + 1;
+      MakeArray (NBase, NBaseSize, TSIZE (CARDINAL));
+      NCombSize := LastReadReduceState;
+      IF IsElement (ORD ('o'), Options) THEN NCombSize := NCombSize * 6; END;
+      MakeArray (NComb, NCombSize, TSIZE (tComb));
+      NTableMax := NCombSize - 1;
+      FOR b := 0 TO NTableMax DO
+	 NComb^ [b].Check := NoState;
+	 NComb^ [b].Next  := NoState;
+      END;
+      NTableSize := 0;
+
+      Sort (1, LastReadState, IsLessN, Swap);
+WriteStepTime ("CompSort	");
+
+      FOR j := 1 TO LastReadState DO
+	 State := SortPtr^ [j];
+	 WITH StatePtr^ [State] DO
+	    Entry1 := NTEntryPtr^ [State];
+	    WHILE Entry1 # NIL DO
+	       WITH Entry1^ DO
+		  Entry1 := Next;
+	       END;
+	    END;
+
+	    Base := 0;				(* search a usable base	*)
+	    LOOP
+	       IF Base > NTableMax - MaxNontermCode THEN
+		  ExtendArray (NComb, NCombSize, TSIZE (tComb));
+(* MessageI ("extend NComb", Warning, NoPosition, Long, ADR (NCombSize)); *)
+		  FOR b := NTableMax + 1 TO CARDINAL (NCombSize - 1) DO
+		     NComb^ [b].Check := NoState;
+		     NComb^ [b].Next  := NoState;
+		  END;
+		  NTableMax := NCombSize - 1;
+	       END;
+	       Entry1 := NTEntryPtr^ [State];
+	       LOOP
+		  IF Entry1 = NIL THEN Success := TRUE; EXIT; END;
+		  WITH Entry1^ DO
+		     IF NComb^ [Base + Symbol].Check # NoState THEN
+			Success := FALSE; EXIT;
+		     END;
+		     Entry1 := Next;
+		  END;
+	       END;
+	       IF Success THEN EXIT; END;
+	       INC (Base);
+	    END;
+
+	    NBase^ [ReadIndex] := Base;		(* fill entries into comb *)
+	    Entry1 := NTEntryPtr^ [State];
+	    WHILE Entry1 # NIL DO
+	       WITH Entry1^ DO
+		  NComb^ [Base + Symbol].Next  := Entry;
+		  NComb^ [Base + Symbol].Check := ReadIndex;
+		  Entry1 := Next;
+	       END;
+	    END;
+	    NTableSize := Max (NTableSize, Base + MaxNontermCode);
+	 END;
+      END;
+      CardSize := StateCount + 1;
+      ReleaseArray (NCardPtr, CardSize, TSIZE (SHORTCARD));
+      ReleaseArray (NTEntryPtr, CardSize, TSIZE (tEntryPtr));
+      ReleaseArray (SortPtr, CardSize, TSIZE (tStateRange));
+   END CompressNTable;
+*)
+
+PROCEDURE CompressNTable;
+   TYPE
+      tGroup	= RECORD Offset, Size: SHORTCARD; END;
+   VAR
+      Base, b, i, j, jj, k, Offset, Prev, Delta, GroupCount	: CARDINAL;
+      State, CardSize	: LONGINT;
+      Success	: BOOLEAN;
+      Entry1	: tEntryPtr;
+      MemoSize	: LONGINT;
+      MemoPtr	: POINTER TO ARRAY [0..1000000] OF CARDINAL;
+      GroupSize	: LONGINT;
+      GroupPtr	: POINTER TO ARRAY [0..1000000] OF tGroup;
+      MaxNontermCode	: CARDINAL;
+   BEGIN
+      MaxNontermCode := MaxTerminalCode + NontermCount;
+      NBaseSize := LastReadState + 1;
+      MakeArray (NBase, NBaseSize, TSIZE (CARDINAL));
+      NCombSize := Max (LastReadReduceState, MaxNontermCode + 1);
+      IF IsElement (ORD ('o'), Options) THEN NCombSize := NCombSize * 5; END;
+      MakeArray (NComb, NCombSize, TSIZE (tComb));
+      NTableMax := NCombSize - 1;
+      NTableSize := 0;
+      FOR b := MaxTerminalCode TO NTableMax DO NComb^ [b] := NoComb; END;
+      MemoSize := NontermCount + 1;
+      MakeArray (MemoPtr, MemoSize, TSIZE (CARDINAL));
+      FOR b := 0 TO NontermCount DO MemoPtr^ [b] := 0; END;
+      GroupSize	:= NontermCount DIV 2 + 1;
+      MakeArray (GroupPtr, GroupSize, TSIZE (tGroup));
+      Sort (1, LastReadState, IsLessN, Swap);
+WriteStepTime ("CompSort	");
+
+      FOR jj := 1 TO LastReadState DO
+	 State := SortPtr^ [jj];
+	 WITH StatePtr^ [State] DO
+
+	    Entry1 := NTEntryPtr^ [State];
+	    IF Entry1 # NIL THEN
+	       Offset	  := Entry1^.Symbol;	(* turn row into a list of ranges (groups) *)
+	       Prev	  := Offset;
+	       GroupCount := 1;
+	       GroupPtr^ [1].Offset := Offset;
+	       Entry1	  := Entry1^.Next;
+	       WHILE Entry1 # NIL DO
+		  WITH Entry1^ DO
+		     IF Symbol > Prev + 1 THEN
+			GroupPtr^ [GroupCount].Size := Prev - Offset;
+			INC (GroupCount);
+			Offset	:= Symbol;
+			GroupPtr^ [GroupCount].Offset := Offset;
+		     END;
+		     Prev	:= Symbol;
+		     Entry1	:= Next;
+		  END;
+	       END;
+	       GroupPtr^ [GroupCount].Size := Prev - Offset;
+
+	       Offset := GroupPtr^ [1].Offset;	(* get form of row and look up Base *)
+	       IF GroupCount = 1 THEN
+		  Delta := GroupPtr^ [1].Size;
+	       ELSE
+		  Delta := GroupPtr^ [2].Offset - Offset;
+	       END;
+	       IF MemoPtr^ [Delta] <= Offset THEN
+		  Base := 0;
+	       ELSE
+		  Base := MemoPtr^ [Delta] - Offset;
+	       END;
+							(* search Base for form *)
+	       WHILE (NComb^ [Base + Offset].Check # NoState) OR
+		     (NComb^ [Base + Offset + Delta].Check # NoState) DO
+		  INC (Base);
+		  IF Base > NTableMax - MaxNontermCode THEN
+		     ExtendArray (NComb, NCombSize, TSIZE (tComb));
+(* MessageI ("extend NComb", Warning, NoPosition, Long, ADR (NCombSize)); *)
+		     FOR b := NTableMax + 1 TO CARDINAL (NCombSize - 1) DO NComb^ [b] := NoComb; END;
+		     NTableMax := NCombSize - 1;
+		  END;
+	       END;
+	       MemoPtr^ [Delta] := Base + Offset;	(* memoize Base for form *)
+
+	       LOOP					(* search a usable base	*)
+		  IF Base > NTableMax - MaxNontermCode THEN
+		     ExtendArray (NComb, NCombSize, TSIZE (tComb));
+(* MessageI ("extend NComb", Warning, NoPosition, Long, ADR (NCombSize)); *)
+		     FOR b := NTableMax + 1 TO CARDINAL (NCombSize - 1) DO NComb^ [b] := NoComb; END;
+		     NTableMax := NCombSize - 1;
+		  END;
+		  i := 1;
+		  Success := TRUE;
+		  LOOP
+		     j := GroupPtr^ [i].Offset;
+		     k := j + GroupPtr^ [i].Size;
+		     LOOP
+			IF NComb^ [Base + j].Check # NoState THEN
+			   REPEAT INC (j); UNTIL NComb^ [Base + j].Check = NoState;
+			   Success := FALSE; EXIT; END;
+			INC (j);
+			IF j > k THEN EXIT; END;
+		     END;
+		     IF NOT Success OR (i = GroupCount) THEN EXIT; END;
+		     INC (i);
+		  END;
+		  IF Success THEN EXIT; END;
+		  INC (Base, j - GroupPtr^ [i].Offset);
+	       END;
+
+	       NBase^ [ReadIndex] := Base;		(* fill entries into comb *)
+	       Entry1 := NTEntryPtr^ [State];
+	       WHILE Entry1 # NIL DO
+		  WITH Entry1^ DO
+		     NComb^ [Base + Symbol].Next  := Entry;
+		     NComb^ [Base + Symbol].Check := ReadIndex;
+		     Entry1 := Next;
+		  END;
+	       END;
+	       NTableSize := Max (NTableSize, Base + MaxNontermCode);
+	    ELSE
+	       NBase^ [ReadIndex] := 0;
+	    END;
+	 END;
+      END;
+      CardSize := StateCount + 1;
+      ReleaseArray (NCardPtr	, CardSize, TSIZE (SHORTCARD	));
+      ReleaseArray (NTEntryPtr	, CardSize, TSIZE (tEntryPtr	));
+      ReleaseArray (MemoPtr	, MemoSize, TSIZE (CARDINAL	));
+      ReleaseArray (GroupPtr	, GroupSize,TSIZE (tGroup	));
+      ReleaseArray (SortPtr	, CardSize, TSIZE (tStateRange	));
+   END CompressNTable;
+
+BEGIN
+   ElmtSize	:= TSIZE (tTableElmt);
+   TDefault	:= NIL;
+   NDefault	:= NIL;
+   TEntryCount	:= 0;
+   NEntryCount	:= 0;
+   TDefaultSavings	:= 0;
+   NDefaultSavings	:= 0;
+   NoComb.Check	:= NoState;
+   NoComb.Next	:= NoState;
+END Compress.

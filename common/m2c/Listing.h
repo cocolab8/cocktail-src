@@ -1,0 +1,13 @@
+#define DEFINITION_Listing
+
+#ifndef DEFINITION_IO
+#include "IO.h"
+#endif
+
+extern ZfM_3 ZijFQGAF_0;
+extern ZfM_3 ZijFQGAF_1;
+extern BOOLEAN ZijFQGAF_2;
+extern void ZijFQGAF_3 ARGS ((INTEGER Z121, INTEGER Z122, INTEGER Z123, INTEGER Z124, INTEGER Z125, ADDRESS Z126));
+extern BOOLEAN ZijFQGAF_4 ARGS ((void));
+extern void ZijFQGAF_5 ARGS ((INTEGER *Z121, INTEGER *Z122, INTEGER *Z123, INTEGER *Z124, INTEGER *Z125, ADDRESS *Z126));
+extern void BEGIN_Listing ARGS ((void));

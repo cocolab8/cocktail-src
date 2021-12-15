@@ -1,0 +1,11 @@
+m2c:
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../front/src -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake sources M2FLAGS="-c -d../../front/src -d../../reuse/src -o../m" -c -f ../m/Makefile
+
+sources:
+
+clean CLEAN:
+	del *.obj
+	del bnf.exe

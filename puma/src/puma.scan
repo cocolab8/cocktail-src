@@ -1,0 +1,568 @@
+/* $Id: puma.scan,v 1.11 2008/09/25 14:53:58 grosch Exp $ */
+
+/*
+ * $Log: puma.scan,v $
+ * Revision 1.11  2008/09/25 14:53:58  grosch
+ * added handling of #@ line directives
+ * added attribute FileName to token TargetCode
+ *
+ * Revision 1.10  2008/09/12 13:29:04  grosch
+ * added new kinds of FOR loops for iteration over lists of tree nodes
+ * extended pattern matching in IF statements by optional conditions
+ *
+ * Revision 1.9  2008/08/25 08:58:43  grosch
+ * improved some error messages
+ *
+ * Revision 1.8  2004/01/05 16:40:33  grosch
+ * allow statements after RETURN statement
+ * added new statement for IMPORT of external routine declarations
+ * allow pattern matching in IF statements
+ * a FOR loop can declare its loop variable
+ * added new scopes and changed scoping rules:
+ *    THEN and ELSE parts of the IF statement and the FOR and WHILE loops
+ *
+ * Revision 1.7  2001/12/17 12:05:56  grosch
+ * added GLOBAL and LOCAL declarations for variables with node types
+ * added WHILE loop
+ * added EXTERN attribute to routine declarations
+ * added TRIP as new kind of routine providing automatic tree traversal
+ *
+ * Revision 1.6  2000/09/14 15:42:16  grosch
+ * reactivated error message for unclosed strings
+ *
+ * Revision 1.5  1999/06/03 08:23:36  grosch
+ * add source window
+ *
+ * Revision 1.4  1998/04/21 10:09:32  grosch
+ * truncation of file and module names to 8.3 format
+ * added many language extensions
+ * added Information messages and option -u
+ *
+ * Revision 1.3  1996/05/14  19:49:26  grosch
+ * fixed bug for MS-DOS at \ \r \n
+ *
+ * Revision 1.2  1996/05/08  15:36:42  grosch
+ * added handling of hex constans and C++ comments
+ *
+ * Revision 1.1  1993/10/27  17:52:58  grosch
+ * corrected handling of \ \n in target code sections
+ *
+ * Revision 1.0  1993/08/17  15:48:17  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 20.3.1989 */
+
+EXPORT  {
+FROM StringM	IMPORT tStringRef;
+FROM Idents	IMPORT tIdent	;
+FROM Texts	IMPORT tText	;
+FROM Position	IMPORT tPosition;
+
+INSERT tScanAttribute
+
+PROCEDURE Error		(Text: ARRAY OF CHAR; Position: tPosition);
+PROCEDURE ErrorI	(Text: ARRAY OF CHAR; Position: tPosition; Ident: tIdent);
+PROCEDURE Warning	(Text: ARRAY OF CHAR; Position: tPosition);
+PROCEDURE WarningI	(Text: ARRAY OF CHAR; Position: tPosition; Ident: tIdent);
+PROCEDURE Information	(Text: ARRAY OF CHAR; Position: tPosition);
+PROCEDURE InformationI	(Text: ARRAY OF CHAR; Position: tPosition; Ident: tIdent);
+}
+
+GLOBAL  {
+FROM SYSTEM	IMPORT ADR;
+FROM StringM	IMPORT PutString, NoString;
+FROM Strings	IMPORT tString, Concatenate, Char, SubString,
+			AssignEmpty, Length, WriteL,
+			ArrayToString, IntToString, StringToInt;
+FROM Idents	IMPORT tIdent, MakeIdent, NoIdent, GetStringRef;
+FROM Texts	IMPORT MakeText, Append;
+FROM Sets	IMPORT IsElement;
+FROM Tree	IMPORT Options, ErrorCount;
+FROM Position	IMPORT tPosition;
+
+IMPORT Errors, Idents;
+
+VAR NestingLevel: INTEGER; ThePosition, StringPos, CommentPos: tPosition;
+
+INSERT ErrorAttribute
+
+PROCEDURE Error (Text: ARRAY OF CHAR; Position: tPosition);
+   BEGIN
+      Errors.Message (Text, Errors.Error, Position);
+      INC (ErrorCount);
+   END Error;
+
+PROCEDURE ErrorI (Text: ARRAY OF CHAR; Position: tPosition; Ident: tIdent);
+   BEGIN
+      Errors.MessageI (Text, Errors.Error, Position, Errors.Ident, ADR (Ident));
+      INC (ErrorCount);
+   END ErrorI;
+
+PROCEDURE Warning (Text: ARRAY OF CHAR; Position: tPosition);
+   BEGIN
+      IF NOT IsElement (ORD ('s'), Options) THEN
+	 Errors.Message (Text, Errors.Warning, Position);
+      END;
+   END Warning;
+
+PROCEDURE WarningI (Text: ARRAY OF CHAR; Position: tPosition; Ident: tIdent);
+   BEGIN
+      IF NOT IsElement (ORD ('s'), Options) THEN
+	 Errors.MessageI (Text, Errors.Warning, Position, Errors.Ident, ADR (Ident));
+      END;
+   END WarningI;
+
+PROCEDURE Information (Text: ARRAY OF CHAR; Position: tPosition);
+   BEGIN
+      IF NOT IsElement (ORD ('u'), Options) THEN
+	 Errors.Message (Text, Errors.Information, Position);
+      END;
+   END Information;
+
+PROCEDURE InformationI (Text: ARRAY OF CHAR; Position: tPosition; Ident: tIdent);
+   BEGIN
+      IF NOT IsElement (ORD ('u'), Options) THEN
+	 Errors.MessageI (Text, Errors.Information, Position, Errors.Ident, ADR (Ident));
+      END;
+   END InformationI;
+
+PROCEDURE MakeDirective (VAR Result: tString; Line: CARDINAL; File: tIdent);
+
+   PROCEDURE AppendS (VAR Result: tString; VAR In: ARRAY OF CHAR);
+     VAR s: tString;
+     BEGIN
+       ArrayToString (In, s);
+       Concatenate (Result, s);
+     END AppendS;
+
+   PROCEDURE AppendI (VAR Result: tString; In: INTEGER);
+     VAR s: tString;
+     BEGIN
+       IntToString (In, s);
+       Concatenate (Result, s);
+     END AppendI;
+
+   PROCEDURE AppendIdent (VAR Result: tString; In: tIdent);
+     VAR s: tString;
+     BEGIN
+       Idents.GetString (In, s);
+       Concatenate (Result, s);
+     END AppendIdent;
+
+   PROCEDURE AppendIdentEscaped (VAR Result: tString; Ident: tIdent);
+      VAR
+         i	: CARDINAL;
+         ch	: CHAR;
+         s	: tString;
+      BEGIN
+         Idents.GetString (Ident, s);
+         FOR i := 1 TO Length (s) DO
+	    ch := Char (s, i);
+	    IF ch = '\' THEN Strings.Append (Result, ch); END;
+	    Strings.Append (Result, ch);
+         END;
+      END AppendIdentEscaped;
+
+   BEGIN
+      Strings.AssignEmpty (Result);
+      IF IsElement (ORD ('*'), Options) OR
+	 IsElement (ORD ('+'), Options) OR
+	 IsElement (ORD ('c'), Options) THEN
+	 IF IsElement (ORD ('6'), Options) THEN
+	    AppendS (Result, "# line ");
+	    AppendI (Result, Line);
+	    AppendS (Result, ' "');
+	    AppendIdentEscaped (Result, File);
+	    Strings.Append (Result, '"');
+	 ELSE
+	    AppendS (Result, "/* line ");
+	    AppendI (Result, Line);
+	    AppendS (Result, ' "');
+	    AppendIdent (Result, File);
+	    AppendS (Result, '" */');
+	 END;
+      ELSIF IsElement (ORD ('J'), Options) THEN
+	 AppendS (Result, "/* line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 AppendS (Result, '" */');
+      ELSE
+	 AppendS (Result, "(* line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 AppendS (Result, '" *)');
+      END;
+   END MakeDirective;
+}
+
+LOCAL	{
+VAR
+  Word, String, TargetCode: tString;
+  LineNo	: LONGCARD;
+}
+
+BEGIN	{ NestingLevel := 0; }
+
+DEFAULT	{
+   GetWord (Word);
+   Errors.MessageI ("illegal character", Errors.Error, Attribute.Position, Errors.String, ADR (Word));
+   INC (ErrorCount);
+}
+
+EOF     {
+   CASE yyStartState OF
+   | comment	: Error ("unterminated comment", CommentPos);
+   | expr	,
+     targetcode	: Error ("unterminated target code", ThePosition);
+   | CStr1, CStr2,
+     Str1, Str2	: Error ("unterminated string", StringPos);
+   ELSE
+   END;
+}
+
+DEFINE  letter  =   {A-Z a-z _}	.
+        digit   =   {0-9}	.
+	CmtCh   = - {*\t\n}	.
+	StrCh1	= - {'\t\n\r}	.
+	StrCh2	= - {"\t\n\r}	.
+	CStrCh1	= - {'\t\n\r\\}	.
+	CStrCh2	= - {"\t\n\r\\}	.
+	code	= - {\\\t\n\r{\}'"#} .
+	anyExpr	= - {\\\t\n\r{\}'":\ A-Za-z0-9} .
+
+START	comment, Str1, Str2, CStr1, CStr2, targetcode, expr, PPline
+
+RULE
+
+#targetcode#	"{"	: {
+			   IF NestingLevel = 0 THEN
+			      MakeText (Attribute.TargetBlock.Text);
+			      AssignEmpty (TargetCode);
+			      ThePosition := Attribute.Position;
+			   ELSE
+			      GetWord (Word);
+			      Concatenate (TargetCode, Word);
+			   END;
+			   INC (NestingLevel);
+			}
+
+#targetcode#	"}"	:- {
+			   DEC (NestingLevel);
+			   IF NestingLevel = 0 THEN
+			      yyStart (STD);
+			      Append (Attribute.TargetBlock.Text, TargetCode);
+			      Attribute.Position.Line	:= ThePosition.Line;
+			      Attribute.Position.Column	:= ThePosition.Column;
+			      Attribute.TargetBlock.FileName := ThePosition.File;
+			      RETURN TargetBlock;
+			   ELSE
+			      GetWord (Word);
+			      Concatenate (TargetCode, Word);
+			   END;
+			}
+
+#targetcode#	" " + | \r :- {
+			   IF NestingLevel > 0 THEN
+			      GetWord (Word);
+			      Concatenate (TargetCode, Word);
+			   END;
+			}
+
+#targetcode#	code + | \# | \r :- {
+			   IF NestingLevel > 0 THEN
+			      GetWord (Word);
+			      Concatenate (TargetCode, Word);
+			   ELSE
+			      yyStart (STD);
+			      yyLess (0);
+			   END;
+			}
+
+#targetcode#	\t	:- {
+			   IF NestingLevel > 0 THEN
+			      Strings.Append (TargetCode, 11C);
+			   END;
+			   yyTab;
+			}
+
+#targetcode#	\r ? \n	:- {
+			   IF NestingLevel > 0 THEN
+			      Append (Attribute.TargetBlock.Text, TargetCode);
+			      AssignEmpty (TargetCode);
+			   END;
+			   yyEol (0);
+			}
+
+#targetcode#	\\ / \r ? \n	:- {
+			   IF NestingLevel > 0 THEN
+			      Strings.Append (TargetCode, '\');
+			   END;
+			}
+
+#targetcode#	\\ ANY	:- {
+			   IF NestingLevel > 0 THEN
+			      GetWord (Word);
+			      Strings.Append (TargetCode, Char (Word, 2));
+			   END;
+			}
+
+#targetcode#	\\	:- {
+			   IF NestingLevel > 0 THEN
+			      Strings.Append (TargetCode, '\');
+			   END;
+			}
+
+#STD, expr# "/*"	:  {yyStart (comment);
+			    CommentPos := Attribute.Position;}
+#comment# "*/"		:- {yyPrevious;}
+#comment# "*" | CmtCh +	:- {}
+
+#STD, expr# "//" ANY *	:- {}
+
+#STD# \f | \r | \26	:- {}
+
+#STD# (digit + "." digit * | digit * "." digit +) ({Ee} {+\-} ? digit +) ? ,
+#STD# 0 {Xx} (digit | {A-F a-f}) * ,
+#STD# digit +		:  {GetWord (Word);
+	                    Attribute.Number.StringRef := PutString (Word);
+			    RETURN Number;}
+
+#expr# (digit + "." digit * | digit * "." digit +) ({Ee} {+\-} ? digit +) ? ,
+#expr# 0 {Xx} (digit | {A-F a-f}) * ,
+#expr# digit +		:  {GetWord (Word);
+			    Attribute.TargetCode.StringRef := PutString (Word);
+			    RETURN TargetCode;}
+
+#STD, expr, targetcode# ' :{IF (yyStartState = targetcode) AND
+			       (NestingLevel = 0) THEN
+			       yyStart (STD);
+			    END;
+			    GetWord (String);
+			    StringPos := Attribute.Position;
+			    IF IsElement (ORD ('c'), Options)
+			    THEN yyStart (CStr1);
+			    ELSE yyStart (Str1);
+			    END;}
+
+#STD, expr, targetcode# \":						// vi "
+			   {IF (yyStartState = targetcode) AND
+			       (NestingLevel = 0) THEN
+			       yyStart (STD);
+			    END;
+			    GetWord (String);
+			    StringPos := Attribute.Position;
+			    IF IsElement (ORD ('c'), Options)
+			    THEN yyStart (CStr2);
+			    ELSE yyStart (Str2);
+			    END;}
+
+#Str1#	StrCh1 +	,
+#Str2#	StrCh2 +	,
+#CStr1#	CStrCh1 + | \\ ANY ? ,
+#CStr2#	CStrCh2 + | \\ ANY ? :- {GetWord (Word); Concatenate (String, Word);}
+
+#CStr1, CStr2# \\ \r ? \n:-{Strings.Append (String, '\');
+			    Strings.Append (String, 12C); yyEol (0);}
+
+#Str1, CStr1# '		,
+#Str2, CStr2# \"	:-						// vi "
+			   {Strings.Append (String, Char (String, 1));
+			    yyPrevious;
+			    IF yyStartState = targetcode THEN
+			       Concatenate (TargetCode, String);
+			    ELSE
+			       Attribute.String.StringRef := PutString (String);
+			       RETURN String;
+			    END;}
+
+#Str1, Str2, CStr1, CStr2# \t :- {Strings.Append (String, 11C); yyTab;}
+
+#Str1, Str2, CStr1, CStr2# \r ? \n :- {
+			    Strings.Append (String, 12C);
+			    yyEol (0); yyPrevious;
+			    IF yyStartState = STD THEN
+			      Error ("unterminated string", Attribute.Position);
+			    END;
+			    IF yyStartState = targetcode THEN
+			       Concatenate (TargetCode, String);
+			    ELSE
+			       Attribute.String.StringRef := PutString (String);
+			       RETURN String;
+			    END;}
+
+#Str1, Str2, CStr1, CStr2# \r :- {Strings.Append (String, 15C);}
+
+#STD# "::"		: {RETURN '::'			;}
+
+#STD# "{"		: {IF NestingLevel = 0 THEN
+			     ThePosition := Attribute.Position;
+			   END;
+			   yyStart (expr); INC (NestingLevel); RETURN '{';}
+
+#expr# anyExpr * | \r	: {GetWord (Word);
+			   Attribute.TargetCode.StringRef := PutString (Word);
+			   RETURN TargetCode		;}
+
+#expr# "{"		: {INC (NestingLevel);
+			   GetWord (Word);
+			   Attribute.TargetCode.StringRef := PutString (Word);
+			   RETURN TargetCode		;}
+
+#expr# "}"		: {DEC (NestingLevel);
+			   IF NestingLevel = 0 THEN
+			      yyStart (STD);
+			      RETURN '}';
+			   ELSE
+			      GetWord (Word);
+			      Attribute.TargetCode.StringRef := PutString (Word);
+			      RETURN TargetCode;
+			   END				;}
+
+#expr# ":"		: {GetWord (Word);
+			   Attribute.TargetCode.StringRef := PutString (Word);
+			   RETURN TargetCode		;}
+
+#expr# "::"		: {GetWord (Word);
+			   Attribute.'::'.StringRef := PutString (Word);
+			   RETURN '::'			;}
+
+#expr# " " +		: {GetWord (Word);
+			   Attribute.WhiteSpace.StringRef := PutString (Word);
+			   RETURN WhiteSpace		;}
+
+#expr# \n		: {GetWord (Word);
+			   Attribute.WhiteSpace.StringRef := PutString (Word);
+			   yyEol (0);
+			   RETURN WhiteSpace		;}
+
+#expr# \r \n		: {GetWord (Word);
+			   SubString (Word, 2, 2, String);
+			   Attribute.WhiteSpace.StringRef := PutString (String);
+			   yyEol (0);
+			   RETURN WhiteSpace		;}
+
+#expr# \t		: {GetWord (Word);
+			   Attribute.WhiteSpace.StringRef := PutString (Word);
+			   yyTab;
+			   RETURN WhiteSpace		;}
+
+#expr# \\ ANY		: {GetWord (Word);
+			   SubString (Word, 2, 2, String);
+			   Attribute.TargetCode.StringRef := PutString (String);
+			   RETURN TargetCode		;}
+
+#expr# \\ / \r \n	,
+#expr# \\		: {GetWord (Word);
+			   Attribute.TargetCode.StringRef := PutString (Word);
+			   RETURN TargetCode		;}
+
+#STD# BEGIN		: {yyStart (targetcode); RETURN 'BEGIN'	;}
+#STD# CLOSE		: {yyStart (targetcode); RETURN 'CLOSE'	;}
+#STD# EXPORT		: {yyStart (targetcode); RETURN 'EXPORT';}
+#STD# GLOBAL		: {yyStart (targetcode); RETURN 'GLOBAL';}
+#STD# IMPORT		: {yyStart (targetcode); RETURN 'IMPORT';}
+#STD# LOCAL		: {yyStart (targetcode); RETURN 'LOCAL'	;}
+
+#STD#
+  "!"
+| "!="
+| "#"
+| "%"
+| "&"
+| "&&"
+| "*"
+| "+"
+| "-"
+| "/"
+| "<"
+| "<<"
+| "<="
+| "<>"
+| "="
+| "=="
+| ">"
+| ">="
+| ">>"
+| "|"
+| "||"
+| "~"
+| AND
+| DIV
+| MOD
+| \NOT
+| OR
+			: {GetWord (Word);
+	                   Attribute.Operator.Ident := MakeIdent (Word);
+			   RETURN Operator		;}
+
+#STD# IN		: {GetWord (Word);
+	                   Attribute.Operator.Ident := MakeIdent (Word);
+			   RETURN InOperator		;}
+
+#STD# "++" | "--"	: {GetWord (Word);
+	                   Attribute.IncOperator.Ident := MakeIdent (Word);
+			   RETURN IncOperator		;}
+
+#STD# \\ - {\ \t\n\f\r} + : {GetWord (Word);
+			   SubString (Word, 2, Length (Word), String);
+	                   Attribute.Operator.Ident := MakeIdent (String);
+			   RETURN Operator		;}
+
+#STD#
+  "+="
+| "-="
+| "*="
+| "/="
+| "%="
+| "<<="
+| ">>="
+| "&="
+| "^="
+| "|="
+			: {GetWord (Word);
+	                   Attribute.AssignOperator.Ident := MakeIdent (Word);
+			   RETURN AssignOperator	;}
+
+INSERT RULES #STD#
+
+#STD# ".."		: {RETURN '...'			;}
+#STD# "<:"		: {RETURN GUARD			;}
+
+#STD, expr# letter (letter | digit) *
+			: {GetWord (Word);
+	                   Attribute.Ident.Ident := MakeIdent (Word);
+			   RETURN Ident			;}
+
+// interpret #@ line directives
+
+< "#@" " " * "line"	:-{ yyPush (PPline); }
+
+#PPline# {0-9} +	:-{
+			   GetWord (Word);
+			   LineNo := StringToInt (Word);
+			}
+
+#PPline# \" -{\n"} + \"	:-{
+			   GetWord (Word);
+			   SubString (Word, 2, Length (Word) - 1, Word);
+			   yyLineCount := LineNo - 1;
+			   (* change line # only if there is a file name *)
+			   (* -1 compensates for the following yyEol () *)
+			   Attribute.Position.File := MakeIdent (Word);
+			}
+
+#PPline# \r ? \n	:-{
+			   yyPop ();
+			   yyEol (0);
+			   CASE yyStartState OF
+			   | targetcode:
+			     MakeDirective (String, yyLineCount,
+			       Attribute.Position.File);
+			     Append (Attribute.TargetBlock.Text, String);
+			   ELSE
+			   END;
+			}

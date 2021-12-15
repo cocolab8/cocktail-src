@@ -1,0 +1,1617 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.ds ], , 
+.EQ
+delim off
+.EN
+.T0
+
+
+	Tool Support for
+	Data Structures
+
+	J. Grosch
+
+
+.T1
+.T2 "Tool Support" "Tool Support for Data Structures" "Josef Grosch" "Nov. 8, 1989" 17 1994
+.hc ~
+.bp 1
+.ce
+.b "Tool Support for Data Structures"
+.sp
+.uh Abstract
+Linked records are a general mechanism to build data structures like lists,
+trees, and graphs. Most high-level programming languages only provide the
+definition of record types, an operator for component selection, and
+allocation of record storage. We propose to specify complete graph structures
+by context-free grammars. A tool can be used to transform such a specification
+into a set of record type declarations and program code for features like
+denotations for record values, input and output for record values and
+complete graphs, or interactive browsers for data structures. We describe
+such a tool called 
+.i ast
+(generator for abstract syntax trees), its specification language, the
+advantages of this approach, and our current experiences. Currently, the main
+application is the specification of attributed abstract syntax trees within
+compilers. We finally discuss the relationship to related work.
+.sh 1 Introduction
+.pp
+Linked records are a general mechanism to build data structures like lists,
+trees, and graphs. Most high-level programming languages only provide the
+definition of record types, an operator for component selection, and
+allocation of record storage. Therefore, the treatment of compound data types
+in most high-level languages can be considered to be quite "low-level".
+Exceptions are very-high-level languages like e.\ g. SETL
+\*([[SDD86\*(]] which provides denotations
+(aggregates) and input/output operations for values of all data types, even
+compound ones like tuples, arrays, or sets.
+.pp
+We propose to raise the level of conventional languages somewhat by
+improving the declarations of data structures and by extending the set of
+operations available for compound data types. Declarations should not merely
+describe single records but also the relationships among them. Additional
+operations include denotations for record values (aggregates) as well as input and
+output for record values or complete data structures like graphs.
+Moreover, it is desirable to have commonly used operations for general data structures.
+These could range from reversing the
+elements of lists to interactive browsers for graphs which allow the
+inspection of the values of all fields of the nodes in a user-driven dialogue.
+.pp
+The structure of graphs can be specified conveniently by context-free
+grammars. A grammar rule describes a node type and a nonterminal a set of
+node types.
+.pp
+The above features could be incorporated into existing or future languages.
+This would of course be the kind of realization to prefer.
+However, today we have to live with languages like Modula-2 or C without those
+features. Therefore, a tool could produce a program
+module written in the concrete target language which defines the specified
+data structure by a set of record declarations and which implements the
+additional operations by generated procedures. This has the advantage that
+no changes to existing languages are necessary.
+.pp
+This paper presents such a tool called
+.i ast :
+generator for \fIa\fPbstract \fIs\fPyntax \fIt\fPrees\*([<\*([[Gro\*(]]\*(>].
+The tool's name is derived from its main application in compiler
+construction where it is used for attributed abstract syntax trees.
+.i ast
+is implemented in Modula-2 as well as in C under UNIX and generates Modula-2 or C source
+modules. We describe the specification language of the tool, its output, its
+advantages, and our experiences. We also discuss related approaches.
+In the following we talk only about the data structure directed graph
+because lists and trees are special cases thereof. The examples use
+Modula-2 as target language.
+.sh 1 "Specification Language"
+.pp
+The structure of directed graphs is specified by a
+formalism based on context-free grammars.
+However, we use the classical terminology for graphs in defining the
+specification language. Its relationship to context-free grammars is
+discussed later.
+.sh 2 "Node Types"
+.pp
+A directed graph consists of
+.i nodes .
+A node may be related to other nodes in a so-called
+.i parent-child
+relation. Then the first node is called a
+.i parent
+node and the latter nodes are called
+.i child
+nodes. Nodes without a parent node are usually called
+.i root
+nodes, nodes without children are called
+.i leaf
+nodes.
+.pp
+The structure and the properties of nodes are described by
+.i "node types" .
+Every node belongs to a node type.
+A specification of a graph describes a finite number of node types.
+A node type specifies the names of the child nodes and the associated node
+types as well as the names of the attributes and the associated attribute types.
+.sh 2 Children
+.pp
+Children are distinguished by
+.i selector
+names which have to be unambiguous within one node type.
+The children are of a certain node type.
+.(b
+Example:
+.sp 0.5
+.FT
+   If        = Expr: Expr Then: Stats Else: Stats .
+   While     = Expr: Expr Stats: Stats .
+.)b
+The example introduces two node types called
+.i If
+and
+.i While .
+A node of type If has three children which are selected by the names
+.i Expr ,
+.i Then ,
+and
+.i Else.
+The children have the node types
+.i Expr ,
+.i Stats ,
+and
+.i Stats .
+If a selector name is equal to the associated name of the node type it can
+be omitted. Therefore, the above example can be abbreviated as follows:
+.(b
+.FT
+   If        = Expr Then: Stats Else: Stats .
+   While     = Expr Stats .
+.)b
+.sh 2 Attributes
+.pp
+As well as children, every node type can specify an arbitrary number of
+.i attributes
+of arbitrary types. Like children, attributes are characterized by a selector
+name and a certain type.
+The descriptions of attributes are enclosed in brackets. The attribute types
+are given by names taken from the target language. Missing attribute types
+are assumed to be int or INTEGER depending on the target language (C or Modula-2).
+Children and attributes can be given in any order.
+The type of an attribute can be a pointer to a node type. In contrast to children,
+.i ast
+does not follow such an attribute during a graph traversal. All attributes
+are considered to be neither tree nor graph structured. Only the user knows
+about this fact and therefore he/she should take care.
+.(b
+Example:
+.sp 0.5
+.FT
+   Binary    = Lop: Expr Rop: Expr [Operator: INTEGER] .
+   Unary     = Expr [Operator] .
+   IntConst  = [Value] .
+   RealConst = [Value: REAL] .
+.)b
+.sh 2 Extensions
+.pp
+To allow several alternatives for the types of children an
+.i extension
+mechanism is used. A node type may be associated with several other node types enclosed
+in angle brackets. The first node type is called
+.i base
+or
+.i super
+type and the latter types are called
+.i derived
+types or
+.i subtypes .
+A derived type can in turn be extended with no limitation of the nesting depth.
+The extension mechanism induces a subtype relation between node types.
+This relation is transitive.
+Where a node of a certain node type is required, either a node of this node type or a node of
+a subtype thereof is possible.
+.(b
+Example:
+.sp 0.5
+.FT
+Stats        = <
+   If        = Expr Then: Stats Else: Stats .
+   While     = Expr Stats .
+> .
+.)b
+.pp
+In the above example
+.i Stats
+is a base type describing nodes with neither children nor attributes.
+It has two derived types called
+.i If
+and
+.i While .
+Where a node of type Stats is required, nodes of types Stats, If, and While are possible.
+Where a node of type If is required, nodes of type If are possible, only.
+.pp
+Besides extending the set of possible node types, the extension mechanism has
+the property of extending the children and attributes of the base type.
+The derived types possess the children and attributes of the base type.
+They may define additional children and attributes. In other words they
+.i inherit
+the structure of the base type.
+The selector names of all children and attributes in an extension hierarchy have to be distinct.
+The syntax has been designed this way in order to allow single inheritance, only.
+.(b
+Example:
+.sp 0.5
+.FT
+Stats        = Next: Stats [Position: tPosition] <
+   If        = Expr Then: Stats Else: Stats .
+   While     = Expr Stats .
+> .
+.)b
+.pp
+Nodes of type
+.i Stats
+have one child selected by the name
+.i Next
+and one attribute named
+.i Position .
+Nodes of type
+.i While
+have three children with the selector names
+.i Next ,
+.i Expr ,
+and
+.i Stats
+and one attribute named
+.i Position.
+.pp
+A node of a base type like
+.i Stats
+usually does not occur in an abstract syntax tree for a complete program.
+Still,
+.i ast
+defines this node type. It could be used as placeholder for unexpanded
+nonterminals in incomplete programs which occur in applications like
+syntax directed editors.
+.sh 2 Modules
+.pp
+The specification of node types can be grouped into modules. This feature
+can be used to structure a specification or to extend an existing one. If a
+node type has already been declared the given children, attributes, and
+extensions are added to the existing declaration.
+Otherwise a new node type is introduced.
+.(b
+Example:
+.sp 0.5
+.FT
+MODULE my_version
+.sp 0.5
+Stats        = [Env: tEnv] <                    /* add attribute */
+   While     = Init: Stats Terminate: Stats .   /* add children  */
+   Repeat    = Stats Expr .                     /* add node type */
+> .
+.sp 0.5
+END my_version
+.)b
+.sh 2 Properties
+.pp
+Children and attributes can be given several properties by attaching
+keywords like INPUT or REVERSE.
+.i Input
+attributes receive a value at node-creation time, whereas non-input
+attributes may receive their values at later times.
+Input attributes are included into the parameter list of the
+node constructor procedures (see section 3). As a shorthand,
+every list of children and attributes may contain the symbol '->' to separate
+input from non-input items.
+The property
+.i reverse
+specifies how lists should be reversed. It is discussed in the next section.
+.sh 2 "Reversal of Lists"
+.pp
+Recursive node types like
+.i Stats
+in the abstract grammar of the example below describe lists of subtrees.
+There are some cases where it is convenient to be able to easily
+reverse the order of the subtrees in a list. The facility provided by
+.i ast
+is a generalization of an idea presented in\*([<\*([[Par88\*(]]\*(>].
+.pp
+Using LR parsers, one might be forced to parse a list using a left-recursive
+concrete grammar rule because of the limited stack size.
+The concrete grammar rules of the following examples are written in the
+input language of the parser generator
+.i lalr
+\*([[Gro88\*(],GrV\*(]] which is similar to the one of
+YACC\*([<\*([[Joh75\*(]]\*(>]. The node constructor
+procedures within the semantic actions are the ones provided by
+.i ast
+(see section 3).
+.(b
+Example:
+.sp 0.5
+concrete grammar (with tree building actions):
+.sp 0.5
+.FT
+Stats:                         {$$ := mStats0 ();      } .
+Stats: Stats Stat ';'          {$$ := mStats1 ($2, $1);} .
+Stat : WHILE Expr DO Stats END {$$ := mWhile  ($2, ReverseTREE ($4));} .
+.)b
+.(b
+abstract grammar:
+.sp 0.5
+.FT
+Stats        = <
+   Stats0    = .
+   Stats1    = Stat Stats REVERSE .
+> .
+.)b
+Without the call of the procedure ReverseTREE and the property REVERSE
+a parser using the above concrete grammar would construct statement lists
+where the list elements are in the wrong order, because the last statement
+in the source would be the first one in the list. The WHILE rule represents a
+location where statement lists are used.
+.pp
+To easily solve this problem,
+.i ast
+can generate a procedure to reverse lists.
+The specification has to describe how this should be done.
+At most one child of every node type may be given the property
+.i reverse .
+The generated list reversal procedure ReverseTREE then reverses a list with
+respect to this indicated child.
+The procedure ReverseTREE has to be called exactly once for a list to be
+reversed. This is the case at the location where a complete list is included
+as subtree (e.\ g. in a WHILE statement).
+.sh 2 "Target Code"
+.pp
+An
+.i ast
+specification may include sections containing
+.i "target code" .
+Target code is code written in the target language which is copied unchecked
+and unchanged to certain places in the generated module.
+Target code can be used for import or export statements, for the declaration
+of global variables or procedures, and for statements to
+initialize or finalize the declared data structures.
+.sh 2 "Type Specific Operations"
+.pp
+Procedures generated by
+.i ast
+apply seven operations to attributes: initialization, finalization, ascii read
+and write, binary read and write, and copy (see Table 1).
+.i Initialization
+is performed whenever a node is created. It can range from
+assigning an initial value to the allocation of dynamic storage or the
+construction of complex data structures.
+.i Finalization
+is performed immediately before a node is deleted and may e. g. release
+dynamically allocated space. The
+.i read
+and
+.i write
+operations enable the readers and writers to handle the
+complete nodes including all attributes, even those of user-defined types.
+The operation
+.i copy
+is needed to duplicate values of attributes of user-defined types. By default,
+.i ast
+just copies the bytes of an attribute to duplicate it.
+Therefore, pointer semantics is assumed for attributes of a pointer type.
+If value semantics is needed, the user has to take care about this operation.
+.pp
+The operations are type specific in the sense that every type has its own
+set of operations. All attributes having the same type (target type name)
+are treated in the same way. Chosing different type names for one type
+introduces subtypes and allows to treat attributes of different subtypes
+differently. Type operations for the predefined types of a target language
+are predefined within
+.i ast .
+For user-defined types,
+.i ast
+assumes default operations (see Table 1).
+The procedures yyReadHex and
+yyWriteHex read and write the bytes of an attribute as hexadecimal values.
+The procedures yyGet and
+yyPut read and write the bytes of an attribute unchanged (without conversion).
+The operations are defined by a macro mechanism.
+TYPE is replaced by the concrete type name.
+.i a
+is a formal macro parameter referring to the attribute.
+It is possible to redefine the operations by including new macro definitions
+written in
+.i cpp
+syntax.
+.(b L
+.sp 0.5
+.ce
+Table 1: Type specific operations
+.sp 0.5
+.TS
+center;
+c | c | c s
+c | c | c | c
+l | l | l | l.
+		\h'2c'default macro
+operation	macro name	C	Modula-2
+_
+initialization	beginTYPE(a)
+finalization	closeTYPE(a)
+ascii read	readTYPE(a)	yyReadHex (& a, sizeof (a));	yyReadHex (a);
+ascii write	writeTYPE(a)	yyWriteHex (& a, sizeof (a));	yyWriteHex (a);
+binary read	getTYPE(a)	yyGet (& a, sizeof (a));	yyGet (a);
+binary write	putTYPE(a)	yyPut (& a, sizeof (a));	yyPut (a);
+copy	copyTYPE(a)
+.TE
+.)b
+.sh 1 "Generated Program Module and its Use"
+.pp
+A specification as described in the previous section is translated by
+.i ast
+into a program module consisting of a definition and an implementation part.
+Only the definition part is sketched here.
+The definition part contains primarily type declarations to
+describe the structure of the graphs and the headings of the generated
+procedures.
+.(z L
+.ce
+Table 2: Generated objects and procedures
+.sp 0.5
+.TS
+center;
+l | l.
+object/procedure	description
+_
+<node type>	named constant to encode a node type
+tTREE	pointer type, refers to variant record type describing all node types
+TREERoot	variable of type tTREE, can serve as root
+ 	(additional variables can be declared)
+_
+MakeTREE	node constructor procedure without attribute initialization
+n<node type>	node constructor procedures with attribute initialization
+ 	according to the type specific operations
+m<node type>	node constructor procedures with attribute initialization
+	from a parameter list for \fIinput\fP attributes
+ReleaseTREE	node or graph finalization procedure,
+	all attributes are finalized, all node space is deallocated
+ReleaseTREEModule	deallocation of all graphs managed by a module
+WriteTREENode	ASCII node writer procedure
+ReadTREE	ASCII graph reader procedure
+WriteTREE	ASCII graph writer procedure
+GetTREE	binary graph reader procedure
+PutTREE	binary graph writer procedure
+ReverseTREE	procedure to reverse lists
+TraverseTREETD	top down graph traversal procedure (reverse depth first)
+TraverseTREEBU	bottom up graph traversal procedure (depth first search)
+CopyTREE	graph copy procedure 
+CheckTREE	graph syntax checker procedure 
+QueryTREE	graph browser procedure 
+BeginTREE	procedure to initialize user-defined data structures
+CloseTREE	procedure to finalize user-defined data structures
+.TE
+.)z
+.pp
+Every node type is turned into a constant declaration and a record
+(struct) declaration. 
+That is quite simple, because node types and record declarations
+are almost the same concepts
+except for the extension mechanism and some shorthand notations.
+All these records become members of a variant record (union) used to describe
+graph nodes in general. This variant record has a tag field called
+.i Kind
+which stores the code of the node type.
+A pointer to the variant record is a type representing graphs.
+Like all generated names, this pointer type is derived from the name of the
+specification. Table 2 briefly explains the exported objects.
+Their generation is requested by simple command line options.
+.pp
+The parameters of the procedures
+.i "m<node type>"
+have to be given in the order of the
+.i input
+attributes in the specification. Attributes of the base type (recursively)
+precede the ones of the derived type.
+The procedures
+.i TraverseTREETD
+and
+.i TraverseTREEBU
+visit all nodes of a graph. At every node a procedure given as
+parameter is executed. An assignment of a graph to a variable of
+type
+.i tTREE
+can be done in two ways: The usual assignment operators '=' or ':=' yield pointer
+semantics. The procedure
+.i CopyTREE
+yields value semantics by duplicating a given graph.
+.pp
+The procedure
+.i QueryTREE
+allows to browse a graph and to inspect one node at a time. A node including
+the values of its attributes is printed on
+.i "standard output" .
+Then the user is prompted to provide one of the following commands from
+.i "standard input" :
+.(b
+.ta 3c
+parent	display parent node
+quit	quit procedure QueryTREE
+<selector>	display specified child
+.)b
+.pp
+Unfortunately, the typing rules of
+.i ast
+(see section 2.4.) can not be mapped to every target language. For example the subtype
+relation can not be expressed in Modula-2. A subtype has to be compatible with its base type.
+Two subtypes of one base type have to be incompatible.
+As a compromise, all node types without base
+types could be implemented by different pointer types. Extensions of a base type would be
+mapped to the same pointer type as the base type. This solution would implement half of
+.i ast's
+typing rules through static typing of the target language. For a full implementation, target
+languages with subtypes such as Oberon or C++ are necessary.
+.pp
+The current implementation of
+.i ast
+omits static type checking. It offers dynamic type checking through the procedure
+.i CheckTREE .
+This procedure has to be called explicitly
+to check if a graph is properly typed. In case of typing errors
+the involved parent and child nodes are printed on
+.i "standard error" .
+.pp
+The remainder of this section explains how to use the generated objects,
+presents the advantages of this approach, and reports early experience with
+the method.
+.pp
+Trees or graphs are created by successively creating their nodes. The easiest
+way is to call the constructor procedures m<node type>. These combine node
+creation, storage allocation, and attribute assignment.
+They provide a mechanism similar to record aggregates. Nested calls of
+constructor procedures allow programming with (ground) terms as in Prolog
+or LISP. The type of a node can be retrieved by
+examination of the predefined tag field called
+.i Kind .
+Children and attributes can be accessed using two record selections.
+The first one states the node type and the
+second one gives the selector name of the desired item.
+.(b
+Example:
+.sp 0.5
+abstract syntax:
+.sp 0.5
+.FT
+Expr         = [Position: tPosition] <
+   Binary    = Lop: Expr Rop: Expr [Operator: INTEGER] .
+   Unary     = Expr [Operator] .
+   IntConst  = [Value] .
+   RealConst = [Value: REAL] .
+> .
+.)b
+.(b
+tree construction by a term:
+.sp 0.5
+.FT
+CONST Plus = 1;
+VAR t: tTREE; Pos: tPosition;
+.sp 0.5
+t := mBinary (Pos, mIntConst (Pos, 2), mIntConst (Pos, 3), Plus);
+.)b
+.(b
+tree construction during parsing:
+.sp 0.5
+.FT
+Expr: Expr '+' Expr {$$.Tree := mBinary ($2.Pos, $1.Tree, $3.Tree, Plus);} .
+Expr:      '-' Expr {$$.Tree := mUnary  ($1.Pos, $2.Tree, Minus);        } .
+Expr: IntConst      {$$.Tree := mIntConst ($1.Pos, $1.IntValue);         } .
+Expr: RealConst     {$$.Tree := mRealConst ($1.Pos, $1.RealValue);       } .
+.)b
+.(b
+access of tag field, children, and attributes:
+.sp 0.5
+.FT
+CASE t^.Kind OF
+| Expr  : ... t^.Expr.Position             ...
+| Binary: ... t^.Binary.Operator           ...
+          ... t^.Binary.Lop                ...
+| Unary : ... t^.Unary.Expr^.Expr.Position ...
+END;
+.)b
+.pp
+.i ast
+can be used not only for abstract syntax trees in compilers but for every
+tree or graph like data structure. In general the data structure can serve
+as interface between phases within a program or between separate programs.
+In the latter case it would be communicated via a file using the generated
+reader and writer procedures.
+.pp
+Generated tree respectively graph modules have successfully been used in
+compilers e.\ g. for MiniLAX\*([<\*([[WGS89\*(]]\*(>] and UNITY
+\*([[Bie89\*(]] as well as for a Modula -> C translator\*([<\*([[Mar90\*(]]\*(>].
+The modules for the internal data structure of
+.i ast
+itself and the attribute evaluator generator
+.i ag
+\*([[Gro\*(]] have also been generated by
+.i ast .
+Moreover, the symbol table module of the Modula -> C translator has been
+generated.
+.pp
+The advantage of this approach is that it saves considerably hand-coding of
+trivial declarations and operations. Table 3 lists the sizes (numbers of
+lines) of some specifications and the generated modules.
+Sums in the specification column are composed of the sizes for
+the definition of node types and for user-supplied target code.
+Sums in the tree module column are composed of the sizes for the
+definition part and for the implementation part.
+The large sizes of the tree modules are due to the numerous
+node constructor procedures and from the graph browser in the case of
+.i ag .
+These procedures proved to be very helpful for debugging purposes
+as they provide readable output of complex data structures.
+.(b L
+.sp 0.5
+.ce
+Table 3: Examples of \fIast\fP applications
+.sp 0.5
+.TS
+center;
+l | r | r.
+application	specification	tree module
+_
+MiniLAX         	56	202 + \0835 = 1037
+UNITY           	210	207 + \0962 = 1169
+Modula -> C        	240	583 + 3083 = 3666
+ag             	78 + 347 = 425	317 + 1317 = 1634
+Symbol table	82 + 900 = 982	399 + 1431 = 1830
+.TE
+.)b
+.pp
+The realization of the presented concepts by a preprocessor leads to the mixture of generated
+and hand-written program code. The debugging of such a program may be problematic. Of course,
+the pure generated parts are correct. With the possibility to insert target code and type
+specific operations errors might be introduced. These are detected by the compiler or during
+run time and reported with respect to the generated program code instead of the
+specification. Therefore, errors in this situation are hard to debug. This
+problem could be solved by incorporating the concepts into a language instead of implementing
+them by a preprocessor.
+.ne 5
+.sh 1 "Related Research"
+.sh 2 "Variant Records"
+.pp
+.i ast
+specifications and variant record types like in Pascal\*([<\*([[JWM85\*(]]\*(>]
+or Modula-2\*([<\*([[Wir85\*(]]\*(>] are very similar. Every node type in an
+.i ast
+specification corresponds to a single variant. In the generated code, every
+node type is translated into a record type. All record types become members
+of a variant record type representing the type for the graph nodes.
+.pp
+The differences are the following:
+.i ast
+specifications are shorter than directly hand-written variant record types.
+They are based on the formalism of context-free grammars (see section below).
+The generator
+.i ast
+automatically provides operations on record types which would be simple but
+voluminous to program by hand. The node constructor procedures allow
+programming with record aggregates and provide dynamic storage management.
+The reader and writer procedures supply input and output for record types
+and even for complete linked data structures such as trees and graphs.
+.sh 2 "Type Extensions"
+.pp
+Type extensions have been introduced with the language Oberon
+\*([[Wir88a\*(],Wir88b\*(],Wir88c\*(]].
+The extension mechanism of
+.i ast
+is basically the same as in Oberon.
+The notions extension, base type, and derived type are equivalent (see Table 4).
+.i "Type tests"
+and
+.i "type guards"
+are not supported by
+.i ast .
+They can be programmed by inspecting the tag field of a node.
+.i ast
+does not provide assignment of subtypes to base types in the sense of value semantics or a
+projection, respectively.
+The tool can be seen as a preprocessor providing type extensions for Modula-2 and C.
+.pp
+The second example in section 2.4. illuminates the relationship between
+.i ast
+and Oberon. The node type
+.i Stats
+is a base type with two fields, a child and an attribute.
+It is extended e. g. by the node type
+.i While
+with two more fields representing children.
+.sh 2 "Context-Free Grammars"
+.pp
+As already mentioned,
+.i ast
+specifications are based on context-free grammars.
+.i ast
+specifications extend context-free grammars by selector names for right-hand
+side symbols, attributes, the extension mechanism, and modules. If the
+features are
+omitted we basically arrive at context-free grammars. This holds from the
+syntactic as well as from the semantic point of view. The names of the node
+types represent both terminal or nonterminal symbols and rule names.
+Node types correspond to grammar rules. The notions of derivation and
+derivation tree can be used similarly in both cases. The selector names can
+be seen as syntactic sugar and the attributes as some kind of terminal
+symbols. The extension mechanism is equivalent to a shorthand notation for
+factoring out common rule parts in combination with implicit chain rules.
+.pp
+Again referring to the second example in section 2.4.,
+.i Stats
+corresponds to a nonterminal. There are two rules or right-hand sides for
+.i Stats
+which are named
+.i If
+and
+.i While .
+The latter would be regarded as nonterminals, too, if a child of type
+.i If
+or
+.i While
+would be specified.
+.sh 2 "Attribute Grammars"
+.pp
+Attribute grammars
+\*([[Knu68\*(],Knu71\*(]] and
+.i ast
+specifications are based on context-free grammars and associate attributes with terminal
+and nonterminals symbols. Additionally,
+.i ast
+allows attributes which are local to rules.
+As the structure of the tree itself is known and transparent, subtrees can be
+accessed or created dynamically and used as attribute values. The access of
+the right-hand side symbols uses the selector names for symbolic access
+instead of the grammar symbols with an additional subscript if needed.
+There is no need to map chain rules
+to tree nodes because of the extension mechanism offered by
+.i ast.
+Attribute evaluation is outside the scope of
+.i ast .
+This can be done either with the attribute evaluator generator
+.i ag
+\*([[Gro\*(]] which understands
+.i ast
+specifications extended by attribute computation rules and processes the
+trees generated by
+.i ast
+or by hand-written programs that use an
+.i ast
+generated module. In the latter case attribute computations do not have to
+obey the single assignment restriction for attributes. They can assign a
+value to an attribute zero, once, or several times.
+.sh 2 "Interface Description Language (IDL)"
+.pp
+The approach of
+.i ast
+is similar to the one of IDL\*([<\*([[Lam87\*(],NNG89\*(]]\*(>].
+Both specify attributed trees as well as graphs.
+Node types without extensions are called nodes in IDL and node types with
+extensions (base types) are called classes.
+.i ast
+has simplified this to the single notion of a node type.
+Attributes are treated similarly in both systems.
+Children and attributes are both regarded as attributes, as
+structural and non-structural ones, with only little difference in between.
+Whereas IDL in general allows multiple inheritance of attributes,
+.i ast
+is restricted to single inheritance and uses the notion extension instead
+\*([[Wir88a\*(]].
+IDL knows the predefined types INTEGER, RATIONAL, BOOLEAN, STRING, SEQ OF,
+and SET OF. It offers special operations for the types SEQ OF and SET OF.
+.i ast
+really has no built in types at all, it uses the ones of the target language
+and has a table containing the type specific operations e.\ g. for reading
+and writing. Both
+.i ast
+and IDL allow attributes of user-defined types. In
+.i ast
+the type specific operations for predefined or user-defined
+types are easily expressed by macros using the target language directly.
+IDL offers an assertion language whereas
+.i ast
+does not. IDL provides a mechanism to modify existing specifications.
+The module feature of
+.i ast
+can be used to extend existing specifications.
+From
+.i ast ,
+readers and writers are requested with simple command line options instead of
+complicated syntactic constructs.
+.i ast
+does not support representation specifications, because representations are
+much more easily expressed using the types of the target language directly.
+Summarizing, we consider
+.i ast
+to have a simpler specification method and to generate more powerful
+features like aggregates, reversal of lists, and graph browsers.
+.sh 2 "Object-Oriented Languages"
+.pp
+The extension mechanism of 
+.i ast
+is exactly the same as single inheritance in object-oriented languages like
+e. g. Simula\*([<\*([[DMN70\*(]]\*(>] or Smalltalk\*([<\*([[Gol84\*(]]\*(>].
+The hierarchy introduced by the extension mechanism corresponds
+directly to the class hierarchy of object-oriented languages.
+The notions
+.i "base type"
+and
+.i superclass
+both represent the same concept. Messages and virtual procedures are out of the scope of
+.i ast.
+Virtual procedures or object specific procedures might be simulated with
+procedure-valued attributes.
+Table 4 summarizes the corresponding notions of trees
+(\fIast\fP), type extensions, and object-oriented programming.
+.(b L
+.sp 0.5
+.ce
+Table 4: Comparison of notions from the areas of trees, types, and object-oriented programming
+.sp 0.5
+.TS
+center;
+l | l | l.
+trees	types	object-oriented programming
+_
+node type	record type	class
+-	base type	superclass
+-	derived type	subclass
+attribute, child	record field	instance variable
+tree node	record variable	object, instance
+-	extension	inheritance
+.TE
+.)b
+.sh 2 "Tree Grammars"
+.pp
+Conventional tree grammars are characterized by the fact that all
+right-hand sides start with a terminal symbol. They are used for the
+description of string languages that represent trees in prefix form.
+.i ast
+specifications describe trees which are represented by (absolute) pointers
+from parent to child nodes. If we shift the names of node types of
+.i ast
+specifications to the beginning of the right-hand side and interpret them as
+terminals we arrive at conventional tree grammars. That is exactly what is
+done by the tree/graph writer procedures. They write a tree/graph in prefix
+form and prepend every node with the name of its node type.
+That is necessary to be able to perform the read operation.
+.sh 1 Summary
+.pp
+We presented the tool
+.i ast ,
+a generator for abstract syntax trees, which supports the definition and
+manipulation of graph-like data structures. The records which define a graph
+and their relationships are specified by a formalism based on context-free
+grammars. The data structures may be decorated with attributes of arbitrary
+types. The tool generates a program module containing a set of
+declarations to define the data structure and various procedures to
+manipulate it. There are procedures to construct and destroy
+nodes or graphs, to read and write graphs from (to) files, and to traverse
+graphs in some commonly used manners. The mentioned readers and writers
+process ascii as well as binary graph representations.
+.pp
+The advantages of this approach are: record aggregates are provided which
+allow a concise notation for node creation. It is possible to build trees
+by writing terms. The extension mechanism avoids chain rules and allows, for
+example lists with elements of different types. Input/output procedures
+for records and complete graphs are provided. The output procedures and the
+interactive graph browser facilitate the debugging phase as they operate on
+a readable level and know the data structure.
+The user does not have to attend to algorithms for traversing graphs. He/she
+is freed from the task of writing large amounts of relatively simple code.
+All of these features significantly increase programmer productivity.
+.fi
+.[]
+.[-
+.ds [F Bie89
+.ds [A F\*(p] Bieler
+.ds [T An Interpreter for Chandy/Misra's UNITY
+.ds [R internal paper
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D 1989
+.][
+.[-
+.ds [F DMN70
+.ds [A O\*(p] Dahl
+.as [A \*(c]B\*(p] Myrhaug
+.as [A \*(m]K\*(p] Nygaard
+.ds [T SIMULA 67 Common Base Language - Publication S-22
+.ds [I Norwegian Computing Center
+.ds [C Oslo
+.ds [D 1970
+.][
+.[-
+.ds [F Gol84
+.ds [A A\*(p] Goldberg
+.ds [T Smalltalk-80: The Interactive Programming Environment
+.ds [I Addison Wesley
+.ds [C Reading, M\&A
+.ds [C Reading, MA
+.ds [D 1984
+.][
+.[-
+.ds [F Gro88
+.ds [A J\*(p] Grosch
+.ds [T Generators for High-Speed Front-Ends
+.ds [V 371
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 81-92
+.ds [D Oct. 1988
+.][
+.[-
+.ds [F Gro
+.ds [A J\*(p] Grosch
+.ds [T Ast - A Generator for Abstract Syntax Trees
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 15
+.ds [N 15
+.][
+.[-
+.ds [F GrV
+.ds [A J\*(p] Grosch
+.as [A \*(n]B\*(p] Vielsack
+.ds [T The Parser Generators Lalr and Ell
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 8
+.ds [N 8
+.][
+.[-
+.ds [F Gro
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F JWM85
+.ds [A K\*(p] Jensen
+.as [A \*(c]N\*(p] Wirth
+.as [A \*(c]A\*(p]\*(a]B\*(p] Mickel
+.as [A \*(m]J\*(p]\*(a]F\*(p] Miner
+.ds [T Pascal User Manual and Report
+.ds [O Third Edition
+.ds [I Springer Verlag
+.ds [C New York
+.ds [D 1985
+.][
+.[-
+.ds [F Joh75
+.ds [A S\*(p]\*(a]C\*(p] Johnson
+.ds [T Yacc \(em  Yet Another Compiler-Compiler
+.ds [R Computer Science Technical Report 32
+.ds [I Bell Telephone Laboratories
+.ds [C Murray Hill, NJ
+.ds [D July 1975
+.][
+.[-
+.ds [F Knu68
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-Free Languages
+.nr [P 1
+.ds [P 127-146
+.ds [J Mathematical Systems Theory
+.ds [V 2
+.ds [D June 1968
+.ds [N 2
+.][
+.[-
+.ds [F Knu71
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-free Languages: Correction
+.nr [P 1
+.ds [P 95-96
+.ds [J Mathematical Systems Theory
+.ds [V 5
+.ds [D Mar. 1971
+.][
+.[-
+.ds [F Lam87
+.ds [A D\*(p]\*(a]A\*(p] Lamb
+.ds [T IDL: Sharing Intermediate Representations
+.nr [P 1
+.ds [P 297-318
+.ds [J ACM Trans. Prog. Lang. and Systems
+.ds [V 9
+.ds [N 3
+.ds [D July 1987
+.][
+.[-
+.ds [F Mar90
+.ds [A M\*(p] Martin
+.ds [T Entwurf und Implementierung eines \\*Ubersetzers von Modula-2 nach C
+.ds [R Diplomarbeit
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Feb. 1990
+.][
+.[-
+.ds [F NNG89
+.ds [A J\*(p]\*(a]R\*(p] Nestor
+.as [A \*(c]J\*(p]\*(a]M\*(p] Newcomer
+.as [A \*(c]P\*(p] Giannini
+.as [A \*(m]D\*(p]\*(a]L\*(p] Stone
+.ds [T IDL: The Language and its Implementation
+.ds [I Prentice Hall
+.ds [C Englewood Cliffs, NJ
+.ds [C Englewood Cliffs
+.ds [D 1989
+.][
+.[-
+.ds [F Par88
+.ds [A J\*(p]\*(a]C\*(p]\*(a]H\*(p] Park
+.ds [T y+: A Yacc Preprocessor for Certain Semantic Actions
+.ds [J SI\&GPLAN Notices
+.ds [V 23
+.ds [N 6
+.nr [P 1
+.ds [P 97-106
+.ds [D 1988
+.][
+.[-
+.ds [F SDD86
+.ds [A J\*(p]\*(a]T\*(p] Schwartz
+.as [A \*(c]R\*(p]\*(a]B\*(p]\*(a]K\*(p] Dewar
+.as [A \*(c]E\*(p] Dubinsky
+.as [A \*(m]E\*(p] Schonberg
+.ds [T Programming with Sets - An Introduction to SETL
+.ds [I Springer Verlag
+.ds [C New York
+.ds [D 1986
+.][
+.[-
+.ds [F WGS89
+.ds [A W\*(p]\*(a]M\*(p] Waite
+.as [A \*(c]J\*(p] Grosch
+.as [A \*(m]F\*(p]\*(a]W\*(p] Schr\\*oer
+.ds [T Three Compiler Specifications
+.ds [R GMD-Studie Nr. 166
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Aug. 1989
+.][
+.[-
+.ds [F Wir85
+.ds [A N\*(p] Wirth
+.ds [T Programming in Modula-2
+.nr [P 0
+.ds [P 202
+.ds [I Springer Verlag
+.ds [C Heidelberg
+.ds [D 1985
+.ds [O Third Edition
+.][
+.[-
+.ds [F Wir88a
+.ds [A N\*(p] Wirth
+.ds [T Type Extensions
+.ds [J ACM Trans. Prog. Lang. and Systems
+.ds [V 10
+.ds [N 2
+.ds [D Apr. 1988
+.nr [P 1
+.ds [P 204-214
+.][
+.[-
+.ds [F Wir88b
+.ds [A N\*(p] Wirth
+.ds [T From Modula to Oberon
+.ds [J Software\(emPractice & Experience
+.ds [V 18
+.ds [N 7
+.ds [D July 1988
+.nr [P 1
+.ds [P 661-670
+.][
+.[-
+.ds [F Wir88c
+.ds [A N\*(p] Wirth
+.ds [T The Programming Language Oberon
+.ds [J Software\(emPractice & Experience
+.ds [V 18
+.ds [N 7
+.ds [D July 1988
+.nr [P 1
+.ds [P 671-690
+.][
+.bp 1
+.lp
+.b Contents
+.sp
+.xp

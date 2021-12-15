@@ -1,0 +1,216 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Table.mi,v $
+ *	
+ *	purpose:	table to handle terminals and nonterminals environment
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+
+IMPLEMENTATION MODULE Table;
+
+FROM DynArray	IMPORT	MakeArray;
+FROM Idents	IMPORT	tIdent, MaxIdent;
+FROM rMemory	IMPORT	Alloc;
+FROM Sets	IMPORT	tSet, MakeSet, Include, Assign, AssignEmpty, AssignElmt, Union;
+FROM SYSTEM	IMPORT	TSIZE;
+FROM Tree	IMPORT	tTree;
+FROM Types	IMPORT	IsTerm, IsNonterm;
+
+(* TABLE_ )*
+FROM Idents	IMPORT	WriteIdent;
+FROM Info	IMPORT	WriteIdentSet;
+FROM IO		IMPORT	tFile, WriteS, WriteI, WriteNl;
+*( _TABLE *)
+
+TYPE
+  tTableEntryP = POINTER TO tTableEntry;
+
+  tTermEntry = RECORD END;
+
+  tNontermEntry =
+    RECORD
+      Expr: tTree;
+      Leafs: tSet;
+      First: tSet;
+      Follow: tSet;
+      Length: INTEGER;
+    END;
+  
+  tTableEntry =
+    RECORD
+      CASE :INTEGER OF
+      | 1: Term: tTermEntry;
+      | 2: Nonterm: tNontermEntry;
+      END;
+    END;
+
+VAR
+  TableArray: POINTER TO ARRAY [0..1000] OF tTableEntryP;
+  TableSizeL: LONGINT;
+  infinite: INTEGER;
+
+PROCEDURE InitTable	;
+  VAR
+    id: tIdent;
+  BEGIN
+    TableSizeL := MaxId + 1;
+    MakeArray (TableArray, TableSizeL, TSIZE (tTableEntryP));
+    FOR id := 1 TO MaxId DO
+      IF IsNonterm (id) THEN
+	TableArray^[id] := Alloc (TSIZE (tNontermEntry));
+	WITH TableArray^[id]^.Nonterm DO
+	  Expr := NIL;
+	  MakeSet (Leafs, MaxId);
+	  MakeSet (First, MaxId);
+	  MakeSet (Follow, MaxId);
+	  Length := infinite;
+	END;
+      ELSIF IsTerm (id) THEN
+	(* ???
+	TableArray^[id] := Alloc (TSIZE (tTermEntry));
+	WITH TableArray^[id].Term DO
+	END;
+	*)
+      ELSE
+	TableArray^[id] := NIL;
+      END;
+    END;
+  END InitTable;
+
+PROCEDURE SetExpr	(nonterm: tIdent; expr: tTree);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      TableArray^[nonterm]^.Nonterm.Expr := expr;
+    END;
+  END SetExpr;
+
+PROCEDURE Expr		(nonterm: tIdent): tTree;
+  BEGIN
+    RETURN TableArray^[nonterm]^.Nonterm.Expr;
+  END Expr;
+
+PROCEDURE SetLeaf	(nonterm: tIdent; leaf: tIdent);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      Include (TableArray^[nonterm]^.Nonterm.Leafs, leaf);
+    END;
+  END SetLeaf;
+
+PROCEDURE Leafs		(nonterm: tIdent; VAR leafs: tSet);
+  BEGIN
+    Assign (leafs, TableArray^[nonterm]^.Nonterm.Leafs);
+  END Leafs;
+
+PROCEDURE SetFirst	(nonterm: tIdent; first: tSet);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      Assign (TableArray^[nonterm]^.Nonterm.First, first);
+    END;
+  END SetFirst;
+
+PROCEDURE First		(id: tIdent; VAR first: tSet);
+  BEGIN
+    IF IsNonterm (id) THEN
+      Assign (first, TableArray^[id]^.Nonterm.First);
+    ELSIF IsTerm (id) THEN
+      AssignElmt (first, id);
+    ELSE
+      AssignEmpty (first);
+    END;
+  END First;
+
+PROCEDURE SetFollow	(nonterm: tIdent; follow: tSet);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      Assign (TableArray^[nonterm]^.Nonterm.Follow, follow);
+    END;
+  END SetFollow;
+
+PROCEDURE ExtendFollow	(nonterm: tIdent; follow: tSet);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      Union (TableArray^[nonterm]^.Nonterm.Follow, follow);
+    END;
+  END ExtendFollow;
+
+PROCEDURE Follow		(nonterm: tIdent; VAR follow: tSet);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      Assign (follow, TableArray^[nonterm]^.Nonterm.Follow);
+    ELSE
+      AssignEmpty (follow);
+    END;
+  END Follow;
+
+PROCEDURE SetLength (nonterm: tIdent; len: INTEGER);
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      TableArray^[nonterm]^.Nonterm.Length := len;
+    END;
+  END SetLength;
+
+PROCEDURE Length (nonterm: tIdent): INTEGER;
+  BEGIN
+    IF IsNonterm (nonterm) THEN
+      RETURN TableArray^[nonterm]^.Nonterm.Length;
+    ELSE
+      RETURN 1;
+    END;
+  END Length;
+
+(* TABLE_ )*
+PROCEDURE WriteTable	(f: tFile);
+  VAR id: tIdent;
+  BEGIN
+    FOR id := 1 TO MaxId DO
+      IF IsNonterm (id) THEN
+	WriteNontermEntry (f, id, TableArray^[id]^.Nonterm);
+      ELSIF IsTerm (id) THEN
+	WriteTermEntry (f, id, TableArray^[id]^.Term);
+      END;
+    END;
+  END WriteTable;
+
+PROCEDURE WriteNontermEntry (f: tFile; id: tIdent; VAR entry: tNontermEntry);
+  BEGIN
+    WITH entry DO
+      WriteS (f, 'First (');
+      WriteIdent (f, id);
+      WriteS (f, '): ');
+      WriteIdentSet (f, First);
+      WriteNl (f);
+
+      WriteS (f, 'Follow('); 
+      WriteIdent (f, id);
+      WriteS (f, '): ');
+      WriteIdentSet (f, Follow);
+      WriteNl (f);
+
+      WriteS (f, 'Leafs (');
+      WriteIdent (f, id);
+      WriteS (f, '): ');
+      WriteIdentSet (f, Leafs);
+      WriteNl (f);
+
+      WriteS (f, 'Length (');
+      WriteIdent (f, id);
+      WriteS (f, '): ');
+      WriteI (f, Length, 0);
+      WriteNl (f);
+    END;
+  END WriteNontermEntry;
+
+PROCEDURE WriteTermEntry (f: tFile; id: tIdent; VAR entry: tTermEntry);
+  BEGIN
+    WITH entry DO
+    END;
+  END WriteTermEntry;
+*( _TABLE *)
+
+BEGIN
+  infinite := MAX (INTEGER) DIV 2;
+END Table.

@@ -1,0 +1,31 @@
+! + generate C++ code!
+! 6 generate # line directives!
+! 7 touch output files only if necessary!
+! 8 report storage consumption!
+! : generate lines not longer than 80 characters!
+! a generate all, same as -di (default)!
+! b do not optimize generated code!
+! c generate C   code (default: Modula-2)!
+! d generate header file or definition module!
+! e treat undefined names as error!
+! f signal a runtime error if none of the rules of a procedure matches!
+! g browse internal data structure with graphical browser!
+! h print help information!
+! i generate implementation part or module!
+! k allow non-linear patterns!
+! l <dir> specify the directory dir where puma finds its tables!
+! m use procedure MakeTREE to construct nodes (default: inline code)!
+! n check parameters for NoTREE (NULL, NIL) and treat as failure!
+! o list undefined names on standard output!
+! p allow node constructors without parentheses!
+! q browse internal data structure with text browser!
+! r print patterns!
+! s suppress warnings!
+! t print tree definitions!
+! u suppress information messages!
+! v treat undefined names as warning!
+! w surround actions by WITH statements!
+! x generate and print a traversal procedure for all node types (Traverse)!
+! y <type> generate and print a traversal procedure for all node types!
+! z <type> restrict traversal procedure to reach node types of class <type>, only!
+! I <dir> add dir to the list of directories to be searched for IMPORT files!

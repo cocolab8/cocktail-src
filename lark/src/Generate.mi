@@ -1,0 +1,3828 @@
+(* $Id: Generate.mi,v 1.24 2013/01/15 13:38:20 grosch Exp $ *)
+
+(*
+ * $Log: Generate.mi,v $
+ * Revision 1.24  2013/01/15 13:38:20  grosch
+ * allow generation of large parsers in Java
+ *
+ * Revision 1.23  2010/07/07 09:53:55  grosch
+ * added support for building of concrete syntax trees
+ *
+ * Revision 1.22  2008/10/02 14:22:25  grosch
+ * moved setting of LarkLib from install time to run time
+ *
+ * Revision 1.21  2008/09/25 14:50:35  grosch
+ * revised handling of #@ line directives
+ * renamed AppendLine -> MakeDirective, WriteLine -> WriteDirective
+ *
+ * Revision 1.20  2008/08/25 13:06:10  grosch
+ * cared for pointer operations on 64 bit platforms: introduced module Pointers
+ *
+ * Revision 1.19  2006/11/28 17:03:08  grosch
+ * for Java generate YYACCEPT without semicolon
+ *
+ * Revision 1.18  2002/08/07 12:37:33  grosch
+ * added generation of named constants for all tokens (option -f)
+ *
+ * Revision 1.17  2001/08/08 15:01:15  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 1.16  2001/01/28 23:32:17  grosch
+ * added type casts to function arguments in order to satisfy MS VC++
+ *
+ * Revision 1.15  2000/09/12 17:49:41  grosch
+ * checked in update for generation of Java from Trevor nash
+ * moved the default of some target code sections to skeletons
+ *
+ * Revision 1.14  2000/01/31 11:47:02  grosch
+ * added generation of comment to ? in case of unknown tokens
+ *
+ * Revision 1.13  1999/12/01 11:27:17  grosch
+ * added generation of Java
+ *
+ * Revision 1.12  1999/11/11 11:29:41  grosch
+ * bug fix: wrong order of rules caused crash in generation of examples
+ * bug fix in processing of selector names in case rules begin with action
+ *
+ * Revision 1.11  1999/06/03 07:56:29  grosch
+ * bug fix: in ANSI C++ contants need a type
+ *
+ * Revision 1.10  1998/04/21 12:55:21  grosch
+ * truncation of file and module names to 8.3 format
+ * improved error messages in case of missing files
+ * added procedures AddEscape and WriteStartSymbols2
+ * update of Eiffel code generation
+ * several improvements
+ *
+ * Revision 1.9  1995/11/07  09:20:01  grosch
+ * added write procedures with column counting
+ * renamed yySynAttribute to yyS and yyAttributeStack to yyA
+ * renamed parameter Out to f
+ * added procedure WriteRule2
+ * added handling of LALR(2) grammars
+ *
+ * Revision 1.8  1994/12/09  14:16:27  grosch
+ * added alternate algorithm for table compression
+ * added pseudo function YYCODE
+ *
+ * Revision 1.7  1994/11/13  12:40:57  grosch
+ * renamed gmdupd to gupd
+ * introduced macros yyDecrement and yySetNT
+ *
+ * Revision 1.6  1994/09/13  12:52:19  grosch
+ * added generation of Ada code
+ *
+ * Revision 1.5  1994/08/30  12:08:21  grosch
+ * added negation of predicates
+ * optimization called ReachableTrial
+ * added reparsing and selection masks (#)
+ *
+ * Revision 1.4  1994/07/14  12:22:27  grosch
+ * improved handling of nonterminal reduce actions
+ * added support for graphic visualization
+ * avoid generation of duplicated code for dynamic decisions
+ *
+ * Revision 1.3  1994/04/25  11:46:50  grosch
+ * added graphic runtime debugger
+ *
+ * Revision 1.2  1994/03/23  15:08:46  grosch
+ * allow several start symbols
+ * accept Yacc input as well as Lark input
+ * output several table elements on a line
+ * fix bug in memory management in CompressNTable
+ *
+ * Revision 1.1  1994/03/17  22:20:56  grosch
+ * added generation of C++
+ *
+ * Revision 1.0  1994/02/01  14:05:45  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Okt. 1994 *)
+
+IMPLEMENTATION MODULE Generate;
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM Pointers	IMPORT PTRINT;
+FROM rSystem	IMPORT rSystem;
+FROM General	IMPORT Min, Exp2, Log10;
+FROM DynArray	IMPORT MakeArray, ReleaseArray;
+FROM IO		IMPORT tFile, WriteOpen, WriteClose, StdOutput, ReadOpen, EndOfFile, ReadClose;
+FROM Checks	IMPORT ErrorCheck;
+FROM Strings	IMPORT tString, ArrayToString, Concatenate, Append,
+			StringToArray, Length, Assign, SubString, Char, ReadL,
+			AssignEmpty, cMaxStrLength, IntToString;
+FROM StringM	IMPORT tStringRef;
+FROM Idents	IMPORT tIdent, NoIdent, MakeIdent, GetString, GetStringRef, MaxIdent;
+FROM Lists	IMPORT Head;
+FROM Texts	IMPORT tText;
+FROM Sets	IMPORT tSet, IsElement, Minimum, Maximum, MakeSet, ReleaseSet,
+			Include, ResizeSet;
+FROM Pack	IMPORT PackHandle, BeginPackCard, PackCard, PackInt, EndPack;
+FROM Position	IMPORT tPosition, NoPosition;
+FROM Errors	IMPORT MessageI, Message, Ident, Character, Error, Warning,
+			Fatal, Array;
+FROM Tree	IMPORT Options, ScannerPackageName, ScannerName, ParserPackageName,
+			ParserName, LarkLib, Prefix, SourceFile, SourceFile2, LastTerm,
+			tTree, NoTree, TreeRoot, Terminal, Nonterminal, ToRulePtr, Epsilon,
+			ImportPos, ExportPos, GlobalPos, LocalPos, BeginPos, ClosePos, TailPos,
+			Import, Export, Global, Local, Begin, Close, Tail, Tags, ReachableTrial,
+			ToSymbolPtr, Reachable, String, PrecDef,
+			Language, tLanguage, ErrorCount, Identify;
+FROM Semantic	IMPORT RuleCount, TermCount, NontermCount, MaxTerminalCode,
+			RootCount, StartCount;
+FROM LR1	IMPORT StateCount, StatePtr, Invalid, RuleBase, ItemPtr, KernelItemPtr;
+FROM Conflict	IMPORT ConditionCount, ConditionPtr, DynRuleSet;
+FROM Compress	IMPORT LastReadState, LastReadReduceState, RecodeSymbol, RecodeTableElmt,
+			TDefault, NDefault, TComb, TBase, TTableSize, NComb, NBase,
+			NTableSize, RecodeDefault, DefaultLookPtr, DefaultSetPtr,
+			DefaultSetCount;
+FROM GenLRk	IMPORT WriteCaseLRk, WriteRead, WriteReduce;
+
+IMPORT IO, Strings, StringM, Lists, Texts, Tree, Layout, Idents;
+
+CONST
+   ExtDefM	= ".md";
+   ExtImpM	= ".mi";
+   ExtDefC	= ".h";
+   ExtImpC	= ".c";
+   ExtImpCc	= ".cxx";
+   ExtDefA	= ".ads";
+   ExtImpA	= ".adb";
+   ExtE		= ".e";
+   ExtJ		= ".java";
+
+   ParsDefM	= "Parser.md";
+   ParsImpM	= "Parser.mi";
+   ParsDrvM	= "ParsDrv.mi";
+
+   ParsDefC	= "Parser.h";
+   ParsImpC	= "Parser.c";
+   ParsDrvC	= "ParsDrv.c";
+
+   ParsDefCc	= "Parser.hh";
+   ParsImpCc	= "Parser.cxx";
+   ParsDrvCc	= "ParsDrv.cxx";
+
+   ParsDefA	= "parser.ads";
+   ParsImpA	= "parser.adb";
+   ParsDrvA	= "parsdrv.adb";
+
+   ParsImpE	= "parser.e";
+   ParsDrvE	= "parsdrv.e";
+   ErrorsE	= "errors.e";
+   PositionE	= "position.e";
+   AttributeE	= "attribut.e";
+   ScanAttributeE="scanattr.e";
+   RFileE	= "rfile.e";
+
+   ParsImpJ	= "Parser.java";
+   ParsDrvJ	= "ParsDrv.java";
+
+   SmallTables	= FALSE;
+   PartSize	= 8000;
+
+VAR
+   Scanner, Parser, Drv	: ARRAY [0..31] OF CHAR;
+   Extension		: ARRAY [0.. 7] OF CHAR;
+   FileNameS		: tString;
+   FileNameI		: tIdent;
+   IsFirstGroup		: BOOLEAN;
+   LineCount, ColumnCount	: CARDINAL;
+   prefix		: tIdent;
+
+PROCEDURE WriteC (File: tFile; Ch: CHAR);
+   BEGIN IO.WriteC (File, Ch); INC (ColumnCount); END WriteC;
+
+PROCEDURE WriteS (File: tFile; Text: ARRAY OF CHAR);
+   BEGIN IO.WriteS (File, Text); INC (ColumnCount, HIGH (Text) + 1); END WriteS;
+
+PROCEDURE WriteI (File: tFile; Value, Length: INTEGER);
+   BEGIN
+      IO.WriteI (File, Value, Length);
+      IF Length = 0 THEN INC (ColumnCount, 6); ELSE INC (ColumnCount, Length); END;
+   END WriteI;
+
+PROCEDURE WriteN (File: tFile; Value: LONGCARD; Length, Base: INTEGER);
+   BEGIN IO.WriteN (File, Value, Length, Base); INC (ColumnCount, Length); END WriteN;
+
+PROCEDURE WriteNl (File: tFile);
+   BEGIN IO.WriteNl (File); INC (LineCount); ColumnCount := 0; END WriteNl;
+
+PROCEDURE WriteSpaces (File: tFile; Count: INTEGER);
+   BEGIN Layout.WriteSpaces (File, Count); INC (ColumnCount, Count); END WriteSpaces;
+
+PROCEDURE WriteIdent (File: tFile; Ident: tIdent);
+   BEGIN
+      Idents.WriteIdent (File, Ident);
+      INC (ColumnCount, StringM.Length (GetStringRef (Ident)));
+   END WriteIdent;
+
+PROCEDURE WriteL (File: tFile; String: tString);
+   BEGIN Strings.WriteL (File, String); INC (LineCount); ColumnCount := 0; END WriteL;
+
+PROCEDURE WriteText (File: tFile; Text: tText);
+   BEGIN
+      Texts.WriteText (File, Text); INC (LineCount, Lists.Length (Text));
+      ColumnCount := 0;
+   END WriteText;
+
+PROCEDURE Writeyy (File: tFile; Ch: CHAR);
+   BEGIN
+      IF IsElement (ORD (':'), Options) AND (ColumnCount > 0) THEN WriteNl (File); END;
+      IO.WriteS (File, "yy"); IO.WriteC (File, Ch); INC (ColumnCount, 3);
+   END Writeyy;
+
+PROCEDURE SmartOpen (FileName: tString): tFile;
+   VAR
+      PathS	: tString;
+      PathA	: ARRAY [0..255] OF CHAR;
+      n		: INTEGER;
+   BEGIN
+      IF IsElement (ORD ('7'), Options) THEN
+	 ArrayToString	("yy", PathS);
+	 Concatenate	(PathS, FileName);
+	 Append		(PathS, 0C);
+	 StringToArray	(PathS, PathA);
+      ELSE
+	 Append		(FileName, 0C);
+	 StringToArray	(FileName, PathA);
+      END;
+      n := WriteOpen	(PathA);
+   (* ErrorCheck	(PathA, n); *)
+      IF n < 0 THEN
+	 INC (ErrorCount);
+	 MessageI ("can not access file", Fatal, NoPosition, Array, ADR (PathA));
+      END;
+      RETURN n;
+   END SmartOpen;
+
+PROCEDURE SmartClose (FileName: tString; f: tFile);
+   VAR
+      String	,
+      PathS	: tString;
+      PathA	: ARRAY [0..255] OF CHAR;
+      n		: INTEGER;
+   BEGIN
+      WriteClose	(f);
+      IF IsElement (ORD ('7'), Options) THEN
+	 ArrayToString	("gupd ", PathS);
+	 Concatenate	(PathS, FileName);
+	 ArrayToString	(" yy", String);
+	 Concatenate	(PathS, String);
+	 Concatenate	(PathS, FileName);
+	 Append		(PathS, 0C);
+	 StringToArray	(PathS, PathA);
+	 n := rSystem	(PathA);
+      END;
+   END SmartClose;
+
+PROCEDURE LibOpen (VAR FileName: ARRAY OF CHAR): tFile;
+   VAR
+      String1, String2	: tString;
+      In		: tFile;
+   BEGIN
+      Assign		(String1, LarkLib);
+      ArrayToString	(FileName, String2);
+      Concatenate	(String1, String2);
+      Append		(String1, 0C);
+      StringToArray	(String1, FileName);
+      In := ReadOpen	(FileName);
+   (* ErrorCheck	(FileName, In); *)
+      IF In < 0 THEN
+	 INC (ErrorCount);
+	 MessageI ("can not access file", Fatal, NoPosition, Array, ADR (FileName));
+      END;
+      RETURN In;
+   END LibOpen;
+
+PROCEDURE MakeFileName (Name: tIdent; Default, Ext: ARRAY OF CHAR; VAR FileName: tString);
+   VAR String	: tString;
+   BEGIN
+      IF Name = NoIdent THEN
+	 ArrayToString	(Default, FileName);
+      ELSE
+	 GetString	(Name, FileName);
+      END;
+      ArrayToString	(Ext, String);
+      Concatenate	(FileName, String);
+   END MakeFileName;
+
+PROCEDURE WriteCode (In, Out: tFile; LibLine: tString; TextPos: tPosition; Text: tText);
+   VAR
+      Line	: tString;
+   BEGIN
+      IF Texts.IsEmpty (Text) THEN
+	 (* There may be a default supplied in the skeleton file: include it. *)
+	 IF (Length (LibLine) >= 3) AND (Char (LibLine, 3) = '[') THEN
+	     LOOP
+		IF EndOfFile (In) THEN EXIT; END;
+		ReadL (In, Line);
+		IF (Length (Line) >= 2) AND ((Char (Line, 1) = '$')) THEN
+		   IF (Char (Line, 2) = ']') THEN EXIT; END;
+		   IF (Char (Line, 2) = '@') THEN ExpandLine (Out, Line);
+		   ELSE Message ("missing $] in skeleton?", Fatal, NoPosition);
+		   END;
+		ELSE
+		   WriteL (Out, Line);
+		END;
+	     END;
+	 END;
+      ELSE
+	 (* If there is a default supplied in the skeleton file skip it *)
+	 IF (Length (LibLine) >= 3) AND (Char (LibLine, 3) = '[') THEN
+	     LOOP
+		IF EndOfFile (In) THEN
+		   Message ("missing $] in skeleton?", Fatal, NoPosition);
+		   EXIT;
+		END;
+		ReadL (In, Line);
+		IF (Length (Line) >= 2) AND ((Char (Line, 1) = '$')) THEN
+		   IF (Char (Line, 2) = ']') THEN EXIT; END;
+		   IF (Char (Line, 2) # '@') THEN
+		       Message ("missing $] in skeleton?", Fatal, NoPosition);
+		   END;
+		END;
+	     END;
+	 END;
+	 WriteDirective		(Out, TextPos.Line, TextPos.File);
+	 WriteText		(Out, Text);
+	 WriteDirective		(Out, LineCount + 2, FileNameI);
+      END;
+   END WriteCode;
+
+PROCEDURE CopyFile (In, f: tFile);
+   VAR
+      Line	: tString;
+      Ch	: CHAR;
+   BEGIN
+      WHILE NOT EndOfFile (In) DO
+	 ReadL (In, Line);
+	 IF (Length (Line) >= 2) AND (Char (Line, 1) = '$') THEN
+	    Ch := Char (Line, 2);
+	    CASE Ch OF
+	    | '-' : WriteCode (In, f, Line, ImportPos, Import);
+	    | 'E' : WriteCode (In, f, Line, ExportPos, Export);
+		    IF Language = Cpp THEN
+		       IF IsElement (ORD (','), Options) THEN
+			  WriteDefine (f, "YYTrialParse", TRUE);
+		       END;
+		       IF IsElement (ORD (';'), Options) THEN
+			  WriteDefine (f, "YYReParse", TRUE);
+		       END;
+		       IF IsElement (ORD ('&'), Options) THEN
+			  WriteDefine (f, "YYGetLook", TRUE);
+		       END;
+		       IF IsElement (ORD ('b'), Options) THEN
+			  WriteDefine (f, "YYMemoParse", TRUE);
+		       END;
+		    END;
+	    | 'I' : WriteStartSymbols (f);
+	    | 'U' : WriteNonterminals (f);
+	    | '6' : IF IsElement (ORD ('f'), Options) THEN
+		       WriteTerminals (f);
+		    END;
+	    | '@' : ExpandLine (f, Line);
+	    | '#' : IF Language = Java THEN
+		       IF ParserPackageName # NoIdent THEN
+			  WriteS (f, "package ");
+			  WriteIdent (f, ParserPackageName);
+			  WriteS (f, ";");
+			  WriteNl (f);
+		       END;
+		    END;
+	    | ']' : Message ("unpaired $] in skeleton", Fatal, NoPosition);
+	    ELSE
+	       MessageI ("unknown $ directive in skeleton", Fatal, NoPosition,
+		  Character, ADR (Ch));
+	    END;
+	 ELSE
+	    WriteL (f, Line);
+	 END;
+      END;
+   END CopyFile;
+
+PROCEDURE ExpandLine (f: tFile; Line: tString);
+   VAR
+      Ch	: CHAR;
+      i		: CARDINAL;
+   BEGIN
+      i := 3;
+      LOOP
+	 INC (i);
+	 IF i > Length (Line) THEN WriteNl (f); EXIT; END;
+	 Ch := Char (Line, i);
+	 CASE Ch OF
+	 | '@' : IF ParserName = NoIdent THEN
+		    IF Char (Line, i + 1) = '_'
+		    THEN INC (i);
+		    ELSE WriteS (f, Parser);
+		    END;
+		 ELSE WriteIdent (f, ParserName); END;
+	 | '$' : IF ScannerName = NoIdent THEN
+		    IF Char (Line, i + 1) = '_'
+		    THEN INC (i);
+		    ELSE WriteS (f, Scanner);
+		    END;
+		 ELSE
+		    IF ScannerPackageName # NoIdent THEN
+		       WriteIdent (f, ScannerPackageName);
+		       WriteC (f, '.');
+		    END;
+		    WriteIdent (f, ScannerName);
+		 END;
+	 | '#' : IF Language = Java THEN
+		    IF ParserPackageName = NoIdent THEN
+		       IF Char (Line, i + 1) = '.' THEN INC (i); END;
+		    ELSE
+		       WriteIdent  (f, ParserPackageName);
+		    END;
+		 ELSE
+		    WriteC (f, Ch);
+		 END;
+	 ELSE	 WriteC (f, Ch);
+	 END;
+      END;
+   END ExpandLine;
+
+PROCEDURE WriteIdentEscaped (VAR Out: tFile; Ident: tIdent);
+   VAR
+      i	: CARDINAL;
+      ch: CHAR;
+      s	: tString;
+   BEGIN
+      Idents.GetString (Ident, s);
+      FOR i := 1 TO Length (s) DO
+	 ch := Char (s, i);
+	 IF ch = '\' THEN WriteC (Out, ch); END;
+	 WriteC (Out, ch);
+      END;
+   END WriteIdentEscaped;
+
+PROCEDURE MakeDirective (VAR Result: tString; Line: CARDINAL; File: tIdent);
+
+   PROCEDURE AppendS (VAR Result: tString; VAR In: ARRAY OF CHAR);
+     VAR s: tString;
+     BEGIN
+       ArrayToString (In, s);
+       Concatenate (Result, s);
+     END AppendS;
+
+   PROCEDURE AppendI (VAR Result: tString; In: INTEGER);
+     VAR s: tString;
+     BEGIN
+       IntToString (In, s);
+       Concatenate (Result, s);
+     END AppendI;
+
+   PROCEDURE AppendIdent (VAR Result: tString; In: tIdent);
+     VAR s: tString;
+     BEGIN
+       Idents.GetString (In, s);
+       Concatenate (Result, s);
+     END AppendIdent;
+
+   PROCEDURE AppendIdentEscaped (VAR Result: tString; Ident: tIdent);
+      VAR
+	 i	: CARDINAL;
+	 ch	: CHAR;
+	 s	: tString;
+      BEGIN
+	 Idents.GetString (Ident, s);
+	 FOR i := 1 TO Length (s) DO
+	    ch := Char (s, i);
+	    IF ch = '\' THEN Append (Result, ch); END;
+	    Append (Result, ch);
+	 END;
+      END AppendIdentEscaped;
+
+   BEGIN
+      Strings.AssignEmpty (Result);
+      CASE Language OF
+      | Modula2:
+	 AppendS (Result, "(* line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 AppendS (Result, '" *)');
+      | C, Cpp:
+	 IF IsElement (ORD ('g'), Options) THEN
+	    AppendS (Result, "# line ");
+	    AppendI (Result, Line);
+	    AppendS (Result, ' "');
+	    AppendIdentEscaped (Result, File);
+	    Append (Result, '"');
+	 ELSE
+	    AppendS (Result, "/* line ");
+	    AppendI (Result, Line);
+	    AppendS (Result, ' "');
+	    AppendIdent (Result, File);
+	    AppendS (Result, '" */');
+	 END;
+      | Java:
+	 AppendS (Result, "/* line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 AppendS (Result, '" */');
+      | Eiffel, Ada:
+	 AppendS (Result, "-- line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 Append (Result, '"');
+      END;
+   END MakeDirective;
+
+PROCEDURE WriteDirective (Out: tFile; Line: CARDINAL; File: tIdent);
+   VAR s: tString;
+   BEGIN
+      IF Line # 0 THEN
+	 MakeDirective (s, Line, File);
+	 WriteL (Out, s);
+      END;
+   END WriteDirective;
+
+PROCEDURE WriteDefine (f: tFile; Text: ARRAY OF CHAR; Value: BOOLEAN);
+   BEGIN
+      CASE Language OF
+      | Modula2
+      , C
+      , Cpp
+      , Ada
+      , Eiffel
+      , Java:
+	 WriteS (f, "# define ");
+	 WriteS (f, Text);
+      END;
+      WriteNl (f);
+   END WriteDefine;
+
+PROCEDURE WriteConstant (f: tFile; Text: ARRAY OF CHAR; Value: INTEGER);
+   BEGIN
+      CASE Language OF
+      | Modula2:
+	 WriteS (f, Text);
+	 WriteS (f, "	= ");
+	 WriteI (f, Value, 0);
+	 WriteC (f, ";");
+      | C:
+	 WriteS (f, "# define ");
+	 WriteS (f, Text);
+	 WriteS (f, "	");
+	 WriteI (f, Value, 0);
+      | Cpp:
+	 WriteS (f, "static const long ");
+	 WriteS (f, Text);
+	 WriteS (f, "	= ");
+	 WriteI (f, Value, 0);
+	 WriteC (f, ";");
+      | Eiffel:
+	 WriteS (f, Text);
+	 WriteS (f, "	: INTEGER is ");
+	 WriteI (f, Value, 0);
+	 WriteC (f, ";");
+      | Ada:
+	 WriteS (f, Text);
+	 WriteS (f, "	: constant Integer := ");
+	 WriteI (f, Value, 0);
+	 WriteC (f, ";");
+      | Java:
+	 WriteS (f, "private static final int ");
+	 WriteS (f, Text);
+	 WriteS (f, "	= ");
+	 WriteI (f, Value, 0);
+	 WriteC (f, ";");
+      END;
+      WriteNl (f);
+   END WriteConstant;
+
+PROCEDURE WriteConstants (f: tFile);
+
+   BEGIN
+      WriteConstant (f, "yyFirstTerminal"	, 0				);
+      WriteConstant (f, "yyLastTerminal"	, MaxTerminalCode		);
+      WriteConstant (f, "yySetSize"		, MaxTerminalCode + 1		);
+      WriteConstant (f, "yyFirstSymbol"		, 0				);
+      WriteConstant (f, "yyLastSymbol"		, MaxTerminalCode + NontermCount);
+      WriteConstant (f, "yyTTableMax"		, TTableSize			);
+      WriteConstant (f, "yyNTableMax"		, NTableSize			);
+      WriteConstant (f, "yyStartState"		, 1				);
+      WriteConstant (f, "yyFirstReadState"	, 1				);
+      WriteConstant (f, "yyLastReadState"	, LastReadState			);
+      WriteConstant (f, "yyFirstReadReduceState", LastReadState + 1		);
+      WriteConstant (f, "yyLastReadReduceState"	, LastReadReduceState		);
+      WriteConstant (f, "yyFirstReduceState"	, LastReadReduceState + 1	);
+      WriteConstant (f, "yyLastReduceState"	, LastReadReduceState + RuleCount);
+      WriteConstant (f, "yyLastState"		, LastReadReduceState + RuleCount + CARDINAL (ConditionCount));
+      WriteConstant (f, "yyLastStopState"	, LastReadReduceState + StartCount);
+
+      CASE Language OF
+      | Modula2	:
+	 IF IsElement (ORD ('u'), Options) THEN
+	    WriteConstant (f, "yyTDefaultSize"	, 0			);
+	 ELSE
+	    WriteConstant (f, "yyTDefaultSize"	, LastReadState		);
+	    WriteDefine (f, "YYTDefault", TRUE);
+	 END;
+	 IF IsElement (ORD ('o'), Options) THEN
+	    WriteConstant (f, "yyNDefaultSize"	, 0			);
+	    WriteConstant (f, "yyNTable1Max"	, NTableSize		);
+	    WriteConstant (f, "yyNTable2Max"	, MaxTerminalCode + 1	);
+	 ELSE
+	    WriteConstant (f, "yyNDefaultSize"	, LastReadState		);
+	    WriteConstant (f, "yyNTable1Max"	, MaxTerminalCode + 1	);
+	    WriteConstant (f, "yyNTable2Max"	, NTableSize		);
+	    WriteDefine (f, "YYNDefault", TRUE);
+	 END;
+	 IF IsElement (ORD (','), Options) THEN
+	    WriteDefine (f, "YYTrialParse", TRUE);
+	 END;
+	 IF IsElement (ORD (';'), Options) THEN
+	    WriteDefine (f, "YYReParse", TRUE);
+	 END;
+	 IF IsElement (ORD ('&'), Options) THEN
+	    WriteDefine (f, "YYGetLook", TRUE);
+	 END;
+	 IF IsElement (ORD ('b'), Options) THEN
+	    WriteDefine (f, "YYMemoParse", TRUE);
+	 END;
+      | C, Cpp	:
+	 IF NOT IsElement (ORD ('u'), Options) THEN
+	    WriteDefine (f, "YYTDefault", TRUE);
+	 END;
+	 IF NOT IsElement (ORD ('o'), Options) THEN
+	    WriteDefine (f, "YYNDefault", TRUE);
+	 END;
+	 IF IsElement (ORD (','), Options) THEN
+	    WriteDefine (f, "YYTrialParse", TRUE);
+	 END;
+	 IF IsElement (ORD (';'), Options) THEN
+	    WriteDefine (f, "YYReParse", TRUE);
+	 END;
+	 IF IsElement (ORD ('&'), Options) THEN
+	    WriteDefine (f, "YYGetLook", TRUE);
+	 END;
+	 IF IsElement (ORD ('b'), Options) THEN
+	    WriteDefine (f, "YYMemoParse", TRUE);
+	 END;
+	 IF IsElement (ORD ('4'), Options) THEN
+	    WriteDefine (f, "YYDEC_TABLE", TRUE);
+	 END;
+	 IF IsElement (ORD ('6'), Options) THEN
+	    WriteDefine (f, "YYaccDefault", TRUE);
+	 END;
+	 IF IsElement (ORD ('O'), Options) THEN
+	    WriteConstant (f, "yyEpsilon"	, Epsilon		);
+	    WriteDefine (f, "YYCSTree", TRUE);
+	 END;
+      | Eiffel	:
+	 IF NOT IsElement (ORD ('u'), Options) THEN
+	    WriteDefine (f, "YYTDefault", TRUE);
+	 END;
+	 IF IsElement (ORD (','), Options) THEN
+	    WriteDefine (f, "YYTrialParse", TRUE);
+	 END;
+	 IF IsElement (ORD (';'), Options) THEN
+	    WriteDefine (f, "YYReParse", TRUE);
+	 END;
+	 IF IsElement (ORD ('&'), Options) THEN
+	    WriteDefine (f, "YYGetLook", TRUE);
+	 END;
+	 IF IsElement (ORD ('b'), Options) THEN
+	    WriteDefine (f, "YYMemoParse", TRUE);
+	 END;
+      | Ada	:
+	 IF NOT IsElement (ORD ('u'), Options) THEN
+	    WriteDefine (f, "YYTDefault", TRUE);
+	 END;
+	 IF NOT IsElement (ORD ('o'), Options) THEN
+	    WriteDefine (f, "YYNDefault", TRUE);
+	 END;
+	 IF IsElement (ORD (','), Options) THEN
+	    WriteDefine (f, "YYTrialParse", TRUE);
+	 END;
+	 IF IsElement (ORD (';'), Options) THEN
+	    WriteDefine (f, "YYReParse", TRUE);
+	 END;
+	 IF IsElement (ORD ('&'), Options) THEN
+	    WriteDefine (f, "YYGetLook", TRUE);
+	 END;
+	 IF IsElement (ORD ('b'), Options) THEN
+	    WriteDefine (f, "YYMemoParse", TRUE);
+	 END;
+      | Java	:
+	 IF IsElement (ORD ('u'), Options) THEN
+	    WriteConstant (f, "yyTDefaultSize"	, 0			);
+	 ELSE
+	    WriteConstant (f, "yyTDefaultSize"	, LastReadState		);
+	    WriteDefine (f, "YYTDefault", TRUE);
+	 END;
+	 IF IsElement (ORD ('o'), Options) THEN
+	    WriteConstant (f, "yyNDefaultSize"	, 0			);
+	    WriteConstant (f, "yyNTable1Max"	, NTableSize		);
+	    WriteConstant (f, "yyNTable2Max"	, MaxTerminalCode + 1	);
+	 ELSE
+	    WriteConstant (f, "yyNDefaultSize"	, LastReadState		);
+	    WriteConstant (f, "yyNTable1Max"	, MaxTerminalCode + 1	);
+	    WriteConstant (f, "yyNTable2Max"	, NTableSize		);
+	    WriteDefine (f, "YYNDefault", TRUE);
+	 END;
+	 IF IsElement (ORD ('4'), Options) THEN
+	    WriteDefine (f, "YYDEC_TABLE", TRUE);
+	 END;
+      END;
+   END WriteConstants;
+
+PROCEDURE WriteRules (f: tFile);
+   VAR Rule	: CARDINAL;
+   BEGIN
+      FOR Rule := 1 TO RuleCount DO
+	 IF Reachable IN ToRulePtr^ [Rule]^.Rule.LHS^.Nonterminal.Properties THEN
+	    CASE Language OF
+	    | Modula2:
+	       WriteS (f, "      | ");
+	       WriteI (f, Rule, 0);
+	       WriteS (f, ': Copy ("');
+	       WriteRule (f, Rule);
+	       WriteS (f, '", Name);');
+	       WriteNl (f);
+	    | C, Cpp, Java:
+	       WriteC (f, '"');
+	       WriteRule2 (f, Rule);
+	       WriteS (f, '",');
+	       WriteNl (f);
+	    | Eiffel:
+	       WriteS (f, "      when ");
+	       WriteI (f, Rule, 0);
+	       WriteS (f, ' then Result := "');
+	       WriteRule (f, Rule);
+	       WriteS (f, '";');
+	       WriteNl (f);
+	    | Ada:
+	       WriteS (f, "      when ");
+	       WriteI (f, Rule, 0);
+	       WriteS (f, ' =>  return "');
+	       WriteRule (f, Rule);
+	       WriteS (f, '";');
+	       WriteNl (f);
+	    END;
+	 END;
+      END;
+   END WriteRules;
+
+PROCEDURE WriteTokenName (f: tFile);
+   VAR
+      Terminals		: tTree;
+      String		: tString;
+      i, j		: CARDINAL;
+      Delim		: CHAR;
+      TokenNameSize	: LONGINT;
+      TokenNamePtr	: POINTER TO ARRAY [0..50000] OF tTree;
+   BEGIN
+      CASE Language OF
+      | Modula2:
+	 Terminals := TreeRoot^.Grammar.Terminals;
+	 WHILE Terminals^.Kind = Terminal DO
+	    WITH Terminals^.Terminal DO
+	       IF (Reachable IN Properties) AND NOT (PrecDef IN Properties) THEN
+		  GetString (Repr, String);
+		  WriteS (f, "      | ");
+		  WriteI (f, Code, 0);
+		  WriteS (f, ": Copy (");
+		  Delim := Char (String, 1);
+		  IF (Delim = '"') OR (Delim = "'") THEN
+		    WriteIdent (f, Repr);
+		  ELSE
+		    WriteC (f, '"');
+		    WriteIdent (f, Repr);
+		    WriteC (f, '"');
+		  END;
+		  WriteS (f, ", Name);");
+		  WriteNl (f);
+	       END;
+	       Terminals := Next;
+	    END;
+	 END;
+      | C, Cpp:
+	 TokenNameSize := MaxTerminalCode + 1;
+	 MakeArray (TokenNamePtr, TokenNameSize, TSIZE (tTree));
+	 FOR j := 0 TO MaxTerminalCode DO TokenNamePtr^ [j] := NoTree; END;
+	 Terminals := TreeRoot^.Grammar.Terminals;
+	 WHILE Terminals^.Kind = Terminal DO
+	    WITH Terminals^.Terminal DO
+	       IF (Reachable IN Properties) AND NOT (PrecDef IN Properties) THEN
+		  TokenNamePtr^ [Code] := Terminals;
+	       END;
+	       Terminals := Next;
+	    END;
+	 END;
+	 FOR j := 0 TO MaxTerminalCode DO
+	    IF TokenNamePtr^ [j] = NoTree THEN
+	       WriteS (f, "0,"); WriteNl (f);
+	    ELSE
+	       GetString (TokenNamePtr^ [j]^.Terminal.Repr, String);
+	       WriteS (f, '"');
+	       IF (Char (String, 1) = '"') OR (Char (String, 1) = "'") THEN
+		 FOR i := 2 TO Length (String) - 1 DO
+		   IF (Char (String, i) = '\') OR (Char (String, i) = '"') THEN WriteC (f, '\'); END;
+		   WriteC (f, Char (String, i));
+		 END;
+	       ELSE
+		 FOR i := 1 TO Length (String) DO
+		   IF (Char (String, i) = '\') OR (Char (String, i) = '"') THEN WriteC (f, '\'); END;
+		   WriteC (f, Char (String, i));
+		 END;
+	       END;
+	       WriteS (f, '",');
+	       WriteNl (f);
+	    END;
+	 END;
+	 ReleaseArray (TokenNamePtr, TokenNameSize, TSIZE (tTree));
+      | Eiffel:
+	 Terminals := TreeRoot^.Grammar.Terminals;
+	 WHILE Terminals^.Kind = Terminal DO
+	    WITH Terminals^.Terminal DO
+	       IF (Reachable IN Properties) AND NOT (PrecDef IN Properties) THEN
+		  GetString (Repr, String);
+		  WriteS (f, "      when ");
+		  WriteI (f, Code, 0);
+		  WriteS (f, ' then Result := "');
+		  Delim := Char (String, 1);
+		  IF (Delim = '"') OR (Delim = "'") THEN
+		    FOR i := 2 TO Length (String) - 1 DO
+		      IF (Char (String, i) = '%') OR (Char (String, i) = '"') THEN WriteC (f, '%'); END;
+		      WriteC (f, Char (String, i));
+		    END;
+		  ELSE
+		    FOR i := 1 TO Length (String) DO
+		      IF (Char (String, i) = '%') OR (Char (String, i) = '"') THEN WriteC (f, '%'); END;
+		      WriteC (f, Char (String, i));
+		    END;
+		  END;
+		  WriteS (f, '";');
+		  WriteNl (f);
+	       END;
+	       Terminals := Next;
+	    END;
+	 END;
+      | Ada:
+	 Terminals := TreeRoot^.Grammar.Terminals;
+	 WHILE Terminals^.Kind = Terminal DO
+	    WITH Terminals^.Terminal DO
+	       IF (Reachable IN Properties) AND NOT (PrecDef IN Properties) THEN
+		  GetString (Repr, String);
+		  WriteS (f, "      when ");
+		  WriteI (f, Code, 0);
+		  WriteS (f, ' => return "');
+		  Delim := Char (String, 1);
+		  IF (Delim = '"') OR (Delim = "'") THEN
+		    FOR i := 2 TO Length (String) - 1 DO
+		      WriteC (f, Char (String, i));
+		      IF Char (String, i) = '"' THEN WriteC (f, '"'); END;
+		    END;
+		  ELSE
+		    WriteIdent (f, Repr);
+		  END;
+		  WriteS (f, '";');
+		  WriteNl (f);
+	       END;
+	       Terminals := Next;
+	    END;
+	 END;
+      | Java:
+	 TokenNameSize := MaxTerminalCode + 1;
+	 MakeArray (TokenNamePtr, TokenNameSize, TSIZE (tTree));
+	 FOR j := 0 TO MaxTerminalCode DO TokenNamePtr^ [j] := NoTree; END;
+	 Terminals := TreeRoot^.Grammar.Terminals;
+	 WHILE Terminals^.Kind = Terminal DO
+	    WITH Terminals^.Terminal DO
+	       IF (Reachable IN Properties) AND NOT (PrecDef IN Properties) THEN
+		  TokenNamePtr^ [Code] := Terminals;
+	       END;
+	       Terminals := Next;
+	    END;
+	 END;
+	 FOR j := 0 TO MaxTerminalCode DO
+	    IF TokenNamePtr^ [j] = NoTree THEN
+	       WriteS (f, '"",'); WriteNl (f);
+	    ELSE
+	       GetString (TokenNamePtr^ [j]^.Terminal.Repr, String);
+	       WriteS (f, '"');
+	       IF (Char (String, 1) = '"') OR (Char (String, 1) = "'") THEN
+		 FOR i := 2 TO Length (String) - 1 DO
+		   IF (Char (String, i) = '\') OR (Char (String, i) = '"') THEN WriteC (f, '\'); END;
+		   WriteC (f, Char (String, i));
+		 END;
+	       ELSE
+		 FOR i := 1 TO Length (String) DO
+		   IF (Char (String, i) = '\') OR (Char (String, i) = '"') THEN WriteC (f, '\'); END;
+		   WriteC (f, Char (String, i));
+		 END;
+	       END;
+	       WriteS (f, '",');
+	       WriteNl (f);
+	    END;
+	 END;
+	 ReleaseArray (TokenNamePtr, TokenNameSize, TSIZE (tTree));
+      END;
+   END WriteTokenName;
+
+PROCEDURE WriteNontermNames (f: tFile);
+   VAR
+      Nonterminals	: tTree;
+   BEGIN
+      CASE Language OF
+      | Modula2:
+      | C, Cpp, Java:
+	 Nonterminals := TreeRoot^.Grammar.Nonterminals;
+	 WHILE Nonterminals^.Kind = Nonterminal DO
+	    WITH Nonterminals^.Nonterminal DO
+	       IF Reachable IN Properties THEN
+		  WriteC	(f, '"');
+		  WriteIdent	(f, Name);
+		  WriteS	(f, '",');
+		  WriteNl	(f);
+	       END;
+	       Nonterminals := Next;
+	    END;
+	 END;
+      | Eiffel:
+      | Ada:
+      END;
+   END WriteNontermNames;
+
+PROCEDURE WriteNonterminals (f: tFile);
+   VAR
+      IsFirst		: BOOLEAN;
+      Nonterminals	: tTree;
+   BEGIN
+      IsFirst := TRUE;
+      Nonterminals := TreeRoot^.Grammar.Nonterminals;
+      WHILE Nonterminals^.Kind = Nonterminal DO
+	 WITH Nonterminals^.Nonterminal DO
+	    IF Reachable IN Properties THEN
+	       CASE Language OF
+	       | Modula2:
+		  WriteS	(f, "yyNT");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	= ");
+		  WriteI	(f, RecodeSymbol (Index), 0);
+		  WriteS	(f, ";");
+		  WriteNl	(f);
+	       | C, Cpp	:
+		  IF IsFirst THEN
+		     IsFirst := FALSE;
+		  ELSE
+		     WriteS	(f, ",");
+		     WriteNl	(f);
+		  END;
+		  WriteS	(f, "yyNT");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	= ");
+		  WriteI	(f, RecodeSymbol (Index), 0);
+	       | Eiffel	:
+		  WriteS	(f, "yyNT");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	: INTEGER is ");
+		  WriteI	(f, RecodeSymbol (Index), 0);
+		  WriteS	(f, ";");
+		  WriteNl	(f);
+	       | Ada	:
+		  WriteS	(f, "yyNT");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	: constant Integer := ");
+		  WriteI	(f, RecodeSymbol (Index), 0);
+		  WriteS	(f, ";");
+		  WriteNl	(f);
+	       | Java	:
+		  WriteS	(f, "static final int yyNT");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	= ");
+		  WriteI	(f, RecodeSymbol (Index), 0);
+		  WriteS	(f, ";");
+		  WriteNl	(f);
+	       END;
+	    END;
+	    Nonterminals := Next;
+	 END;
+      END;
+      IF (Language = C) OR (Language = Cpp) THEN WriteNl (f); END;
+   END WriteNonterminals;
+
+PROCEDURE WriteStartSymbols (f: tFile);
+   VAR
+      StartCount	: CARDINAL;
+      StartSymbols	: tTree;
+   BEGIN
+      StartCount := 0;
+      StartSymbols := TreeRoot^.Grammar.Starts;
+      WHILE StartSymbols^.Kind = Tree.Ident DO
+	 WITH StartSymbols^.Ident DO
+	    IF Object # NoTree THEN
+	       INC (StartCount);
+	       CASE Language OF
+	       | Modula2:
+		  WriteS	(f, "yy");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	= ");
+		  WriteI	(f, StartCount, 0);
+		  WriteC	(f, ";");
+	       | C, Cpp, Java:
+		  WriteS	(f, "# define yy");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	");
+		  WriteI	(f, StartCount, 0);
+	    (* | Cpp:
+		  WriteS	(f, "   const		yy");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	= ");
+		  WriteI	(f, StartCount, 0);
+		  WriteC	(f, ";"); *)
+	       | Eiffel:
+		  WriteS	(f, "yy");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	: INTEGER is ");
+		  WriteI	(f, StartCount, 0);
+		  WriteC	(f, ";");
+	       | Ada:
+		  WriteS	(f, "yy");
+		  WriteIdent	(f, Name);
+		  WriteS	(f, "	: constant Integer := ");
+		  WriteI	(f, StartCount, 0);
+		  WriteC	(f, ";");
+	       END;
+	       WriteNl (f);
+	    END;
+	    StartSymbols := Next;
+	 END;
+      END;
+   END WriteStartSymbols;
+
+PROCEDURE WriteStartLines (f: tFile);
+   VAR
+      StartCount	: CARDINAL;
+      StartSymbols	: tTree;
+   BEGIN
+      StartCount := 0;
+      StartSymbols := TreeRoot^.Grammar.Starts;
+      WHILE StartSymbols^.Kind = Tree.Ident DO
+	 WITH StartSymbols^.Ident DO
+	    IF Object # NoTree THEN
+	       INC (StartCount);
+	       CASE Language OF
+	       | Modula2:
+		  WriteS (f, "yyStartLine [");
+		  WriteI (f, StartCount, 0);
+		  WriteS (f, "] := ");
+		  WriteI (f, Object^.Nonterminal.Pos.Line, 0);
+		  WriteC (f, ";");
+	       | C, Cpp, Ada:
+		  WriteI (f, Object^.Nonterminal.Pos.Line, 0);
+		  WriteC (f, ",");
+	       | Eiffel:
+		  WriteS (f, "yyStartLine.put (");
+		  WriteI (f, Object^.Nonterminal.Pos.Line, 0);
+		  WriteS (f, ", ");
+		  WriteI (f, StartCount, 0);
+		  WriteS (f, ");");
+	       | Java:
+		  WriteI (f, Object^.Nonterminal.Pos.Line, 0);
+		  WriteC (f, ",");
+	       END;
+	       WriteNl (f);
+	    END;
+	    StartSymbols := Next;
+	 END;
+      END;
+      IF StartCount = 0 THEN
+	 CASE Language OF
+	 | Modula2:
+	    WriteS (f, "yyStartLine [1] := ");
+	    WriteI (f, TreeRoot^.Grammar.Rules^.Nonterminal.Pos.Line, 0);
+	    WriteC (f, ";");
+	 | C, Cpp, Ada:
+	    WriteI (f, TreeRoot^.Grammar.Rules^.Nonterminal.Pos.Line, 0);
+	    WriteC (f, ",");
+	 | Eiffel:
+	    WriteS (f, "yyStartLine.put (");
+	    WriteI (f, TreeRoot^.Grammar.Rules^.Nonterminal.Pos.Line, 0);
+	    WriteS (f, ", 1);");
+	 | Java:
+	    WriteI (f, TreeRoot^.Grammar.Rules^.Nonterminal.Pos.Line, 0);
+	    WriteC (f, ",");
+	 END;
+	 WriteNl (f);
+      END;
+   END WriteStartLines;
+
+PROCEDURE WriteTerminals (f: tFile);
+   CONST
+      Initial	= 0;
+      Character	= 1;
+      Special	= 2;
+   VAR
+      Terminal	: tTree;
+      UsedNames, IdentSet	: tSet;
+      MaxName, First, Last, i	: CARDINAL;
+      From, To, Str		: tString;
+      Ident	: tIdent;
+      Array	: ARRAY [0 .. 255] OF CHAR;
+      ch	: CHAR;
+      MyCHR	: ARRAY [0 .. 15] OF CHAR;
+      Text	: ARRAY [0 .. 31] OF CHAR;
+      State	: SHORTCARD;
+   BEGIN
+      MaxName := MaxIdent () + TermCount;
+      MakeSet (UsedNames, MaxName);
+      MakeSet (IdentSet, 127);
+      FOR ch := 'A' TO 'Z' DO Include (IdentSet, ORD (ch)); END;
+      FOR ch := 'a' TO 'z' DO Include (IdentSet, ORD (ch)); END;
+      FOR ch := '0' TO '9' DO Include (IdentSet, ORD (ch)); END;
+      Include (IdentSet, ORD ('_'));
+
+      MyCHR [ 0] := '0';
+      MyCHR [ 1] := '1';
+      MyCHR [ 2] := '2';
+      MyCHR [ 3] := '3';
+      MyCHR [ 4] := '4';
+      MyCHR [ 5] := '5';
+      MyCHR [ 6] := '6';
+      MyCHR [ 7] := '7';
+      MyCHR [ 8] := '8';
+      MyCHR [ 9] := '9';
+      MyCHR [10] := 'A';
+      MyCHR [11] := 'B';
+      MyCHR [12] := 'C';
+      MyCHR [13] := 'D';
+      MyCHR [14] := 'E';
+      MyCHR [15] := 'F';
+
+      Terminal := TreeRoot^.Grammar.Terminals;
+      WHILE Terminal^.Kind = Tree.Terminal DO
+	 WITH Terminal^.Terminal DO
+	    IF (Reachable IN Properties) AND NOT (PrecDef IN Properties) THEN
+	       GetString (Name, From);
+	       First := 1;
+	       Last := Length (From);
+	       IF String IN Properties THEN
+		  First := 2;
+		  DEC (Last);
+	       END;
+	       State := Initial;
+	       Assign (To, Prefix);
+	       FOR i := First TO Last DO
+		  ch := Char (From, i);
+		  IF ORD (ch) >= 128 THEN		(* 8 bit character *)
+		     IF State # Initial THEN Append (To, '_'); END;
+		     Append (To, MyCHR [ORD (ch) DIV 16]);
+		     Append (To, MyCHR [ORD (ch) MOD 16]);
+		     State := Special;
+							(* 7 bit character *)
+		  ELSIF IsElement (ORD (ch), IdentSet) THEN
+		     IF State = Special THEN Append (To, '_'); END;
+		     Append (To, ch);
+		     State := Character;
+		  ELSIF ch = '-' THEN
+		     IF State = Character THEN
+			Append (To, '_');
+		     ELSE
+			IF State # Initial THEN Append (To, '_'); END;
+			ArrayToString ("minus", Str);
+			Concatenate (To, Str);
+			State := Special;
+		     END;
+		  ELSE
+		     CASE ch OF
+		     | CHR (0)	: Text := "NUL";
+		     | CHR (1)	: Text := "SOH";
+		     | CHR (2)	: Text := "STX";
+		     | CHR (3)	: Text := "ETX";
+		     | CHR (4)	: Text := "EOT";
+		     | CHR (5)	: Text := "ENQ";
+		     | CHR (6)	: Text := "ACK";
+		     | CHR (7)	: Text := "BEL";
+		     | CHR (8)	: Text := "BS";
+		     | CHR (9)	: Text := "HT";
+		     | CHR (10)	: Text := "LF";
+		     | CHR (11)	: Text := "VT";
+		     | CHR (12)	: Text := "FF";
+		     | CHR (13)	: Text := "CR";
+		     | CHR (14)	: Text := "SO";
+		     | CHR (15)	: Text := "SI";
+		     | CHR (16)	: Text := "DLE";
+		     | CHR (17)	: Text := "DC1";
+		     | CHR (18)	: Text := "DC2";
+		     | CHR (19)	: Text := "DC3";
+		     | CHR (20)	: Text := "DC4";
+		     | CHR (21)	: Text := "NAK";
+		     | CHR (22)	: Text := "SYN";
+		     | CHR (23)	: Text := "ETB";
+		     | CHR (24)	: Text := "CAN";
+		     | CHR (25)	: Text := "EM";
+		     | CHR (26)	: Text := "SUB";
+		     | CHR (27)	: Text := "ESC";
+		     | CHR (28)	: Text := "FS";
+		     | CHR (29)	: Text := "GS";
+		     | CHR (30)	: Text := "RS";
+		     | CHR (31)	: Text := "US";
+		     | ' '	: Text := "space";
+		     | '!'	: Text := "exclamation_mark";
+		     | '"'	: Text := "double_quote";
+		     | '#'	: Text := "hash_sign";
+		     | '$'	: Text := "dollar";
+		     | '%'	: Text := "percent";
+		     | '&'	: Text := "ampersand";
+		     | "'"	: Text := "quote";
+		     | '('	: Text := "left_parentheses";
+		     | ')'	: Text := "right_parentheses";
+		     | '*'	: Text := "asterisk";
+		     | '+'	: Text := "plus";
+		     | ','	: Text := "comma";
+		  (* | '-'	: Text := "minus"; *)
+		     | '.'	: Text := "dot";
+		     | '/'	: Text := "slash";
+		     | ':'	: Text := "colon";
+		     | ';'	: Text := "semicolon";
+		     | '<'	: Text := "less";
+		     | '='	: Text := "equal";
+		     | '>'	: Text := "greater";
+		     | '?'	: Text := "question_mark";
+		     | '@'	: Text := "at_sign";
+		     | '['	: Text := "left_bracket";
+		     | '\'	: Text := "backslash";
+		     | ']'	: Text := "right_bracket";
+		     | '^'	: Text := "uparrow";
+		  (* | '_'	: Text := "underscore"; *)
+		     | '`'	: Text := "backquote";
+		     | '{'	: Text := "left_curly";
+		     | '|'	: Text := "bar";
+		     | '}'	: Text := "right_curly";
+		     | '~'	: Text := "tilde";
+		     | CHR (127): Text := "DEL";
+		     END;
+		     IF State # Initial THEN Append (To, '_'); END;
+		     ArrayToString (Text, Str);
+		     Concatenate (To, Str);
+		     State := Special;
+		  END;
+	       END;
+	       LOOP
+		  Ident := MakeIdent (To);
+		  IF Ident > MaxName THEN
+		     INC (MaxName, TermCount);
+		     ResizeSet (UsedNames, MaxName);
+		  END;
+		  IF NOT IsElement (Ident, UsedNames) THEN EXIT; END;
+		  Append (To, '_');
+	       END;
+	       Include (UsedNames, Ident);
+	       StringToArray (To, Array);
+	       WriteConstant (f, Array, Code);
+	    END;
+	    Terminal := Next;
+	 END;
+      END;
+      ReleaseSet (UsedNames);
+      ReleaseSet (IdentSet);
+   END WriteTerminals;
+
+PROCEDURE GenParser;
+   VAR
+      In, Out	: tFile;
+      Line	: tString;
+      FileName	: ARRAY [0..255] OF CHAR;
+      j		: INTEGER;
+      Ch	: CHAR;
+      s		: tString;
+   BEGIN
+      CASE Language OF
+      | Modula2	: FileName := ParsImpM ; Extension := ExtImpM ;
+      | C	: FileName := ParsImpC ; Extension := ExtImpC ;
+      | Cpp	: FileName := ParsImpCc; Extension := ExtImpCc;
+      | Ada	: FileName := ParsImpA ; Extension := ExtImpA ; Parser := "parser";
+      | Eiffel	:
+		  Parser := "parser";
+		  MakeFileName		(ParserName, Parser, ".txt", FileNameS);
+		  Out := SmartOpen	(FileNameS);
+		  PutEiffelTables	(Out);
+		  SmartClose		(FileNameS, Out);
+		  FileName := ParsImpE; Extension := ExtE;
+      | Java	: FileName := ParsImpJ; Extension := ExtJ ;
+      END;
+
+      IF ParserName = NoIdent THEN
+	ArrayToString (Parser, s);
+	prefix := MakeIdent (s);
+      ELSE
+	prefix := ParserName;
+      END;
+
+      IF IsElement (ORD ('5'), Options) AND IsElement (ORD ('c'), Options) THEN
+	 ArrayToString (FileName, Line);
+	 Append (Line, 'g');
+	 Append (Line, 0C);
+	 StringToArray (Line, FileName);
+      END;
+      In := LibOpen	(FileName);
+      MakeFileName	(ParserName, Parser, Extension, FileNameS);
+      Out := SmartOpen	(FileNameS);
+      FileNameI := MakeIdent (FileNameS);
+      LineCount := 0;
+
+      WHILE NOT EndOfFile (In) DO
+	ReadL (In, Line);
+	IF (Length (Line) >= 2) AND (Char (Line, 1) = '$') THEN
+	  Ch := Char (Line, 2);
+	  CASE Ch OF
+	  | '-' : WriteCode (In, Out, Line, ImportPos, Import);
+	  | 'E' : WriteCode (In, Out, Line, ExportPos, Export);
+	  | 'G' : WriteCode (In, Out, Line, GlobalPos, Global);
+	  | 'L' : WriteCode (In, Out, Line, LocalPos, Local);
+	  | 'B' : WriteCode (In, Out, Line, BeginPos, Begin);
+	  | 'C' : WriteCode (In, Out, Line, ClosePos, Close);
+	  | 'Z' : WriteCode (In, Out, Line, TailPos, Tail);
+	  | 'T' : WriteConstants	(Out);
+	  | 'X' : IF IsElement (ORD ('n'), Options) THEN
+		    SubString		(Line, 3, Length (Line), Line);
+		    WriteL		(Out, Line);
+		  END;
+	  | 'R' : WriteReduceCase	(Out);
+	  | 'S' : IF NOT IsElement (ORD ('C'), Options) THEN
+		     WriteRules		(Out);
+		  END;
+	  | 'W' : WriteTokenName	(Out);
+	  | '+' : WriteNontermNames	(Out);
+	  | 'I' : WriteStartSymbols	(Out);
+	  | 'U' : IF Language = Java THEN
+		    IF NOT IsElement (ORD ('4'), Options) THEN
+		      WriteNonterminals	(Out);
+		    END;
+		  ELSE
+		    WriteNonterminals	(Out);
+		  END;
+	  | 'J' : WriteStartLines	(Out);
+	  | 'P' : PutTBase		(Out);
+	  | 'Q' : PutNBase		(Out);
+	  | 'D' : IF NOT IsElement (ORD ('u'), Options) THEN
+		     PutTDefault	(Out);
+		  END;
+	  | 'V' : IF NOT IsElement (ORD ('o'), Options) THEN
+		     PutNDefault	(Out);
+		  END;
+	  | 'M' : PutTComb		(Out);
+	  | '%' : PutTableParts		(Out);
+	  | '!' : CopyTableParts	(Out);
+	  | 'N' : IF IsElement (ORD ('o'), Options) THEN
+		     PutNComb1		(Out);
+		  END;
+	  | 'Y' : IF NOT IsElement (ORD ('o'), Options) THEN
+		     PutNComb2		(Out);
+		  END;
+	  | 'K' : PutLength		(Out);
+	  | 'H' : PutLeftHandSide	(Out);
+	  | 'O' : PutContinuation	(Out);
+	  | 'F' : PutFinalToProd	(Out);
+	  | 'A' : PutCondition		(Out);
+	  | '@' : ExpandLine		(Out, Line);
+	  | '/' : WriteItems1		(Out);
+	  | '*' : WriteItems2		(Out);
+	  | '4' : IF IsElement (ORD ('6'), Options) THEN
+		     DefaultLook1	(Out);
+		  END;
+	  | '5' : IF IsElement (ORD ('6'), Options) THEN
+		     DefaultLook2	(Out);
+		  END;
+	  | '6' : IF IsElement (ORD ('f'), Options) THEN
+		     WriteTerminals	(Out);
+		  END;
+	  | '7' : WriteC	(Out, '"');
+		  StringToArray	(LarkLib, FileName);
+		  WriteS	(Out, FileName);
+		  WriteC	(Out, '"');
+		  WriteNl	(Out);
+	  | '#' : IF Language = Java THEN
+		    IF ParserPackageName # NoIdent THEN
+		       WriteS (Out, "package ");
+		       WriteIdent  (Out, ParserPackageName);
+		       WriteS (Out, ";");
+		       WriteNl (Out);
+		    END;
+		    IF IsElement (ORD (','), Options) THEN
+		       WriteDefine (Out, "YYTrialParse", TRUE);
+		    END;
+		    IF IsElement (ORD (';'), Options) THEN
+		       WriteDefine (Out, "YYReParse", TRUE);
+		    END;
+		    IF IsElement (ORD ('&'), Options) THEN
+		       WriteDefine (Out, "YYGetLook", TRUE);
+		    END;
+		    IF IsElement (ORD ('b'), Options) THEN
+		       WriteDefine (Out, "YYMemoParse", TRUE);
+		    END;
+		  END;
+	  | '|' : IF IsElement (ORD ('O'), Options) THEN
+		     PutRules (Out);
+		  END;
+	  | ']' : Message ("unpaired $] in skeleton", Fatal, NoPosition);
+	  ELSE
+	     MessageI ("unknown $ directive in skeleton", Fatal, NoPosition,
+		Character, ADR (Ch));
+	  END;
+	ELSE
+	  WriteL (Out, Line);
+	END;
+      END;
+      ReadClose (In);
+      WriteClose (Out);
+      IF (Language = Modula2) OR (Language = Eiffel) OR
+	 (Language = Ada) OR (Language = Java) THEN (* call cpp *)
+	 IF IsElement (ORD ('7'), Options) THEN
+	    ArrayToString ("gcpp yy", Line);
+	 ELSE
+	    ArrayToString ("gcpp ", Line);
+	 END;
+	 Concatenate	(Line, FileNameS);
+	 Append		(Line, 0C);
+	 StringToArray	(Line, FileName);
+	 j := rSystem	(FileName);
+      END;
+      SmartClose (FileNameS, Out);
+   END GenParser;
+
+PROCEDURE GenInterface;
+   VAR
+      In, Out	: tFile;
+      FileName	: ARRAY [0..255] OF CHAR;
+   BEGIN
+      CASE Language OF
+      | C	: FileName := ParsDefC ; Extension := ExtDefC;
+      | Cpp	: FileName := ParsDefCc; Extension := ExtDefC;
+      | Eiffel	: RETURN;
+      | Ada	: FileName := ParsDefA ; Extension := ExtDefA; Parser := "parser";
+      | Modula2	: FileName := ParsDefM ; Extension := ExtDefM;
+      END;
+
+      In := LibOpen	(FileName);
+      MakeFileName	(ParserName, Parser, Extension, FileNameS);
+      Out := SmartOpen	(FileNameS);
+      FileNameI := MakeIdent (FileNameS);
+      LineCount := 0;
+      CopyFile		(In, Out);
+      ReadClose		(In);
+      SmartClose	(FileNameS, Out);
+   END GenInterface;
+
+PROCEDURE GenDriver;
+   VAR
+      In, Out	: tFile;
+      String	: tString;
+      FileName	: ARRAY [0..255] OF CHAR;
+   BEGIN
+      IF IsElement (ORD ('c'), Options) THEN
+	 FileName := ParsDrvC; Extension := ExtImpC;
+      ELSIF IsElement (ORD ('+'), Options) THEN
+	 FileName := ParsDrvCc; Extension := ExtImpCc;
+      ELSIF IsElement (ORD ('e'), Options) THEN
+	 FileName := ParsDrvE; Extension := ExtE;
+	 Parser := "parser"; Drv := "drv";
+      ELSIF IsElement (ORD ('3'), Options) THEN
+	 FileName := ParsDrvA; Extension := ExtImpA;
+	 Parser := "parser"; Drv := "drv";
+      ELSIF IsElement (ORD ('j'), Options) THEN
+	 FileName := ParsDrvJ; Extension := ExtJ;
+      ELSE
+	 FileName := ParsDrvM; Extension := ExtImpM;
+      END;
+
+      In := LibOpen	(FileName);
+
+      IF ParserName = NoIdent THEN
+	 ArrayToString	(Parser, FileNameS);
+      ELSE
+	 GetString	(ParserName, FileNameS);
+      END;
+      ArrayToString	(Drv, String);
+      Concatenate	(FileNameS, String);
+      ArrayToString	(Extension, String);
+      Concatenate	(FileNameS, String);
+      Out := SmartOpen	(FileNameS);
+      CopyFile		(In, Out);
+      ReadClose		(In);
+      SmartClose	(FileNameS, Out);
+   END GenDriver;
+
+PROCEDURE GenEiffelSupport;
+
+   PROCEDURE HandleFile (Name: ARRAY OF CHAR);
+      VAR
+	 In, Out	: tFile;
+	 FileName	: ARRAY [0..255] OF CHAR;
+	 i		: CARDINAL;
+
+      BEGIN
+	 FOR i := 0 TO HIGH (Name) DO FileName [i] := Name [i]; END;
+	 FileName [HIGH (Name) + 1] := 0C;
+	 In := LibOpen	(FileName);
+	 FOR i := 0 TO HIGH (Name) DO FileName [i] := Name [i]; END;
+	 FileName [HIGH (Name) + 1] := 0C;
+	 Out := WriteOpen	(FileName);
+      (* ErrorCheck		(Name, Out); *)
+	 IF Out < 0 THEN
+	    INC (ErrorCount);
+	    MessageI ("can not access file", Fatal, NoPosition, Array, ADR (Name));
+	 END;
+	 CopyFile		(In, Out);
+	 ReadClose		(In);
+	 WriteClose		(Out);
+      END HandleFile;
+
+   BEGIN
+      HandleFile (ErrorsE	);
+      HandleFile (PositionE	);
+      HandleFile (AttributeE	);
+      HandleFile (ScanAttributeE);
+      HandleFile (RFileE	);
+   END GenEiffelSupport;
+
+PROCEDURE WriteReduceCase (f: tFile);
+   VAR
+      LabelCount, CaseCount, Rule, Item: CARDINAL;
+      IsFirst		: BOOLEAN;
+   BEGIN
+      LabelCount := 0;
+      CaseCount	 := 1;
+      OpenCase (f);
+
+      FOR Rule := 1 TO RuleCount DO
+	 WITH ToRulePtr^ [Rule]^.Rule DO
+	    IF Reachable IN LHS^.Nonterminal.Properties THEN
+	       IF LabelCount >= CaseLabels THEN
+		  NextCase (f);
+		  INC (CaseCount);
+		  LabelCount := 0;
+	       END;
+	       INC (LabelCount);
+
+	       CASE Language OF
+	       | Modula2	: WriteS (f, "| ");
+	       | C, Cpp, Java	: WriteS (f, "case ");
+	       | Eiffel		: WriteS (f, "when ");
+	       | Ada		: WriteS (f, "when ");
+	       END;
+	       WriteI (f, LastReadReduceState + Index, 0);
+	       IF NOT IsElement (ORD ('n'), Options) AND (ReadReduceIndex # 0) THEN
+		  CASE Language OF
+		  | Modula2	: WriteS (f, ", ");
+		  | C, Cpp, Java: WriteC (f, ':'); WriteNl (f); WriteS (f, "case ");
+		  | Eiffel	: WriteS (f, ", ");
+		  | Ada		: WriteS (f, " | ");
+		  END;
+		  WriteI (f, ReadReduceIndex, 0);
+	       END;
+	       CASE Language OF
+	       | Modula2	: WriteS (f, ':');
+	       | C, Cpp, Java	: WriteS (f, ':');
+	       | Eiffel		: WriteS (f, " then");
+	       | Ada		: WriteS (f, " =>");
+	       END;
+
+	       IF Rule <= RootCount THEN
+		  WriteNl (f);
+		  CASE Language OF
+		  | Modula2
+		  , C
+		  , Cpp
+		  , Ada
+		  , Eiffel	:
+		     WriteS (f, "YYACCEPT;"); WriteNl (f);
+		  | Java	:
+		     WriteS (f, "YYACCEPT"); WriteNl (f);
+		  END;
+	       ELSE
+		  IF ((Language = C) OR (Language = Cpp)) AND IsElement (Rule, DynRuleSet) THEN
+		     WriteNl (f); WriteS (f, "yy"); WriteI (f, Rule, 0); WriteS (f, ':');
+		  END;
+		  WriteReduceCode (f, Rule, FALSE);
+	       END;
+	    END;
+	 END;
+      END;
+
+      FOR Rule := 1 TO CARDINAL (ConditionCount) DO
+	 IsFirst := TRUE;
+	 WITH ConditionPtr^ [Rule] DO
+	    IF LabelCount >= CaseLabels THEN
+	       NextCase (f);
+	       INC (CaseCount);
+	       LabelCount := 0;
+	    END;
+	    INC (LabelCount);
+
+	    CASE Language OF
+	    | Modula2		: WriteS (f, "| ");
+	    | C, Cpp, Java	: WriteS (f, "case ");
+	    | Eiffel		: WriteS (f, "when ");
+	    | Ada		: WriteS (f, "when ");
+	    END;
+	    WriteI (f, RecodeTableElmt (TableEntry), 0);
+	    CASE Language OF
+	    | Modula2		: WriteS (f, ':');
+	    | C, Cpp, Java	: WriteS (f, ':');
+	    WriteS (f, " /* STATE "); WriteI (f, dState, 0); WriteS (f, " */");
+	    | Eiffel		: WriteS (f, " then");
+	    | Ada		: WriteS (f, " =>");
+	    END;
+	    WriteNl (f);
+	    IF TheK # 0 THEN
+	       WriteCaseLRk (f, Rule);
+	    ELSE
+	       WITH StatePtr^ [dState] DO
+		  FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+		     WITH ItemPtr^ [Item] DO
+			IF (Dot = ToRulePtr^ [Rule]^.Rule.Length) AND IsElement (Rule, RuleSet) THEN
+			   IF IsFirst THEN
+			      CASE Language OF
+			      | Modula2		: WriteS (f, "IF ");
+			      | C, Cpp, Java	: WriteS (f, "if (");
+			      | Eiffel		: WriteS (f, "if ");
+			      | Ada		: WriteS (f, "if ");
+			      END;
+			      IsFirst := FALSE;
+			   ELSE
+			      CASE Language OF
+			      | Modula2	: WriteS (f, "ELSIF ");
+			      | C, Cpp	: WriteS (f, "else if (");
+			      | Eiffel	: WriteS (f, "elseif ");
+			      | Ada	: WriteS (f, "elsif ");
+			      | Java	: WriteS (f, "} else if (");
+			      END;
+			   END;
+			   CASE ToRulePtr^ [Rule]^.Kind OF
+			   | Tree.Cond	:
+			      WITH ToRulePtr^ [Rule]^.Cond DO
+				 WriteS (f, "yyPrintResult (");
+				 CASE Language OF
+				 | Modula2:
+				    WriteI (f, CondPos.Line, 0);
+				    WriteS (f, ",");
+				    IF Not THEN WriteS (f, "NOT "); END;
+				 | C, Cpp:
+				    WriteS (f, "* yyStateStackPtr, ");
+				    WriteI (f, CondPos.Line, 0);
+				    WriteS (f, ",");
+				    IF Not THEN WriteS (f, "! "); END;
+				 | Eiffel:
+				    WriteI (f, CondPos.Line, 0);
+				    WriteS (f, ",");
+				    IF Not THEN WriteS (f, "not "); END;
+				 | Ada	:
+				    WriteI (f, CondPos.Line, 0);
+				    WriteS (f, ",");
+				    IF Not THEN WriteS (f, "not "); END;
+				 | Java:
+				    WriteS (f, "yyStateStack [yyStackPtr], ");
+				    WriteI (f, CondPos.Line, 0);
+				    WriteS (f, ",");
+				    IF Not THEN WriteS (f, "! "); END;
+				 END;
+				 WriteS (f, "(");
+				 WriteNl (f);
+				 WriteDirective (f, CondPos.Line, CondPos.File);
+				 WriteSemanticAction (f, Cond, CondPos, Length, Length, Delta, ToRulePtr^ [Rule]);
+				 WriteDirective (f, LineCount + 2, FileNameI);
+				 WriteS (f, "))");
+			      END;
+			   | Tree.Look	:
+			      WITH ToRulePtr^ [Rule]^.Look DO
+				 WriteS (f, "yyPrintResult (");
+				 CASE Language OF
+				 | Modula2:
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTerminal ");
+				    IF Not THEN
+				       WriteS (f, "# ");
+				    ELSE
+				       WriteS (f, "= ");
+				    END;
+				 | C, Cpp:
+				    WriteS (f, "* yyStateStackPtr, ");
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTerminal ");
+				    WriteNl (f);
+				    IF Not THEN
+				       WriteS (f, "!= ");
+				    ELSE
+				       WriteS (f, "== ");
+				    END;
+				 | Eiffel:
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTerminal ");
+				    IF Not THEN
+				       WriteS (f, "/= ");
+				    ELSE
+				       WriteS (f, "= ");
+				    END;
+				 | Ada	:
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTerminal ");
+				    IF Not THEN
+				       WriteS (f, "/= ");
+				    ELSE
+				       WriteS (f, "= ");
+				    END;
+				 | Java:
+				    WriteS (f, "yyStateStack [yyStackPtr], ");
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTerminal ");
+				    WriteNl (f);
+				    IF Not THEN
+				       WriteS (f, "!= ");
+				    ELSE
+				       WriteS (f, "== ");
+				    END;
+				 END;
+				 WriteI (f, Object^.Terminal.Code, 0);
+				 WriteS (f, ")");
+			      END;
+			   | Tree.TrialParse	:
+			      WITH ToRulePtr^ [Rule]^.TrialParse DO
+				 WriteS (f, "yyPrintResult (");
+				 CASE Language OF
+				 | Modula2:
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTrialParse (");
+				    WriteI (f, ToRulePtr^ [Rule]^.TrialParse.RuleState^.Rule.Index, 0);
+				    WriteS (f, ", yyTerminal, ");
+				    WriteI (f, NamePos.Line, 0);
+				    IF Not THEN
+				       WriteS (f, ") # 0)");
+				    ELSE
+				       WriteS (f, ") = 0)");
+				    END;
+				 | C, Cpp:
+				    WriteS (f, "* yyStateStackPtr, ");
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTrialParse (");
+				    WriteNl (f);
+				    WriteI (f, ToRulePtr^ [Rule]^.TrialParse.RuleState^.Rule.Index, 0);
+				    WriteS (f, ", yyTerminal, ");
+				    WriteI (f, NamePos.Line, 0);
+				    IF Not THEN
+				       WriteS (f, ") != 0)");
+				    ELSE
+				       WriteS (f, ") == 0)");
+				    END;
+				 | Eiffel:
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTrialParse (");
+				    WriteI (f, ToRulePtr^ [Rule]^.TrialParse.RuleState^.Rule.Index, 0);
+				    WriteS (f, ", yyTerminal, ");
+				    WriteI (f, NamePos.Line, 0);
+				    IF Not THEN
+				       WriteS (f, ") /= 0)");
+				    ELSE
+				       WriteS (f, ") = 0)");
+				    END;
+				 | Ada	:
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTrialParse (");
+				    WriteI (f, ToRulePtr^ [Rule]^.TrialParse.RuleState^.Rule.Index, 0);
+				    WriteS (f, ", yyTerminal, ");
+				    WriteI (f, NamePos.Line, 0);
+				    IF Not THEN
+				       WriteS (f, ") /= 0)");
+				    ELSE
+				       WriteS (f, ") = 0)");
+				    END;
+				 | Java:
+				    WriteS (f, "yyStateStack [yyStackPtr], ");
+				    WriteI (f, NamePos.Line, 0);
+				    WriteS (f, ", yyTrialParse (");
+				    WriteNl (f);
+				    WriteI (f, ToRulePtr^ [Rule]^.TrialParse.RuleState^.Rule.Index, 0);
+				    WriteS (f, ", yyTerminal, ");
+				    WriteI (f, NamePos.Line, 0);
+				    IF Not THEN
+				       WriteS (f, ") != 0)");
+				    ELSE
+				       WriteS (f, ") == 0)");
+				    END;
+				 END;
+			      END;
+			   END;
+			   CASE Language OF
+			   | Modula2	: WriteS (f, " THEN");
+			   | C, Cpp	: WriteS (f, ")");
+			   | Eiffel	: WriteS (f, " then");
+			   | Ada	: WriteS (f, " then");
+			   | Java	: WriteS (f, ") {");
+			   END;
+			   WriteReduce (f, RuleBase + Rule);
+			END;
+		     END;
+		  END;
+		  CASE Language OF
+		  | Modula2	: WriteS (f, "ELSE");
+		  | C, Cpp	: WriteS (f, "else {");
+		  | Eiffel	: WriteS (f, "else");
+		  | Ada		: WriteS (f, "else");
+		  | Java	: WriteS (f, "} else {");
+		  END;
+		  IF Implicit >= RuleBase THEN
+		     WriteReduce (f, Implicit);
+		  ELSE
+		     WriteRead (f, Implicit);
+		  END;
+	       END;
+	       CASE Language OF
+	       | Modula2	: WriteS (f, "END;");
+	       | C, Cpp, Java	: WriteS (f, '}');
+	       | Eiffel		: WriteS (f, "end;");
+	       | Ada		: WriteS (f, "end if;");
+	       END;
+	    WriteNl (f);
+	    END;
+	 END;
+      END;
+      CloseCase (f, CaseCount);
+   END WriteReduceCase;
+
+PROCEDURE WriteReduceCode (f: tFile; Rule: CARDINAL; dynamic: BOOLEAN);
+   BEGIN
+      WITH ToRulePtr^ [Rule]^.Rule DO
+	 WriteS (f, ' ');
+	 IF NOT IsElement (ORD ('C'), Options) THEN
+	    CASE Language OF
+	    | Modula2		: WriteS (f, '(*" '); WriteRule (f, Rule); WriteS (f, '"*)');
+	    | C, Cpp, Java	: WriteS (f, "/* "); WriteRule2 (f, Rule); WriteS (f, "*/");
+	    | Eiffel		: WriteS (f, "-- "); WriteRule (f, Rule);
+	    | Ada		: WriteS (f, "-- "); WriteRule (f, Rule);
+	    END;
+	    WriteNl (f);
+	 END;
+	 CASE Language OF
+	 | Modula2:
+	    IF Length > 0 THEN
+	       WriteS (f, "DEC (yyStackPtr, "); WriteI (f, Length, 0); WriteS (f, "); ");
+	    END;
+	    WriteS (f, "yyNonterminal := ");
+	    WriteS (f, "yyNT");
+	    WriteIdent (f, LHS^.Nonterminal.Name);
+	    WriteS (f, ';');
+	 | C, Cpp:
+	    IF Length > 0 THEN
+	       WriteS (f, "yyDecrement ("); WriteI (f, Length, 0); WriteS (f, ") ");
+	    END;
+	    WriteS (f, "yySetNT (yyNT"); WriteIdent (f, LHS^.Nonterminal.Name); WriteS (f, ")");
+	 | Eiffel:
+	    IF Length > 0 THEN
+	       WriteS (f, "yyStackPtr := yyStackPtr - "); WriteI (f, Length, 0); WriteS (f, "; ");
+	    END;
+	    WriteS (f, "yyNonterminal := ");
+	    WriteS (f, "yyNT");
+	    WriteIdent (f, LHS^.Nonterminal.Name);
+	    WriteS (f, ';');
+	 | Ada:
+	    IF Length > 0 THEN
+	       WriteS (f, "yyStackPtr := yyStackPtr - "); WriteI (f, Length, 0); WriteS (f, "; ");
+	    END;
+	    WriteS (f, "yyNonterminal := ");
+	    WriteS (f, "yyNT");
+	    WriteIdent (f, LHS^.Nonterminal.Name);
+	    WriteS (f, ';');
+	 | Java:
+	   IF dynamic THEN
+	     IF Length > 0 THEN
+	       WriteS (f, "yyStackPtr -= "); WriteI (f, Length, 0); WriteS (f, "; ");
+	     END;
+	     WriteS (f, "yyNonterminal = ");
+	     WriteI (f, RecodeSymbol (LHS^.Nonterminal.Index), 0);
+	     WriteS (f, ";");
+	   ELSE
+	     IF Length > 0 THEN
+	       WriteS (f, "yyDecrement ("); WriteI (f, Length, 0); WriteS (f, ") ");
+	     END;
+	     WriteS (f, "yySetNT (yyNT"); WriteIdent (f, LHS^.Nonterminal.Name); WriteS (f, ")");
+	   END;
+	 END;
+	 IF (Language = C) OR (Language = Cpp) OR (Language = Java) THEN WriteS (f, " {"); END;
+	 WriteNl (f);
+	 IsFirstGroup := TRUE;
+	 WriteDirective (f, UCActPos.Line, UCActPos.File);
+	 WriteSemanticAction (f, UCAction, UCActPos, Length, 0, Delta, ToRulePtr^ [Rule]);
+	 IF NOT IsFirstGroup THEN
+	    CASE Language OF
+	    | Modula2	: WriteS (f, "END;"); WriteNl (f);
+	    | C, Cpp	:
+	    | Eiffel	: WriteS (f, "end;"); WriteNl (f);
+	    | Ada	: WriteS (f, "end if;"); WriteNl (f);
+	    | Java	: WriteS (f, "}"); WriteNl (f);
+	    END;
+	 END;
+	 IF NOT Texts.IsEmpty (Action) THEN
+	    IF (ReachableTrial IN LHS^.Nonterminal.Properties) OR
+	       IsElement (ORD (';'), Options) THEN
+	       CASE Language OF
+	       | Modula2: WriteS (f, "IF yyControl.yyActions THEN");
+	       | C, Cpp	: WriteS (f, "} if (yyControl.yyActions) {");
+	       | Eiffel	: WriteS (f, "if yyControlActions then");
+	       | Ada	: WriteS (f, "if yyControl.yyActions then");
+	       | Java	: WriteS (f, "} if (yyActions) {");
+	       END;
+	       WriteNl (f);
+	    END;
+	    IsFirstGroup := FALSE;
+	    WriteDirective (f, ActPos.Line, ActPos.File);
+	    WriteSemanticAction (f, Action, ActPos, Length, 0, Delta, ToRulePtr^ [Rule]);
+	    IF (ReachableTrial IN LHS^.Nonterminal.Properties) OR
+	       IsElement (ORD (';'), Options) THEN
+	       CASE Language OF
+	       | Modula2: WriteS (f, "END;"); WriteNl (f);
+	       | C, Cpp	:
+	       | Eiffel	: WriteS (f, "end;"); WriteNl (f);
+	       | Ada	: WriteS (f, "end if;"); WriteNl (f);
+	       | Java	:
+	       END;
+	    END;
+	 ELSIF IsElement (ORD ('.'), Options) AND (Length > 0) THEN
+	    CASE Language OF
+	    | Modula2	: WriteS (f, "yyS := "); Writeyy (f, 'A'); WriteS (f, "^[yyStackPtr + 1];");
+	    | C, Cpp, Java
+			: WriteS (f, "yyS = " ); Writeyy (f, 'A'); WriteS (f, " [0];");
+	    | Eiffel	: WriteS (f, "yyS := "); Writeyy (f, 'A'); WriteS (f, ".item (yyStackPtr + 1);");
+	    | Ada	: WriteS (f, "yyS := "); Writeyy (f, 'A'); WriteS (f, " (yyStackPtr + 1);");
+	    END;
+	    WriteNl (f);
+	 END;
+	 WriteDirective (f, LineCount + 2, FileNameI);
+	 IF (Language = C) OR (Language = Cpp) OR (Language = Java) THEN
+	    WriteS (f, "} break;"); WriteNl (f);
+	 END;
+      END;
+   END WriteReduceCode;
+
+PROCEDURE OpenCase (f: tFile);
+   BEGIN
+      CASE Language OF
+      | Modula2		: WriteS (f, "CASE yyState OF");
+      | C, Cpp, Java	: WriteS (f, "switch (yyState) {");
+      | Eiffel		: WriteS (f, "inspect yyState");
+      | Ada		: WriteS (f, "case yyState is");
+      END;
+      WriteNl (f);
+   END OpenCase;
+
+PROCEDURE NextCase (f: tFile);
+   BEGIN
+      CASE Language OF
+      | Modula2		: WriteS (f, "ELSE CASE yyState OF");
+      | C, Cpp, Java	: WriteS (f, "default: switch (yyState) {");
+      | Eiffel		: WriteS (f, "else inspect yyState");
+      | Ada		: WriteS (f, "when others => case yyState is");
+      END;
+      WriteNl (f);
+   END NextCase;
+
+PROCEDURE CloseCase (f: tFile; CaseCount: INTEGER);
+   BEGIN
+      CASE Language OF
+      | Modula2:
+	WHILE CaseCount > 0 DO
+	  WriteS (f, "END;"); WriteNl (f);
+	  DEC (CaseCount);
+	END;
+      | C, Cpp:
+	WriteS (f, 'default: switch (yyState) {'); WriteNl (f);
+	WriteS (f, 'case 1: goto yyAbort;'); WriteNl (f);
+	WriteS (f, 'case 2: goto yyRead;'); WriteNl (f);
+	WriteS (f, 'case 3: goto yyReduce;'); WriteNl (f);
+	WriteS (f, '}'); WriteNl (f);
+	WHILE CaseCount > 0 DO
+	  WriteS (f, '}'); WriteNl (f);
+	  DEC (CaseCount);
+	END;
+      | Eiffel:
+	WHILE CaseCount > 0 DO
+	  WriteS (f, "end;"); WriteNl (f);
+	  DEC (CaseCount);
+	END;
+      | Ada:
+	WHILE CaseCount > 0 DO
+	  IF CaseCount = 1 THEN WriteS (f, "when others => null;"); WriteNl (f); END;
+	  WriteS (f, "end case;"); WriteNl (f);
+	  DEC (CaseCount);
+	END;
+      | Java:
+	WriteS (f, '}'); WriteNl (f);
+	DEC (CaseCount);
+      END;
+   END CloseCase;
+
+PROCEDURE Lookup (Elements: tTree; Selector: tIdent): CARDINAL;
+   VAR i	: CARDINAL;
+   BEGIN
+      i := 0;
+      WHILE Elements^.Kind = Tree.Ident DO
+	 INC (i);
+	 IF Elements^.Ident.Selector = Selector THEN RETURN i; END;
+	 Elements := Elements^.Ident.Next;
+      END;
+      RETURN 0;
+   END Lookup;
+
+PROCEDURE IndexToName (Rule: tTree; AttrIndex: CARDINAL): tIdent;
+   VAR
+      i		: CARDINAL;
+      elements	: tTree;
+   BEGIN
+      WITH Rule^.Rule DO
+	 IF AttrIndex <= Length THEN
+	    elements := RuleOrig^.Rule.Elements;
+	    FOR i := 2 TO AttrIndex DO
+	       elements := elements^.Ident.Next;
+	    END;
+	    RETURN elements^.Ident.Name;
+	 ELSE
+	    RETURN NoIdent;
+	 END;
+      END;
+   END IndexToName;
+
+PROCEDURE WriteSemanticAction (f: tFile; Action: tText; Pos: tPosition; length, Offset, Delta: INTEGER; Rule: tTree);
+   CONST yyTabSpace	= 8;
+   VAR
+      i, i2, j, from, to: CARDINAL;
+      AttrIndex, OrigAI	: INTEGER;
+      String, String2	: tString;
+      IsNegative, IsFirstMode	: BOOLEAN;
+      Delimiter, c	: CHAR;
+      SlctPos		: tPosition;
+      Selector, TokenId	: tIdent;
+      TokenNode		: tTree;
+   BEGIN
+      WHILE NOT Texts.IsEmpty (Action) DO
+	StringM.GetString (tStringRef (PTRINT (Head (Action))), String);
+	Lists.Tail (Action);
+	i2 := Length (String);
+	i := 0;
+	WHILE i < i2 DO
+	  INC (i); c := Char (String, i);
+	  IF (c = '\') AND (i < i2) THEN
+	    INC (i); WriteC (f, Char (String, i));
+	  ELSIF c = 11C THEN
+	    WriteC (f, c);
+	    INC (Pos.Column, yyTabSpace - 1 - (Pos.Column + i - 1) MOD yyTabSpace);
+	  ELSIF (c = '"') OR (c = "'") THEN
+	    SlctPos := Pos;
+	    INC (SlctPos.Column, i);
+	    Delimiter := c;
+	    WriteC (f, c);
+	    LOOP
+	      INC (i);
+	      IF i <= cMaxStrLength THEN
+		c := Char (String, i);
+		WriteC (f, c);
+		IF ((Language = C) OR (Language = Cpp) OR (Language = Java)) AND (c = '\') OR
+		   (Language = Eiffel) AND (c = '%') THEN
+		  INC (i); WriteC (f, Char (String, i));
+		END;
+		IF c = Delimiter THEN EXIT; END;
+	      ELSE
+		Message ("string is too long", Error, SlctPos);
+		RETURN;
+	      END;
+	    END;
+	  ELSIF (c = '$') AND (i < i2) THEN
+	    INC (i); c := Char (String, i);
+	    to := 0; from := i + 1;
+	    IF c = '<' THEN
+	      WHILE (i <= i2) AND (Char (String, i) # '>') DO INC (i); END;
+	      IF i < i2 THEN to := i - 1; INC (i); c := Char (String, i); END;
+	    END;
+	    IF c = '$' THEN
+	      Writeyy (f, 'S');
+	      IF from < to THEN
+		WriteC (f, '.');
+		FOR j := from TO to DO WriteC (f, Char (String, j)); END;
+	      ELSE
+		WriteTag (f, Rule^.Rule.LHS^.Nonterminal.Name);
+	      END;
+	    ELSIF ('0' <= c) AND (c <= '9') OR (c = '-') THEN
+	      SlctPos := Pos;
+	      INC (SlctPos.Column, i);
+	      AttrIndex := 0;
+	      IF c = '-' THEN
+		INC (i); c := Char (String, i);
+		IsNegative := TRUE;
+	      ELSE
+		IsNegative := FALSE;
+	      END;
+	      LOOP
+		IF NOT (('0' <= c) AND (c <= '9')) THEN DEC (i); EXIT; END;
+		AttrIndex := AttrIndex * 10 + INTEGER (ORD (c) - ORD ('0'));
+		IF i >= i2 THEN EXIT; END;
+		INC (i); c := Char (String, i);
+	      END;
+	      IF IsNegative THEN AttrIndex := - AttrIndex; END;
+	      OrigAI := AttrIndex;
+	      IF (Delta > 0) AND (AttrIndex > 0) THEN DEC (AttrIndex, Delta); END;
+	      IF AttrIndex > length THEN
+		IF NOT IsElement (ORD ('s'), Options) THEN
+		  Message ("selector out of bounds", Warning, SlctPos);
+		END;
+	      END;
+	      WriteAttrIndex (f, AttrIndex - Offset);
+	      IF from < to THEN
+		WriteC (f, '.');
+		FOR j := from TO to DO WriteC (f, Char (String, j)); END;
+	      ELSIF 0 < OrigAI THEN
+		WriteTag (f, IndexToName (Rule, OrigAI));
+	      END;
+	    ELSIF ('A' <= c) AND (c <= 'Z') OR ('a' <= c) AND (c <= 'z') OR (c = '_') THEN
+	      SlctPos := Pos;
+	      INC (SlctPos.Column, i);
+	      AssignEmpty (String2);
+	      LOOP
+		IF NOT (('A' <= c) AND (c <= 'Z') OR ('a' <= c) AND (c <= 'z') OR
+		  ('0' <= c) AND (c <= '9') OR (c = '_')) THEN DEC (i); EXIT; END;
+		Append (String2, c);
+		IF i >= i2 THEN EXIT; END;
+		INC (i); c := Char (String, i);
+	      END;
+	      Selector := MakeIdent (String2);
+	      AttrIndex := Lookup (Rule^.Rule.RuleOrig^.Rule.Elements, Selector);
+	      IF AttrIndex = 0 THEN
+		MessageI ("selector not declared", Error, SlctPos, Ident, ADR (Selector));
+		INC (ErrorCount);
+	      ELSE
+		DEC (AttrIndex, Delta);
+	      END;
+	      IF AttrIndex > length THEN
+		IF NOT IsElement (ORD ('s'), Options) THEN
+		  MessageI ("selector out of bounds", Warning, SlctPos, Ident, ADR (Selector));
+		END;
+	      END;
+	      WriteAttrIndex (f, AttrIndex - Offset);
+	    ELSIF c = '(' THEN
+	      INC (i); c := Char (String, i);
+	      TokenId := 0;
+	      WHILE c # ')' DO
+		TokenId := TokenId * 10 + CARDINAL (ORD (c) - ORD ('0'));
+		INC (i); c := Char (String, i);
+	      END;
+	      TokenNode := Identify (TokenId);
+	      IF (TokenNode # NoTree) AND (TokenNode^.Kind = Terminal) THEN
+		WriteI (f, TokenNode^.Terminal.Code, 0);
+	      ELSE
+		WriteS (f, "? /* "); WriteIdent (f, TokenId); WriteS (f, " */");
+	      END;
+	    ELSE
+	      WriteC (f, '$');
+	      WriteC (f, c);
+	    END;
+	  ELSIF (c = '#') AND (i < i2) THEN
+	    INC (i); c := Char (String, i);
+	    IF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN
+	      IsFirstMode := TRUE;
+	      CASE Language OF
+	      | Modula2:
+		IF IsFirstGroup THEN IsFirstGroup := FALSE; ELSE WriteS (f, "END; "); END;
+		WriteS (f, "IF {");
+		LOOP
+		  IF IsFirstMode THEN IsFirstMode := FALSE;
+		  ELSIF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN WriteS (f, ", "); END;
+		  CASE c OF
+		  | 'S': WriteS (f, "yystandard");
+		  | 'T': WriteS (f, "yytrial"	);
+		  | 'B': WriteS (f, "yybuffer"	);
+		  | 'R': WriteS (f, "yyreparse"	);
+		  ELSE DEC (i); EXIT;
+		  END;
+		  IF i >= i2 THEN EXIT; END;
+		  INC (i); c := Char (String, i);
+		END;
+		WriteS (f, "} * yyControl.yyMode # {} THEN");
+	      | C, Cpp, Java:
+		WriteS (f, "} if ((");
+		IF Language = Java THEN WriteS (f, "("); END;
+		LOOP
+		  IF IsFirstMode THEN IsFirstMode := FALSE;
+		  ELSIF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN WriteS (f, " | "); END;
+		  CASE c OF
+		  | 'S': WriteS (f, "yystandard");
+		  | 'T': WriteS (f, "yytrial"	);
+		  | 'B': WriteS (f, "yybuffer"	);
+		  | 'R': WriteS (f, "yyreparse"	);
+		  ELSE DEC (i); EXIT;
+		  END;
+		  IF i >= i2 THEN EXIT; END;
+		  INC (i); c := Char (String, i);
+		END;
+		IF Language = Java THEN
+		   WriteS (f, ") & yyMode) != 0) {");
+		ELSE
+		   WriteS (f, ") & yyControl.yyMode) {");
+		END;
+		WriteNl (f);
+	      | Eiffel:
+		IF IsFirstGroup THEN IsFirstGroup := FALSE; ELSE WriteS (f, "end; "); END;
+		WriteS (f, "if");
+		LOOP
+		  IF IsFirstMode THEN IsFirstMode := FALSE;
+		  ELSIF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN WriteS (f, " or"); END;
+		  IF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN
+		     WriteS (f, " yyControlMode = ");
+		  END;
+		  CASE c OF
+		  | 'S': WriteS (f, "yystandard"	);
+		  | 'T': WriteS (f, "yytrial"		);
+		  | 'B': WriteS (f, "yybuffering"	);
+		  | 'R': WriteS (f, "yyreparsing"	);
+		  ELSE DEC (i); EXIT;
+		  END;
+		  IF i >= i2 THEN EXIT; END;
+		  INC (i); c := Char (String, i);
+		END;
+		WriteS (f, " then");
+	      | Ada:
+		IF IsFirstGroup THEN IsFirstGroup := FALSE; ELSE WriteS (f, "end if; "); END;
+		WriteS (f, "if");
+		LOOP
+		  IF IsFirstMode THEN IsFirstMode := FALSE;
+		  ELSIF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN WriteS (f, " or"); WriteNl (f); END;
+		  IF (c = 'S') OR (c = 'T') OR (c = 'B') OR (c = 'R') THEN
+		     WriteS (f, " yyControl.yyMode = ");
+		  END;
+		  CASE c OF
+		  | 'S': WriteS (f, "yystandard"	);
+		  | 'T': WriteS (f, "yytrial"		);
+		  | 'B': WriteS (f, "yybuffering"	);
+		  | 'R': WriteS (f, "yyreparsing"	);
+		  ELSE DEC (i); EXIT;
+		  END;
+		  IF i >= i2 THEN EXIT; END;
+		  INC (i); c := Char (String, i);
+		END;
+		WriteS (f, " then");
+	      END;
+	    ELSE
+	      WriteC (f, '#');
+	      DEC (i);
+	    END;
+	  ELSE
+	    WriteC (f, c);
+	  END;
+	END;
+	INC (Pos.Line);
+	Pos.Column := 0;
+	WriteNl (f);
+      END;
+   END WriteSemanticAction;
+
+PROCEDURE WriteAttrIndex (f: tFile; AttrIndex: INTEGER);
+   BEGIN
+      CASE Language OF
+      | Modula2:
+	 Writeyy (f, 'A');
+	 WriteS (f, "^[yyStackPtr");
+	 IF AttrIndex >= 0 THEN WriteS (f, "+"); END;
+	 WriteI (f, AttrIndex, 0);
+	 WriteS (f, "]");
+      | C, Cpp:
+	 Writeyy (f, 'A');
+	 WriteS (f, " [");
+	 WriteI (f, AttrIndex - 1, 0);
+	 WriteS (f, "]");
+      | Eiffel:
+	 Writeyy (f, 'A');
+	 WriteS (f, ".item (yyStackPtr");
+	 IF AttrIndex >= 0 THEN WriteS (f, "+"); END;
+	 WriteI (f, AttrIndex, 0);
+	 WriteS (f, ")");
+      | Ada:
+	 Writeyy (f, 'A');
+	 WriteS (f, " (yyStackPtr");
+	 IF AttrIndex >= 0 THEN WriteS (f, "+"); END;
+	 WriteI (f, AttrIndex, 0);
+	 WriteS (f, ")");
+      | Java:
+	 Writeyy (f, 'A');
+	 WriteS (f, " [yyStackPtr");
+	 IF AttrIndex >= 0 THEN WriteS (f, "+"); END;
+	 WriteI (f, AttrIndex, 0);
+	 WriteS (f, "]");
+      END;
+   END WriteAttrIndex;
+
+PROCEDURE WriteTag (f: tFile; Name: tIdent);
+   VAR tags	: tTree;
+   BEGIN
+      tags := Tags;
+      WHILE (tags # NoTree) AND (tags^.Tag.Name # Name) DO
+	 tags := tags^.Tag.Next;
+      END;
+      IF tags # NoTree THEN
+	 WriteC (f, '.');
+	 WriteIdent (f, tags^.Tag.Tag);
+      END;
+   END WriteTag;
+
+PROCEDURE WriteRule (f: tFile; Rule: CARDINAL);
+   VAR i	: CARDINAL;
+   BEGIN
+      WITH ToRulePtr^ [Rule]^.Rule DO
+	WriteToken (f, LHS^.Nonterminal.Index);
+	WriteS (f, " : ");
+	FOR i := 1 TO Length DO WriteToken (f, ElmtsPtr^ [i]); WriteC (f, ' '); END;
+      END;
+   END WriteRule;
+
+PROCEDURE WriteRule2 (f: tFile; Rule: CARDINAL);
+   VAR i	: CARDINAL;
+   BEGIN
+      WITH ToRulePtr^ [Rule]^.Rule DO
+	WriteToken (f, LHS^.Nonterminal.Index);
+	WriteS (f, " : ");
+	FOR i := 1 TO Length DO
+	   IF ((Language = C) OR (Language = Cpp)) AND
+	      (StringM.Length (GetStringRef (ToSymbolPtr^[ElmtsPtr^ [i]]^.Terminal.Name)) + ColumnCount > 72) THEN
+	     WriteS (f, "\"); WriteNl (f);
+	   END;
+	   WriteToken (f, ElmtsPtr^ [i]); WriteC (f, ' ');
+	END;
+      END;
+   END WriteRule2;
+
+PROCEDURE WriteToken (f: tFile; t: CARDINAL);
+   VAR
+     String	: tString;
+     i		: CARDINAL;
+     ch		: CHAR;
+   BEGIN
+      IF t < Epsilon THEN
+	 GetString (ToSymbolPtr^[t]^.Terminal.Name, String);
+      ELSE
+	 GetString (ToSymbolPtr^[t]^.Nonterminal.Name, String);
+      END;
+      CASE Language OF
+      | Modula2:
+	 ch := Char (String, 1);
+	 IF ch = '"' THEN WriteC (f, "'"); ELSE WriteC (f, ch); END;
+	 FOR i := 2 TO Length (String) DO
+	    ch := Char (String, i);
+	    IF (ch = ')') AND (Char (String, i - 1) = '*')
+	    OR (ch = '*') AND (Char (String, i - 1) = '(') THEN WriteC (f, ' '); END;
+	    IF ch = '"' THEN WriteC (f, "'"); ELSE WriteC (f, ch); END
+	 END;
+      | C, Cpp, Java:
+	 ch := Char (String, 1);
+	 IF ch = '"' THEN WriteC (f, "\"); END;
+	 WriteC (f, ch);
+	 FOR i := 2 TO Length (String) DO
+	    ch := Char (String, i);
+	    IF (ch = '/') AND (Char (String, i - 1) = '*')
+	    OR (ch = '*') AND (Char (String, i - 1) = '/') THEN WriteC (f, ' '); END;
+	    IF (ch = '"') OR (ch = '\') THEN WriteC (f, "\"); END;
+	    WriteC (f, ch);
+	 END;
+      | Eiffel:
+	 ch := Char (String, 1);
+	 IF ch = '"' THEN WriteC (f, "%"); END;
+	 WriteC (f, ch);
+	 FOR i := 2 TO Length (String) DO
+	    ch := Char (String, i);
+	    IF (ch = '"') OR (ch = '%') THEN WriteC (f, "%"); END;
+	    WriteC (f, ch);
+	 END;
+      | Ada:
+	 FOR i := 1 TO Length (String) DO
+	    ch := Char (String, i); WriteC (f, ch);
+	    IF ch = '"' THEN WriteC (f, '"'); END;
+	 END;
+      END;
+   END WriteToken;
+
+PROCEDURE PutTBase (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO LastReadState DO
+      PackCard (p, TBase^[i]);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteS (File, "& yyTComb ["); WriteI (File, TBase^[i], 4); WriteS (File, "], ");
+      INC (c); IF c = 4 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteI (File, TBase^[i], 5);
+      IF i # LastReadState THEN WriteS (File, ", "); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyTBase = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, TBase^[i], 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF LastReadState >= PartSize THEN
+      WriteS (File, "    private static int [] yyTBase = new int [");
+      WriteI (File, LastReadState + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyTBase = ");
+      WriteIdent (File, prefix); WriteS (File, "_TBase1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutTBase;
+
+PROCEDURE PutNBase (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO LastReadState DO
+      PackCard (p, NBase^[i]);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteS (File, "& yyNComb [");
+      WriteI (File, INTEGER (NBase^[i]) - INTEGER (MaxTerminalCode) - 1, 4);
+      WriteS (File, "], ");
+      INC (c); IF c = 4 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteI (File, NBase^[i], 5);
+      IF i # LastReadState THEN WriteS (File, ", "); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyNBase = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, INTEGER (NBase^[i]) - INTEGER (MaxTerminalCode) - 1, 5);
+	WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c # 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF LastReadState >= PartSize THEN
+      WriteS (File, "    private static int [] yyNBase = new int [");
+      WriteI (File, LastReadState + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyNBase = ");
+      WriteIdent (File, prefix); WriteS (File, "_NBase1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutNBase;
+
+PROCEDURE PutTDefault (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO LastReadState DO
+      PackCard (p, RecodeDefault (TDefault^[i]));
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteI (File, RecodeDefault (TDefault^[i]), 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteI (File, RecodeDefault (TDefault^[i]), 5);
+      IF i # LastReadState THEN WriteS (File, ", "); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyTDefault = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, RecodeDefault (TDefault^[i]), 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF LastReadState >= PartSize THEN
+      WriteS (File, "    private static int [] yyTDefault = new int [");
+      WriteI (File, LastReadState + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyTDefault = ");
+      WriteIdent (File, prefix); WriteS (File, "_TDefault1.yy;"); WriteNl(File);
+    END;
+  END;
+END PutTDefault;
+
+PROCEDURE PutNDefault (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO LastReadState DO
+      PackCard (p, StatePtr^ [NDefault^[i]].ReadIndex);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteI (File, StatePtr^ [NDefault^[i]].ReadIndex, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO LastReadState DO
+      WriteI (File, StatePtr^ [NDefault^[i]].ReadIndex, 5);
+      IF i # LastReadState THEN WriteS (File, ", "); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyNDefault = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, StatePtr^ [NDefault^[i]].ReadIndex, 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF LastReadState >= PartSize THEN
+      WriteS (File, "    private static int [] yyNDefault = new int [");
+      WriteI (File, LastReadState + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyNDefault = ");
+      WriteIdent (File, prefix); WriteS (File, "_NDefault1.yy;"); WriteNl(File);
+    END;
+  END;
+END PutNDefault;
+
+PROCEDURE PutTComb (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 0 TO TTableSize DO
+      PackCard (p, TComb^[i].Check);
+      PackCard (p, TComb^[i].Next );
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 0 TO TTableSize DO
+      WriteC (File, '{');
+      WriteI (File, TComb^[i].Check, 4); WriteS (File, ", ");
+      WriteI (File, TComb^[i].Next , 4); WriteS (File, "}, ");
+      INC (c); IF c = 5 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 0 TO TTableSize DO
+      WriteC (File, '(');
+      WriteI (File, TComb^[i].Check, 4); WriteS (File, ", ");
+      WriteI (File, TComb^[i].Next , 4); WriteC (File, ")");
+      IF i # TTableSize THEN WriteS (File, ", "); END;
+      INC (c); IF c = 5 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyTCombCheck = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := 0 TO TTableSize DO
+	WriteI (File, TComb^[i].Check, 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+      WriteS (File, "    private static final int [] yyTCombNext = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := 0 TO TTableSize DO
+	WriteI (File, TComb^[i].Next, 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF TTableSize >= PartSize THEN
+      WriteS (File, "    private static int [] yyTCombCheck = new int [");
+      WriteI (File, TTableSize + 1, 0); WriteS (File, "];"); WriteNl (File);
+      WriteS (File, "    private static int [] yyTCombNext  = new int [");
+      WriteI (File, TTableSize + 1, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyTCombCheck = ");
+      WriteIdent (File, prefix); WriteS (File, "_TCombCheck1.yy;");
+      WriteNl (File);
+      WriteS (File, "    private static int [] yyTCombNext  = ");
+      WriteIdent (File, prefix); WriteS (File, "_TCombNext1.yy;");
+      WriteNl (File);
+    END;
+  END;
+END PutTComb;
+
+PROCEDURE PutNComb1 (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := MaxTerminalCode + 1 TO NTableSize DO
+      PackCard (p, NComb^[i].Next);
+    END;
+    EndPack (p);
+  | C, Cpp, Java:
+    c := 0;
+    FOR i := MaxTerminalCode + 1 TO NTableSize DO
+      WriteI (File, NComb^[i].Next, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := MaxTerminalCode + 1 TO NTableSize DO
+      WriteI (File, NComb^[i].Next, 5);
+      IF i # NTableSize THEN WriteS (File, ", "); END;
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  END;
+END PutNComb1;
+
+PROCEDURE PutNComb2 (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := MaxTerminalCode + 1 TO NTableSize DO
+      PackCard (p, NComb^[i].Check);
+      PackCard (p, NComb^[i].Next);
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := MaxTerminalCode + 1 TO NTableSize DO
+      WriteC (File, '{');
+      WriteI (File, NComb^[i].Check, 4); WriteS (File, ", ");
+      WriteI (File, NComb^[i].Next , 4); WriteS (File, "}, ");
+      INC (c); IF c = 5 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := MaxTerminalCode + 1 TO NTableSize DO
+      WriteC (File, '(');
+      WriteI (File, NComb^[i].Check, 4); WriteS (File, ", ");
+      WriteI (File, NComb^[i].Next , 4); WriteC (File, ")");
+      IF i # NTableSize THEN WriteS (File, ", "); END;
+      INC (c); IF c = 5 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyNCombCheck = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := MaxTerminalCode + 1 TO NTableSize DO
+	WriteI (File, NComb^[i].Check, 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File); WriteNl (File);
+      WriteS (File, "    private static final int [] yyNCombNext = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := MaxTerminalCode + 1 TO NTableSize DO
+	WriteI (File, NComb^[i].Next, 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF NTableSize - MaxTerminalCode > PartSize THEN
+      WriteS (File, "    private static int [] yyNCombCheck = new int [");
+      WriteI (File, NTableSize - MaxTerminalCode, 0); WriteS (File, "];");
+      WriteNl (File);
+      WriteS (File, "    private static int [] yyNCombNext  = new int [");
+      WriteI (File, NTableSize - MaxTerminalCode, 0); WriteS (File, "];");
+      WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyNCombCheck = ");
+      WriteIdent (File, prefix); WriteS (File, "_NCombCheck1.yy;");
+      WriteNl (File);
+      WriteS (File, "    private static int [] yyNCombNext  = ");
+      WriteIdent (File, prefix); WriteS (File, "_NCombNext1.yy;");
+      WriteNl (File);
+    END;
+  END;
+END PutNComb2;
+
+PROCEDURE PutLength (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF Reachable IN LHS^.Nonterminal.Properties THEN
+	  PackCard (p, Length);
+	END;
+      END;
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF Reachable IN LHS^.Nonterminal.Properties THEN
+	  WriteI (File, Length, 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	END;
+      END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF Reachable IN LHS^.Nonterminal.Properties THEN
+	  WriteI (File, Length, 5);
+	  IF i # RuleCount THEN WriteS (File, ", "); END;
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	END;
+      END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyLength = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO RuleCount DO
+	WITH ToRulePtr^ [i]^.Rule DO
+	  IF Reachable IN LHS^.Nonterminal.Properties THEN
+	    WriteI (File, Length, 5); WriteS (File, ", ");
+	    INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	  END;
+	END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF RuleCount > PartSize THEN
+      WriteS (File, "    private static int [] yyLength = new int [");
+      WriteI (File, RuleCount, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyLength = ");
+      WriteIdent (File, prefix); WriteS (File, "_Length1.yy;"); WriteNl (File);
+    END;
+  END;
+END PutLength;
+
+PROCEDURE PutLeftHandSide (File: tFile);
+VAR
+  i		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule.LHS^.Nonterminal DO
+	IF Reachable IN Properties THEN
+	  PackCard (p, RecodeSymbol (Index));
+	END;
+      END;
+    END;
+    EndPack (p);
+  | C, Cpp:
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule.LHS^.Nonterminal DO
+	IF Reachable IN Properties THEN
+	  WriteS (File, "yyNT"); WriteIdent (File, Name); WriteC (File, ','); WriteNl (File);
+	END;
+      END;
+    END;
+  | Ada:
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule.LHS^.Nonterminal DO
+	IF Reachable IN Properties THEN
+	  WriteS (File, "yyNT"); WriteIdent (File, Name);
+	  IF i # RuleCount THEN WriteC (File, ','); END;
+	  WriteNl (File);
+	END;
+      END;
+    END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyLeftHandSide = {");
+      WriteNl (File);
+      FOR i := 1 TO RuleCount DO
+	WITH ToRulePtr^ [i]^.Rule.LHS^.Nonterminal DO
+	  IF Reachable IN Properties THEN
+	    WriteS (File, "yyNT"); WriteIdent (File, Name); WriteC (File, ',');
+	    WriteNl (File);
+	  END;
+	END;
+      END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF RuleCount > PartSize THEN
+      WriteS (File, "    private static int [] yyLeftHandSide = new int [");
+      WriteI (File, RuleCount, 0); WriteS (File, "];"); WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyLeftHandSide = ");
+      WriteIdent (File, prefix); WriteS (File, "_LeftHandSide1.yy;");
+      WriteNl (File);
+    END;
+  END;
+END PutLeftHandSide;
+
+PROCEDURE PutContinuation (File: tFile);
+VAR
+  i, c		: LONGINT;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO StateCount DO
+      IF StatePtr^[i].Class # Invalid THEN
+	PackCard (p, RecodeSymbol (StatePtr^[i].Continuation));
+      END;
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO StateCount DO
+      IF StatePtr^[i].Class # Invalid THEN
+	WriteI (File, RecodeSymbol (StatePtr^[i].Continuation), 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO StateCount DO
+      IF StatePtr^[i].Class # Invalid THEN
+	WriteI (File, RecodeSymbol (StatePtr^[i].Continuation), 5); WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyContinuation = { 0,");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO StateCount DO
+	IF StatePtr^[i].Class # Invalid THEN
+	  WriteI (File, RecodeSymbol (StatePtr^[i].Continuation), 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSIF LastReadState >= PartSize THEN
+      WriteS (File, "    private static int [] yyContinuation = new int [");
+      WriteI (File, LastReadState + 1, 0); WriteS (File, "];");
+      WriteNl (File);
+    ELSE
+      WriteS (File, "    private static int [] yyContinuation = ");
+      WriteIdent (File, prefix); WriteS (File, "_Continuation1.yy;");
+      WriteNl (File);
+    END;
+  END;
+END PutContinuation;
+
+PROCEDURE PutFinalToProd (File: tFile);
+VAR
+  i, c, size	: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF ReadReduceIndex # 0 THEN
+	  PackCard (p, LastReadReduceState + Index);
+	END;
+      END;
+    END;
+    EndPack (p);
+  | C, Cpp:
+    c := 0;
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF ReadReduceIndex # 0 THEN
+	  WriteI (File, LastReadReduceState + Index, 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	END;
+      END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO RuleCount DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF ReadReduceIndex # 0 THEN
+	  WriteI (File, LastReadReduceState + Index, 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	END;
+      END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Java:
+    IF SmallTables THEN
+      WriteS (File, "    private static final int [] yyFinalToProd = {");
+      WriteNl (File);
+      c := 0;
+      FOR i := 1 TO RuleCount DO
+	WITH ToRulePtr^ [i]^.Rule DO
+	  IF ReadReduceIndex # 0 THEN
+	    WriteI (File, LastReadReduceState + Index, 5); WriteS (File, ", ");
+	    INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	  END;
+	END;
+      END;
+      IF c > 0 THEN WriteNl (File); END;
+      WriteS (File, "    };"); WriteNl (File);
+    ELSE
+      size := LastReadReduceState - LastReadState;
+      IF size > PartSize THEN
+	WriteS (File, "    private static int [] yyFinalToProd = new int [");
+	WriteI (File, size, 0); WriteS (File, "];"); WriteNl (File);
+      ELSE
+	WriteS (File, "    private static int [] yyFinalToProd = ");
+	WriteIdent (File, prefix); WriteS (File, "_FinalToProd1.yy;");
+	WriteNl (File);
+      END;
+    END;
+  END;
+END PutFinalToProd;
+
+PROCEDURE PutCondition (File: tFile);
+VAR
+  i, c		: CARDINAL;
+  p		: PackHandle;
+BEGIN
+  CASE Language OF
+  | Modula2:
+    BeginPackCard (p, File);
+    FOR i := 1 TO CARDINAL (ConditionCount) DO
+      PackCard (p, RecodeTableElmt (ConditionPtr^ [i].Repair));
+    END;
+    EndPack (p);
+  | C, Cpp, Java:
+    c := 0;
+    FOR i := 1 TO CARDINAL (ConditionCount) DO
+      WriteI (File, RecodeTableElmt (ConditionPtr^ [i].Repair), 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  | Ada:
+    c := 0;
+    FOR i := 1 TO CARDINAL (ConditionCount) DO
+      WriteI (File, RecodeTableElmt (ConditionPtr^ [i].Repair), 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+  END;
+END PutCondition;
+
+PROCEDURE PutTableParts (File: tFile);
+VAR
+  i, j		: CARDINAL;
+  k		: LONGINT;
+  part		: CARDINAL;
+  c		: CARDINAL;
+BEGIN
+  IF SmallTables THEN RETURN; END;
+
+  part := 1; i := 0;
+  WHILE i <= TTableSize DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_TCombCheck"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= TTableSize) DO
+      WriteI (File, TComb^[i].Check, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= TTableSize DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_TCombNext"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= TTableSize) DO
+      WriteI (File, TComb^[i].Next, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := MaxTerminalCode + 1;
+  WHILE i <= NTableSize DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_NCombCheck"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= NTableSize) DO
+      WriteI (File, NComb^[i].Check, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := MaxTerminalCode + 1;
+  WHILE i <= NTableSize DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_NCombNext"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= NTableSize) DO
+      WriteI (File, NComb^[i].Next, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= LastReadState DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_TBase"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= LastReadState) DO
+      WriteI (File, TBase^[i], 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= LastReadState DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_NBase"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= LastReadState) DO
+      WriteI (File, INTEGER (NBase^[i]) - INTEGER (MaxTerminalCode) - 1, 5);
+      WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= LastReadState DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_TDefault"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= LastReadState) DO
+      WriteI (File, RecodeDefault (TDefault^[i]), 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 0;
+  WHILE i <= LastReadState DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_NDefault"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF i = 0 THEN WriteS (File, " 0,"); INC (i); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= LastReadState) DO
+      WriteI (File, StatePtr^ [NDefault^[i]].ReadIndex, 5); WriteS (File, ", ");
+      INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+      INC (i); INC (j);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 1;
+  WHILE i <= RuleCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_Length"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= RuleCount) DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF Reachable IN LHS^.Nonterminal.Properties THEN
+	  WriteI (File, Length, 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	  INC (j);
+	END;
+      END;
+      INC (i);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 1;
+  WHILE i <= RuleCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_LeftHandSide"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= RuleCount) DO
+      WITH ToRulePtr^ [i]^.Rule.LHS^.Nonterminal DO
+	IF Reachable IN Properties THEN
+	  WriteI (File, RecodeSymbol (Index), 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	  INC (j);
+	END;
+      END;
+      INC (i);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; k := 0;
+  WHILE k <= StateCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_Continuation"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {");
+    IF k = 0 THEN WriteS (File, " 0,"); INC (k); END;
+    WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (k <= StateCount) DO
+      IF StatePtr^[k].Class # Invalid THEN
+	WriteI (File, RecodeSymbol (StatePtr^[k].Continuation), 5);
+	WriteS (File, ", ");
+	INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	INC (j);
+      END;
+      INC (k);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File); WriteNl (File);
+    INC (part);
+  END;
+
+  part := 1; i := 1;
+  WHILE i <= RuleCount DO
+    WriteS (File, "class "); WriteIdent (File, prefix);
+    WriteS (File, "_FinalToProd"); WriteI (File, part, 0);
+    WriteS (File, " {"); WriteNl (File);
+    WriteS (File, "  static final int [] yy = {"); WriteNl (File);
+    c := 0; j := 1;
+    WHILE (j <= PartSize) AND (i <= RuleCount) DO
+      WITH ToRulePtr^ [i]^.Rule DO
+	IF ReadReduceIndex # 0 THEN
+	  WriteI (File, LastReadReduceState + Index, 5); WriteS (File, ", ");
+	  INC (c); IF c = 10 THEN c := 0; WriteNl (File); END;
+	  INC (j);
+	END;
+      END;
+      INC (i);
+    END;
+    IF c > 0 THEN WriteNl (File); END;
+    WriteS (File, "  };"); WriteNl (File);
+    WriteS (File, "};"); WriteNl (File);
+    INC (part);
+  END;
+END PutTableParts;
+
+PROCEDURE CopyTableParts (File: tFile);
+VAR
+  i, size	: CARDINAL;
+  part, part_sz	: CARDINAL;
+BEGIN
+  IF SmallTables THEN RETURN; END;
+
+  IF TTableSize >= PartSize THEN
+    part := 1; i := 0;
+    WHILE i <= TTableSize DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_TCombCheck");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyTCombCheck, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (TTableSize + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    part := 1; i := 0;
+    WHILE i <= TTableSize DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_TCombNext");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyTCombNext, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (TTableSize + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+  END;
+
+  IF NTableSize - MaxTerminalCode > PartSize THEN
+    part := 1; i := MaxTerminalCode + 1;
+    WHILE i <= NTableSize DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_NCombCheck");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyNCombCheck, ");
+      WriteI (File, i - MaxTerminalCode - 1, 0); WriteS (File, ", ");
+      WriteI (File, Min (NTableSize + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    part := 1; i := MaxTerminalCode + 1;
+    WHILE i <= NTableSize DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_NCombNext");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyNCombNext, ");
+      WriteI (File, i - MaxTerminalCode - 1, 0); WriteS (File, ", ");
+      WriteI (File, Min (NTableSize + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+  END;
+
+  IF LastReadState >= PartSize THEN
+    part := 1; i := 0; part_sz := PartSize + 1;
+    WHILE i <= LastReadState DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_TBase");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyTBase, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (LastReadState + 1 - i, part_sz), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, part_sz);
+      IF part = 1 THEN part_sz := PartSize; END;
+      INC (part);
+    END;
+
+    part := 1; i := 0; part_sz := PartSize + 1;
+    WHILE i <= LastReadState DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_NBase");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyNBase, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (LastReadState + 1 - i, part_sz), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, part_sz);
+      IF part = 1 THEN part_sz := PartSize; END;
+      INC (part);
+    END;
+
+    part := 1; i := 0; part_sz := PartSize + 1;
+    WHILE i <= LastReadState DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_TDefault");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyTDefault, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (LastReadState + 1 - i, part_sz), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, part_sz);
+      IF part = 1 THEN part_sz := PartSize; END;
+      INC (part);
+    END;
+
+    part := 1; i := 0; part_sz := PartSize + 1;
+    WHILE i <= LastReadState DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_NDefault");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyNDefault, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (LastReadState + 1 - i, part_sz), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, part_sz);
+      IF part = 1 THEN part_sz := PartSize; END;
+      INC (part);
+    END;
+  END;
+
+  IF RuleCount > PartSize THEN
+    part := 1; i := 1;
+    WHILE i <= RuleCount DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_Length");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyLength, ");
+      WriteI (File, i - 1, 0); WriteS (File, ", ");
+      WriteI (File, Min (RuleCount + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+
+    part := 1; i := 1;
+    WHILE i <= RuleCount DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_LeftHandSide");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyLeftHandSide, ");
+      WriteI (File, i - 1, 0); WriteS (File, ", ");
+      WriteI (File, Min (RuleCount + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+  END;
+
+  IF LastReadState >= PartSize THEN
+    part := 1; i := 0; part_sz := PartSize + 1;
+    WHILE i <= LastReadState DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_Continuation");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyContinuation, ");
+      WriteI (File, i, 0); WriteS (File, ", ");
+      WriteI (File, Min (LastReadState + 1 - i, part_sz), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, part_sz);
+      IF part = 1 THEN part_sz := PartSize; END;
+      INC (part);
+    END;
+  END;
+
+  size := LastReadReduceState - LastReadState;
+  IF size > PartSize THEN
+    part := 1; i := 1;
+    WHILE i <= size DO
+      WriteS (File, "        System.arraycopy (");
+      WriteIdent (File, prefix); WriteS (File, "_FinalToProd");
+      WriteI (File, part, 0); WriteS (File, ".yy, 0, yyFinalToProd, ");
+      WriteI (File, i - 1, 0); WriteS (File, ", ");
+      WriteI (File, Min (size + 1 - i, PartSize), 0);
+      WriteS (File, ");"); WriteNl (File);
+      INC (i, PartSize);
+      INC (part);
+    END;
+  END;
+END CopyTableParts;
+
+PROCEDURE PutEiffelTables (TableFile: tFile);
+
+  PROCEDURE PutTBase (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, LastReadState + 1, 0); WriteS (File, " = yyTBase"); WriteNl (File);
+      WriteI (File, 0, 0); WriteNl (File);
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, TBase^[i], 0); WriteNl (File);
+      END;
+   END PutTBase;
+
+  PROCEDURE PutNBase (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, LastReadState + 1, 0); WriteS (File, " = yyNBase"); WriteNl (File);
+      WriteI (File, 0, 0); WriteNl (File);
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, NBase^[i], 0); WriteNl (File);
+      END;
+    END PutNBase;
+
+  PROCEDURE PutTDefault (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, LastReadState + 1, 0); WriteS (File, " = yyTDefault"); WriteNl (File);
+      WriteI (File, 0, 0); WriteNl (File);
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, RecodeDefault (TDefault^[i]), 0); WriteNl (File);
+      END;
+    END PutTDefault;
+
+  PROCEDURE PutNDefault (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, LastReadState + 1, 0); WriteS (File, " = yyNDefault"); WriteNl (File);
+      WriteI (File, 0, 0); WriteNl (File);
+      FOR i := 1 TO LastReadState DO
+	WriteI (File, StatePtr^ [NDefault^[i]].ReadIndex, 0); WriteNl (File);
+      END;
+    END PutNDefault;
+
+  PROCEDURE PutTCheck (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, TTableSize + 1, 0); WriteS (File, " = yyTCheck"); WriteNl (File);
+      FOR i := 0 TO TTableSize DO
+	WriteI (File, TComb^[i].Check, 0); WriteNl (File);
+      END;
+   END PutTCheck;
+
+  PROCEDURE PutTNext (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, TTableSize + 1, 0); WriteS (File, " = yyTNext"); WriteNl (File);
+      FOR i := 0 TO TTableSize DO
+	WriteI (File, TComb^[i].Next , 0); WriteNl (File);
+      END;
+   END PutTNext;
+
+  PROCEDURE PutNComb (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, NTableSize - MaxTerminalCode, 0); WriteS (File, " = yyNComb"); WriteNl (File);
+      IF IsElement (ORD ('o'), Options) THEN
+	FOR i := MaxTerminalCode + 1 TO NTableSize DO
+	  WriteI (File, NComb^[i].Next, 0); WriteNl (File);
+	END;
+      ELSE
+	FOR i := MaxTerminalCode + 1 TO NTableSize DO
+	  WriteI (File, NComb^[i].Check, 0); WriteS (File, ' ');
+	  WriteI (File, NComb^[i].Next , 0); WriteNl (File);
+	END;
+      END;
+   END PutNComb;
+
+  PROCEDURE PutLength (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, RuleCount, 0); WriteS (File, " = yyLength"); WriteNl (File);
+      FOR i := 1 TO RuleCount DO
+	WITH ToRulePtr^ [i]^.Rule DO
+	  IF Reachable IN LHS^.Nonterminal.Properties THEN
+	    WriteI (File, Length, 0); WriteNl (File);
+	  END;
+	END;
+      END;
+    END PutLength;
+
+  PROCEDURE PutLeftHandSide (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, RuleCount, 0); WriteS (File, " = yyLeftHandSide"); WriteNl (File);
+      FOR i := 1 TO RuleCount DO
+	WITH ToRulePtr^ [i]^.Rule.LHS^.Nonterminal DO
+	  IF Reachable IN Properties THEN
+	    WriteI (File, RecodeSymbol (Index), 0); WriteNl (File);
+	  END;
+	END;
+      END;
+    END PutLeftHandSide;
+
+  PROCEDURE PutContinuation (File: tFile);
+    VAR i: LONGINT;
+    BEGIN
+      WriteI (File, LastReadState + 1, 0); WriteS (File, " = yyContinuation"); WriteNl (File);
+      WriteI (File, 0, 0); WriteNl (File);
+      FOR i := 1 TO StateCount DO
+	IF StatePtr^[i].Class # Invalid THEN
+	  WriteI (File, RecodeSymbol (StatePtr^[i].Continuation), 0); WriteNl (File);
+	END;
+      END;
+    END PutContinuation;
+
+  PROCEDURE PutFinalToProd (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, LastReadReduceState - LastReadState, 0); WriteS (File, " = yyFinalToProd"); WriteNl (File);
+      FOR i := 1 TO RuleCount DO
+	WITH ToRulePtr^ [i]^.Rule DO
+	  IF ReadReduceIndex # 0 THEN
+	    WriteI (File, LastReadReduceState + Index, 0); WriteNl (File);
+	  END;
+	END;
+      END;
+    END PutFinalToProd;
+
+  PROCEDURE PutCondition (File: tFile);
+    VAR i: CARDINAL;
+    BEGIN
+      WriteI (File, ConditionCount, 0); WriteS (File, " = yyCondition"); WriteNl (File);
+      FOR i := 1 TO CARDINAL (ConditionCount) DO
+	WriteI (File, RecodeTableElmt (ConditionPtr^ [i].Repair), 0); WriteNl (File);
+      END;
+    END PutCondition;
+
+  BEGIN
+      PutTBase		(TableFile);
+      PutNBase		(TableFile);
+   IF NOT IsElement (ORD ('u'), Options) THEN
+      PutTDefault	(TableFile);
+   END;
+   IF NOT IsElement (ORD ('o'), Options) THEN
+      PutNDefault	(TableFile);
+   END;
+      PutTCheck		(TableFile);
+      PutTNext		(TableFile);
+      PutNComb		(TableFile);
+      PutLength		(TableFile);
+      PutLeftHandSide	(TableFile);
+      PutContinuation	(TableFile);
+      PutFinalToProd	(TableFile);
+      PutCondition	(TableFile);
+  END PutEiffelTables;
+
+PROCEDURE WriteItems1 (f: tFile);
+   VAR
+      State	: LONGINT;
+      Item, c	: CARDINAL;
+   BEGIN
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       WriteS (f, "static yytItem yys");
+	       WriteI (f, State, 0);
+	       WriteS (f, " [] = {");
+	       c := 0;
+	       FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+		  WITH ItemPtr^ [Item] DO
+		     WriteC (f, "{");
+		     WriteI (f, Rule, 0);
+		     WriteS (f, ", ");
+		     WriteI (f, Dot, 0);
+		     WriteS (f, "}, ");
+		  END;
+		  INC (c); IF c = 6 THEN c := 0; WriteNl (f); END;
+	       END;
+	       WriteS (f, "{0}};");
+	       WriteNl (f);
+	    END;
+	 END;
+      END;
+   END WriteItems1;
+
+PROCEDURE WriteItems2 (f: tFile);
+   VAR State	: LONGINT;
+   BEGIN
+      FOR State := 1 TO StateCount DO
+	 IF StatePtr^ [State].Class # Invalid THEN
+	    WriteS (f, "yys");
+	    WriteI (f, State, 0);
+	    WriteC (f, ",");
+	    WriteNl (f);
+	 END;
+      END;
+   END WriteItems2;
+
+PROCEDURE DefaultLook1 (f: tFile);
+   VAR
+      Sets, i, j, x, y, c	: CARDINAL;
+      Line			: ARRAY [0 .. 100] OF LONGCARD;
+   BEGIN
+      Sets := (MaxTerminalCode + 1) DIV 32;
+      FOR i := 1 TO CARDINAL (DefaultSetCount) DO
+	 FOR j := 0 TO Sets DO Line [j] := 0; END;
+	 FOR x := Minimum (DefaultSetPtr^ [i]) TO Maximum (DefaultSetPtr^ [i]) DO
+	    IF IsElement (x, DefaultSetPtr^ [i]) THEN
+	       y := RecodeSymbol (x);
+	       INC (Line [y DIV 32], Exp2 (y MOD 32));
+	    END;
+	 END;
+	 WriteS (f, "static unsigned long yyl");
+	 WriteI (f, i, 0);
+	 WriteS (f, " [] = {");
+	 WriteNl (f);
+	 c := 0;
+	 FOR j := 0 TO Sets DO
+	    WriteS (f, "0x"); WriteN (f, Line [j], 8, 16); WriteS (f, ", ");
+	    INC (c); IF c = 6 THEN c := 0; WriteNl (f); END;
+	 END;
+	 WriteS (f, "};"); WriteNl (f);
+      END;
+   END DefaultLook1;
+
+PROCEDURE DefaultLook2 (f: tFile);
+   VAR
+      State	: LONGINT;
+      c		: CARDINAL;
+   BEGIN
+      c := 0;
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       IF DefaultLookPtr^ [ReadIndex] # 0 THEN
+		  WriteSpaces (f, 3 - Log10 (DefaultLookPtr^ [ReadIndex]));
+		  WriteS (f, "yyl"); WriteI (f, DefaultLookPtr^ [ReadIndex], 0);
+	       ELSE
+		  WriteI (f, 0, 7);
+	       END;
+	       WriteC (f, ",");
+	       INC (c); IF c = 8 THEN c := 0; WriteNl (f); END;
+	    END;
+	 END;
+      END;
+      IF c > 0 THEN WriteNl (f); END;
+   END DefaultLook2;
+
+PROCEDURE GenCSTreeFiles;
+VAR
+  f		: tFile;
+  String	: tString;
+  Rule, i, k	: CARDINAL;
+  previous	: tIdent;
+BEGIN
+  ArrayToString	(parser_name, FileNameS);
+  ArrayToString	("Rules.cs", String);
+  Concatenate	(FileNameS, String);
+  f := SmartOpen (FileNameS);
+
+  WriteS  (f, "using System;"); WriteNl (f);
+  WriteS  (f, "using System.Collections.Generic;"); WriteNl (f);
+  WriteS  (f, "using System.Linq;"); WriteNl (f);
+  WriteS  (f, "using System.Text;"); WriteNl (f);
+  WriteNl (f);
+  WriteS  (f, "namespace CoCoLab.Parser.");
+  WriteS  (f, parser_name); WriteNl (f);
+  WriteS  (f, "{"); WriteNl (f);
+  WriteS  (f, "    public enum Rules"); WriteNl (f);
+  WriteS  (f, "    {"); WriteNl (f);
+  previous := NoIdent;
+  FOR Rule := 1 TO RuleCount DO
+    WITH ToRulePtr^ [Rule]^.Rule DO
+      IF Reachable IN LHS^.Nonterminal.Properties THEN
+	WriteS	(f, "        // ");
+	WriteToken (f, LHS^.Nonterminal.Index);
+	WriteS (f, " : ");
+	FOR i := 1 TO Length DO
+	  WriteToken (f, ElmtsPtr^ [i]); WriteC (f, ' ');
+	END;
+	WriteNl (f);
+
+	WITH LHS^.Nonterminal DO
+	  IF Name = previous THEN
+	    INC (k);
+	  ELSE
+	    previous := Name; k := 1;
+	  END;
+	  WriteS  (f, "        CCL");
+	  WriteI  (f, parser_no, 0);
+	  WriteC  (f, "_");
+	  WriteIdent (f, Name);
+	  WriteC  (f, "_");
+	  WriteI  (f, k, 0);
+	  WriteS  (f, " = ");
+	  WriteI  (f, Rule, 0);
+	  WriteC  (f, ",");
+	  WriteNl (f);
+	END;
+      END;
+    END;
+  END;
+  WriteS  (f, "    }"); WriteNl (f);
+  WriteS  (f, "}"); WriteNl (f);
+  SmartClose (FileNameS, f);
+END GenCSTreeFiles;
+
+PROCEDURE PutRules (f: tFile);
+VAR
+  Rule, i	: CARDINAL;
+BEGIN
+  FOR Rule := 1 TO RuleCount DO
+    WITH ToRulePtr^ [Rule]^.Rule DO
+      IF (Reachable IN LHS^.Nonterminal.Properties) AND (Length > 0) THEN
+	WriteS	(f, "/* ");
+	WriteToken (f, LHS^.Nonterminal.Index);
+	WriteS (f, " : ");
+	FOR i := 1 TO Length DO
+	  WriteToken (f, ElmtsPtr^ [i]); WriteC (f, ' ');
+	END;
+	WriteS	(f, "*/");
+	WriteNl (f);
+	WriteS	(f, "static unsigned short yyRule");
+	WriteI	(f, Rule, 0);
+	WriteS	(f, " [] = { ");
+	FOR i := 1 TO Length DO
+	  WriteI (f, ElmtsPtr^ [i], 0); WriteS (f, ", ")
+	END;
+	WriteS	(f, "};");
+	WriteNl (f);
+      END;
+    END;
+  END;
+  WriteNl (f);
+  WriteS  (f, "static unsigned short * yyRules [] = { 0,"); WriteNl (f);
+  FOR Rule := 1 TO RuleCount DO
+    WITH ToRulePtr^ [Rule]^.Rule DO
+      IF (Reachable IN LHS^.Nonterminal.Properties) AND (Length > 0) THEN
+	WriteS  (f, "  yyRule");
+	WriteI  (f, Rule, 0);
+      ELSE
+	WriteS  (f, "  0");
+      END;
+      WriteC  (f, ",");
+      WriteNl (f);
+    END;
+  END;
+  WriteS  (f, "};"); WriteNl (f);
+END PutRules;
+
+BEGIN
+   Scanner	:= "Scanner";
+   Parser	:= "Parser";
+   Drv		:= "Drv";
+   CaseLabels	:= MAX (SHORTCARD);
+   ColumnCount	:= 0;
+   parser_name	:= "";
+   parser_no	:= 1;
+END Generate.

@@ -1,0 +1,228 @@
+TRAFO	tsl
+TREE	Tree
+PUBLIC	tsl
+
+GLOBAL {
+
+FROM IO		IMPORT StdOutput, WriteS, WriteI, WriteN, WriteNl;
+FROM Strings	IMPORT tString, ArrayToString, StringToArray;
+FROM Idents	IMPORT tIdent, MakeIdent, GetLength, GetString, WriteIdent;
+FROM Tree	IMPORT Test, Dummy, Reverse;
+
+VAR
+  ichar			,
+  icpp_tconvention	,
+  icpp_thash_table	,
+  icpp_tkind		,
+  icpp_toperator	,
+  icpp_tspecifier	,
+  iint			,
+  irbool		,
+  ishort		,
+  itIdent		,
+  itPosition		,
+  itStringRef		,
+  itcpp_tree		,
+  ius_long		,
+  ius_short		,
+  elmt_name		: tIdent;
+
+PROCEDURE is_next (ident: tIdent): BOOLEAN;
+VAR
+  s: tString;
+  a: ARRAY [1..5] OF CHAR;
+  i: CARDINAL;
+BEGIN
+  IF GetLength (ident) # 4 THEN RETURN FALSE; END;
+  GetString (ident, s);
+  StringToArray (s, a);
+  FOR i := 1 TO 4 DO
+    IF ('A' <= a [i]) AND (a [i] <= 'Z') THEN
+      a [i] := CHR (ORD (a [i]) - ORD ('A') + ORD ('a'));
+    END;
+  END;
+  RETURN (a [1] = 'n') AND (a [2] = 'e') AND (a [3] = 'x') AND (a [4] = 't');
+END is_next;
+
+PROCEDURE is_no (ident: tIdent): BOOLEAN;
+VAR
+  s: tString;
+  a: ARRAY [1..256] OF CHAR;
+  i: CARDINAL;
+BEGIN
+  IF GetLength (ident) < 2 THEN RETURN FALSE; END;
+  GetString (ident, s);
+  StringToArray (s, a);
+  FOR i := 1 TO 2 DO
+    IF ('A' <= a [i]) AND (a [i] <= 'Z') THEN
+      a [i] := CHR (ORD (a [i]) - ORD ('A') + ORD ('a'));
+    END;
+  END;
+  RETURN (a [1] = 'n') AND (a [2] = 'o');
+END is_no;
+
+PROCEDURE write_ident (ident: tIdent);
+BEGIN
+  WriteIdent (StdOutput, ident);
+END write_ident;
+
+PROCEDURE MI (VAR array: ARRAY OF CHAR): tIdent;
+VAR string: tString;
+BEGIN
+  ArrayToString (array, string);
+  RETURN MakeIdent (string);
+END MI;
+
+}
+
+BEGIN {
+  ichar			:= MI ("char");
+  icpp_tconvention	:= MI ("cpp_tconvention");
+  icpp_thash_table	:= MI ("cpp_thash_table");
+  icpp_tkind		:= MI ("cpp_tkind");
+  icpp_toperator	:= MI ("cpp_toperator");
+  icpp_tspecifier	:= MI ("cpp_tspecifier");
+  iint			:= MI ("int");
+  irbool		:= MI ("rbool");
+  ishort		:= MI ("short");
+  itIdent		:= MI ("tIdent");
+  itPosition		:= MI ("tPosition");
+  itStringRef		:= MI ("tStringRef");
+  itcpp_tree		:= MI ("tcpp_tree");
+  ius_long		:= MI ("us_long");
+  ius_short		:= MI ("us_short");
+}
+
+// TODO trailing blanks: kind='class    '
+// TODO trailing blanks: specifier='int '
+// TODO selectors: XML does have, TSL does not have
+//                 Remove from XML? How to separate adjacent lists?
+// done lists vs. next: align TSL to XML
+// TODO lists vs. no...: align TSL to XML / remove no... from XML and TSL
+// TODO order of attributes and children
+// TODO representation of attributes and children
+// TODO specify frame in TSL: tags <XML> and <cpp_tree>
+// TODO how to specify _ref in TSL?
+
+PROCEDURE tsl (Tree)
+
+Ag (...) :-
+  "base-package = com.cocolab.cxx;"; NL
+  NL
+  "type _ref"; NL
+  "  attributes"; NL
+  "  <"; NL
+  "    _addr = string // pointer to tree node"; NL
+  "  >"; NL
+  "end-type"; NL
+  NL
+  "type _node abstract"; NL
+  "  attributes"; NL
+  "  <"; NL
+  "    _addr = string // address of tree node"; NL
+  "  >"; NL
+  "end-type"; NL
+  tsl (Classes);
+  .
+Class (Attributes := Attributes, BaseClass := BaseClass) :-
+  NL
+  "type "; write_ident (Name); NL
+  IF BaseClass ?= Class (Name := parent) THEN
+    "  parent ("; write_ident (parent); ")"; NL
+  ELSE
+    "  parent (_node)"; NL
+  END
+  IF have_members (Attributes) THEN
+    "  attributes"; NL
+    "  <"; NL
+    tsl (Attributes);
+    "  >"; NL
+  END
+  "end-type"; NL
+  tsl (Extensions);
+  tsl (Next);
+  .
+Child (...) :-
+  IF (Reverse IN Properties) AND is_next (Name) THEN
+  ELSE
+    list: BOOLEAN := is_list (Class);
+    "    "; write_ident (Name); " = ";
+    IF list
+    THEN "list ["; write_ident (elmt_name); "]";
+    ELSE write_ident (Type);
+    END
+    IF have_members (Next) THEN ","; END
+    IF list THEN " // "; write_ident (Type); END
+    NL
+  END
+  tsl (Next);
+  .
+Attribute (...) :-
+  IF {{Test, Dummy}} * Properties = {{}} THEN
+    "    "; write_ident (Name); " = "; write_type (Type);
+    IF have_members (Next) THEN ","; END " // "; write_ident (Type); NL
+  END
+  tsl (Next);
+  .
+AttrOrAction (...) :-
+  tsl (Next);
+  .
+
+PROCEDURE write_type (tIdent)
+
+(ichar			) :- "string"; .	//
+(icpp_tconvention	) :- "string"; .	// enum
+(icpp_thash_table	) :- "string"; .	// reference (internal use)
+(icpp_tkind		) :- "string"; .	// enum (bitset?)
+(icpp_toperator		) :- "string"; .	// enum?
+(icpp_tspecifier	) :- "string"; .	// bitset
+(iint			) :- "int"; .		//
+(irbool			) :- "boolean"; .	//
+(ishort			) :- "int"; .		//
+(itIdent		) :- "string"; .	//
+(itPosition		) :- "string"; .	// record
+(itStringRef		) :- "string"; .	//
+(itcpp_tree		) :- "string"; .	// reference to tree
+(ius_long		) :- "int"; .		//
+(ius_short		) :- "int"; .		//
+
+PREDICATE have_members (Attributes)
+
+Child (...) :-
+  CONDITION (Reverse IN Properties) AND is_next (Name);
+  IF NOT have_members (Next) THEN FAIL END
+  .
+Child (...) :-
+  .
+Attribute (...) :-
+  CONDITION {{Test, Dummy}} * Properties = {{}};
+  .
+AttrOrAction (...) :-
+  have_members (Next);
+  .
+
+PREDICATE is_list (Class)
+
+Class (...) :-
+  CONDITION have_iterator (Attributes);
+  elmt_name := Name;
+  .
+Class (...) :-
+  CONDITION have_iterator (Extensions);
+  .
+
+PREDICATE have_iterator ([Attributes, Classes])
+
+Class (...) :-
+  CONDITION have_iterator (Attributes);
+  elmt_name := Name;
+  .
+Class (...) :-
+  CONDITION have_iterator (Next);
+  .
+Child (...) :-
+  CONDITION (Reverse IN Properties) AND is_next (Name);
+  .
+AttrOrAction (...) :-
+  CONDITION have_iterator (Next);
+  .

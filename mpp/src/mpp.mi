@@ -1,0 +1,16 @@
+(* $Id: mpp.mi,v 4.0 1993/08/26 16:09:22 grosch rel $ *)
+
+MODULE mpp;
+
+FROM IO		IMPORT	StdOutput, StdError, CloseIO;
+FROM Parser	IMPORT	Parser, CloseParser;
+FROM rSystem	IMPORT	rExit;
+
+VAR  ErrorCount : CARDINAL;
+
+BEGIN
+   ErrorCount := Parser ();
+   CloseParser;
+   CloseIO;
+   IF ErrorCount > 0 THEN rExit (1) ELSE rExit (0) END;
+END mpp.

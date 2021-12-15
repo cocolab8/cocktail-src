@@ -1,0 +1,45 @@
+(* $Id: tidy.mi$ *)
+
+(*
+ * $Log:$
+ *
+ *)
+
+MODULE tidy;
+
+IMPORT Reader;
+IMPORT Writer;
+IMPORT IO;
+
+FROM rSystem	IMPORT GetArgument, rExit;
+FROM Position	IMPORT NoPosition;
+FROM Strings	IMPORT tString, ArrayToString;
+FROM Idents	IMPORT MakeIdent;
+FROM IO		IMPORT CloseIO;
+
+VAR Token	: INTEGER;
+    FileName	: ARRAY [0..255] OF CHAR;
+    String	: tString;
+
+BEGIN
+   GetArgument (1, FileName);
+   ArrayToString (FileName, String);
+   Reader.Attribute.Position := NoPosition;
+   Reader.Attribute.Position.File := MakeIdent (String);
+   Reader.BeginFile (FileName);
+   Reader.BeginScanner;
+   REPEAT
+      Token := Reader.GetToken ();
+   UNTIL Token = Reader.EofToken;
+   Reader.CloseScanner;
+   Writer.Attribute.Position := NoPosition;
+   Writer.Attribute.Position.File := MakeIdent (String);
+   Writer.BeginFile (FileName);
+   Writer.BeginScanner;
+   REPEAT
+      Token := Writer.GetToken ();
+   UNTIL Token = Writer.EofToken;
+   Writer.CloseScanner;
+   CloseIO;
+   rExit (0);
+END tidy.

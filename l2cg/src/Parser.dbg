@@ -1,0 +1,64 @@
+State   21 (  29): derivation trees
+-----------------------------------
+
+	shift reduce conflict implicitly repaired
+
+.Grammar _EOF_ 
+.Decls RulePart 
+.Decls Comment 
+|  Decls.Comment 
+ Decls.TokenPart 
+ 'TOKEN' Tokens.
+
+reduce  164  TokenPart:  'TOKEN' Tokens. {Comment} ?
+
+example   r  TOKEN .Comment RULE 
+
+.Grammar _EOF_ 
+.Decls RulePart 
+ Decls.TokenPart 
+ 'TOKEN'.Tokens 
+ Tokens.Comment 
+
+shift   169  Tokens:  Tokens.Comment ?
+
+example   s  TOKEN .Comment RULE 
+
+State   21 (  29): summary
+--------------------------
+
+ignore reduce  164  TokenPart:  'TOKEN' Tokens. {Comment}
+retain shift   169  Tokens:  Tokens.Comment 
+
+State   29 (  47): derivation trees
+-----------------------------------
+
+	shift reduce conflict implicitly repaired
+
+.Grammar _EOF_ 
+.Decls RulePart 
+.Decls Comment 
+|  Decls.Comment 
+ Decls.PrecPart 
+ 'OPER' PrecPart_1 Precedences.
+
+reduce  182  PrecPart:  'OPER' PrecPart_1 Precedences. {Comment} ?
+
+example   r  OPER .Comment RULE 
+
+.Grammar _EOF_ 
+.Decls RulePart 
+ Decls.PrecPart 
+ 'OPER' PrecPart_1.Precedences 
+ Precedences.Comment 
+
+shift   188  Precedences:  Precedences.Comment ?
+
+example   s  OPER .Comment RULE 
+
+State   29 (  47): summary
+--------------------------
+
+ignore reduce  182  PrecPart:  'OPER' PrecPart_1 Precedences. {Comment}
+retain shift   188  Precedences:  Precedences.Comment 
+

@@ -1,0 +1,2434 @@
+/* $Id: sem.puma,v 1.20 2010/07/07 08:39:14 grosch Exp $ */
+
+/*
+ * $Log: sem.puma,v $
+ * Revision 1.20  2010/07/07 08:39:14  grosch
+ * added missing case in TransformExpr: NoExpression
+ *
+ * Revision 1.19  2009/10/13 08:32:30  grosch
+ * added missing code at node type IfMatch
+ *
+ * Revision 1.18  2008/09/12 13:29:04  grosch
+ * added new kinds of FOR loops for iteration over lists of tree nodes
+ * extended pattern matching in IF statements by optional conditions
+ *
+ * Revision 1.17  2004/11/24 17:18:41  grosch
+ * allow "variable::attribute" for GLOBAL variables in target code
+ *
+ * Revision 1.16  2004/01/05 16:40:33  grosch
+ * allow statements after RETURN statement
+ * added new statement for IMPORT of external routine declarations
+ * allow pattern matching in IF statements
+ * a FOR loop can declare its loop variable
+ * added new scopes and changed scoping rules:
+ *    THEN and ELSE parts of the IF statement and the FOR and WHILE loops
+ *
+ * Revision 1.15  2003/07/22 11:29:02  grosch
+ * allow "variable::attribute" for GLOBAL variables
+ *
+ * Revision 1.14  2002/10/21 09:54:20  grosch
+ * fixed bug: expressions in head of FOR loop are never treated as conditions
+ *
+ * Revision 1.13  2002/10/18 14:33:38  grosch
+ * fixed bug: expressions in head of FOR loop are never treated as conditions
+ *
+ * Revision 1.12  2002/08/07 12:19:15  grosch
+ * added explicit initialization of attributes
+ * improved handling of files cg.cg and puma.cg
+ *
+ * Revision 1.11  2002/07/29 14:40:44  grosch
+ * issue warning if condition without keyword CONDITION is found
+ * added keyword CONDITION to conditions
+ * added automatic test whether pointers are not NULL before dereferencing them
+ *
+ * Revision 1.10  2002/04/18 13:33:45  grosch
+ * renamed attribute Routine.IsExtern to Routine.IsPublic
+ *
+ * Revision 1.9  2002/01/10 14:21:29  grosch
+ * omit code for yyAbort (option -f) for TRIPs
+ *
+ * Revision 1.8  2001/12/17 12:05:56  grosch
+ * added GLOBAL and LOCAL declarations for variables with node types
+ * added WHILE loop
+ * added EXTERN attribute to routine declarations
+ * added TRIP as new kind of routine providing automatic tree traversal
+ *
+ * Revision 1.7  2001/09/20 14:26:57  grosch
+ * fixed bug at code generation for FAIL and REJECT inside IF
+ * added attribute grammar for control flow analysis
+ *
+ * Revision 1.6  2001/08/28 21:06:13  grosch
+ * several improvements of semantic analysis
+ *
+ * Revision 1.5  2001/08/01 14:43:52  grosch
+ * delivery of Trevor Nash for generation of Java
+ *
+ * Revision 1.4  2001/01/05 19:01:20  grosch
+ * fixed bug: treat a = b + c; as assignment in C
+ *
+ * Revision 1.3  1999/10/13 15:22:31  grosch
+ * improved checking of function calls
+ *
+ * Revision 1.2  1999/06/03 08:25:26  grosch
+ * bug fix: VIRTUAL attributes
+ *
+ * Revision 1.1  1998/04/21 10:13:48  grosch
+ * truncation of file and module names to 8.3 format
+ * added many language extensions
+ * improved error messages
+ * added Information messages and option -u
+ *
+ * Revision 1.0  1993/08/17  15:48:19  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 19.4.1991/Dec. 2001 */
+
+TRAFO Semantic PUBLIC Semantics RemoveTreeTypes AddStructuredTypes
+
+EXPORT {
+FROM Idents	IMPORT tIdent;
+FROM Sets	IMPORT tSet;
+FROM Tree	IMPORT tTree;
+
+VAR TypeCount	: SHORTCARD;
+VAR TypeNames, UserTypes	: tSet;
+
+PROCEDURE IdentifyClass (t: tTree; Ident: tIdent): tTree;
+PROCEDURE IdentifyClass2 (i: tIdent; VAR TreeName: tTree): tTree;
+PROCEDURE LookupClass	(Classes: tTree; i: CARDINAL): tTree;
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM General	IMPORT Max;
+FROM Position	IMPORT WritePosition;
+FROM IO		IMPORT tFile, StdOutput, WriteN, WriteS, WriteI, WriteNl;
+FROM DynArray	IMPORT MakeArray, ReleaseArray;
+FROM Strings	IMPORT tString, IntToString, Append, Concatenate, ArrayToString;
+FROM Idents	IMPORT WriteIdent, tIdent, NoIdent, MakeIdent, MaxIdent, GetString;
+FROM Texts	IMPORT MakeText;
+FROM Scanner	IMPORT Error, ErrorI, Warning, WarningI, Information, InformationI;
+FROM Position	IMPORT tPosition, NoPosition;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, AssignEmpty	,
+   IsElement	, Include	, IsEmpty	, Extract	,
+   Select	, Difference	, Complement	, ForallDo	,
+   IsSubset	, Minimum	, Maximum	, Assign	,
+   Exclude	, Intersection	, WriteSet	, IsNotEqual	,
+   Card		;
+
+FROM Tree	IMPORT
+   tTree	, NoTree	, TreeRoot	, mCall		,
+   mCompose	, mDecompose	, mDontCare	, mDontCare1	,
+   mNilTest	, mNoPattern	, mOnePattern	, mVarDef	,
+   mNoObject	, mObject	, mNodeTypes	, mUserType	,
+   mVar		, mConsType	, mField	, mNoClass	,
+   mOneExpr	, mNoExpr	, mValue	, mDummyObject	,
+   mWriteStr	, mAssignment	, ForallClasses	, ForallAttributes,
+   Options	, ReverseTree	, IsType	, Class		,
+   Test		, (* Dummy	, *) HasTempos	, HasPatterns	,
+   iEqual	, DefaultAssignOp, f		, NoCodeAttr	;
+
+FROM Eval	IMPORT Eval;
+
+IMPORT Strings, Idents;
+
+VAR
+   ExternNames	,
+   LocExternNames,
+   ActTypes	,
+   BaseTypes	,
+   ActNames	,
+   UserNames	,
+   LabelNames	,
+   ParamNames	,
+   RoutineNames	: tSet;
+   dObjects	,
+   gParameters	,
+   Decls	,
+   GlobalDecls	,
+   Args		,
+   gInObjects	,
+   gOutObjects	,
+   gReturnObject,
+   Node		,
+   Var		,
+   TreeName	,
+   Iterator	,
+   ActRule	,
+   ActType	,
+   ActTree	,
+   ActClass	,
+   RevChild	: tTree;
+   RuleCount	,
+   VarCount	: INTEGER;
+   yy		,
+   PlusPlus	,
+   MinusMinus	,
+   Dot		,
+   ActName	,
+   ProcName	,
+   ParamName	: tIdent;
+   dummy	,
+   HasLocals	,
+   IsOutput	,
+   Mode		,
+   Success	: BOOLEAN;
+   String	,
+   String1	: tString;
+   RoutineKind	,
+   i		: CARDINAL;
+   nNoObject	: tTree;
+   gPos		: tPosition;
+
+PROCEDURE IdentifyClass (t: tTree; Ident: tIdent): tTree;
+   VAR class	: tTree;
+   BEGIN
+      WHILE t^.Kind = Class DO
+	 WITH t^.Class DO
+	    IF Name = Ident THEN RETURN t; END;
+	    class := IdentifyClass (Extensions, Ident);
+	    IF class # NoTree THEN RETURN class; END;
+	    t := Next;	(* RETURN IdentifyClass (Next, Ident); *)
+	 END;
+      END;
+      RETURN NoTree;
+   END IdentifyClass;
+
+PROCEDURE IdentifyTree (i: tIdent): tTree;	(* is i name of a tree type ? *)
+   VAR Node: tTree;
+   BEGIN
+      Node := TreeRoot^.Spec.TreeNames;
+      WHILE Node^.Kind = Tree.TreeName DO
+	 IF Node^.TreeName.Name = i THEN RETURN Node; END;
+	 Node := Node^.TreeName.Next;
+      END;
+      RETURN NoTree;
+   END IdentifyTree;
+
+PROCEDURE IdentifyProc (i: tIdent): tTree;     (* is i name of a subroutine ? *)
+   VAR Object, Node: tTree;
+   BEGIN
+      Object := IdentifyProc2 (i, TreeRoot);
+      IF Object # NoTree THEN RETURN Object; END;
+      Node := TreeRoot^.Spec.Imports;
+      WHILE Node^.Kind = Tree.Import DO
+	 Object := IdentifyProc2 (i, Node^.Import.Spec);
+	 IF Object # NoTree THEN RETURN Object; END;
+	 Node := Node^.Import.Next;
+      END;
+      RETURN NoTree;
+   END IdentifyProc;
+
+PROCEDURE IdentifyProc2 (i: tIdent; t: tTree): tTree; (* is i name of a subroutine ? *)
+   VAR Node: tTree;
+   BEGIN
+      Node := t^.Spec.Routines;
+      WHILE Node^.Kind # Tree.NoRoutine DO
+	 IF Node^.Routine.Name = i THEN RETURN Node; END;
+	 Node := Node^.Routine.Next;
+      END;
+      RETURN NoTree;
+   END IdentifyProc2;
+
+PROCEDURE IdentifyVar (Node: tTree; i: tIdent): tTree; (* is i name of a variable ? *)
+   BEGIN
+      WHILE Node^.Kind # Tree.NoObject DO
+	 IF Node^.Object.Name = i THEN RETURN Node; END;
+	 Node := Node^.Object.Next;
+      END;
+      RETURN NoTree;
+   END IdentifyVar;
+
+PROCEDURE IdentifyClass2 (i: tIdent; VAR TreeName: tTree): tTree; (* is i a node type ? *)
+   VAR Class: tTree;
+   BEGIN
+      TreeName := TreeRoot^.Spec.TreeNames;
+      WHILE TreeName^.Kind = Tree.TreeName DO
+	 Class := IdentifyClass (TreeName^.TreeName.Classes, i);
+	 IF Class # NoTree THEN RETURN Class; END;
+	 TreeName := TreeName^.TreeName.Next;
+      END;
+      TreeName := NoTree;
+      RETURN NoTree;
+   END IdentifyClass2;
+
+PROCEDURE LookupClass (Classes: tTree; i: CARDINAL): tTree;
+   VAR Class: tTree;
+   BEGIN
+      IF Classes^.Kind = Tree.NoClass THEN RETURN NoTree; END;
+      WITH Classes^.Class DO
+	 IF Index = i THEN RETURN Classes; END;
+	 Class := LookupClass (Extensions, i);
+	 IF Class # NoTree THEN RETURN Class; END;
+	 RETURN LookupClass (Next, i);
+      END;
+   END LookupClass;
+
+PROCEDURE MakeTypes (Index: INTEGER; Classes: tTree; VAR Types: tSet);
+   BEGIN
+      ActTypes := Types;
+      ForallClasses (Classes, ProcObjects);
+      Include (ActTypes, Index);
+      Types := ActTypes;
+   END MakeTypes;
+
+PROCEDURE CheckSubtype (f: tTree; IsInParam: BOOLEAN; t2: tTree;
+			Pos: tPosition; Guard: BOOLEAN): BOOLEAN;
+   VAR
+      isEmpty, IsOutput	: BOOLEAN;
+      string, s2: tString;
+      type, i	: CARDINAL;
+      t1	: tTree;
+   BEGIN
+      t1 := f^.Object.TypeDesc;
+      IF t1^.Kind = Tree.NodeTypes THEN
+	 IsOutput := (f^.Object.Path # NoTree) AND
+		     (f^.Object.Path^.Kind = Tree.Var) AND
+		      f^.Object.Path^.Var.IsOutput;
+	 IF t2^.Kind = Tree.UserType THEN
+	    IF t2^.UserType.Type # NoIdent THEN
+	       InformationI ("node type required instead of", Pos, t2^.UserType.Type);
+	    ELSE
+	       Information ("node type required", Pos);
+	    END;
+	    RETURN TRUE;
+	 ELSIF t2^.NodeTypes.TreeName # t1^.NodeTypes.TreeName THEN
+	    Error ("incompatible tree types", Pos);
+	    RETURN TRUE;
+	 ELSIF IsInParam AND IsOutput AND		(* REF parameter *)
+	    IsNotEqual (t1^.NodeTypes.Types, t2^.NodeTypes.Types) THEN
+	    Error ("incompatible node types", Pos);
+	 ELSIF NOT IsSubset (t2^.NodeTypes.Types, t1^.NodeTypes.Types) THEN
+	    IF Guard THEN
+	       MakeSet (ActTypes, t2^.NodeTypes.TreeName^.TreeName.ClassCount);
+	       Assign (ActTypes, t2^.NodeTypes.Types);
+	       Intersection (ActTypes, t1^.NodeTypes.Types);
+	       isEmpty := IsEmpty (ActTypes);
+	       ReleaseSet (ActTypes);
+	       IF NOT isEmpty THEN RETURN TRUE; END;
+	    END;
+	    MakeSet (ActTypes, t1^.NodeTypes.TreeName^.TreeName.ClassCount);
+	    Assign (ActTypes, t1^.NodeTypes.Types);
+	    Strings.AssignEmpty (string);
+	    i := 0;
+	    WHILE NOT IsEmpty (ActTypes) DO
+	       type := Extract (ActTypes);
+	       ActClass := LookupClass (t1^.NodeTypes.TreeName^.TreeName.Classes, type);
+	       GetString (ActClass^.Class.Name, s2);
+	       INC (i);
+	       CASE i OF
+	       | 1	:
+	       | 2, 3	: Append (string , ',');
+			  Append (string , ' ');
+	       | 4	: ArrayToString (", ...", s2);
+			  AssignEmpty (ActTypes);
+	       END;
+	       Concatenate (string, s2);
+	       ForallClasses (ActClass^.Class.Extensions, ExcludeTypes);
+	    END;
+	    ReleaseSet (ActTypes);
+	    ErrorI ("subtype required of", Pos, MakeIdent (string));
+	    RETURN TRUE;
+	 END;
+      ELSIF t1^.Kind = Tree.UserType THEN
+	 IF t2^.Kind = Tree.NodeTypes THEN
+	    InformationI ("user-type required", Pos, t1^.UserType.Type);
+	 ELSIF t2^.UserType.Type # t1^.UserType.Type THEN
+	    Information ("incompatible types", Pos);
+	 END;
+      END;
+      RETURN FALSE;
+   END CheckSubtype;
+
+PROCEDURE CheckType (t1, t2: tTree; Pos: tPosition);
+   VAR t	: tSet;
+   BEGIN
+      IF t1^.Kind = Tree.NodeTypes THEN
+	 IF t2^.Kind = Tree.UserType THEN
+	    IF t2^.UserType.Type # NoIdent THEN
+	       InformationI ("node type required instead of", Pos, t2^.UserType.Type);
+	    ELSE
+	       Information ("node type required", Pos);
+	    END;
+	 ELSIF t2^.NodeTypes.TreeName # t1^.NodeTypes.TreeName THEN
+	    Error ("incompatible tree types", Pos);
+	 ELSE
+	    MakeSet (t, t1^.NodeTypes.TreeName^.TreeName.ClassCount);
+	    Assign (t, t1^.NodeTypes.Types);
+	    Intersection (t, t2^.NodeTypes.Types);
+	    IF IsEmpty (t) THEN
+	       Warning ("incompatible node types", Pos);
+	    END;
+	    ReleaseSet (t);
+	 END;
+      ELSIF t1^.Kind = Tree.UserType THEN
+	 IF t2^.Kind = Tree.NodeTypes THEN
+	    InformationI ("user-type required", Pos, t1^.UserType.Type);
+	 ELSIF t2^.UserType.Type # t1^.UserType.Type THEN
+	    Information ("incompatible types", Pos);
+	 END;
+      END;
+   END CheckType;
+
+PROCEDURE TransformPattern (t: tTree): tTree;
+   VAR TreeName, s, object	: tTree;
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.NoExpr	: RETURN mNoPattern (t^.NoExpr.Pos);
+
+      | Tree.OneExpr	: WITH t^.OneExpr DO
+	    RETURN mOnePattern (TransformPattern (Expr), TransformPattern (Next));
+	 END;
+
+      | Tree.NamedExpr	: WITH t^.NamedExpr DO
+	    ErrorI ("illegal pattern name", Expr^.Expr.Pos, Name);
+	    RETURN mOnePattern (TransformPattern (Expr), TransformPattern (Next));
+	 END;
+
+      | Tree.Compose	: WITH t^.Compose DO
+	    IF Expr^.Kind = Tree.VarUse THEN
+	       Object := IdentifyClass2 (Expr^.VarUse.Name, TreeName);
+	       IF Object = NoTree THEN Object := IdentifyProc (Expr^.VarUse.Name); END;
+	    ELSIF (Expr^.Kind = Tree.Binary) AND
+		  (Expr^.Binary.Lop^.Kind = Tree.VarUse) AND
+		  (Expr^.Binary.Rop^.Kind = Tree.VarUse) THEN
+	       Object := IdentifyTree (Expr^.Binary.Lop^.VarUse.Name);
+	       IF Object # NoTree THEN
+		  Object := IdentifyClass (Object^.TreeName.Classes, Expr^.Binary.Rop^.VarUse.Name);
+	       END;
+	    ELSE
+	       Object := NoTree;
+	    END;
+
+	    Expr := TransformExpr (Expr);
+	    IF Object # NoTree THEN
+	       IF Object^.Kind = Class THEN
+		  Exprs := TransformName (Exprs, Object^.Class.Objects);
+		  s := mDecompose (Pos, Selector, Expr, TransformPattern (Exprs), Widen);
+		  s^.Decompose.Object := Object;
+		  RETURN s;
+	       ELSE
+		  IF Selector # NoIdent THEN
+		     WarningI ("identifier ignored before function call", Pos, Selector);
+		  END;
+		  s := mCall (Pos, Expr, TransformExpr (Exprs), mNoPattern (Pos));
+		  s^.Call.Object := Object;
+		  RETURN mValue (Pos, s);
+	       END;
+	    ELSE
+	       IF Selector # NoIdent THEN
+		  WarningI ("identifier ignored before function call", Pos, Selector);
+	       END;
+	       s := mCall (Pos, Expr, TransformExpr (Exprs), mNoExpr (Pos));
+	       s^.Call.Object := Object;
+	       RETURN mValue (Pos, s);
+	    END;
+	 END;
+
+      | Tree.VarUse	: WITH t^.VarUse DO
+	    Object := IdentifyClass2 (Name, TreeName);
+	    IF (Object # NoTree) AND IsElement (ORD ('p'), Options) THEN
+	       s := mDecompose (Pos, NoIdent, t, mOnePattern (mDontCare (Pos), mNoPattern (Pos)), FALSE);
+	       s^.Decompose.Object := Object;
+	       RETURN s;
+	    ELSE
+	       RETURN mVarDef (Pos, Name);
+	    END;
+	 END;
+
+      | Tree.Nil	: RETURN mNilTest (t^.Nil.Pos, t^.Nil.Selector);
+
+      | Tree.DontCare1
+      , Tree.DontCare	: RETURN t;
+
+      | Tree.Binary	: WITH t^.Binary DO
+	    IF IsElement (ORD ('p'), Options) AND (Operator = Dot) AND
+	       (Lop^.Kind = Tree.VarUse) AND (Rop^.Kind = Tree.VarUse) THEN
+	       object := IdentifyTree (Lop^.VarUse.Name);
+	       IF object # NoTree THEN
+		  object := IdentifyClass (object^.TreeName.Classes, Rop^.VarUse.Name);
+		  IF object # NoTree THEN
+		     s := mDecompose (Pos, NoIdent, t, mOnePattern (mDontCare (Pos), mNoPattern (Pos)), FALSE);
+		     s^.Decompose.Object := object;
+		     RETURN s;
+		  END;
+	       END;
+	    END;
+	    RETURN mValue (Pos, TransformExpr (t));
+	 END;
+
+      | Tree.Call
+      , Tree.PreOperator
+      , Tree.PostOperator
+      , Tree.Index
+      , Tree.Parents
+      , Tree.Guard
+      , Tree.TargetExpr
+      , Tree.StringExpr
+      , Tree.AttrDesc	: RETURN mValue (t^.Expr.Pos, TransformExpr (t));
+
+      END;
+   END TransformPattern;
+
+PROCEDURE TransformExpr (t: tTree): tTree;
+   VAR TreeName, s, object	: tTree;
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.NoExpr	:
+
+      | Tree.OneExpr	: WITH t^.OneExpr DO
+	    Expr	:= TransformExpr (Expr);
+	    Next	:= TransformExpr (Next);
+	 END;
+
+      | Tree.NoDeclaration:
+
+      | Tree.ParamDecl
+      , Tree.VarDecl	: WITH t^.Declaration DO
+	    Next	:= TransformExpr (Next);
+	 END;
+
+      | Tree.InitDecl	: WITH t^.InitDecl DO
+	    Expr	:= TransformExpr (Expr);
+	    Next	:= TransformExpr (Next);
+	 END;
+
+      | Tree.NamedExpr	: WITH t^.NamedExpr DO
+	    ErrorI ("name illegal before function argument", t^.NamedExpr.Expr^.Expr.Pos, Name);
+	    RETURN mOneExpr (TransformExpr (Expr), TransformExpr (Next));
+	 END;
+
+      | Tree.Compose	: WITH t^.Compose DO
+	    IF Expr^.Kind = Tree.VarUse THEN
+	       Object := IdentifyClass2 (Expr^.VarUse.Name, TreeName);
+	       IF Object = NoTree THEN Object := IdentifyProc (Expr^.VarUse.Name); END;
+	    ELSIF (Expr^.Kind = Tree.Binary) AND
+		  (Expr^.Binary.Lop^.Kind = Tree.VarUse) AND
+		  (Expr^.Binary.Rop^.Kind = Tree.VarUse) THEN
+	       Object := IdentifyTree (Expr^.Binary.Lop^.VarUse.Name);
+	       IF Object # NoTree THEN
+		  Object := IdentifyClass (Object^.TreeName.Classes, Expr^.Binary.Rop^.VarUse.Name);
+	       END;
+	    ELSE
+	       Object := NoTree;
+	    END;
+
+	    Expr := TransformExpr (Expr);
+	    IF Object # NoTree THEN
+	       IF Object^.Kind = Class THEN
+		  Exprs := TransformName (Exprs, Object^.Class.Objects);
+		  Exprs := TransformExpr (Exprs);
+		  RETURN t;
+	       ELSE
+		  IF Selector # NoIdent THEN
+		     WarningI ("identifier ignored before function call", Pos, Selector);
+		  END;
+		  s := mCall (Pos, Expr, TransformExpr (Exprs), mNoPattern (Pos));
+		  s^.Call.Object := Object;
+		  RETURN s;
+	       END;
+	    ELSE
+	       IF Selector # NoIdent THEN
+		  WarningI ("identifier ignored before function call", Pos, Selector);
+	       END;
+	       s := mCall (Pos, Expr, TransformExpr (Exprs), mNoExpr (Pos));
+	       s^.Call.Object := Object;
+	       RETURN s;
+	    END;
+	 END;
+
+      | Tree.VarUse	: WITH t^.VarUse DO
+	    Object := IdentifyClass2 (Name, TreeName);
+	    IF (Object # NoTree) AND IsElement (ORD ('p'), Options) THEN
+	       s := mCompose (Pos, NoIdent, t, mOneExpr (mDontCare (Pos), mNoExpr (Pos)), FALSE);
+	       s^.Compose.Object := Object;
+	       RETURN s;
+	    ELSE
+	       Object := NoTree;
+	       RETURN t;
+	    END;
+	 END;
+
+      | Tree.Nil	:
+      | Tree.DontCare1	:
+      | Tree.DontCare	:
+
+      | Tree.Call	: WITH t^.Call DO
+	    IF Expr^.Kind = Tree.VarUse THEN
+	       Object := IdentifyProc (Expr^.VarUse.Name);
+	    ELSE
+	       Object := NoTree;
+	    END;
+	    Expr  := TransformExpr (Expr);
+	    Exprs := TransformExpr (Exprs);
+	    IF Object # NoTree THEN
+	       Patterns	:= TransformPattern (Patterns);
+	    ELSE
+	       Patterns	:= TransformExpr (Patterns);
+	    END;
+	 END;
+
+      | Tree.Binary	: WITH t^.Binary DO
+	    IF IsElement (ORD ('p'), Options) AND
+	       (Lop^.Kind = Tree.VarUse) AND (Rop^.Kind = Tree.VarUse) THEN
+	       object := IdentifyTree (Lop^.VarUse.Name);
+	       IF object # NoTree THEN
+		  object := IdentifyClass (object^.TreeName.Classes, Rop^.VarUse.Name);
+		  IF object # NoTree THEN
+		     s := mCompose (Pos, NoIdent, t, mOneExpr (mDontCare (Pos), mNoExpr (Pos)), FALSE);
+		     s^.Compose.Object := object;
+		     RETURN s;
+		  END;
+	       END;
+	    END;
+	    Lop		:= TransformExpr (Lop);
+	    Rop		:= TransformExpr (Rop);
+	 END;
+
+      | Tree.PreOperator
+      , Tree.PostOperator: WITH t^.PreOperator DO
+	    Expr	:= TransformExpr (Expr);
+	 END;
+
+      | Tree.Index	: WITH t^.Index DO
+	    Expr	:= TransformExpr (Expr);
+	    Exprs	:= TransformExpr (Exprs);
+	 END;
+
+      | Tree.Parents	: WITH t^.Parents DO
+	    Expr	:= TransformExpr (Expr);
+	 END;
+
+      | Tree.Guard	: WITH t^.Guard DO
+	    Expr	:= TransformExpr (Expr);
+	 END;
+
+      | Tree.TargetExpr	:
+      | Tree.StringExpr	:
+      | Tree.AttrDesc	:
+      | Tree.NoExpression:
+      END;
+      RETURN t;
+   END TransformExpr;
+
+PROCEDURE TransformStmt (t: tTree; AllowCondition: BOOLEAN): tTree;
+   VAR
+      param, AssignTree, Parent	: tTree;
+      Position			: tPosition;
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.NoStatement: RETURN t;
+
+      | Tree.ProcCall	: WITH t^.ProcCall DO
+	    Call := TransformExpr (Call);
+	    CASE Call^.Kind OF
+	    | Tree.Call		: WITH Call^.Call DO
+		  IF AllowCondition AND (Object # NoTree) THEN
+		     IF Object^.Kind = Tree.Predicate THEN
+			t^.Kind := Tree.Condition;
+		     ELSIF Object^.Kind = Tree.Function THEN
+			t^.Kind := Tree.Condition;
+			Warning ("condition without keyword", Pos);
+		     END;
+		  END;
+	       END;
+	    | Tree.StringExpr	:
+	       t := mWriteStr (Pos, Next, Call^.StringExpr.String);
+	    | Tree.Binary	: WITH Call^.Binary DO
+		  IF (Operator = iEqual)
+		  AND (IsElement (ORD ('c'), Options) OR IsElement (ORD ('J'), Options)) THEN
+		     t := mAssignment (Pos, Next, Lop, Rop, DefaultAssignOp);
+		  ELSIF HasAssignment (Call, AssignTree, Parent, Position) AND
+			(IsElement (ORD ('c'), Options) OR IsElement (ORD ('J'), Options)) THEN
+		     Parent^.Binary.Lop := AssignTree^.Binary.Rop;
+		     t := mAssignment (Position, Next, AssignTree^.Binary.Lop, Call, DefaultAssignOp);
+		  ELSIF (Operator = NoIdent) AND (Rop^.Kind = Tree.Call) THEN
+		  ELSIF AllowCondition THEN
+		     t^.Kind := Tree.Condition;
+		     Warning ("condition without keyword", Pos);
+		  END;
+	       END;
+	    | Tree.PreOperator	,
+	      Tree.PostOperator	:
+		  IF (Call^.PreOperator.Operator = PlusPlus) OR
+		     (Call^.PreOperator.Operator = MinusMinus) THEN
+		  ELSIF AllowCondition THEN
+		     t^.Kind := Tree.Condition;
+		     Warning ("condition without keyword", Pos);
+		  END;
+	    ELSE
+	       IF AllowCondition THEN
+		  t^.Kind := Tree.Condition;
+		  Warning ("condition without keyword", Pos);
+	       END;
+	    END;
+	 END;
+
+      | Tree.Assignment	: WITH t^.Assignment DO
+	    Adr  := TransformExpr (Adr );
+	    Expr := TransformExpr (Expr);
+	 END;
+
+      | Tree.MatchStmt	: WITH t^.MatchStmt DO
+	    Exprs := TransformExpr (Exprs);
+	 END;
+
+      | Tree.DeclStmt	: WITH t^.DeclStmt DO
+	    param := Declarations;
+	    WHILE param^.Kind # Tree.NoDeclaration DO
+	       CASE param^.Kind OF
+	       | Tree.InitDecl: WITH param^.InitDecl DO
+		     Expr := TransformExpr (Expr);
+		  END;
+	       ELSE
+	       END;
+	       param := param^.Declaration.Next;
+	    END;
+	 END;
+
+      | Tree.Condition	: WITH t^.Condition DO
+	    Expr := TransformExpr (Expr);
+	 END;
+
+      | Tree.IfMatch	: WITH t^.IfMatch DO
+	    Expr := TransformExpr (Expr);
+	    Exprs := TransformExpr (Exprs);
+	    Then := TransformStmt (Then, TRUE);
+	    Else := TransformStmt (Else, TRUE);
+	 END;
+
+      | Tree.If		: WITH t^.If DO
+	    Expr := TransformExpr (Expr);
+	    Then := TransformStmt (Then, TRUE);
+	    Else := TransformStmt (Else, TRUE);
+	 END;
+
+      | Tree.For	: WITH t^.For DO
+	    Init := TransformStmt (Init, FALSE);
+	    Expr := TransformExpr (Expr);
+	    Step := TransformStmt (Step, FALSE);
+	    Statements := TransformStmt (Statements, TRUE);
+	 END;
+
+      | Tree.ForEach	: WITH t^.ForEach DO
+	    Var  := TransformStmt (Var, FALSE);
+	    Expr := TransformExpr (Expr);
+	    Statements := TransformStmt (Statements, TRUE);
+	 END;
+
+      | Tree.Return	: WITH t^.Return DO
+	    Expr := TransformExpr (Expr);
+	 END;
+
+      | Tree.Reject	:
+      | Tree.Fail	:
+      | Tree.TargetStmt	:
+      | Tree.Nl		:
+      | Tree.WriteStr	:
+      END;
+      t^.Statement.Next := TransformStmt (t^.Statement.Next, AllowCondition);
+      RETURN t;
+   END TransformStmt;
+
+PROCEDURE TransformName (t, Objects: tTree): tTree;
+   VAR
+      Exprs		: tTree;
+      Last		: POINTER TO tTree;
+      n, i		,
+      Minimum, Maximum	: INTEGER;
+      PatternsSize	: LONGINT;
+      PatternsPtr	: POINTER TO ARRAY [0..50000] OF tTree;
+
+   PROCEDURE Lookup (Ident: tIdent; Objects: tTree): INTEGER;
+      VAR i	: INTEGER;
+      BEGIN
+	 i := 0;
+	 WHILE Objects^.Kind = Tree.Object DO
+	    INC (i);
+	    IF Objects^.Object.Name = Ident THEN RETURN i; END;
+	    Objects := Objects^.Object.Next;
+	 END;
+	 RETURN 0;
+      END Lookup;
+
+   BEGIN
+      Exprs := t;
+      WHILE Exprs^.Kind = Tree.OneExpr DO Exprs := Exprs^.OneExpr.Next; END;
+      IF Exprs^.Kind = Tree.NoExpr THEN RETURN t; END;
+      n := 0;
+      Exprs := Objects;
+      WHILE Exprs^.Kind = Tree.Object DO INC (n); Exprs := Exprs^.Object.Next; END;
+      PatternsSize := n + 1;
+      MakeArray (PatternsPtr, PatternsSize, TSIZE (tTree));
+      FOR i := 1 TO n DO PatternsPtr^[i] := NoTree; END;
+      Last := ADR (t);
+      Exprs := t;
+      i := 0;
+      WHILE Exprs^.Kind = Tree.OneExpr DO
+	 INC (i);
+	 PatternsPtr^[i] := Exprs^.OneExpr.Expr;
+	 Last := ADR (Exprs^.OneExpr.Next);
+	 Exprs := Exprs^.OneExpr.Next;
+      END;
+      Minimum := i + 1;
+      Maximum := i;
+      WHILE Exprs^.Kind = Tree.NamedExpr DO
+	 WITH Exprs^.NamedExpr DO
+	    i := Lookup (Name, Objects);
+	    IF i = 0 THEN
+	       ErrorI ("identifier not declared", Expr^.Expr.Pos, Name);
+	    ELSIF PatternsPtr^[i] # NoTree THEN
+	       ErrorI ("pattern or argument multiply supplied", Expr^.Expr.Pos, Name);
+	    ELSE
+	       PatternsPtr^[i] := Expr;
+	    END;
+	    Maximum := Max (Maximum, i);
+	    Exprs := Next;
+	 END;
+      END;
+      Exprs := mOneExpr (mDontCare (NoPosition), mNoExpr (NoPosition));
+      FOR i := Maximum TO Minimum BY -1 DO
+	 IF PatternsPtr^[i] = NoTree THEN
+	    Exprs := mOneExpr (mDontCare1 (NoPosition), Exprs);
+	 ELSE
+	    Exprs := mOneExpr (PatternsPtr^[i], Exprs);
+	 END;
+      END;
+      Last^ := Exprs;
+      ReleaseArray (PatternsPtr, PatternsSize, TSIZE (tTree));
+      RETURN t;
+   END TransformName;
+
+PROCEDURE CheckExprList (t, Objects: tTree);
+   BEGIN
+      IF (t^.Kind = Tree.NoExpr) AND (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.Kind = Tree.NoExpr THEN
+	 Error ("too few expressions or arguments", t^.NoExpr.Pos); RETURN;
+      END;
+      WITH t^.OneExpr DO
+	 IF Expr^.Kind = Tree.DontCare THEN RETURN; END;
+	 IF Objects^.Kind = Tree.NoObject THEN
+	    Error ("too many expressions or arguments", Expr^.Expr.Pos); RETURN;
+	 END;
+	 dummy := CheckExpr (Expr, Objects, FALSE, FALSE);
+	 CheckExprList (Next, Objects^.Object.Next);
+      END;
+   END CheckExprList;
+
+PROCEDURE CheckInParams (t, Objects: tTree);
+   BEGIN
+      IF (t^.Kind = Tree.NoExpr) OR (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      WITH t^.OneExpr DO
+	 IF Expr^.Kind = Tree.DontCare THEN RETURN; END;
+	 IF Objects^.Object.Path^.Var.IsOutput AND (Expr^.Kind = Tree.VarUse) AND
+	    (Expr^.VarUse.Object # NoTree) AND (Expr^.VarUse.Object^.Object.Path^.Kind = Tree.Var) AND
+	    NOT Expr^.VarUse.Object^.Object.Path^.Var.IsOutput THEN
+	    Expr^.VarUse.Object^.Object.Path^.Var.IsRegister := FALSE;
+	 END;
+	 CheckInParams (Next, Objects^.Object.Next);
+      END;
+   END CheckInParams;
+
+PROCEDURE CheckCallExprs (t, Objects: tTree);
+   BEGIN
+      IF (t^.Kind = Tree.NoExpr) AND (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.Kind = Tree.NoExpr THEN
+	 Error ("too few expressions or arguments", t^.NoExpr.Pos); RETURN;
+      END;
+      WITH t^.OneExpr DO
+	 IF Expr^.Kind = Tree.DontCare THEN
+	    Expr^.DontCare.Tempos := MakeTempos (Objects);
+	    RETURN;
+	 END;
+	 IF Objects^.Kind = Tree.NoObject THEN
+	    Error ("too many expressions or arguments", Expr^.Expr.Pos); RETURN;
+	 END;
+	 dummy := CheckExprVar (Expr, Objects, TRUE, FALSE);
+	 CheckCallExprs (Next, Objects^.Object.Next);
+      END;
+   END CheckCallExprs;
+
+PROCEDURE CheckExprVar (t, Objects: tTree; IsInParam, Guard: BOOLEAN): BOOLEAN;
+   BEGIN
+      IF t^.Kind = Tree.Compose THEN
+	 t^.Compose.Tempo := MakeVar ();
+	 IF (Objects^.Kind = Tree.Object) AND
+	    (Objects^.Object.TypeDesc^.Kind = Tree.NodeTypes) THEN
+	    t^.Compose.TypeDesc := Objects^.Object.TypeDesc;
+	 ELSE
+	    t^.Compose.TypeDesc := t^.Compose.Object^.Class.TypeDesc;
+	 END;
+      ELSIF t^.Kind = Tree.DontCare1 THEN
+	 t^.DontCare1.Tempo := MakeVar ();
+	 IF Objects^.Kind = Tree.Object THEN
+	    t^.DontCare1.TypeDesc := Objects^.Object.TypeDesc;
+	 END;
+      END;
+      RETURN CheckExpr (t, Objects, IsInParam, Guard);
+   END CheckExprVar;
+
+PROCEDURE CheckExpr (t, Objects: tTree; IsInParam, Guard: BOOLEAN): BOOLEAN;
+   VAR dynamicCheck	: BOOLEAN;
+   BEGIN
+      dynamicCheck := FALSE;
+      CASE t^.Kind OF
+
+      | Tree.Compose: WITH t^.Compose DO
+	    IF Selector # NoIdent THEN
+	       WarningI ("identifier ignored", Pos, Selector);
+	    END;
+	    IF Objects^.Kind = Tree.Object THEN
+	       dynamicCheck := CheckSubtype (Objects, IsInParam,
+		  Object^.Class.TypeDesc, Pos, FALSE);
+	    END;
+	 (* IF Object = NoTree THEN
+	       dummy := CheckExpr (Expr, dObjects, FALSE, FALSE);
+	    ELSE *)
+	       CheckExpr2 (Expr);
+	 (* END; *)
+	    CheckExprList (Exprs, Object^.Class.Objects);
+	    RETURN FALSE;
+	 END;
+
+      | Tree.VarUse: WITH t^.VarUse DO
+	    IF IsElement (Name, LabelNames) OR
+	       IsElement (Name, RoutineNames) THEN	(* global variables *)
+	       Object := IdentifyVar (Decls, Name);
+	       IF (Object # NoTree) AND (Objects^.Kind = Tree.Object) THEN
+		  RETURN CheckSubtype (Objects, IsInParam,
+		     Object^.Object.TypeDesc, Pos, Guard);
+	       END;
+	    ELSIF NOT IsElement (Name, ExternNames) AND
+		  NOT IsElement (Name, LocExternNames) AND
+		  NOT IsElement (Name, UserNames) THEN
+	       IF IsElement (ORD ('e'), Options) THEN
+		  ErrorI ("identifier not declared", Pos, Name);
+	       ELSIF IsElement (ORD ('v'), Options) AND NOT IsElement (ORD ('s'), Options) THEN
+		  WarningI ("identifier not declared", Pos, Name);
+	       END;
+	       Include (UserNames, Name);
+	    END;
+	 END;
+
+      | Tree.Nil: WITH t^.Nil DO
+	    IF Selector # NoIdent THEN
+	       WarningI ("identifier ignored", Pos, Selector);
+	    END;
+	    RETURN FALSE;
+	 END;
+
+      | Tree.Call: WITH t^.Call DO
+	    IF Object = NoTree THEN
+	       dummy := CheckExpr (Expr, dObjects, FALSE, FALSE);
+	       IF Expr^.Kind = Tree.VarUse THEN
+		  ProcName := Expr^.VarUse.Name;
+	       ELSIF (Expr^.Kind = Tree.Binary) AND
+		     (Expr^.Binary.Lop^.Kind = Tree.VarUse) THEN
+		  ProcName := Expr^.Binary.Lop^.VarUse.Name;
+	       ELSE
+		  ProcName := NoIdent;
+	       END;
+
+	       IF NOT IsElement (ProcName, ExternNames) AND
+		  NOT IsElement (ProcName, LocExternNames) AND
+		  NOT IsElement (ProcName, UserNames) THEN
+		  IF IsElement (ORD ('e'), Options) THEN
+		     ErrorI ("subroutine identifier not declared", Pos, ProcName);
+		  ELSIF IsElement (ORD ('v'), Options) AND NOT IsElement (ORD ('s'), Options) THEN
+		     WarningI ("subroutine identifier not declared", Pos, ProcName);
+		  END;
+		  Include (UserNames, ProcName);
+	       END;
+	       CheckCallExprs (Exprs, dObjects);
+	       CheckCallExprs (Patterns, dObjects);
+	    ELSIF IsType (Object, Tree.Routine) THEN
+	       CheckExpr2 (Expr);
+	       IF (Object^.Kind = Tree.Function) AND (Objects^.Kind =
+	       Tree.Object) THEN
+		  dynamicCheck := CheckSubtype (Objects, IsInParam,
+		     Object^.Function.ReturnObjects^.Object.TypeDesc, Pos, Guard);
+	       END;
+	       CheckCallExprs (Exprs, Object^.Routine.InObjects);
+	       CheckCallPatterns (Patterns, Object^.Routine.OutObjects);
+	       CheckInParams (Exprs, Object^.Routine.InObjects);
+	       RETURN dynamicCheck;
+	    ELSE
+	       Error ("subroutine identifier required", Pos);
+	    END;
+	 END;
+
+      | Tree.Binary: WITH t^.Binary DO
+	    dummy := CheckExprVar (Lop, dObjects, FALSE, FALSE);
+	    dummy := CheckExprVar (Rop, dObjects, FALSE, FALSE);
+	 END;
+
+      | Tree.PreOperator, Tree.PostOperator: WITH t^.PreOperator DO
+	    dummy := CheckExprVar (Expr, Objects, FALSE, FALSE);
+	 END;
+
+      | Tree.Index: WITH t^.Index DO
+	    dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	    CheckExprList (Exprs, dObjects);
+	 END;
+
+      | Tree.Parents: WITH t^.Parents DO
+	    dummy := CheckExprVar (Expr, Objects, IsInParam, Guard);
+	 END;
+
+      | Tree.Guard: WITH t^.Guard DO
+	    IF CheckExprVar (Expr, Objects, FALSE, TRUE) AND
+	       (Objects^.Kind = Tree.Object) AND
+	       (Objects^.Object.TypeDesc^.Kind # Tree.UserType) THEN
+	       Tempo := MakeVar ();
+	    ELSE
+	       Tempo := NoIdent;
+	       Information ("type guard ignored", Pos);
+	    END;
+	    Object := Objects;
+	 END;
+
+      | Tree.AttrDesc: WITH t^.AttrDesc DO
+	    IF IsElement (Name, LabelNames) OR
+	       IsElement (Name, RoutineNames) THEN	(* global variables *)
+	       Object := IdentifyVar (Decls, Name);
+	       IF Object^.Object.TypeDesc^.Kind = Tree.NodeTypes THEN
+		  ActClass := LookupClass (Object^.Object.TypeDesc^.NodeTypes.TreeName^.TreeName.Classes,
+				  Minimum (Object^.Object.TypeDesc^.NodeTypes.Types));
+		  Type := ActClass^.Class.Name;
+		  ActName := Attribute;
+		  ActType := NoTree;
+		  ActTree := Object^.Object.TypeDesc^.NodeTypes.TreeName;
+		  ForallAttributes (ActClass, CheckAttribute);
+		  IF ActType = NoTree THEN
+		     ErrorI ("attribute not declared", Pos, Attribute);
+		  ELSIF Maximum (Object^.Object.TypeDesc^.NodeTypes.Types) >
+		     GetRange (ActClass^.Class.Extensions, ActClass^.Class.Index) THEN
+		     ErrorI ("attribute not accessible", Pos, Attribute);
+		  ELSE
+		     IF Objects^.Kind = Tree.Object THEN
+			dynamicCheck := CheckSubtype (Objects, IsInParam,
+			   ActType, Pos, Guard);
+		     END;
+		  END;
+		  TypeDesc := ActType;
+		  RETURN dynamicCheck;
+	       ELSE
+		  ErrorI ("node type required", Pos, Name);
+		  Object := NoTree;
+	       END;
+	    ELSE
+	       IF NOT IsElement (ORD ('+'), Options) THEN
+		  ErrorI ("identifier not declared", Pos, Name);
+	       END;
+	       Object := NoTree;
+	    END;
+	 END;
+
+      ELSE
+      END;
+      RETURN TRUE;
+   END CheckExpr;
+
+PROCEDURE CheckExpr2 (t: tTree);
+   BEGIN
+      CASE t^.Kind OF
+
+      | Tree.VarUse: WITH t^.VarUse DO
+	    Object := IdentifyVar (Decls, Name);
+	 END;
+
+      | Tree.Binary: WITH t^.Binary DO
+	    CheckExpr2 (Lop);
+	    CheckExpr2 (Rop);
+	 END;
+
+      | Tree.Compose:
+	    dummy := CheckExpr (t, dObjects, FALSE, FALSE);
+      END;
+   END CheckExpr2;
+
+PROCEDURE CheckPatternList (t, Objects: tTree);
+   VAR Pattern	: tTree;
+   BEGIN
+      IF (t^.Kind = Tree.NoPattern) AND (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.Kind = Tree.NoPattern THEN
+	 Error ("too few patterns", t^.NoPattern.Pos); RETURN;
+      END;
+      Pattern := t^.OnePattern.Pattern;
+      IF Pattern^.Kind = Tree.DontCare THEN RETURN; END;
+      IF Objects^.Kind = Tree.NoObject THEN
+	 Error ("too many patterns", t^.OnePattern.Pattern^.Pattern.Pos); RETURN;
+      END;
+      CheckPattern (Pattern, Objects, Objects^.Object.Path);
+      CheckPatternList (t^.OnePattern.Next, Objects^.Object.Next);
+   END CheckPatternList;
+
+PROCEDURE CheckSubPatterns (t, Objects, Path: tTree);
+   VAR Pattern	: tTree;
+   BEGIN
+      IF (t^.Kind = Tree.NoPattern) AND (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.Kind = Tree.NoPattern THEN
+	 Error ("too few patterns", t^.NoPattern.Pos); RETURN;
+      END;
+      Pattern := t^.OnePattern.Pattern;
+      IF Pattern^.Kind = Tree.DontCare THEN RETURN; END;
+      IF Objects^.Kind = Tree.NoObject THEN
+	 Error ("too many patterns", Pattern^.Pattern.Pos); RETURN;
+      END;
+      CheckPattern (Pattern, Objects, mField (Path, Objects^.Object.Name, Objects));
+      CheckSubPatterns (t^.OnePattern.Next, Objects^.Object.Next, Path);
+   END CheckSubPatterns;
+
+PROCEDURE CheckCallPatterns (t, Objects: tTree);
+   BEGIN
+      IF (t^.Kind = Tree.NoPattern) AND (Objects^.Kind # Tree.Object) THEN RETURN; END;
+      IF t^.Kind = Tree.NoPattern THEN
+	 Error ("too few patterns or arguments", t^.NoPattern.Pos); RETURN;
+      END;
+      WITH t^.OnePattern DO
+	 IF Pattern^.Kind = Tree.DontCare THEN
+	    Pattern^.DontCare.Tempos := MakeTempos (Objects);
+	    RETURN;
+	 END;
+	 IF Objects^.Kind = Tree.NoObject THEN
+	    Error ("too many patterns or arguments", Pattern^.Pattern.Pos); RETURN;
+	 END;
+	 Pattern^.Pattern.Tempo := MakeVar ();
+	 Pattern^.Pattern.TypeDesc := Objects^.Object.TypeDesc;
+	 CheckPattern (Pattern, Objects, mVar (Pattern^.Pattern.Tempo, FALSE, TRUE));
+	 CheckCallPatterns (Next, Objects^.Object.Next);
+      END;
+   END CheckCallPatterns;
+
+PROCEDURE CheckPattern (t, Objects, Path: tTree);
+   VAR dynamicCheck	: BOOLEAN;
+   BEGIN
+      t^.Pattern.Path := Path;
+      CASE t^.Kind OF
+
+      | Tree.Decompose: WITH t^.Decompose DO
+	    IF Selector # NoIdent THEN
+	       IF IsElement (Selector, LabelNames) THEN
+		  ErrorI ("identifier multiply declared", Pos, Selector);
+	       ELSE
+		  Include (LabelNames, Selector);
+	       END;
+	       IF Widen AND (Objects^.Kind = Tree.Object) THEN
+		  Decls := mObject (Decls, Selector, Objects^.Object.TypeDesc,
+		     Path, NoTree);
+	       ELSE
+		  Decls := mObject (Decls, Selector, Object^.Class.TypeDesc,
+		     Path, NoTree);
+	       END;
+	    END;
+
+	    IF Objects^.Kind = Tree.Object THEN
+	       dynamicCheck := CheckSubtype (Objects, FALSE,
+		  Object^.Class.TypeDesc, Pos, FALSE);
+	    END;
+	 (* IF Object = NoTree THEN
+	       dummy := CheckExpr (Expr, dObjects, FALSE, FALSE);
+	    ELSE *)
+	       CheckExpr2 (Expr);
+	 (* END; *)
+	    CheckSubPatterns (Patterns, Object^.Class.Objects, mConsType (Path, Object^.Class.Name, Object));
+	 END;
+
+      | Tree.VarDef: WITH t^.VarDef DO
+	    IF IsElement (Name, LabelNames) THEN
+	       IF NOT IsElement (ORD ('k'), Options) THEN
+		  ErrorI ("identifier multiply declared", Pos, Name);
+	       END;
+	       Object := IdentifyVar (Decls, Name);
+	       IF (Object # NoTree) AND (Objects^.Kind = Tree.Object) THEN
+		  CheckType (Objects^.Object.TypeDesc, Object^.Object.TypeDesc, Pos);
+	       END;
+	    ELSE
+	       Include (LabelNames, Name);
+	       IF Objects^.Kind = Tree.Object THEN
+		  Decls := mObject (Decls, Name, Objects^.Object.TypeDesc,
+		     Path, NoTree);
+	       END;
+	       Object := NoTree;
+	    END;
+	 END;
+
+      | Tree.NilTest: WITH t^.NilTest DO
+	    IF Selector # NoIdent THEN
+	       IF IsElement (Selector, LabelNames) THEN
+		  ErrorI ("identifier multiply declared", Pos, Selector);
+	       ELSE
+		  Include (LabelNames, Selector);
+	       END;
+	       IF Objects^.Kind = Tree.Object THEN
+		  Decls := mObject (Decls, Selector, Objects^.Object.TypeDesc,
+		     Path, NoTree);
+	       END;
+	    END;
+	 END;
+
+      | Tree.Value: dummy := CheckExprVar (t^.Value.Expr, dObjects, FALSE, FALSE);
+
+      ELSE
+      END;
+   END CheckPattern;
+
+PROCEDURE MakeVar (): tIdent;
+   VAR String1, String2	: tString;
+   BEGIN
+      INC (VarCount);
+      ArrayToString ("yyV", String1);
+      IntToString (VarCount, String2);
+      Concatenate (String1, String2);
+      RETURN MakeIdent (String1);
+   END MakeVar;
+
+PROCEDURE MakeTempos (Objects: tTree): tTree;
+   BEGIN
+      IF Objects^.Kind = Tree.Object THEN
+	 WITH Objects^.Object DO
+	    RETURN mObject (MakeTempos (Next), MakeVar (), TypeDesc, Path,
+	       NoTree);
+	 END;
+      ELSE
+	 RETURN nNoObject;
+      END;
+   END MakeTempos;
+}
+
+BEGIN {
+   dObjects := mDummyObject (NoTree); dObjects^.DummyObject.Next := dObjects;
+   nNoObject := mNoObject ();
+   ArrayToString ("++", String1); PlusPlus	:= MakeIdent (String1);
+   ArrayToString ("--", String1); MinusMinus	:= MakeIdent (String1);
+   ArrayToString ("." , String1); Dot		:= MakeIdent (String1);
+}
+
+GLOBAL TheSpec: Spec;
+
+PROCEDURE Semantics (t: Tree)
+
+Spec (..) :-
+String: tString, id: tIdent;
+	ArrayToString ("NodeHead", String);
+	id := MakeIdent (String);
+	ArrayToString ("yy", String);
+	yy := MakeIdent (String);
+	TypeCount := MaxIdent ();
+	MakeSet (RoutineNames	, TypeCount);
+	MakeSet (LabelNames	, TypeCount);
+	MakeSet (ParamNames	, TypeCount);
+	MakeSet (TypeNames	, TypeCount);
+	MakeSet (ExternNames	, TypeCount);
+	MakeSet (LocExternNames	, TypeCount);
+	MakeSet (UserTypes	, TypeCount);
+	MakeSet (UserNames	, TypeCount);
+	Include (TypeNames, id);
+	ClassObjects (TreeNames);
+	Semantics (Public);
+	DoImport (Imports);
+	CollectExtern (Extern, ExternNames);
+
+	Declarations := TransformExpr (Declarations);
+	VarCount := 0;
+	Args := nNoObject;
+	Decls := nNoObject;
+	IsOutput := FALSE;
+	Mode := FALSE;
+	GlobalDecls := nNoObject;
+	CheckGlobalDecls (Declarations);
+	GlobalDecls := Decls;
+
+	ProcObjects (Routines);
+	Semantics (Routines);
+	CONDITION IsElement (ORD ('o'), Options) AND NOT IsEmpty (UserNames);
+	WriteNl (StdOutput);
+	WriteS (StdOutput, "Undefined External Names"); WriteNl (StdOutput);
+	WriteS (StdOutput, "------------------------"); WriteNl (StdOutput);
+	WriteNl (StdOutput);
+{
+	FOR i := 1 TO TypeCount DO
+	   IF IsElement (i, UserNames) THEN
+	      WriteIdent (StdOutput, i); WriteNl (StdOutput);
+	   END;
+	END;
+}; .
+Name (..) :-
+	Object := IdentifyProc (Name);
+	IF Object = NoTree THEN
+	   ErrorI ("subroutine identifier not declared", Pos, Name);
+	ELSE
+	   Object^.Routine.IsPublic := TRUE;
+	END;
+	Semantics (Next);
+	.
+Procedure (..) ;
+Predicate (..) :-
+	AssignEmpty (LocExternNames);
+	CollectExtern (Extern, LocExternNames);
+	AssignEmpty (ParamNames);
+	CheckSem (InParams);
+	CheckSem (OutParams);
+	Declarations := TransformExpr (Declarations);
+	Decls := ParamDecls;
+	CheckLocalDecls (Declarations);
+	gInObjects := InObjects;
+	gOutObjects := OutObjects;
+	gParameters := ParamDecls;
+	RoutineKind := t^.Kind;
+	RuleCount := 0;
+	CheckSem (Rules);
+	Semantics (Next);
+	.
+Function (..) :-
+	AssignEmpty (LocExternNames);
+	CollectExtern (Extern, LocExternNames);
+	AssignEmpty (ParamNames);
+	CheckSem (InParams);
+	CheckSem (OutParams);
+	CheckSem (ReturnParams);
+	Declarations := TransformExpr (Declarations);
+	Decls := ParamDecls;
+	CheckLocalDecls (Declarations);
+	gInObjects := InObjects;
+	gOutObjects := OutObjects;
+	gReturnObject := ReturnObjects;
+	gParameters := ParamDecls;
+	RoutineKind := Tree.Function;
+	RuleCount := 0;
+	CheckSem (Rules);
+	Semantics (Next);
+	.
+self:
+Trip (..) :-
+	AssignEmpty (LocExternNames);
+	CollectExtern (Extern, LocExternNames);
+	AssignEmpty (ParamNames);
+	CheckSem (InParams);
+	CheckSem (OutParams);
+	Declarations := TransformExpr (Declarations);
+	Decls := ParamDecls;
+	CheckLocalDecls (Declarations);
+	IF InObjects^.Kind # Tree.Object THEN
+	   Error ("argument required", Pos);
+	ELSIF InObjects^.Object.TypeDesc^.Kind # Tree.NodeTypes THEN
+	   Error ("node type required for first argument", Pos);
+	ELSE
+	   gPos := Pos;
+	   gPos.Column := 0;
+	   Rules := GenRules (self);
+	END
+	t^.Kind := Tree.Procedure;
+	IsTrip := TRUE;
+	gInObjects := InObjects;
+	gOutObjects := OutObjects;
+	gParameters := ParamDecls;
+	RoutineKind := t^.Kind;
+	RuleCount := 0;
+	CheckSem (Rules);
+	Semantics (Next);
+	.
+
+
+PROCEDURE CollectExtern (t: Tree, REF Names: tSet)
+
+Name (..), _ :-
+	Include (Names, Name);
+	CollectExtern (Next, Names);
+	.
+
+
+PROCEDURE ProcObjects (t: Tree)
+
+Procedure (..) ;
+Predicate (..) ;
+Trip (..) :-
+	IF IsElement (Name, RoutineNames) THEN
+	   ErrorI ("routine identifier multiply declared", Pos, Name);
+	ELSE
+	   Include (RoutineNames, Name);
+	END;
+	Args := nNoObject;
+	Decls := GlobalDecls;
+	AssignEmpty (ParamNames);
+	IsOutput := FALSE;
+	ProcObjects (InParams);
+	InObjects := ReverseTree (Args);
+	Args := nNoObject;
+	IsOutput := TRUE;
+	ProcObjects (OutParams);
+	OutObjects := ReverseTree (Args);
+	Args := nNoObject;
+	IsOutput := FALSE;
+	ProcObjects (Declarations);
+	ParamDecls := Decls;
+	ProcObjects (Next);
+	.
+Function (..) :-
+	IF IsElement (Name, RoutineNames) THEN
+	   ErrorI ("routine identifier multiply declared", Pos, Name);
+	ELSE
+	   Include (RoutineNames, Name);
+	END;
+	Args := nNoObject;
+	Decls := GlobalDecls;
+	AssignEmpty (ParamNames);
+	IsOutput := FALSE;
+	ProcObjects (InParams);
+	InObjects := ReverseTree (Args);
+	Args := nNoObject;
+	IsOutput := TRUE;
+	ProcObjects (OutParams);
+	OutObjects := ReverseTree (Args);
+	Args := nNoObject;
+	IsOutput := FALSE;
+	ProcObjects (ReturnParams);
+	ReturnObjects := ReverseTree (Args);
+	Args := nNoObject;
+	IsOutput := FALSE;
+	ProcObjects (Declarations);
+	ParamDecls := Decls;
+	ProcObjects (Next);
+	.
+ParamDecl (..) :-
+	IF IsElement (Name, ParamNames) THEN
+	   ErrorI ("parameter identifier multiply declared", Pos, Name);
+	ELSE
+	   Include (ParamNames, Name);
+	END;
+	ParamName := Name;
+	Mode := IsRef;
+	ProcObjects (Type);
+	Object := Decls;
+	ProcObjects (Next);
+	.
+VarDecl  (..) ;
+InitDecl (..) :-
+	IF IsElement (Name, ParamNames) THEN
+	   ErrorI ("variable identifier multiply declared", Pos, Name);
+	ELSE
+	   Include (ParamNames, Name);
+	END;
+	ParamName := Name;
+	Mode := FALSE;
+	ProcObjects (Type);
+	Object := Decls;
+	ProcObjects (Next);
+	.
+Type (..) :-
+	IF (Name # NoIdent) AND (Names^.Kind # Tree.NoName) THEN
+	   TreeName := IdentifyTree (Name);
+	   IF TreeName # NoTree THEN
+	      MakeSet (ActTypes, TreeName^.TreeName.ClassCount);
+	      MakeSet (BaseTypes, TreeName^.TreeName.ClassCount);
+	   ELSE
+	      ErrorI ("tree type not declared", Pos, Name);
+	   END;
+	ELSIF (Name # NoIdent) AND (Names^.Kind = Tree.NoName) THEN
+	   TreeName := IdentifyTree (Name);
+	   IF TreeName # NoTree THEN			/* a tree type */
+	      MakeSet (ActTypes, TreeName^.TreeName.ClassCount);
+	      MakeSet (BaseTypes, TreeName^.TreeName.ClassCount);
+	      MakeTypes (TreeName^.TreeName.Classes^.Class.Index, TreeName^.TreeName.Classes, ActTypes);
+	   ELSE						/* not a tree type */
+	      ActClass := IdentifyClass2 (Name, TreeName);
+	      IF ActClass # NoTree THEN			/* a node type */
+		 MakeSet (ActTypes, TreeName^.TreeName.ClassCount);
+		 MakeSet (BaseTypes, TreeName^.TreeName.ClassCount);
+	         Include (BaseTypes, ActClass^.Class.Index);
+	         MakeTypes (ActClass^.Class.Index, ActClass^.Class.Extensions, ActTypes);
+	      END;
+	   END;
+	ELSIF (Name = NoIdent) AND (Names^.Kind # Tree.NoName) THEN
+	   ActClass := IdentifyClass2 (Names^.Name.Name, TreeName);
+	   IF ActClass # NoTree THEN
+	      MakeSet (ActTypes, TreeName^.TreeName.ClassCount);
+	      MakeSet (BaseTypes, TreeName^.TreeName.ClassCount);
+	   ELSE
+	      ErrorI ("node type not declared", Names^.Name.Pos, Names^.Name.Name);
+	   END;
+	ELSE
+	   TreeName := NoTree;
+	END;
+
+	IF TreeName # NoTree THEN
+	   ActTree := TreeName^.TreeName.Classes;
+	   ProcObjects (Names);
+	   Node := mNodeTypes (TreeName, ActTypes, BaseTypes);
+	ELSE						/* assume user type */
+	   IF Name = NoIdent THEN
+	      Error ("incorrect type", Pos);
+	   ELSE
+	      Include (TypeNames, Name);
+	   END;
+	   Node := mUserType (Name, Name);
+	END;
+	Var   := mVar (ParamName, IsOutput OR Mode, TRUE);
+	Args  := mObject (Args , ParamName, Node, Var, NoTree);
+	Decls := mObject (Decls, ParamName, Node, Var, NoTree);
+	.
+TargetType (..) :-
+	Var   := mVar (ParamName, IsOutput OR Mode, TRUE);
+	Args  := mObject (Args , ParamName, t, Var, NoTree);
+	Decls := mObject (Decls, ParamName, t, Var, NoTree);
+	.
+Name (..) :-
+	ActClass := IdentifyClass (ActTree, Name);
+	IF ActClass # NoTree THEN
+	   Include (ActTypes, ActClass^.Class.Index);
+	   Include (BaseTypes, ActClass^.Class.Index);
+	   ForallClasses (ActClass^.Class.Extensions, ProcObjects);
+	ELSE
+	   ErrorI ("node type not declared in current tree", Pos, Name);
+	END;
+	ProcObjects (Next);
+	.
+Class (..) :-
+	Include (ActTypes, Index);
+	.
+
+
+PROCEDURE ClassObjects (t: Tree)
+
+TreeName (..) :-
+	ActTree := t;
+	ClassCount := 0;
+	ForallClasses (Classes, CountClasses);
+	Size: LONGINT := ClassCount + 1;
+	MakeArray (IndexToClass, Size, TSIZE (tTree));
+	ForallClasses (Classes, ClassTypes);
+	ForallClasses (Classes, ClassObjects);
+	ClassObjects (Next);
+	.
+Class (..) :-
+	Args := nNoObject;
+	ForallAttributes (t, ClassObjects);
+	Objects := ReverseTree (Args);
+	.
+Child (..) :-
+	ActClass := IdentifyClass (ActTree^.TreeName.Classes, Type);
+	Args := mObject (Args, Name, ActClass^.Class.TypeDesc, NoTree, t);
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) # {{}};
+	.
+Attribute (..) :-
+	CONDITION (NodeType # NoTree) AND (NodeType^.Kind = Tree.Class);
+	Args := mObject (Args, Name, NodeType^.Class.TypeDesc, NoTree, t);
+	.
+Attribute (..) :-
+	CONDITION NodeType # NoTree;
+	/* (Type = ActTree^.TreeName.Name); /* OR (Type = ActTree^.TreeName.tName); */
+	typeDesc: TypeDesc := mNodeTypes (ActTree, ActTypes, BaseTypes);	/* arg 2&3 is dummy */
+	MakeSet (typeDesc^.NodeTypes.Types, ActTree^.TreeName.ClassCount);
+	Complement (typeDesc^.NodeTypes.Types);
+	Exclude (typeDesc^.NodeTypes.Types, 0);
+	MakeSet (typeDesc^.NodeTypes.BaseTypes, ActTree^.TreeName.ClassCount);
+	Args := mObject (Args, Name, typeDesc, NoTree, t);
+	.
+Attribute (..) :-
+	Args := mObject (Args, Name, mUserType (Type, CppType), NoTree, t);
+	Include (TypeNames, CppType);
+	.
+
+
+PROCEDURE CountClasses (t: Tree)
+
+Class (..) :-
+	INC (ActTree^.TreeName.ClassCount);
+	Index := ActTree^.TreeName.ClassCount;
+	.
+
+
+PROCEDURE ClassTypes (t: Tree)
+
+Class (..) :-
+	TypeDesc := mNodeTypes (ActTree, ActTypes, BaseTypes);	/* 2nd arg is dummy */
+	MakeSet (TypeDesc^.NodeTypes.Types, ActTree^.TreeName.ClassCount);
+	MakeSet (TypeDesc^.NodeTypes.BaseTypes, ActTree^.TreeName.ClassCount);
+	MakeTypes (Index, Extensions, TypeDesc^.NodeTypes.Types);
+	ActTree^.TreeName.IndexToClass^ [Index] := t;
+	Include (TypeDesc^.NodeTypes.BaseTypes, Index);
+	.
+
+
+PROCEDURE CheckGlobalDecls (Declarations)
+
+VarDecl (..) :-
+	IF IsElement (Name, RoutineNames) THEN
+	   ErrorI ("variable identifier multiply declared", Pos, Name);
+	ELSE
+	   Include (RoutineNames, Name);
+	END;
+	ParamName := Name;
+	ProcObjects (Type);
+	Object := Decls;
+	CheckGlobalDecls (Next);
+	.
+InitDecl (Expr := Expr) :-
+	IF IsElement (Name, RoutineNames) THEN
+	   ErrorI ("variable identifier multiply declared", Pos, Name);
+	ELSE
+	   Include (RoutineNames, Name);
+	END;
+	ParamName := Name;
+	ProcObjects (Type);
+	Object := Decls;
+	IF (Expr^.Kind = Tree.Compose) AND IsElement (ORD ('c'), Options) THEN
+	   Error ("constant expression required", Expr::Pos);
+	END
+	dummy := CheckExprVar (Expr, Object, FALSE, FALSE);
+	CheckSem (Expr);
+	CheckGlobalDecls (Next);
+	.
+
+
+PROCEDURE CheckLocalDecls (Declarations)
+
+InitDecl (..) :-
+	dummy := CheckExprVar (Expr, Object, FALSE, FALSE);
+	Include (ParamNames, Name);
+	CheckSem (Expr);
+	CheckLocalDecls (Next);
+	.
+Declaration (..) :-
+	Include (ParamNames, Name);
+	CheckLocalDecls (Next);
+	.
+
+
+PROCEDURE CheckSem (t: Tree)
+
+ParamDecl (..) :-
+	Include (ParamNames, Name);
+	CheckSem (Next);
+	.
+VarDecl (..) :-
+	HasLocals := TRUE;
+	ParamName := Name;
+	IsOutput := FALSE;
+	Mode := FALSE;
+	ProcObjects (Type);
+	Object := Decls;
+	IF IsElement (Name, LabelNames) THEN
+	   ErrorI ("identifier multiply declared or computed", Pos, Name);
+	ELSE
+	   Include (LabelNames, Name);
+	END;
+	CheckSem (Next);
+	.
+InitDecl (..) :-
+	HasLocals := TRUE;
+	ParamName := Name;
+	IsOutput := FALSE;
+	Mode := FALSE;
+	ProcObjects (Type);
+	Object := Decls;
+	IF IsElement (Name, LabelNames) THEN
+	   ErrorI ("identifier multiply declared or computed", Pos, Name);
+	ELSE
+	   Include (LabelNames, Name);
+	END;
+	dummy := CheckExprVar (Expr, Object, FALSE, FALSE);
+	CheckSem (Expr);
+	CheckSem (Next);
+	.
+Rule (Statements := Statements, Expr := Expr) :-
+	ActRule := t;
+	INC (RuleCount);
+	Index		:= RuleCount;
+	Patterns	:= TransformName (Patterns, gInObjects);
+	Patterns	:= TransformPattern (Patterns);
+	Exprs		:= TransformName (Exprs, gOutObjects);
+	Exprs		:= TransformExpr (Exprs);
+	Expr		:= TransformExpr (Expr);
+	VarCount	:= 0;
+	Statements	:= TransformStmt (Statements, TRUE);
+	HasLocals	:= FALSE;
+	Decls		:= gParameters;
+{	Assign (LabelNames, ParamNames); };
+	CheckPatternList (Patterns, gInObjects);
+	CheckSem (Patterns);
+	Statements::IsReachable := TRUE;
+	Eval (Statements);
+	CheckSem (Statements);
+	CheckExprList (Exprs, gOutObjects);
+	CheckSem (Exprs);
+	IF RoutineKind = Tree.Function THEN
+	   IF Expr^.Kind = Tree.NoExpr THEN
+	      IF NOT Statements::DoesStop THEN
+		 Error ("function requires RETURN expression", Expr::Pos);
+	      END;
+	   ELSE
+	      dummy := CheckExprVar (Expr, gReturnObject, FALSE, FALSE);
+	      Success := FALSE;
+	      CheckSem (Expr);
+	      IF Success THEN INCL (Properties, HasPatterns); END;
+	      IF (HasPatterns IN Properties) AND (Expr^.Kind # Tree.Compose) AND
+		 (t^.Kind # Tree.DontCare1) THEN
+	         Tempo := MakeVar ();
+	      END;
+	   END;
+	END;
+	IF (RoutineKind # Tree.Function) AND (Expr^.Kind # Tree.NoExpr) THEN
+	   Error ("illegal RETURN statement", Expr::Pos);
+	END;
+   IF IsElement (ORD ('c'), Options) THEN
+	IF (VarCount > 0) OR HasLocals THEN INCL (Properties, HasTempos); END;
+   ELSE
+	IF (VarCount > 0) OR HasLocals OR (HasPatterns IN Properties) THEN
+	   INCL (Properties, HasTempos);
+	END;
+   END;
+	CheckTargetCode (Patterns);
+	CheckTargetCode (Exprs);
+	IF RoutineKind = Tree.Function THEN
+	   CheckTargetCode (Expr);
+	END;
+	CheckTargetCode (Statements);
+	CheckSem (Next);
+	.
+ProcCall (..) :-
+	dummy := CheckExprVar (Call, dObjects, FALSE, FALSE);
+	CheckSem (Call);
+	CheckSem (Next);
+	.
+Condition (..) :-
+	dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	CheckSem (Expr);
+	CheckSem (Next);
+	.
+Assignment (..) :-
+	IF Adr^.Kind = Tree.VarUse THEN
+	   Object := IdentifyVar (Decls, Adr^.VarUse.Name);
+	ELSE
+	   Object := NoTree;
+	END;
+	dummy := CheckExprVar (Adr, dObjects, FALSE, FALSE);
+	IF Object # NoTree THEN
+	   dummy := CheckExprVar (Expr, Object, FALSE, FALSE);
+	ELSE
+	   dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	END;
+	CheckSem (Adr);
+	CheckSem (Expr);
+	CheckSem (Next);
+	.
+MatchStmt (..) :-
+	Object := NIL;
+	IF Exprs^.OneExpr.Expr^.Kind = Tree.VarUse THEN
+	   Object := IdentifyVar (Decls, Exprs^.OneExpr.Expr^.VarUse.Name);
+	END;
+	IF Object = NIL THEN
+	   Tempo := MakeVar ();
+	   Object := mObject (nNoObject, Tempo, GetType (Exprs^.OneExpr.Expr),
+	      mVar (Tempo, FALSE, TRUE), NoTree);
+	ELSE
+	   Tempo := NoIdent;
+{	   WITH Object^.Object DO
+	      Object := mObject (nNoObject, Name, TypeDesc, Path, NoTree);
+	   END;
+};
+	END;
+	IF (Object^.Object.TypeDesc = NoTree) OR
+	   (Object^.Object.TypeDesc^.Kind # Tree.NodeTypes) THEN
+	   Error ("node type required", Exprs^.OneExpr.Expr^.Expr.Pos);
+	   Object := dObjects;
+	END;
+	Patterns := TransformName (Patterns, Object);
+	Patterns := TransformPattern (Patterns);
+	dummy := CheckExprVar (Exprs^.OneExpr.Expr, Object, FALSE, FALSE);
+	CheckSem (Exprs);
+	CheckPatternList (Patterns, Object);
+	CheckSem (Patterns);
+	CheckSem (Next);
+	.
+IfMatch (..) :-
+	CheckSem (Next);
+
+	// save scope
+	PrevDecls: Tree := Decls;
+	PrevLabelNames: tSet;
+	MakeSet (PrevLabelNames, TypeCount);
+{	Assign (PrevLabelNames, LabelNames); };
+
+	Object := NIL;
+	IF Exprs^.OneExpr.Expr^.Kind = Tree.VarUse THEN
+	   Object := IdentifyVar (Decls, Exprs^.OneExpr.Expr^.VarUse.Name);
+	END;
+	IF Object = NIL THEN
+	   Tempo := MakeVar ();
+	   Object := mObject (nNoObject, Tempo, GetType (Exprs^.OneExpr.Expr),
+	      mVar (Tempo, FALSE, TRUE), NoTree);
+	ELSE
+	   Tempo := NoIdent;
+{	   WITH Object^.Object DO
+	      Object := mObject (nNoObject, Name, TypeDesc, Path, NoTree);
+	   END;
+};
+	END;
+	IF (Object^.Object.TypeDesc = NoTree) OR
+	   (Object^.Object.TypeDesc^.Kind # Tree.NodeTypes) THEN
+	   Error ("node type required", Exprs^.OneExpr.Expr^.Expr.Pos);
+	   Object := dObjects;
+	END;
+	Patterns := TransformName (Patterns, Object);
+	Patterns := TransformPattern (Patterns);
+	dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	CheckSem (Expr);
+	dummy := CheckExprVar (Exprs^.OneExpr.Expr, Object, FALSE, FALSE);
+	CheckSem (Exprs);
+	CheckPatternList (Patterns, Object);
+	CheckSem (Patterns);
+	CheckSem (Then);
+
+	// restore scope
+	Decls := PrevDecls;
+{	Assign (LabelNames, PrevLabelNames); };
+
+	CheckSem (Else);
+
+	// restore scope
+	Decls := PrevDecls;
+{	Assign (LabelNames, PrevLabelNames); };
+	ReleaseSet (PrevLabelNames);
+	.
+If (..) :-
+	CheckSem (Next);
+
+	// save scope
+	PrevDecls: Tree := Decls;
+	PrevLabelNames: tSet;
+	MakeSet (PrevLabelNames, TypeCount);
+{	Assign (PrevLabelNames, LabelNames); };
+
+	dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	CheckSem (Expr);
+	CheckSem (Then);
+
+	// restore scope
+	Decls := PrevDecls;
+{	Assign (LabelNames, PrevLabelNames); };
+
+	CheckSem (Else);
+
+	// restore scope
+	Decls := PrevDecls;
+{	Assign (LabelNames, PrevLabelNames); };
+	ReleaseSet (PrevLabelNames);
+	.
+For (..) :-
+	CheckSem (Next);
+
+	// save scope
+	PrevDecls: Tree := Decls;
+	PrevLabelNames: tSet;
+	MakeSet (PrevLabelNames, TypeCount);
+{	Assign (PrevLabelNames, LabelNames); };
+
+	CheckSem (Init);
+	dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	CheckSem (Expr);
+	CheckSem (Step);
+	CheckSem (Statements);
+
+	// restore scope
+	Decls := PrevDecls;
+{	Assign (LabelNames, PrevLabelNames); };
+	ReleaseSet (PrevLabelNames);
+	.
+ForEach (..) :-
+	CheckSem (Next);
+
+	// save scope
+	PrevDecls: Tree := Decls;
+	PrevLabelNames: tSet;
+	MakeSet (PrevLabelNames, TypeCount);
+{	Assign (PrevLabelNames, LabelNames); };
+
+	CheckSem (Var);
+	TypeDesc := GetType (Var);
+	GetPos (Var => pos);
+	IF (TypeDesc = NoTree) OR (TypeDesc^.Kind # Tree.NodeTypes) THEN
+	  Error ("node type required", pos);
+	ELSIF Card (TypeDesc^.NodeTypes.BaseTypes) # 1 THEN
+	  Error ("single node type required", pos);
+	ELSE
+	  ActClass := LookupClass (TypeDesc^.NodeTypes.TreeName^.TreeName.Classes,
+			  Minimum (TypeDesc^.NodeTypes.Types));
+	  GetRevChild (ActClass);
+	  IF RevChild = NoTree THEN
+	    Error ("this node type can not be iterated", pos);
+	  ELSE
+	    Type := ActClass^.Class.Name;
+	    Iterator := RevChild^.Child.Name;
+	  END
+	END;
+	dummy := CheckExprVar (Expr, dObjects, FALSE, FALSE);
+	CheckSem (Expr);
+	CheckSem (Statements);
+
+	// restore scope
+	Decls := PrevDecls;
+{	Assign (LabelNames, PrevLabelNames); };
+	ReleaseSet (PrevLabelNames);
+	.
+Return (..) :-
+	Rule := ActRule;
+	IF RoutineKind = Tree.Function THEN
+	   IF Expr^.Kind = Tree.NoExpr THEN
+	      Error ("function requires RETURN expression", Expr^.Expr.Pos);
+	   ELSE
+	      dummy := CheckExprVar (Expr, gReturnObject, FALSE, FALSE);
+	      Success := FALSE;
+	      CheckSem (Expr);
+	      IF Success THEN INCL (Properties, HasPatterns); END;
+	      IF (HasPatterns IN Properties) AND (Expr^.Kind # Tree.Compose) AND (t^.Kind # Tree.DontCare1) THEN
+		 Tempo := MakeVar ();
+	      END;
+	   END;
+	ELSIF (RoutineKind = Tree.Procedure) AND (Expr^.Kind # Tree.NoExpr)
+	   OR (RoutineKind = Tree.Trip     ) AND (Expr^.Kind # Tree.NoExpr)
+	   OR (RoutineKind = Tree.Predicate) THEN
+	   Error ("illegal RETURN statement", Pos);
+	   CheckSem (Expr);
+	END;
+	CheckSem (Next);
+	.
+Fail (..) :-
+	IF RoutineKind = Tree.Function THEN
+	   Error ("FAIL not allowed in function", Pos);
+	END;
+	CheckSem (Next);
+	.
+DeclStmt (..) :-
+	CheckSem (Declarations);
+	CheckTargetCode (Declarations);
+	CheckSem (Next);
+	.
+TargetStmt (..) :-
+	MakeSet (UsedNames, MaxIdent ());
+	ActNames := UsedNames;
+	CheckSem (Stmt);
+	UsedNames := ActNames;
+	CheckSem (Next);
+	.
+Statement (..) :-
+	CheckSem (Next);
+	.
+OnePattern (..) :-
+	CheckSem (Pattern);
+	CheckSem (Next);
+	.
+OneExpr (..) :-
+	CheckSem (Expr);
+	CheckSem (Next);
+	.
+Decompose (..) :-
+	CheckSem (Expr);
+	Success := TRUE;
+	CheckSem (Patterns);
+	.
+VarDef (..) :-
+	CONDITION Object # NoTree;
+	Success := TRUE;
+	.
+NilTest (..) :-
+	Success := TRUE;
+	.
+Value (..) :-
+	Success := TRUE;
+	CheckSem (Expr);
+	.
+Compose (..) :-
+	CheckSem (Expr);
+	CheckSem (Exprs);
+	.
+Call (..) :-
+	CheckSem (Expr);
+	CheckSem (Exprs);
+	CheckSem (Patterns);
+	IF Object = NIL THEN
+	   CheckDontCare (Exprs);
+	   IF Patterns^.Kind = Tree.OneExpr THEN
+	      Error ("illegal output arguments", Patterns^.OneExpr.Expr^.Expr.Pos);
+	   END
+	END
+	.
+Binary (..) :-
+	CheckSem (Lop);
+	CheckSem (Rop);
+	.
+PreOperator (..) ;
+PostOperator (..) ;
+Parents (..) :-
+	CheckSem (Expr);
+	.
+Guard (..) :-
+	Success := TRUE;
+	CheckSem (Expr);
+	.
+Index (..) :-
+	CheckSem (Expr);
+	CheckSem (Exprs);
+	.
+TargetExpr (..) :-
+	MakeSet (UsedNames, MaxIdent ());
+	ActNames := UsedNames;
+	CheckSem (Expr);
+	UsedNames := ActNames;
+	.
+Ident (..) :-
+	Object := IdentifyVar (Decls, Attribute);
+	IF Object = NoTree THEN Include (ActNames, Attribute); END;
+	CheckSem (Next);
+	.
+Any (..) ;
+Anys (..) :-
+	CheckSem (Next);
+	.
+Designator (..) :-
+	IF IsElement (Selector, LabelNames) OR
+	   IsElement (Selector, RoutineNames) THEN	// global variables
+	   Object := IdentifyVar (Decls, Selector);
+	   IF Object^.Object.TypeDesc^.Kind = Tree.NodeTypes THEN
+	      ActClass := LookupClass (Object^.Object.TypeDesc^.NodeTypes.TreeName^.TreeName.Classes,
+			      Minimum (Object^.Object.TypeDesc^.NodeTypes.Types));
+	      IF Maximum (Object^.Object.TypeDesc^.NodeTypes.Types) >
+		 GetRange (ActClass^.Class.Extensions, ActClass^.Class.Index) THEN
+		 ErrorI ("attribute not declared", Pos, Attribute);
+	      END;
+	      Type := ActClass^.Class.Name;
+	   ELSE
+	      ErrorI ("node type required", Pos, Selector);
+	   END;
+	ELSIF NOT IsElement (ORD ('+'), Options) THEN
+	   ErrorI ("identifier not declared", Pos, Selector);
+	END;
+	CheckSem (Next);
+	.
+
+PROCEDURE GetPos (Tree => tPosition)
+
+ProcCall (...) => pos :-
+  GetPos (Call => pos);
+  .
+DeclStmt (...) => pos :-
+  GetPos (Declarations => pos);
+  .
+VarUse  (Pos := Pos) => Pos :-
+  .
+VarDecl (Type := t: Type (...)) => t::Pos :-
+  .
+_ => NoPosition :-
+  .
+
+PROCEDURE GetRevChild (t: Tree)
+
+Class (..) :-
+	RevChild := NoTree;
+	ForallAttributes (t, GetRevChild);
+	.
+Child (..) :-
+	CONDITION Tree.Reverse IN Properties;
+	RevChild := t;
+	.
+
+PROCEDURE CheckTargetCode (t: Tree)
+
+VarDecl (..) :-
+	CheckTargetCode (Next);
+	.
+InitDecl (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Next);
+	.
+ProcCall (..) :-
+	CheckTargetCode (Call);
+	CheckTargetCode (Next);
+	.
+Condition (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Next);
+	.
+Assignment (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Next);
+	.
+MatchStmt (..) :-
+	CheckTargetCode (Exprs);
+	CheckTargetCode (Patterns);
+	CheckTargetCode (Next);
+	.
+IfMatch (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Exprs);
+	CheckTargetCode (Patterns);
+	CheckTargetCode (Then);
+	CheckTargetCode (Else);
+	CheckTargetCode (Next);
+	.
+If (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Then);
+	CheckTargetCode (Else);
+	CheckTargetCode (Next);
+	.
+For (..) :-
+	CheckTargetCode (Init);
+	CheckTargetCode (Expr);
+	CheckTargetCode (Step);
+	CheckTargetCode (Statements);
+	CheckTargetCode (Next);
+	.
+ForEach (..) :-
+	CheckTargetCode (Var);
+	CheckTargetCode (Expr);
+	CheckTargetCode (Statements);
+	CheckTargetCode (Next);
+	.
+Return (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Next);
+	.
+TargetStmt (..) :-
+	ActNames := UsedNames;
+	CheckTargetCode (Stmt);
+	ReleaseSet (UsedNames);
+	CheckTargetCode (Next);
+	.
+Statement (..) :-
+	CheckTargetCode (Next);
+	.
+OnePattern (..) :-
+	CheckTargetCode (Pattern);
+	CheckTargetCode (Next);
+	.
+OneExpr (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Next);
+	.
+Decompose (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Patterns);
+	.
+Value (..) :-
+	CheckTargetCode (Expr);
+	.
+Compose (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Exprs);
+	.
+Call (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Exprs);
+	CheckTargetCode (Patterns);
+	.
+Binary (..) :-
+	CheckTargetCode (Lop);
+	CheckTargetCode (Rop);
+	.
+PreOperator (..) ;
+PostOperator (..) ;
+Guard (..) ;
+Parents (..) :-
+	CheckTargetCode (Expr);
+	.
+Index (..) :-
+	CheckTargetCode (Expr);
+	CheckTargetCode (Exprs);
+	.
+TargetExpr (..) :-
+	ActNames := UsedNames;
+	CheckTargetCode (Expr);
+	ReleaseSet (UsedNames);
+	.
+Ident (..) :-
+	IF IsElement (Attribute, ActNames) AND (Object # NoTree) THEN
+	   ErrorI ("identifier not computed yet", Pos, Attribute);
+	END;
+	CheckTargetCode (Next);
+	.
+Any (..) ;
+Anys (..) ;
+Designator (..) :-
+	CheckTargetCode (Next);
+	.
+
+PROCEDURE CheckDontCare (t: Tree)
+
+OneExpr (Expr := Expr, Next := Next) :-
+   CheckDontCare (Expr);
+   CheckDontCare (Next);
+   .
+NilTest (..) :-
+   .
+Pattern (Pos := Pos) :-
+   Error ("illegal function argument", Pos);
+   .
+
+PROCEDURE RemoveTreeTypes (t: Tree)
+
+Spec (..) :-
+   RemoveTreeTypes (TreeNames);
+   .
+TreeName (..) :-
+   IF tName <= TypeCount THEN Exclude (TypeNames, tName); END;
+   RemoveTreeTypes (Next);
+   .
+
+PROCEDURE AddStructuredTypes () :-
+
+String1: tString, i: tIdent;
+   ArrayToString ("tSet", String1); i := MakeIdent (String1);
+   IF i <= TypeCount THEN Include (UserTypes, i); END;
+   ArrayToString ("tPosition", String1); i := MakeIdent (String1);
+   IF i <= TypeCount THEN Include (UserTypes, i); END;
+   .
+
+/*
+PROCEDURE WriteDecls (Objects)
+
+Object (..) :-
+   WriteIdent (StdOutput, Name); WriteNl (StdOutput);
+   WriteDecls (Next);
+   .
+NoObject (..) :-
+   WriteNl (StdOutput);
+   .
+*/
+
+FUNCTION GetType (t: [Expr, Function, Classes, Declarations, Statements]) TypeDesc
+
+NIL :- RETURN UserType (NoIdent, NoIdent); .
+
+VarDecl	 (Object := Obj) ;
+VarUse	 (Object := Obj) :-
+   CONDITION Obj # NIL;
+   RETURN Obj^.Object.TypeDesc;
+   .
+Compose	 (Object := Object) ;
+Call	 (Object := Object) :- RETURN GetType (Object); .
+
+Guard	 (Expr := Expr) ;
+Parents	 (Expr := Expr) :- RETURN GetType (Expr); .
+
+Function (ReturnObjects := Object (TypeDesc := TypeDesc)) ;
+Class	 (TypeDesc := TypeDesc) :- RETURN TypeDesc; .
+
+AttrDesc (TypeDesc := TypeDesc) :-
+   dummy := CheckExpr (t, dObjects, FALSE, TRUE);
+   RETURN TypeDesc; .
+
+ProcCall (Call := Call) :- RETURN GetType (Call); .
+
+DeclStmt (Declarations := Declarations) :- RETURN GetType (Declarations); .
+
+_ :- RETURN UserType (NoIdent, NoIdent); .
+
+PROCEDURE CheckAttribute (Attributes)
+
+Child (Name := Name, Class := Class) :-
+   CONDITION ActName = Name;
+   ActType := GetType (Class);
+   .
+Attribute (Name := Name) :-
+   CONDITION ActName # Name;
+   .
+Attribute (Name := Name, Type := Type, CppType := CppType, NodeType := NIL) :-
+   ActType := mUserType (Type, CppType);
+   .
+Attribute (Name := Name, NodeType := Class (TypeDesc := TypeDesc)) :-
+   ActType := TypeDesc;
+   .
+Attribute (Name := Name, NodeType := Classes ()) :-
+   ActType := mNodeTypes (ActTree, ActTypes, BaseTypes);  /* 2nd arg is dummy */
+   MakeSet (ActType^.NodeTypes.Types, ActTree^.TreeName.ClassCount);
+   Complement (ActType^.NodeTypes.Types);
+   Exclude (ActType^.NodeTypes.Types, 0);
+   MakeSet (ActType^.NodeTypes.BaseTypes, ActTree^.TreeName.ClassCount);
+   .
+
+PROCEDURE ExcludeTypes (Class)
+
+Class (Index := Index) :- Exclude (ActTypes, Index); .
+
+PREDICATE HasAssignment (Expr => Expr, Expr, tPosition)
+
+Parent    : Binary (Lop :=
+AssignTree: Binary (Lop := Lop, Operator := (iEqual), Pos := Pos))
+   => AssignTree, Parent, Pos :-
+   CONDITION NOT HasAssignment (Lop => ...);
+   .
+Binary (Lop := Lop, Operator := Operator, Rop := Rop)
+   => AssignTree, Parent, Pos :-
+   HasAssignment (Lop => AssignTree, Parent, Pos);
+   .
+
+FUNCTION GetRange (Classes, Range: SHORTCARD) SHORTCARD
+
+Class (Extensions := Extensions, Next := Next, Index := Index), _ :-
+   RETURN GetRange (Next, GetRange (Extensions, Index));
+   .
+NoClass (), _ :-
+   RETURN Range;
+   .
+
+// TRIP
+
+FUNCTION GenRules (t: Trip) Rules
+
+Trip (Rules := Rules, InObjects := Object (TypeDesc :=
+   NodeTypes (Types := Types, TreeName :=
+      TreeName (ClassCount := ClassCount, IndexToClass := IndexToClass)))) :-
+
+   r: Rules := ReverseTree (Rules);
+   WorkingSet: tSet;
+   MakeSet (WorkingSet, ClassCount);
+{  Assign (WorkingSet, Types); };
+   FOR ; NOT IsEmpty (WorkingSet); DO
+      r := GenRules2 (IndexToClass^ [Extract (WorkingSet)], r, t);
+   END;
+   ReleaseSet (WorkingSet);
+   RETURN ReverseTree (r);
+   .
+
+FUNCTION GenRules2 (c: Class, r: Rules, t: Trip) Rules
+
+Class (Extensions := Extensions), ... :-
+   r := GenRules3 (Extensions, r, t);
+   r := GenRule (c, r, t);
+   RETURN r;
+   .
+
+FUNCTION GenRules3 (Classes, r: Rules, t: Trip) Rules
+
+c:
+Class (Extensions := Extensions, Next := Next), ... :-
+   r := GenRules3 (Extensions, r, t);
+   r := GenRule (c, r, t);
+   r := GenRules3 (Next, r, t);
+   RETURN r;
+   .
+... :- RETURN r;
+   .
+
+FUNCTION GenRule (c: Class, r: Rules, t: Trip) Rules
+
+Class (Name := Name, Properties := Properties, Index := Index), ... :-
+
+   CONDITION Tree.HasChildren IN Properties;
+
+   patterns: Exprs := OneExpr (Expr :=
+      Compose (Pos := gPos, Selector := yy, Widen := FALSE, Expr :=
+	 VarUse (Pos := gPos, Name := Name), Exprs :=
+	 OneExpr (Expr :=
+	    mDontCare (gPos), Next :=
+	    NoExpr (Pos := gPos))), Next :=
+      OneExpr (Expr :=
+	 mDontCare (gPos), Next :=
+	 NoExpr (Pos := gPos)));
+
+   Iterator := NoTree;
+   statements: Statements := GenCalls (c, NoStatement (...), t);
+   IF Iterator # NoTree THEN
+      statements := ReverseTree (GenCall (Iterator, ReverseTree (statements), t));
+   END
+
+   RETURN Rule (Line := gPos, Patterns := {patterns},
+      Exprs := NoExpr (Pos := gPos), Expr := mNoExpr (gPos),
+      Statements := statements, Next := r);
+   .
+... :- RETURN r;
+   .
+
+FUNCTION GenCalls (c: [Classes, Attributes], s: Statements, t: Trip) Statements
+
+Class (Attributes := Attributes, BaseClass := BaseClass), ... :-
+   s := GenCalls (Attributes, s, t);
+   s := GenCalls (BaseClass, s, t);
+   RETURN s;
+   .
+self:
+Child (Next := Next, Properties := Properties, Class := Class (Index := Index)),
+_,
+Trip (InObjects := Object (TypeDesc := NodeTypes (Types := Types))) :-
+   CONDITION IsElement (Index, Types);
+   IF Tree.Reverse IN Properties THEN
+      Iterator := self;
+      REJECT
+   END
+   RETURN GenCall (self, GenCalls (Next, s, t), t);
+   .
+AttrOrAction (Next := Next), ... :-
+   RETURN GenCalls (Next, s, t);
+   .
+... :-
+   RETURN s;
+   .
+
+FUNCTION GenCall (c: Child, s: Statements, t: Trip) Statements
+
+Child (Name := Name), _,
+Trip (Name := tName, InObjects := Object (Next := fNext)) :-
+   RETURN ProcCall (Pos := gPos, Call :=
+      Compose (Pos := gPos, Selector := NoIdent, Widen := FALSE, Expr :=
+	 VarUse (Pos := gPos, Name := tName), Exprs :=
+	 OneExpr (Expr :=
+	    AttrDesc (Pos := gPos, Name := yy, Attribute := Name), Next :=
+	    GenParams (fNext, NoExpr (Pos := gPos)))), Next := s);
+   .
+
+FUNCTION GenParams (Objects, e: Exprs) Exprs
+
+Object (Next := Next, Name := Name, TypeDesc := TypeDesc, Path := Path), _ :-
+   RETURN OneExpr (Expr :=
+      VarUse (Pos := gPos, Name := Name), Next :=
+	 GenParams (Next, e));
+   .
+... :-
+   RETURN e;
+   .
+
+// IMPORT
+
+PROCEDURE DoImport ([Imports, Spec, Names])
+
+Import (..) :-
+   TheSpec := Spec;
+   DoImport (Spec);
+   DoImport (Next);
+   .
+Spec (..) :-
+   DoImport (Public);
+   Routines := FilterPublic (Routines);
+   ProcObjects (Routines);
+   .
+Name (..) :-
+   Object := IdentifyProc2 (Name, TheSpec);
+   IF Object = NoTree THEN
+      ErrorI ("subroutine identifier not declared", Pos, Name);
+   ELSE
+      Object^.Routine.IsPublic := TRUE;
+   END;
+   DoImport (Next);
+   .
+
+FUNCTION FilterPublic (Self: Routines) Routines
+
+Routine (Next := Next, IsPublic := (TRUE), Rules := Rules) :-
+   Next := FilterPublic (Next);
+   Rules := NoRule (...);
+   RETURN Self;
+   .
+Routine (Next := Next) :-
+   RETURN FilterPublic (Next);
+   .
+NoRoutine (..) :-
+   RETURN Self;
+   .

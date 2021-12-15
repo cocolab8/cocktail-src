@@ -1,0 +1,202 @@
+(* check arguments *)
+
+(* $Id: ArgCheck.mi,v 4.3 1997/05/27 15:17:02 grosch rel $ *)
+
+(*
+ * $Log: ArgCheck.mi,v $
+ * Revision 4.3  1997/05/27 15:17:02  grosch
+ * truncated module names to 8 characters:
+ * Characte, StringM, Position
+ *
+ * Revision 4.2  1997/04/17 14:34:13  grosch
+ * added support for # line 'dir\file' under Windows
+ *
+ * Revision 4.1  1994/02/23  22:11:34  grosch
+ * deleted unused objects
+ *
+ * Revision 4.0  1993/08/26  16:05:20  grosch
+ * replaced table files (Scanner.Tab, Parser.Tab, ...) by initialization code
+ *
+ * Revision 2.6  1993/08/18  15:13:04  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 2.5  1993/05/28  14:15:23  grosch
+ * added target language Eiffel
+ *
+ * Revision 2.4  1992/08/07  15:34:15  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 2.3  1992/01/30  14:10:10  grosch
+ * redesign of interface to operating system
+ *
+ * Revision 2.2  1991/12/04  16:24:36  grosch
+ * unified escape conventions for all tools
+ *
+ * Revision 2.1  1991/11/21  14:50:01  grosch
+ * new version of RCS on SPARC
+ *
+ * Revision 2.0  91/03/08  18:34:32  grosch
+ * turned tables into initialized arrays (in C)
+ * moved mapping tokens -> strings from Errors to Parser
+ * changed interface for source position
+ * 
+ * Revision 1.4  90/06/12  15:50:29  grosch
+ * renamed main program to bnf, layout improvements
+ * 
+ * Revision 1.3	 89/10/18  19:41:51  grosch
+ * renamed ScanTab and ParsTab to Scan.Tab and Pars.Tab because of PCTE
+ * 
+ * Revision 1.2	 89/05/02  14:21:34  vielsack
+ * new options: -c -m
+ * make source file name available
+ * 
+ * Revision 1.1	 89/02/24  14:02:42  vielsack
+ * call Scanner.BeginFile
+ * 
+ * Revision 1.0	 88/10/04  14:47:21  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE ArgCheck;
+
+FROM Characte	IMPORT	IsEqual,	Assign;
+FROM Errors	IMPORT	eError, eString, tReportMode, SetReportMode,
+			ErrorMessageI, CloseErrors;
+FROM IO		IMPORT	tFile,		StdInput,	StdOutput,
+			ReadOpen,	EndOfFile,	CloseIO;
+FROM Listing	IMPORT	SourceFile;
+FROM WriteTok	IMPORT	tLanguage,	Language;
+FROM Path	IMPORT	InsertPath;
+FROM Scanner	IMPORT	BeginFile;
+FROM Strings	IMPORT	tString,	tStringIndex,	ArrayToString,
+			StringToArray,	SubString,	Char,
+			Concatenate,	Length,		Append,
+			ReadL,		WriteL;
+FROM SysError	IMPORT	StatIsBad,	SysErrorMessageI;
+FROM SYSTEM	IMPORT	ADR;
+FROM Position	IMPORT	NoPosition;
+FROM rSystem	IMPORT	GetArgument,	GetArgCount;
+
+CONST
+  eToManyArgs	= 21;
+  eNoOption	= 20;
+
+  HelpFile	= 'bnf.cat';
+  ShortHelpFile = 'bnf.syn';
+
+  cLong		= '-l';
+  cHelp		= '-h';
+  cModula2	= '-m';
+  cC		= '-c';
+  cEiffel	= '-eiffel';
+  cNoAction	= '-NoAction';
+  cLine		= '-g';
+
+PROCEDURE ArgCheck;
+  VAR
+    ArgNo	: CARDINAL;
+    Argument	: ARRAY [0..255] OF CHAR;
+    ArgString	: tString;
+    file	: tFile;
+    array	: ARRAY [0..255] OF CHAR;
+    SourceFileIsOpen: BOOLEAN;
+    i, i2	: CARDINAL;
+    ch		: CHAR;
+
+  BEGIN
+    SourceFileIsOpen := FALSE;
+
+    FOR ArgNo := 1 TO GetArgCount () - 1 DO
+
+      GetArgument (ArgNo, Argument);
+
+      IF Argument [0] # '-' THEN
+	
+	IF SourceFileIsOpen THEN
+	  ArrayToString (Argument, ArgString);
+	  ErrorMessageI (eToManyArgs, eError, NoPosition, eString, ADR (ArgString));
+	ELSE
+	  SourceFile := ReadOpen (Argument);
+	  IF StatIsBad (SourceFile) THEN
+	    ArrayToString (Argument, ArgString);
+	    SysErrorMessageI (SourceFile, eError, eString, ADR (ArgString));
+	    SourceFile := StdInput;
+	  ELSE
+	    SourceFileIsOpen := TRUE;
+	    BeginFile (Argument);
+	    Assign (SourceFileName, Argument);
+
+	    i := 0; i2 := 0;
+	    ch := Argument [i]; INC (i);
+	    WHILE ch # 0C DO
+	       SourceFileName2 [i2] := ch; INC (i2);
+	       IF ch = '\' THEN SourceFileName2 [i2] := ch; INC (i2); END;
+	       ch := Argument [i]; INC (i);
+	    END;
+	    SourceFileName2 [i2] := 0C;
+	  END;
+	END;
+	  
+      ELSIF IsEqual (Argument, cNoAction) THEN
+	NoActionFlag := TRUE;
+      ELSIF IsEqual (Argument, cLong) THEN
+	SetReportMode (eListing);
+      ELSIF IsEqual (Argument, cModula2) THEN
+	Language := Modula2;
+      ELSIF IsEqual (Argument, cC) THEN
+	Language := C;
+      ELSIF IsEqual (Argument, cEiffel) THEN
+	Language := Eiffel;
+      ELSIF IsEqual (Argument, cLine) THEN
+	Line := TRUE;
+      ELSIF IsEqual (Argument, cHelp) THEN
+	array := HelpFile;
+	InsertPath (array);
+	file := ReadOpen (array);
+	IF StatIsBad (file) THEN
+	  ArrayToString (array, ArgString);
+	  SysErrorMessageI (file, eError, eString, ADR (ArgString));
+	ELSE
+	  CopyFile (file, StdOutput);
+	END;
+	Generate := FALSE;
+	RETURN;
+      ELSE
+	ArrayToString (Argument, ArgString);
+	ErrorMessageI (eNoOption, eError, NoPosition, eString, ADR (ArgString));
+      END;
+	
+    END;
+
+    IF SourceFile = StdInput THEN
+      array := ShortHelpFile;
+      InsertPath (array);
+      file := ReadOpen (array);
+      IF StatIsBad (file) THEN
+	ArrayToString (array, ArgString);
+	SysErrorMessageI (file, eError, eString, ADR (ArgString));
+      ELSE
+	CopyFile (file, StdOutput);
+      END;
+      Generate := FALSE;
+      RETURN;
+    END;
+  END ArgCheck;
+
+PROCEDURE CopyFile (in, out: tFile);
+  VAR line : tString;
+  BEGIN
+    WHILE NOT EndOfFile (in) DO
+      ReadL (in, line);
+      WriteL (out, line);
+    END;
+  END CopyFile;
+
+BEGIN
+  Line		:= FALSE;
+  Generate	:= TRUE;
+  NoActionFlag	:= FALSE;
+  SourceFileName:= ' ';
+  SourceFileName2:= ' ';
+END ArgCheck.

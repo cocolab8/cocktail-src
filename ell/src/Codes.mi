@@ -1,0 +1,378 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Codes.mi,v $
+ *	
+ *	purpose:	handle the terminals codes
+ *
+ *	$Author: grosch $
+ *	$Date: 2008/09/03 09:23:39 $
+ *)
+
+IMPLEMENTATION MODULE Codes;
+
+FROM DynArray	IMPORT	MakeArray, ExtendArray;
+FROM Idents	IMPORT	tIdent, WriteIdent, GetString;
+FROM Scanner	IMPORT	NoIdent, Epsilon;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsElement, Include, ForallDo, IsEmpty,
+			AssignEmpty, IsEqual, Minimum, Maximum, Assign;
+FROM SYSTEM	IMPORT	TSIZE;
+FROM IO		IMPORT	tFile, WriteS, WriteI, WriteNl, WriteC, StdOutput;
+FROM Strings	IMPORT	tString, Length, Char;
+FROM ArgCheck	IMPORT	tLanguage, LANGUAGE;
+
+CONST
+  NoCode = -1;
+  InitTermArraySize = 200;
+  InitCodeArraySize = 100;
+  InitRecSetArraySize = 20;
+  InitSetArraySize = 20;
+
+TYPE
+  tTermR = RECORD Code: tCode; END;
+  tCodeR = RECORD Term, String: tIdent; END;
+
+VAR
+  TermArray: POINTER TO ARRAY [0..1000] OF tTermR;
+  TermArraySizeL: LONGINT;
+  TermArraySize: tIdent;
+
+  CodeArray: POINTER TO ARRAY [0..1000] OF tCodeR;
+  CodeArraySizeL: LONGINT;
+  CodeArraySize: tCode;
+
+  vMaxCode,
+  vDefCode: tCode;
+  Count: INTEGER;
+
+  RecSetArray: POINTER TO ARRAY [0..1000] OF tSet;
+  RecSetArraySizeL: LONGINT;
+  RecSetArraySize: INTEGER;
+
+  SetArray: POINTER TO ARRAY [0..1000] OF tSet;
+  SetArraySizeL: LONGINT;
+  SetArraySize: INTEGER;
+
+PROCEDURE SetCode	(term: tIdent; string: tIdent; code: tCode);
+  BEGIN
+    FixTerm (term);
+    FixCode (code);
+    TermArray^[term].Code := code;
+    CodeArray^[code].Term := term;
+    CodeArray^[code].String := string;
+    IF code > vMaxCode THEN
+      vMaxCode := code;
+    END;
+  END SetCode;
+
+PROCEDURE Code		(term: tIdent): tCode;
+  BEGIN
+    FixTerm (term);
+    RETURN TermArray^[term].Code;
+  END Code;
+
+PROCEDURE Term		(code: tCode): tIdent;
+  BEGIN
+    FixCode (code);
+    RETURN CodeArray^[code].Term;
+  END Term;
+
+PROCEDURE String	(code: tCode): tIdent;
+  BEGIN
+    FixCode (code);
+    RETURN CodeArray^[code].String;
+  END String;
+
+PROCEDURE IsCode	(code: tCode): BOOLEAN;
+  BEGIN
+    RETURN Term (code) # NoIdent;
+  END IsCode;
+
+PROCEDURE IsCoded	(term: tIdent): BOOLEAN;
+  BEGIN
+    RETURN Code (term) # NoCode;
+  END IsCoded;
+
+PROCEDURE SetDefCode	(term: tIdent; string: tIdent);
+  BEGIN
+    SetCode (term, string, DefCode ());
+  END SetDefCode;
+
+PROCEDURE DefCode	(): tCode;
+  BEGIN
+    LOOP
+      FixCode (vDefCode);
+      IF NOT IsCode (vDefCode) THEN
+	RETURN vDefCode;
+      END;
+      INC (vDefCode);
+    END;
+  END DefCode;
+
+PROCEDURE MaxCode	(): tCode;
+  BEGIN
+    RETURN vMaxCode;
+  END MaxCode;
+
+PROCEDURE FixTerm (term: tIdent);
+  VAR OldSize: tIdent;
+  BEGIN
+    IF term >= TermArraySize THEN
+      OldSize := TermArraySize;
+      IF TermArraySize = 0 THEN
+	MakeArray (TermArray, TermArraySizeL, TSIZE (tTermR));
+	TermArraySize := TermArraySizeL;
+      END;
+      WHILE term >= TermArraySize DO
+	ExtendArray (TermArray, TermArraySizeL, TSIZE (tTermR));
+	TermArraySize := TermArraySizeL;
+      END;
+      WHILE OldSize < TermArraySize DO
+	WITH TermArray^[OldSize] DO
+	  Code := NoCode;
+	END;
+	INC (OldSize);
+      END;
+    END;
+  END FixTerm;
+
+PROCEDURE FixCode (code: tCode);
+  VAR OldSize: tCode;
+  BEGIN
+    IF code >= CodeArraySize THEN
+      OldSize := CodeArraySize;
+      IF CodeArraySize = 0 THEN
+	MakeArray (CodeArray, CodeArraySizeL, TSIZE (tCodeR));
+	CodeArraySize := CodeArraySizeL;
+      END;
+      WHILE code >= CodeArraySize DO
+	ExtendArray (CodeArray, CodeArraySizeL, TSIZE (tCodeR));
+	CodeArraySize := CodeArraySizeL;
+      END;
+      WHILE OldSize < CodeArraySize DO
+	WITH CodeArray^[OldSize] DO
+	  Term := NoIdent;
+	END;
+	INC (OldSize);
+      END;
+    END;
+  END FixCode;
+
+ PROCEDURE RecSetIndex (set: tSet): INTEGER;
+  VAR
+    Index: INTEGER;
+    Codes: tSet;
+    Ident: tIdent;
+  BEGIN
+    (* make a new set *)
+    MakeSet (Codes, vMaxCode);
+    (* convert the set *)
+    IF NOT IsEmpty (set) THEN
+      FOR Ident := Minimum (set) TO Maximum (set) DO
+	IF IsElement (Ident, set) AND (Ident # Epsilon) THEN
+	  Include (Codes, Code (Ident));
+	END;
+      END;
+    END;
+    (* look for the set *)
+    Index := vMaxRecSetIndex;
+    LOOP
+      IF Index = cNoIndex THEN EXIT END;			(* not found *)
+      IF IsEqual (RecSetArray^[Index], Codes) THEN EXIT END;	(* found *)
+      DEC (Index);
+    END;
+    IF Index = cNoIndex THEN
+      (* determine index *)
+      INC (vMaxRecSetIndex);
+      Index := vMaxRecSetIndex;
+      (* create or extend the array if necessary *)
+      IF vMaxRecSetIndex >= RecSetArraySize THEN
+	IF RecSetArraySize = 0 THEN
+	  MakeArray (RecSetArray, RecSetArraySizeL, TSIZE (tSet));
+	  RecSetArraySize := RecSetArraySizeL;
+	ELSE
+	  ExtendArray (RecSetArray, RecSetArraySizeL, TSIZE (tSet));
+	  RecSetArraySize := RecSetArraySizeL;
+	END;
+      END;
+      (* enter set *)
+      RecSetArray^[Index] := Codes;
+    ELSE
+      ReleaseSet (Codes);
+    END;
+    RETURN Index;
+  END RecSetIndex;
+
+PROCEDURE SetIndex (set: tSet): INTEGER;
+  VAR
+    Index: INTEGER;
+    Codes: tSet;
+    Ident: tIdent;
+  BEGIN
+    (* make a new set *)
+    MakeSet (Codes, vMaxCode);
+    (* convert the set *)
+    FOR Ident := Minimum (set) TO Maximum (set) DO
+      IF IsElement (Ident, set) AND (Ident # Epsilon) THEN
+	Include (Codes, Code (Ident));
+      END;
+    END;
+    (* look for the set *)
+    Index := vMaxSetIndex;
+    LOOP
+      IF Index = cNoIndex THEN EXIT END;			(* not found *)
+      IF IsEqual (SetArray^[Index], Codes) THEN EXIT END;	(* found *)
+      DEC (Index);
+    END;
+    IF Index = cNoIndex THEN
+      (* determine index *)
+      INC (vMaxSetIndex);
+      Index := vMaxSetIndex;
+      (* create or extend the array if necessary *)
+      IF vMaxSetIndex >= SetArraySize THEN
+	IF SetArraySize = 0 THEN
+	  MakeArray (SetArray, SetArraySizeL, TSIZE (tSet));
+	  SetArraySize := SetArraySizeL;
+	ELSE
+	  ExtendArray (SetArray, SetArraySizeL, TSIZE (tSet));
+	  SetArraySize := SetArraySizeL;
+	END;
+      END;
+      (* enter set *)
+      SetArray^[Index] := Codes;
+    ELSE
+      ReleaseSet (Codes);
+    END;
+    RETURN Index;
+  END SetIndex;
+
+PROCEDURE GetRecSet (index: INTEGER; VAR set: tSet);
+  BEGIN
+    Assign (set, RecSetArray^[index]);
+  END GetRecSet;
+
+PROCEDURE GetSet (index: INTEGER; VAR set: tSet);
+  BEGIN
+    IF index > vMaxSetIndex THEN
+      AssignEmpty (set);
+    ELSE
+      Assign (set, SetArray^[index]);
+    END;
+  END GetSet;
+
+(* CODES_ )*
+PROCEDURE WriteCodes	(f: tFile);
+  VAR
+    code: tCode;
+    term: tIdent;
+    index: INTEGER;
+  BEGIN
+    WriteS (f, 'CodeArray:');
+    WriteNl (f);
+    FOR code := 1 TO CodeArraySize DO
+      term := Term (code);
+      IF term # NoIdent THEN
+	WriteIdent (f, term);
+	WriteS (f, ' -> ');
+	WriteI (f, code, 0);
+	WriteNl (f);
+      END;
+    END;
+    WriteNl (f);
+    WriteS (f, 'TermArray:');
+    WriteNl (f);
+    FOR term := 1 TO TermArraySize DO
+      code := Code (term);
+      IF code # NoCode THEN
+	WriteIdent (f, term);
+	WriteS (f, ' -> ');
+	WriteI (f, code, 0);
+	WriteNl (f);
+      END;
+    END;
+    WriteNl (f);
+
+    WriteS (f, 'IndexArray:'); WriteNl (f);
+    FOR index := 0 TO vMaxSetIndex DO
+      WriteI (f, index, 0); WriteS (f, ' =');
+      WriteIndex (f, index); WriteNl (f);
+    END;
+    WriteNl (f);
+
+    WriteS (f, 'RecIndexArray:'); WriteNl (f);
+    FOR index := 0 TO vMaxRecSetIndex DO
+      WriteI (f, index, 0); WriteS (f, ' =');
+      WriteRecIndex (f, index); WriteNl (f);
+    END;
+    WriteNl (f);
+  END WriteCodes;
+*( _CODES *)
+
+PROCEDURE WriteIndex	(file: tFile; index: INTEGER);
+  VAR set: tSet;
+  BEGIN
+    IF index = cNoIndex THEN RETURN END;
+    MakeSet (set, MaxCode ());
+    GetSet (index, set);
+    f := file;
+    Count := 0;
+    ForallDo (set, WriteName);
+    ReleaseSet (set);
+  END WriteIndex;
+
+PROCEDURE WriteRecIndex (file: tFile; index: INTEGER);
+  VAR set: tSet;
+  BEGIN
+    IF index = cNoIndex THEN RETURN END;
+    MakeSet (set, MaxCode ());
+    GetRecSet (index, set);
+    f := file;
+    Count := 0;
+    ForallDo (set, WriteName);
+    ReleaseSet (set);
+  END WriteRecIndex;
+
+VAR f: tFile;
+
+PROCEDURE WriteName	(e: CARDINAL);
+  BEGIN
+    WriteS (f, ' ');
+    WriteTerminal (f, Term (e));
+    INC (Count);
+    IF Count = 10 THEN WriteNl (f); Count := 0; END;
+  END WriteName;
+
+PROCEDURE WriteTerminal	(file: tFile; ident: tIdent);
+  VAR
+    s	: tString;
+    i	: CARDINAL;
+    c1, c2	: CHAR;
+  BEGIN
+    GetString (ident, s);
+    c1 := Char (s, 1);
+    WriteC (file, c1);
+    FOR i := 2 TO Length (s) DO
+      c2 := Char (s, i);
+      IF (LANGUAGE = C      ) AND ((c1 = '/') AND (c2 = '*') OR (c1 = '*') AND (c2 = '/'))
+      OR (LANGUAGE = MODULA2) AND ((c1 = '(') AND (c2 = '*') OR (c1 = '*') AND (c2 = ')')) THEN
+	WriteC (file, ' ');
+      END;
+      WriteC (file, c2);
+      c1 := c2;
+    END;
+  END WriteTerminal;
+
+BEGIN
+  TermArraySizeL := InitTermArraySize;
+  TermArraySize := 0;
+  CodeArraySizeL := InitCodeArraySize;
+  CodeArraySize := 0;
+  RecSetArraySizeL := InitRecSetArraySize;
+  RecSetArraySize := 0;
+  SetArraySizeL := InitSetArraySize;
+  SetArraySize := 0;
+  vDefCode := 1;
+  vMaxCode := 0;
+  vMaxSetIndex := -1;
+  vMaxRecSetIndex := -1;
+END Codes.

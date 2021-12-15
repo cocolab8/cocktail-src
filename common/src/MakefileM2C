@@ -1,0 +1,99 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+Characte$(ES)	: Characte$(ED)	; $(MD) Characte$(SD)
+
+Characte$(EO)	: Characte$(EI)	; $(MI) Characte$(SI)
+Characte$(EO)	: Characte$(ES)
+
+Checks$(ES)	: Checks$(ED)	; $(MD) Checks$(SD)
+
+Checks$(EO)	: Checks$(EI)	; $(MI) Checks$(SI)
+Checks$(EO)	: Checks$(ES)
+Checks$(EO)	: SysError$(ES)
+Checks$(EO)	: Errors$(ES)
+
+Convert$(ES)	: Convert$(ED)	; $(MD) Convert$(SD)
+
+Convert$(EO)	: Convert$(EI)	; $(MI) Convert$(SI)
+Convert$(EO)	: Convert$(ES)
+
+Errors$(ES)	: Errors$(ED)	; $(MD) Errors$(SD)
+
+Errors$(EO)	: Errors$(EI)	; $(MI) Errors$(SI)
+Errors$(EO)	: Errors$(ES)
+Errors$(EO)	: Listing$(ES)
+Errors$(EO)	: SysError$(ES)
+
+Listing$(ES)	: Listing$(ED)	; $(MD) Listing$(SD)
+
+Listing$(EO)	: Listing$(EI)	; $(MI) Listing$(SI)
+Listing$(EO)	: Listing$(ES)
+
+all	: Main
+Main$(EO)	: Main$(EP)	; $(MP) Main$(SP)
+Main$(EO)	: Convert$(ES)
+Main$(EO)	: Characte$(ES)
+Main$(EO)	: Checks$(ES)
+Main$(EO)	: Errors$(ES)
+Main$(EO)	: Listing$(ES)
+Main$(EO)	: Path$(ES)
+Main$(EO)	: Queues$(ES)
+Main$(EO)	: Stack$(ES)
+Main$(EO)	: SysError$(ES)
+
+Path$(ES)	: Path$(ED)	; $(MD) Path$(SD)
+
+Path$(EO)	: Path$(EI)	; $(MI) Path$(SI)
+Path$(EO)	: Path$(ES)
+Path$(EO)	: Characte$(ES)
+
+Queues$(ES)	: Queues$(ED)	; $(MD) Queues$(SD)
+
+Queues$(EO)	: Queues$(EI)	; $(MI) Queues$(SI)
+Queues$(EO)	: Queues$(ES)
+Queues$(EO)	: Errors$(ES)
+
+Stack$(ES)	: Stack$(ED)	; $(MD) Stack$(SD)
+
+Stack$(EO)	: Stack$(EI)	; $(MI) Stack$(SI)
+Stack$(EO)	: Stack$(ES)
+Stack$(EO)	: Errors$(ES)
+
+SysError$(ES)	: SysError$(ED)	; $(MD) SysError$(SD)
+
+SysError$(EO)	: SysError$(EI)	; $(MI) SysError$(SI)
+SysError$(EO)	: SysError$(ES)
+SysError$(EO)	: Errors$(ES)
+
+Main	: Main$(EO) SysError$(EO) Errors$(EO) Listing$(EO) Stack$(EO) Queues$(EO) Path$(EO) Characte$(EO) Checks$(EO) Convert$(EO)	; $(ML) Main $(OUT) Main
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

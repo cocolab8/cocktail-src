@@ -1,0 +1,67 @@
+(* $Id: Scan.mi,v 2.1 1998/05/27 15:23:55 grosch rel $ *)
+
+MODULE	Scan;
+
+FROM	ArgCheck	IMPORT	CheckArgs;
+FROM	Errors		IMPORT	ErrorTable,	SaveProc,	WriteProc,
+				BeginErrors,	CloseErrors;
+FROM	Idents		IMPORT	GetString;
+FROM	Info		IMPORT	SaveInfo,	WriteInfo,	WriteToken;
+FROM	IO		IMPORT	StdOutput,	CloseIO;
+FROM	Path		IMPORT	InsertPath;
+FROM	Scanner		IMPORT	BeginScanner,	CloseScanner,	ScanTabName,
+				EofToken,	GetToken,	Attribute,
+				SymIdent,	SymString,	SymNumber,
+				SymCodeString,	SymCodeIdent,	SymCodeSpace,
+				SymCodeRest;
+FROM	StdIO		IMPORT	WriteS,		WriteI,		WriteNl;
+FROM	Strings		IMPORT	tString;
+IMPORT	Strings,	StringM;
+
+VAR
+  t : INTEGER;
+  s : tString;
+
+BEGIN
+  SaveProc := SaveInfo;
+  WriteProc := WriteInfo;
+  InsertPath (ErrorTable);
+  InsertPath (ScanTabName);
+  BeginErrors;
+  CheckArgs;
+  BeginScanner;
+  t := GetToken ();
+  WHILE t # EofToken DO
+    WriteI (t, 3);
+    WriteS ('  col ');
+    WriteI (Attribute.pos.line, 3);
+    WriteS ('  line ');
+    WriteI (Attribute.pos.column, 3);
+    WriteS ('  ');
+    CASE t OF
+    | SymIdent, SymString, SymCodeIdent, SymCodeString:
+	WriteToken (StdOutput, t);
+	WriteS ("		>");
+	GetString (Attribute.ident, s);
+	Strings.WriteS (StdOutput, s);
+	WriteS ("<");
+    | SymCodeSpace .. SymCodeRest:
+	WriteToken (StdOutput, t);
+	WriteS ("		>");
+	StringMem.GetString (Attribute.ref, s);
+	Strings.WriteS (StdOutput, s);
+	WriteS ("<");
+    | SymNumber:
+	WriteToken (StdOutput, t);
+	WriteI (Attribute.val, 3);
+    ELSE
+	WriteS ("		");
+	WriteToken (StdOutput, t);
+    END;
+    WriteNl;
+    t := GetToken ();
+  END;
+  CloseScanner;
+  CloseErrors;
+  CloseIO;
+END Scan.

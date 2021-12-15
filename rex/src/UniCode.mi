@@ -1,0 +1,26 @@
+IMPLEMENTATION MODULE UniCode;
+
+FROM IO		IMPORT tFile, WriteC, WriteS, WriteN;
+
+IMPORT Layout;
+
+PROCEDURE WriteChar (f: tFile; Ch: UCHAR);
+   BEGIN
+      IF Ch > ORD (MAX (CHAR)) THEN
+	 WriteS (f, "\u");
+	 WriteN (f, Ch, 4, 16);
+      ELSE
+         Layout.WriteChar (f, CHR (Ch));
+      (* for backwards compatibility ???
+      ELSIF (ORD ('!') <= Ch) AND (Ch <= ORD ('~')) THEN
+	 WriteC (f, "'");
+	 WriteC (f, CHR (Ch));
+	 WriteC (f, "'");
+      ELSE
+	 WriteS (f, "\x");
+	 WriteN (f, Ch, 2, 16);
+      *)
+      END;
+   END WriteChar;
+
+END UniCode.

@@ -1,0 +1,94 @@
+!INCLUDE ..\..\config.mak
+
+CFLAGS	= $(CFG_CFLAGS) /W1 /I$(REUSE)
+
+LDFLAGS	= $(REUSE_LIB)
+
+all	: libcommn.lib
+
+# HEAD
+
+# all	: Main.exe
+
+Characte.obj	: Characte.c	\
+	Characte.h
+
+Checks.obj	: Checks.c	\
+	Checks.h	\
+	Errors.h	\
+	Listing.h	\
+	SysError.h
+
+Convert.obj	: Convert.c	\
+	Convert.h
+
+Errors.obj	: Errors.c	\
+	Errors.h	\
+	SysError.h	\
+	Listing.h
+
+Listing.obj	: Listing.c	\
+	Listing.h
+
+Main.obj	: Main.c	\
+	SysError.h	\
+	Stack.h	\
+	Queues.h	\
+	Path.h	\
+	Listing.h	\
+	Errors.h	\
+	Checks.h	\
+	Characte.h	\
+	Convert.h
+
+Path.obj	: Path.c	\
+	Path.h	\
+	Characte.h
+
+Queues.obj	: Queues.c	\
+	Queues.h	\
+	Errors.h	\
+	SysError.h	\
+	Listing.h
+
+Stack.obj	: Stack.c	\
+	Stack.h	\
+	Errors.h	\
+	SysError.h	\
+	Listing.h
+
+SysError.obj	: SysError.c	\
+	SysError.h	\
+	Errors.h	\
+	Listing.h
+
+SYSTEM_.obj	: SYSTEM_.c SYSTEM_.h
+
+OBJS	=	\
+	SysError.obj	\
+	Stack.obj	\
+	Queues.obj	\
+	Path.obj	\
+	Listing.obj	\
+	Errors.obj	\
+	Checks.obj	\
+	Characte.obj	\
+	Convert.obj
+
+Main_OBJS = Main.obj $(OBJS)
+
+Main.exe	: $(Main_OBJS) $(SYSTEM)
+	$(CC) /nologo $(Main_OBJS) $(SYSTEM) /link /out:Main.exe $(LDFLAGS)
+
+# TAIL
+
+libcommn.lib: $(OBJS)
+	link.exe -lib /nologo /out:libcommn.lib $(OBJS)
+
+clean:
+	del *.obj *.lib *.exe
+
+.SUFFIXES: .h .c .obj
+
+.c.obj:
+	$(CC) $(CFLAGS) /c $*.c

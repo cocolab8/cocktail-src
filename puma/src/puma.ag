@@ -1,0 +1,132 @@
+/* $Id: puma.ag,v 1.3 2008/09/12 13:29:04 grosch rel $ */
+
+/*
+ * $Log: puma.ag,v $
+ * Revision 1.3  2008/09/12 13:29:04  grosch
+ * added new kinds of FOR loops for iteration over lists of tree nodes
+ * extended pattern matching in IF statements by optional conditions
+ *
+ * Revision 1.2  2004/01/05 16:40:33  grosch
+ * allow statements after RETURN statement
+ * added new statement for IMPORT of external routine declarations
+ * allow pattern matching in IF statements
+ * a FOR loop can declare its loop variable
+ * added new scopes and changed scoping rules:
+ *    THEN and ELSE parts of the IF statement and the FOR and WHILE loops
+ *
+ * Revision 1.1  2001/12/17 12:08:32  grosch
+ * fixed bug concerning the FOR loop
+ *
+ * Revision 1.0  2001/09/20 14:32:06  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 6.9.2001 */
+
+MODULE PumaCF
+
+EVAL GLOBAL {
+FROM Scanner IMPORT Error, ErrorI, Warning, WarningI, Information, InformationI;
+}
+
+DECLARE
+
+Statements	= [DoesStop	: BOOLEAN SYN]	/* statement sequence does stop,
+					     it is never executed til its end */
+		  [IsReachable	: BOOLEAN INH]	/* statement is reachable,
+						   it might be executed */
+		  .
+
+RULE
+
+Rule		= { Statements:IsReachable := TRUE	;
+		  } .
+Statements	= { DoesStop		:= FALSE	;
+		  } .
+Statement	= { DoesStop		:= Next:DoesStop;
+		    CHECK IsReachable => Warning ("statement not reachable", Pos);
+		  } .
+IfMatch		= { DoesStop		:= Then:DoesStop AND Else:DoesStop
+					   OR Next:DoesStop;
+		    Next:IsReachable	:= IsReachable AND NOT
+					   (Then:DoesStop AND Else:DoesStop);
+		  } .
+If		= { DoesStop		:= Then:DoesStop AND Else:DoesStop
+					   OR Next:DoesStop;
+		    Next:IsReachable	:= IsReachable AND NOT
+					   (Then:DoesStop AND Else:DoesStop);
+		  } .
+For		= { DoesStop		:= Init:DoesStop OR Statements:DoesStop
+					   AND Next:DoesStop;
+		    Next:IsReachable	:= IsReachable AND NOT Init:DoesStop;
+		  } .
+ForEach		= { DoesStop		:= Statements:DoesStop
+					   AND Next:DoesStop;
+		    Next:IsReachable	:= IsReachable;
+		  } .
+Return		= { DoesStop		:= TRUE		;
+		    Next:IsReachable	:= FALSE	;
+		  } .
+Reject		= { DoesStop		:= TRUE		;
+		    Next:IsReachable	:= FALSE	;
+		  } .
+Fail		= { DoesStop		:= TRUE		;
+		    Next:IsReachable	:= FALSE	;
+		  } .
+
+END PumaCF
+
+MODULE PumaDecls
+
+DECLARE
+
+Rule
+For
+ForEach		= [HasDeclsStmts: BOOLEAN SYN]	/* scope has declarations */
+		  .
+IfMatch
+If		= [HasDeclsThen : BOOLEAN SYN]	/* ditto */
+		  [HasDeclsElse	: BOOLEAN SYN]	/* ditto */
+		  .
+Statements	= [HasDecls	: BOOLEAN SYN]	/* stmt seq has declarations */
+		  [HasAnyDecls	: BOOLEAN SYN]	/* stmt seq has any decls */
+		  .
+
+RULE
+
+Statements	= { HasDecls		:= FALSE		;
+		    HasAnyDecls		:= FALSE		;
+		  } .
+Statement	= { HasDecls		:= Next:HasDecls	;
+		    HasAnyDecls		:= Next:HasAnyDecls	;
+		  } .
+DeclStmt	= { HasDecls		:= TRUE			;
+		    HasAnyDecls		:= TRUE			;
+		  } .
+Rule		= { HasDeclsStmts	:= Statements:HasAnyDecls;
+		  } .
+For		= { HasDeclsStmts	:= Statements:HasDecls	;
+		    HasAnyDecls		:= Init:HasAnyDecls	OR
+					   Statements:HasAnyDecls OR
+					   Next:HasAnyDecls	;
+		  } .
+ForEach		= { HasDeclsStmts	:= Statements:HasDecls	;
+		    HasAnyDecls		:= Var:HasAnyDecls	OR
+					   Statements:HasAnyDecls OR
+					   Next:HasAnyDecls	;
+		  } .
+IfMatch		= { HasDeclsThen	:= Then:HasDecls	;
+		    HasDeclsElse	:= Else:HasDecls	;
+		    HasAnyDecls		:= Then:HasAnyDecls	OR
+		    			   Else:HasAnyDecls	OR
+					   Next:HasAnyDecls	;
+		  } .
+If		= { HasDeclsThen	:= Then:HasDecls	;
+		    HasDeclsElse	:= Else:HasDecls	;
+		    HasAnyDecls		:= Then:HasAnyDecls	OR
+		    			   Else:HasAnyDecls	OR
+					   Next:HasAnyDecls	;
+		  } .
+
+END PumaDecls

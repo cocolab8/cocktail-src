@@ -1,0 +1,1470 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.EQ
+gsize 12
+gfont R
+delim $$
+.EN
+.ds ], , 
+.T0
+
+	Multiple Inheritance
+	in Object-Oriented
+	Attribute Grammars
+
+	J. Grosch
+
+
+.T1
+.T2 "" "Multiple Inheritance in Object-Oriented Attribute Grammars" "Josef Grosch" "Feb. 25, 1992" 28 1994
+.hc ~
+.bp 1
+.ce 99
+.b "Multiple Inheritance in Object-Oriented Attribute Grammars"
+.ce 0
+.sp 1
+.uh Abstract
+Object-oriented attribute grammars are a promising notation for language specifications.
+They have similar benefits as object-orientation in the area of programming languages. They
+support a compact and flexible style for language specifications. Existing definitions can
+be easily reused as well as the associated default behaviour. New definitions can be
+derived from existing ones by specialization. While previous approaches have been
+restricted to single inheritance this paper defines object-oriented attribute grammars
+with multiple inheritance. A system has been developed that processes those attribute
+grammars. We describe an example that uses multiple inheritance and compare the terminology
+and concepts of related areas.
+.uh Keywords
+attribute grammar, object-orientation, multiple inheritance
+.sh 1 Introduction
+.lp
+Object-oriented attribute grammars have been introduced by several authors (e. g.
+\*([[Gro90\*(],Hed89\*(]])
+as a promising notation for attribute grammars.
+An overview of the current state of the art in this area is given in
+\*([[Kos91\*(]].
+The benefits are comparable to those of object-oriented programming languages.
+It is a concise notation and flexible notation for language specifications.
+The reuse of existing definitions is supported by the
+possibility to specify new definitions as extensions or specializations of existing ones.
+The duplication of information is avoided because common parts can be "factored out".
+.pp
+While the main building blocks of object-oriented programming languages are classes, the
+nonterminals play this part in object-oriented attribute grammars. More precisely, the
+notions nonterminal and production rule are unified. This means that there is exactly one
+production rule for every nonterminal. Additionally, a relation between nonterminals is
+specified, for example using chain rules, which describes a subtype relation or class
+hierarchy among the nonterminals. This subtype relation serves for two purposes. First, it
+allows to derive several different strings from one nonterminal because a nonterminal may
+be replaced by a right-hand side corresponding to a nonterminal that is a subtype of the
+replaced one. Second, the subtype relation describes the path for inheritance among the
+nonterminals. The items that are subject to inheritance are right-hand side elements,
+attributes, and attribute computations.
+Inherited attribute computations may be overwritten in the subtype
+by giving different computations for the same attributes.
+.pp
+Before we proceed we have to clarify the terminology:
+Originally, context-free grammars as well as attribute grammars are derivation systems for
+strings. In this paper we are interested in the specification of semantic analysis which is
+based on an abstract syntax tree. Therefore we use grammars to describe the structure of
+trees instead of strings.
+.lp
+In order to avoid confusion between the terms class, nonterminal, terminal, and (sub)type
+we will use the term
+.i "node type"
+to cover all those meanings. The term node type is motivated through a realistic
+description of what is happening: The node types specify the structure of the nodes of the
+abstract syntax tree.
+.lp
+The attributes in attribute grammars are usually classified as
+.i synthesized
+and
+.i inherited .
+Following Hedin\*([<\*([[Hed89\*(]]\*(>] we use the term
+.i "ancestral attribute"
+instead of the standard
+.i "inherited attribute"
+since we use the term
+.i inherited
+in the object-oriented sense.
+.pp
+There is one problem that arises especially from the combination of ancestral attributes
+and inheritance. Let A, B, and C be node types and let B be a subtype of A (B \(ib A)
+having one ancestral attribute x. If the right-hand side of C contains an A, we have to
+know whether to compute the attribute A.x or not. The static type is A, but the dynamic type
+can be any subtype, that is A or B. If it is B we have to compute A.x, if it is A we may
+not compute it.
+The notions node type, subtype, and right-hand side are defined in section 2.
+.pp
+There are several solutions to this problem. First, one can restrict the definition of
+ancestral attributes to top level node types, only. This makes the reuse of existing
+node types very hard in particular in combination with multiple inheritance.
+.pp
+Second, one could use a dynamic dispatch technique which inspects the dynamic type of the
+right-hand side child and decides during runtime whether to compute A.x or not. This
+solution is rather inefficient because of its runtime overhead.
+.pp
+Most existing systems therefore allow single inheritance, only, with the additional
+restriction that ancestral attributes have to be defined at top level node types. The
+last restriction is not severe because it somehow coincides in a natural way with the
+style of usual attribute grammars.
+Hedin\*([<\*([[Hed89\*(]]\*(>] follows this argumentation and calls
+object-oriented attribute grammars having the above problem not
+.i "well formed" .
+.pp
+This paper introduces a third solution to the above mentioned problem. It allows for a
+restricted form of multiple inheritance and still retains the capability to decide at
+generation time which ancestral attributes have to be computed. Attribute evaluators
+can still be implemented efficiently as dynamic dispatch is avoided.
+.pp
+In section 2 we formally define object-oriented attribute grammars with single inheritance.
+Section 3 contains two simple examples using single inheritance.
+Section 4 extends the definition of object-oriented attribute grammars to multiple
+inheritance.
+Section 5 presents an elaborate example with multiple inheritance.
+In section 6 we compare our approach with pure attribute grammars and with object-oriented
+programming in order to reveal the common properties as well as the differences.
+Section 7 summarizes the results.
+.sh 1 "Single Inheritance"
+.lp
+This section formally defines the principles of object-oriented attribute grammars with
+single inheritance.
+As starting point we shortly recall the traditional definition of attribute grammars
+\*([[Knu68\*(],Knu71\*(]].
+.pp
+An attribute grammar is an extension of a context-free grammar.
+A context-free grammar is denoted by G = (N, T, P, Z) where
+N is the set of nonterminals,
+T is the set of terminals,
+P is the set of productions, and
+Z \(mo N is the
+.i start
+symbol, which cannot appear on the right-hand side of any production in P.
+The set V = N \(cu T is called the vocabulary.
+Each production p \(mo P has the form $ p:~X~\(->~alpha $ where X \(mo N and
+$ alpha~\(mo~V sup "*" $.
+The relation \(rA (directly derives) is defined over strings in $ V sup "*" $ as follows:
+if $ p:~X~\(->~alpha $, p \(mo P, $ nu X omega~\(mo~V sup "*" $,
+$ nu alpha omega~\(mo~V sup "*" $ then
+$ nu X omega~\(rA~nu alpha omega $.
+The relation $ \(rA sup "*" $ is the transitive and reflexive closure of \(rA.
+The language L(G) is defined as $ L(G)~=~"{"~w~|~Z~\(rA sup *~w~"}" $.
+.pp
+An attribute grammar augments a context-free grammar by attributes and attribute
+computations. A set of attributes is associated with each symbol in V.
+Attribute computations are added to every production describing how to compute attribute
+values in the local context of a production.
+This simple view of attribute grammars shall suffice for the scope of this paper.
+.pp
+In general there can be several productions having the same nonterminal on the left-hand side.
+This allows for different derivations starting from one nonterminal. In object-oriented
+attribute grammars, one production is permitted for one left-hand side symbol, only.
+This way the notions production and nonterminal (vocabulary respectively) are unified
+and are termed
+.i "node type"
+as already mentioned. Several different derivations are made possible through the
+newly introduced subtype relation.
+.pp
+An object-oriented attribute grammar is formally denoted by G = (N, T, A, C, Z) where
+N is the set of nonterminals,
+T is the set of terminals,
+A is the set of attributes,
+C is the set of attribute computations, and
+Z is the start symbol (Z \(mo N).
+The set NT = N \(cu T is called the set of
+.i "node types" .
+Each element n \(mo NT is associated with a tuple n: (R, B, D, S) where
+$ R~\(mo~NT sup "*" $ is the right-hand side,
+$ B~\(mo~A sup "*" $ is the set of attributes,
+$ D~\(mo~C sup "*" $ is the set of attribute computations, and
+S \(mo NT is the base type.
+.pp
+The elements of NT induce a relation \(ib (subtype) over NT as follows:
+if $ n:~( alpha ,~beta ,~delta ,~m )~\(mo~NT $ then n \(ib m.
+m is called
+.i base
+or
+.i super
+type, n is called
+.i derived
+type or
+.i subtype .
+The relation \(ib is transitive: if n \(ib m and m \(ib o then n \(ib o.
+.pp
+The relation \(rA (directly derives) is defined here only for the context-free or syntactic
+part of an object-oriented attribute grammar. There are two possibilities for derivations
+which are defined over strings in $ NT sup "*" $ as follows:
+.lp
+.nf
+.ta 3.9c
+      if $ nu n sub i omega~\(mo~NT sup "*" $ and	$ n sub 1 :~( alpha sub 1 ,~beta sub 1 ,~delta sub 1 ,~n sub 0 )~\(mo~NT, $
+	$ n sub 2 :~( alpha sub 2 ,~beta sub 2 ,~delta sub 2 ,~n sub 1 )~\(mo~NT, $
+	            $ ... $
+	$ n sub i :~( alpha sub i ,~beta sub i ,~delta sub i ,~n sub i-1 )~\(mo~NT $ then $ nu n sub i omega~\(rA~nu alpha sub 1 alpha sub 2 ... alpha sub i omega $.
+.lp
+.nf
+      if $ nu n omega~\(mo~NT sup "*" $ and $ m~\(ib~n $ then $ nu n omega~\(rA~nu m omega $.
+.lp
+We assume the existence of a predefined node type $ n sub 0 :~(\(/o,~\(/o,~\(/o,~-) $ with
+empty components. In a direct derivation step, a node type can be replaced by its right-hand
+side $ ( alpha sub 1 ... alpha sub i ) $ or by one of its subtypes (m). All replacing
+right-hand sides are the union of right-hand sides according to the subtype hierarchy.
+The relation $ \(rA sup "*" $ is the transitive and reflexive closure of \(rA.
+The language L(G) is defined as $ L(G)~=~"{"~w~|~Z~\(rA sup "*"~w~"}" $.
+.pp
+The subtype relation has the following properties: a derived node type inherits the
+right-hand side, the attributes, and the attribute computations from its base type. As
+consequence of the transitive nature of this relation, a derived type inherits all the
+components from all base types according to the subtype hierarchy.
+It may extend the set of inherited items by defining
+additional right-hand side elements, attributes, or attribute computations. All accumulated
+right-hand side elements and attributes must be distinct because they are
+united. An attribute computation for an attribute may overwrite an inherited one.
+.\" The definition of the subtype relation allows exactly single inheritance.
+.sh 1 Example
+.lp
+We implemented an attribute grammar system called
+.i ag
+based on object-oriented attribute grammars which is part of the Karlsruhe Toolbox for
+Compiler Construction\*([<\*([[GrE90\*(]]\*(>].
+It supports the kinds of single and multiple inheritance described in this paper.
+The following examples of object-oriented attribute grammars with single inheritance
+are written in the specification language of
+.i ag .
+The language tries to adhere to the conventional style of context-free grammars
+as far as possible. It offers far more features for practical usage than can be
+explained here. The interested reader is referred to the user's manual\*([<\*([[Groa\*(]]\*(>].
+.pp
+An attribute grammar is given in the form of nested node type definitions. The nesting
+expresses the subtype hierarchy or the subtype relation. A node type definition consists of
+properties of the node type followed by a list of subtype definitions enclosed in angle
+brackets < >. The properties include the structural or syntactic definition (right-hand
+side), attribute definitions, and attribute computations.
+.(b I
+Example 1:
+.sp 0.5
+.FT
+Expr        = [Value: INTEGER]    { Value := 0; } <
+   Add      = Lop: Expr Rop: Expr { Value := Lop:Value + Rop:Value; } .
+   Sub      = Lop: Expr Rop: Expr { Value := Lop:Value - Rop:Value; } .
+   Const    = Integer             { Value := Integer:Value; } .
+> .
+Integer     = [Value: INTEGER] .
+.)b
+.pp
+The example describes the evaluation of primitive expressions. Attribute definitions are
+given in brackets [ ]. The attribute
+.i Value
+is associated with all subtypes of
+.i Expr
+with a default computation "Value := 0;". The attribute computations are written
+in curly brackets { }. The computations for the node types
+.i Add ,
+.i Sub ,
+and
+.i Const
+overwrite the computation given in the base type
+.i Expr .
+.pp
+The structural or syntactic definition is given as a sequence of node type names,
+possibly prefixed by a selector
+.i (Lop ,
+.i Rop )
+allowing unambiguous access to the component structures.
+.(b I
+Example 2:
+.sp 0.5
+.FT
+Stats       = <
+   NoStat   = .
+   Stat     = Next: Stats [Pos: tPosition] <
+      If    = Expr Then: Stats Else: Stats .
+      While = Expr Stats .
+      Call  = Actuals [Ident: tIdent] .
+   > .
+> .
+.)b
+.pp
+Example 2 describes a possibility for the specification of the abstract syntax of
+statement sequences. The example uses the node type
+.i Stats
+to describe a sequence and the node type
+.i Stat
+to describe various statements. The node types are related as subtypes showing a
+non-trivial subtype relation of nesting depth two. The subtype relation is:
+.i
+NoStat \(ib Stats, Stat \(ib Stats, If \(ib Stat, While \(ib Stat, Call \(ib Stat.
+.r
+In Example 2 the node types
+.i If ,
+.i While ,
+and
+.i Call
+inherit the child
+.i Next
+of type
+.i Stats
+and the attribute
+.i Pos
+from the base type
+.i Stat .
+They add their own children and attributes.
+.sh 1 "Multiple Inheritance"
+.lp
+The problem with multiple inheritance mentioned in the introduction can be solved
+if we distinguish two kinds of types:
+.i "node types"
+and
+.i "abstract types" .
+An abstract syntax tree is constructed only
+out of nodes whose type is a node type - there are no nodes whose type is an abstract one.
+While the node types describe production rules or tree nodes the abstract types describe
+concepts.
+.pp
+An object-oriented attribute grammar with multiple inheritance is formally denoted by
+G = (N, T, K, A, C, Z). N, T, A, C, Z represent the same entities as in the single
+inheritance case. In particular the set NT = N \(cu T represents the set of
+.i "node types" .
+K is the set of
+.i "abstract types" .
+Every element n \(mo NT is now associated with a quintuple
+n: (R, B, D, S, L) where R, B, D, and S are as before.
+Every element k \(mo K is associated with a quintuple k: (R, B, D, U, L)
+where $ U~\(mo~K $ is the base type for the single inheritance mechanism and 
+$ L~\(mo~K sup "*" $ is the set of base types for the multiple inheritance mechanism.
+We have two inheritance mechanisms which operate simultaneously. Multiple
+inheritance behaves similar as single inheritance: A subtype inherits all properties
+(right-hand side, attributes, attribute computations) from all its base types.
+.pp
+Why do we need two mechanisms for inheritance? We retained single inheritance for two
+reasons: First, it is good to be compatible with existing attribute grammars written in the
+single inheritance style. Second, the single inheritance notation allows to adhere largely
+to the conventional style of writing context-free grammars.
+.pp
+The above definition for object-oriented grammars with multiple inheritance distinguishes
+two levels (see Fig. 1).
+The set of abstract types represents the abstract or conceptual level. These types model
+concepts and properties which are common to several node types or even to different
+programming languages. Abstract types are not used for nodes in the syntax tree.
+The set of node types represents production rules of a context-free grammar. The node types
+describe the constructs of a programming language. Node types are used to classify the
+nodes in a syntax tree.
+.(b
+.PS
+scale	= 2.54
+boxwid	= 5.0
+boxht	= 2.0
+dist	= 0.3
+
+	right
+B1:	box "abstract or" "conceptual" "level" invis
+B2:	box "abstract types" invis
+B3:	box "multiple" "inheritance" invis
+	box "production or" "node type" "level" invis at B1 + (0, -3)
+B5:	box "node types" invis
+B6:	box "single" "inheritance" invis
+
+	arc from B2 + (0, -dist) to B2 + (0, dist) at B2 + (1, 0) ->
+	arc from B5 + (0, -dist) to B5 + (0, dist) at B5 + (1, 0) ->
+	arrow from B2 + (0, -dist) to B5 + (0, dist)
+	line from B3 + (-1.2, 0) to B2 + (2.2, 0)
+	line from B3 + (-1.2, 0) to B2 + (0.1, -2)
+	line from B6 + (-1.2, 0) to B5 + (2.2, 0)
+.PE
+.sp
+.ce
+Fig. 1: Inheritance among abstract types and node types
+.)b
+.pp
+The above definition of multiple inheritance allows multiple inheritance among abstract
+types and from abstract types to node types. Among node types, single inheritance is
+available, only. Ancestral attributes may be defined for all abstract types and
+for top level node types. With this restriction it is statically known for all children of
+all nodes whether ancestral attributes have to be computed or not.
+.sh 1 Example
+.lp
+In this section we present a rather elaborate example for an object-oriented attribute
+grammar with multiple inheritance. The example is an excerpt from a specification of the
+demo language MiniLAX\*([<\*([[Grob\*(]]\*(>]. The attribute computations are
+written directly in the implementation language which is Modula-2.
+.(z I
+Example 3:
+.sp 0.5
+.FT
+MODULE SymbolTable
+.sp 0.5
+DECLS           := [Objects: tObjects THREAD OUT] <
+   NODECLS      := .
+   DECL         := Next: Decls IN [Ident: tIdent IN] [Pos: tPosition IN]
+                   { Next:ObjectsIn     := mObject (ObjectsIn, Ident);
+                     ObjectsOut         := Next:ObjectsOut;
+                     CHECK NOT IsDeclared (Ident, ObjectsIn)
+                     ==> Error ("identifier already declared", Pos);    } .
+> .
+.sp 0.5
+ENV             := [Env: tEnv INH] .
+.sp 0.5
+USE   <- ENV    := [Ident: tIdent IN] [Object: tObjects SYN OUT]
+                   { Object             := Identify (Ident, Env);
+                     CHECK Object^.Kind # NoObject
+                     ==> Error ("identifier not declared", Pos);        } .
+.sp 0.5
+SCOPE <- ENV    := [Objects: tObjects SYN] [NewEnv: tEnv SYN]
+                   { Objects            := mNoObjects ();
+                     NewEnv             := mEnv (Objects, Env);         } .
+.sp 0.5
+END SymbolTable
+.)z
+.pp
+The attribute grammar module in Example 3 describes an abstract symbol table.
+It is termed abstract because we deal with entities called objects which are not
+further specified. The symbol table handles declarations of objects, applications (uses)
+of objects, and scopes. It does not specify what kind of objects are to be declared,
+where those objects are used, and which constructs are associated with scopes.
+We use all upper-case names to denote abstract types.
+.pp
+The first three definitions describe lists of abstract declarations. A declaration
+.i DECL
+is characterized by an identifier and a reference to a succeeding declaration.
+The identifier is described by two attributes
+.i Ident
+and
+.i Pos
+holding an internal representation and a source position. The right-hand side child with
+the selector
+.i Next
+and the node type
+.i Decls
+refers to the succeeding declaration.
+.pp
+A list of declarations
+.i (DECLS)
+is either empty
+.i (NODECLS)
+or starts with one element of type
+.i DECL .
+The list has a threaded attribute called
+.i Objects .
+This threaded attribute actually stands for two attributes called
+.i ObjectsIn
+and
+.i ObjectsOut .
+The attribute computations given for
+.i DECL
+in curly brackets { } use this threaded attributes(s) to collect all declared objects in a
+list. They make use of functions from an external data type.
+.i mNoObjects
+creates an empty list,
+.i mObject
+adds a description of an object to a list, and
+.i IsDeclared
+checks for multiple declarations. The latter function is used in a condition (CHECK) that
+issues an error message in case of multiple declarations.
+.pp
+The abstract type
+.i SCOPE
+describes scopes such as blocks or procedures. The attribute
+.i Env
+(for environment) which is inherited from the abstract type
+.i ENV
+describes the set of
+objects that is visible at certain locations in a program. Multiple inheritance is
+expressed by writing an arrow <- and a list of abstract (base) types behind a type.
+A scope is supposed to reside in a surrounding environment described by the attribute
+.i Env
+and to introduce a new set of declarations represented by the attribute
+.i Objects .
+It computes a new environment attribute
+.i NewEnv
+valid inside this scope by calling the external function
+.i mEnv .
+The computation of the attribute
+.i Objects
+is a dummy to satisfy the completeness requirement of attribute grammars.
+.pp
+The abstract type
+.i USE
+describes the application or use of objects. A construct that uses an object has an
+attribute giving the identifier of the object
+.i (Ident) .
+This construct possesses an environment attribute
+.i Env
+that describes all objects visible at this construct. The attribute
+.i Object
+is used to refer to the symbol table entry of the used object. The external function
+.i Identify
+takes the attributes
+.i Ident
+and
+.i Env
+as arguments and computes the attribute
+.i Object .
+In case of the use of an undeclared identifier the CHECK statement will issue an
+appropriate error message.
+.pp
+The attribute definitions in Example 3 use a few keywords. These associate so-called
+properties with the attributes.
+IN characterizes input attributes that have already a value when attribute evaluation
+starts. The value is usually supplied during tree construction.
+OUT characterizes output attributes whose value is needed after attribute evaluation.
+Those attributes may not be removed from the tree nodes by an optimizer.
+SYN and INH classify the attributes as
+.i synthesized
+and
+.i ancestral .
+.pp
+Example 4 shows the connection of the abstract symbol table with the abstract syntax of the
+language MiniLAX. The subset of the node type definitions relevant for the symbol table
+problem is given. Whereas abstract types are introduced with the symbol := the character =
+is used for node types.
+.(z I
+Example 4:
+.sp 0.5
+.FT
+MODULE AbstractSyntax
+.sp 0.5
+MiniLax            = Proc .
+Decls <- DECLS     = <
+   NoDecl          = .
+   Decl <- DECL    = <
+      Var          = Type .
+      Proc         = Formals Decls Stats .
+   > .
+> .
+Stats              = <
+   NoStat          = .
+   Stat            = Next: Stats <
+      Assign       = Adr Expr            [Pos: tPosition] .
+      Call <- USE  = Actuals             [Pos: tPosition] .
+      If           = Expr Then: Stats Else: Stats .
+      While        = Expr Stats .
+      Read         = Adr .
+      Write        = Expr .
+   > .
+> .
+Expr               =                     [Pos: tPosition] <
+   Binary          = Lop: Expr Rop: Expr [Operator: SHORTCARD] .
+   Unary           = Expr                [Operator: SHORTCARD] .
+   IntConst        =                     [Value: INTEGER] .
+   RealConst       =                     [Value: REAL   ] .
+   BoolConst       =                     [Value: BOOLEAN] .
+   Adr             = <
+      Index        = Adr Expr .
+      Ident <- USE = .
+   > .
+> .
+.sp 0.5
+END AbstractSyntax
+.)z
+.pp
+A concrete list of declarations is described by the node type
+.i Decls
+which is a subtype of the abstract type
+.i DECLS .
+A single declaration is described by the node type
+.i Decl
+which inherits from
+.i DECL .
+Two specializations are derived from the node type
+.i Decl
+describing two kinds of declarations: variables and procedures
+.i (Var
+and
+.i Proc) .
+Through inheritance from
+.i DECL
+every
+.i Decl
+specifies already an identifier (attributes
+.i Ident
+and
+.i Pos )
+and a reference to a succeeding declaration (attribute
+.i Next ).
+Therefore the specializations have just to add the missing components which is a
+description of the type in case of a variable and the formal parameters, the local
+declarations, and the procedure body
+.i (Formals ,
+.i Decls ,
+.i Stats )
+in case of a procedure.
+.pp
+The language knows two locations where objects are used: at a procedure call and at a
+variable occurring in an expression. Therefore the node types
+.i Call
+and
+.i Ident
+are subtypes of the abstract type
+.i USE .
+The node type
+.i Call
+specializes the usage of an object by adding a list of actual parameters and an attribute
+.i Pos
+which is needed for an error message.
+.pp
+The attribute computations in the attribute grammar for MiniLAX are grouped into modules
+(see Example 5). We present excerpts from three modules that are involved in the
+symbol table problem. The part of the module
+.i Decls
+shown in Example 5 specializes the computation of the attribute
+.i Next:ObjectsIn
+for the concrete declarations of the language. This way the information in the symbol table
+is extended by the kind of the declared object, the type of variables, and the formal
+parameters of procedures.
+.(z I
+Example 5:
+.sp 0.5
+.FT
+MODULE Decls
+.sp 0.5
+Proc           = { Next:ObjectsIn := mProc (ObjectsIn, Ident, Formals); } .
+Var            = { Next:ObjectsIn := mVar  (ObjectsIn, Ident, Type);    } .
+.sp 0.5
+END Decls
+.sp 0.5
+MODULE Env
+.sp 0.5
+Decls   <- ENV = .
+Stats   <- ENV = .
+Actuals <- ENV = .
+Expr    <- ENV = .
+.sp 0.5
+MiniLax        = { Proc:Env  := NoEnv           ; } .
+DECL          := { Next:Env  := NoEnv           ; } .
+Decl           = { Next:Env  := Env             ; } .
+Proc <- SCOPE  = { Objects   := Decls:ObjectsOut;
+                   Stats:Env := NewEnv          ;
+                   Decls:Env := NewEnv          ; } .
+.sp 0.5
+END Env
+.sp 0.5
+MODULE Conditions
+.sp 0.5
+Call           = { CHECK IsObjectKind (Object, Proc)
+                   ==> Error ("only procedures can be called", Pos); } .
+Ident          = { CHECK IsObjectKind (Object, Var)
+                   ==> Error ("variable required"            , Pos); } .
+.sp 0.5
+END Conditions
+.)z
+.pp
+The module named
+.i Env
+specifies all computations for the environment attribute.
+It is reproduced completely. All node types
+whose subtrees can contain applications of objects need an environment attribute
+.i Env
+and become therefore subtypes of the abstract type
+.i ENV :
+.i Decls ,
+.i Stats ,
+.i Actuals ,
+and
+.i Expr .
+The first attribute computation of
+.i Proc
+connects the "interfaces" of the abstract types
+.i DECLS
+and
+.i SCOPES .
+The attribute
+.i Decls:ObjectsOut
+is the collected list of locally declared objects. It is assigned to the attribute
+.i Objects
+which is required to hold this information from the point of view of the abstract type
+.i SCOPE .
+.i SCOPE
+computes an attribute
+.i NewEnv
+describing the objects visible inside the procedure. The value of this attribute is passed
+to the attributes
+.i Stats:Env
+and
+.i Decls:Env
+to make the environment available for the components of the procedure.
+The rules given in the module
+.i Env
+suffice to specify all computations necessary for the environment attribute. The many
+missing rules are inserted automatically by the tool
+.i ag
+as simple copy rules.
+.pp
+Finally, the module
+.i Conditions
+adds checks to the locations where objects are used. The abstract type
+.i USE
+already checks whether an object is declared or not. We still need to check if an object is
+of the right kind. This test is performed by the external procedure
+.i IsObjectKind .
+.sh 1 Comparison
+.pp
+This section compares object-oriented attribute grammars as introduced in this paper with the
+well-known concepts of (attribute) grammars, tree and record types, type extensions, and
+object-oriented programming.
+The goal is to reveal the common properties as well as the differences among these
+concepts. These areas are related because of the following reasons:
+attribute grammars are usually based on context-free grammars. An attribute grammar
+specifies an evaluation of attributes of a tree defined by such a context-free grammar.
+Trees can be implemented using a set of record type declarations. Therefore
+context-free grammars, trees, and record types deal more or less with the
+same concept. Table 1 compares the most important notions from
+these areas. Additionally we included the notions from the area of
+object-oriented (oo) programming as described e. g. in
+\*([[Bla89\*(]].
+.(b L
+.sp 0.5
+.TS
+center box;
+l | l | l | l.
+(attribute) grammars	trees	types	oo-programming
+_
+rule    	node type	record type	class
+attribute	field in a node type	record field	instance variable
+nonterminal	set of node types	union of record types	-
+terminal	distinct node type	record type without	-
+		   pointer fields
+rule application	tree node	record variable	object, instance
+attribute computation	-	procedure declaration	method
+-	-	procedure call	message
+-	-	base type	superclass
+-	-	derived type	subclass
+-	-	extension	inheritance
+.TE
+.sp 0.5
+.ce
+Table 1: Comparison of notions from the areas of grammars, trees, types, and oo-programming
+.)b
+.pp
+Object-oriented attribute grammars are missing in Table 1. For them we used the notions from
+attribute grammars and added the notions
+node type, base type, subtype or derived type, and inheritance from the other areas.
+.sh 2 "Attribute Grammars"
+.pp
+Conventional grammars in BNF allow several productions with the same nonterminal symbol on the
+left-hand side. A node type in object-oriented attribute grammars, which corresponds to a
+nonterminal as well as to a rule name, has exactly one right-hand side.
+The selector names can be regarded as syntactic sugar.
+To allow for several different derivations, a subtype relation between node types is added.
+During a derivation, a node type may be replaced
+by its right-hand side or by a subtype.
+.\" Additionally, the subtype feature allows to express chain rules and single inheritance.
+Inheritance is a notation to factor out parts that are common to several node types such
+as right-hand sides, attributes, and attribute computations.  Fortunately, attributes
+local to a rule (node type) are possible without any special construct.
+.pp
+Object-oriented attribute grammars are a notation to write BNF grammars in a short and
+concise way and where the underlying tree structure can be exactly described. With respect
+to attribute grammars the same notational advantages hold.
+Attribute grammars are a special case of object-oriented attribute grammars. They are
+characterized by a one level subtype hierarchy, right-hand sides and attribute computations
+are defined for subtypes only, and attributes are associated only with base types.
+In terms of attribute grammar classes
+or attribute grammar semantics object-oriented attribute grammars are equivalent to
+attribute grammars.
+.sh 2 "Trees and Records"
+.pp
+When trees are stored in memory, they can be represented by linked records. Every node type
+corresponds to a record type. Object-oriented attribute grammars directly describe the
+structure of attributed syntax trees. The node types can be seen as record types. The
+right-hand side elements resemble pointer valued fields describing the tree structure and the
+attributes are additional fields for arbitrary information stored at tree nodes. The field
+name and field type needed for record types are also present in the node types of
+object-oriented attribute grammars.
+.sh 2 "Type Extensions"
+.pp
+Type extensions have been introduced with the language
+Oberon by Wirth\*([<\*([[Wir88a\*(],Wir88b\*(],Wir88c\*(]]\*(>].
+They allow the definition of a record type based on an existing record type by adding record
+fields. This extension mechanism induces a subtype relation between record types. The 
+subtype and inheritance features are equivalent in object-oriented attribute grammars and type
+extensions with the difference that Wirth uses the word extension in place of inheritance
+and restricts it to single inheritance.
+.sh 2 "Object-Oriented Programming"
+.pp
+The concepts of subtype and inheritance in object-oriented attribute grammars and
+object-oriented programming have many similarities
+and this explains the name object-oriented attribute grammars.
+The notions class, instance variable,
+object, superclass, and subclass have direct counter parts (see Table 1).
+There are also some differences.  Object-oriented programming allows an
+arbitrary number of named methods which are activated by explicitly sending
+messages. In object-oriented attribute grammars there is exactly one
+attribute computation for an attribute. This computation corresponds to an unnamed method.
+There is nothing like messages: The attribute computation for an attribute is activated
+implicitly and exactly once.
+.sh 1 Summary
+.lp
+We presented object-oriented attribute grammars with single and multiple inheritance. The
+distinction between abstract types and node types allows for a restricted form of multiple
+inheritance that can still be implemented efficiently. The nonterminals or node types are
+the entities constituting the inheritance hierarchy. The items that are subject to
+inheritance are right-hand side elements, attributes, and attribute computations.
+.pp
+Object-oriented attribute grammars are a compact and flexible notation for language
+specifications. The repetition of information is avoided as common parts can be factored
+out. The reuse of definitions is supported - new definitions can be derived from existing
+ones by specializations.
+.pp
+We extended the attribute evaluator generator
+.i ag
+to process object-oriented attribute grammars with multiple inheritance. It turned out that
+it is possible to generate efficient attribute evaluators for this kind of attribute
+grammars.
+.pp
+While we are very satisfied with the advantages of single inheritance we have
+just started to explore the feasibility of multiple inheritance. Our current goal is to
+build a collection of attribute grammar modules containing abstract types that model
+concepts of programming languages such as the discussed symbol table. Together with
+abstract data types these will result a library of reusable parts oriented towards
+semantic analysis of programming languages. If possible those parts will be designed to
+specify aspects of semantic analysis independent of concrete languages.
+.fi
+.sz 12
+.[]
+.[-
+.ds [F Bla89
+.ds [A G\*(p] Blaschek
+.ds [T Implementation of Objects in Modula-2
+.nr [P 1
+.ds [P 147-155
+.ds [J Structured Programming
+.ds [V 10
+.ds [N 3
+.ds [D 1989
+.][
+.[-
+.ds [F Gro90
+.ds [A J\*(p] Grosch
+.ds [T Object-Oriented Attribute Grammars
+.ds [E A\*(p]\*(a]E\*(p] Harmanci
+.as [E \*(n]E\*(p] Gelenbe
+.nr [E 2
+.ds [B Proceedings of the Fifth International Symposium on Computer and Information Sciences (ISCIS V)
+.ds [C Cappadocia, Nevsehir, Turkey
+.nr [P 1
+.ds [P 807-816
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F GrE90
+.ds [A J\*(p] Grosch
+.as [A \*(n]H\*(p] Emmelmann
+.ds [T A Tool Box for Compiler Construction
+.ds [V 477
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 106-116
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Specification of a Minilax Interpreter
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 22
+.ds [N 22
+.][
+.[-
+.ds [F Hed89
+.ds [A G\*(p] Hedin
+.ds [T An Object-Oriented Notation for Attribute Grammars
+.ds [J Proc. of the European Conference on Object-Oriented Programming (ECOOP '89)
+.ds [I The British Computer Society Workshop Series, Cambridge, University Press
+.ds [C Nottingham
+.nr [P 1
+.ds [P 329-345
+.ds [D 1989
+.][
+.[-
+.ds [F Knu68
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-Free Languages
+.nr [P 1
+.ds [P 127-146
+.ds [J Mathematical Systems Theory
+.ds [V 2
+.ds [D June 1968
+.ds [N 2
+.][
+.[-
+.ds [F Knu71
+.ds [A D\*(p]\*(a]E\*(p] Knuth
+.ds [T Semantics of Context-free Languages: Correction
+.nr [P 1
+.ds [P 95-96
+.ds [J Mathematical Systems Theory
+.ds [V 5
+.ds [D Mar. 1971
+.][
+.[-
+.ds [F Kos91
+.ds [A K\*(p] Koskimies
+.ds [T Object-Orientation in Attribute Grammars
+.ds [V 545
+.ds [J LNCS
+.ds [C Berlin
+.ds [I Springer Verlag
+.nr [P 1
+.ds [P 297-329
+.ds [D 1991
+.][
+.[-
+.ds [F Wir88a
+.ds [A N\*(p] Wirth
+.ds [T Type Extensions
+.ds [J ACM Trans. Prog. Lang. and Systems
+.ds [V 10
+.ds [N 2
+.ds [D Apr. 1988
+.nr [P 1
+.ds [P 204-214
+.][
+.[-
+.ds [F Wir88b
+.ds [A N\*(p] Wirth
+.ds [T From Modula to Oberon
+.ds [J Software\(emPractice & Experience
+.ds [V 18
+.ds [N 7
+.ds [D July 1988
+.nr [P 1
+.ds [P 661-670
+.][
+.[-
+.ds [F Wir88c
+.ds [A N\*(p] Wirth
+.ds [T The Programming Language Oberon
+.ds [J Software\(emPractice & Experience
+.ds [V 18
+.ds [N 7
+.ds [D July 1988
+.nr [P 1
+.ds [P 671-690
+.][
+.bp 1
+.lp
+.b Contents
+.sp
+.xp

@@ -1,0 +1,279 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: First.mi,v $
+ *	
+ *	purpose:	compute first sets
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+IMPLEMENTATION MODULE First;
+
+FROM Derivabl	IMPORT	IsNullable;
+FROM DynArray	IMPORT	MakeArray, ReleaseArray;
+FROM Idents	IMPORT	tIdent;
+FROM Scanner	IMPORT	Epsilon;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, AssignElmt, AssignEmpty,
+			IsElement, IsEmpty, Include, Extract, Exclude, Union,
+			Intersection, Assign;
+FROM Stack	IMPORT	tStack, MakeStack, ReleaseStack, Push, Pop, Top, Depth;
+FROM SYSTEM	IMPORT	TSIZE, ADDRESS;
+FROM Table	IMPORT	SetFirst, First, Expr, MaxId;
+FROM Types	IMPORT	Terminals, Nonterminals, IsNonterm;
+FROM Tree	IMPORT	tTree, Option, Times, Plus, List, Action, Leaf,
+			Alternative0, Alternative, Sequence0, Sequence;
+
+VAR vLeftRec: tSet;
+
+PROCEDURE LocalFirst (t: tTree; VAR first: tSet);
+  VAR set: tSet;
+  BEGIN
+    CASE t^.Kind OF
+    | Option:
+	LocalFirst (t^.Option.expr, first);
+	Include (first, Epsilon);
+    | Times:
+	LocalFirst (t^.Times.expr, first);
+	Include (first, Epsilon);
+    | Plus:
+	LocalFirst (t^.Plus.expr, first);
+    | List:
+	LocalFirst (t^.List.body, first);
+	IF IsElement (Epsilon, first) THEN
+	  Exclude (first, Epsilon);
+	  MakeSet (set, MaxId);
+	  LocalFirst (t^.List.sep, set);
+	  Union (first, set);
+	  ReleaseSet (set);
+	END;
+    | Action:
+	AssignElmt (first, Epsilon);
+    | Leaf:
+	AssignElmt (first, t^.Leaf.id^.Id.ident);
+	IF IsNullable (t^.Leaf.id^.Id.ident) THEN
+	  Include (first, Epsilon);
+	END;
+    | Alternative0:
+	AssignEmpty (first);
+    | Alternative:
+	LocalFirst (t^.Alternative.expr, first);
+	MakeSet (set, MaxId);
+	LocalFirst (t^.Alternative.alternative, set);
+	Union (first, set);
+	ReleaseSet (set);
+    | Sequence0:
+	AssignElmt (first, Epsilon);
+    | Sequence:
+	LocalFirst (t^.Sequence.expr, first);
+	IF IsElement (Epsilon, first) THEN
+	  Exclude (first, Epsilon);
+	  MakeSet (set, MaxId);
+	  LocalFirst (t^.Sequence.sequence, set);
+	  Union (first, set);
+	  ReleaseSet (set);
+	END;
+    END;
+  END LocalFirst;
+
+PROCEDURE LocalFirsts;
+  VAR
+    N, F: tSet;
+    n: tIdent;
+  BEGIN
+    MakeSet (N, MaxId);
+    MakeSet (F, MaxId);
+
+    Nonterminals (N);
+    WHILE NOT IsEmpty (N) DO
+      n := Extract (N);
+      LocalFirst (Expr (n), F);
+      SetFirst (n, F);
+    END;
+
+    ReleaseSet (F);
+    ReleaseSet (N);
+  END LocalFirsts;
+
+PROCEDURE GlobalFirsts;
+  VAR
+    S: tStack;
+    N: POINTER TO ARRAY [0..1000] OF INTEGER;
+    X: tSet;
+    Terms: tSet;
+    Nonterms: tSet;
+    infinite: INTEGER;
+
+  PROCEDURE Traverse (x: tIdent);
+    VAR
+      d: INTEGER;
+      Y: tSet;
+      y: tIdent;
+      Fx, Fy: tSet;
+    BEGIN
+      MakeSet (Fx, MaxId);		(* make sets		*)
+      MakeSet (Fy, MaxId);
+      MakeSet (Y, MaxId);
+
+      Push (S, x);
+      d := Depth (S);
+      N^[x] := d;
+
+      First (x, Fx);			(* Terms in local FIRST(x)	*)
+      Intersection (Fx, Terms);
+
+      First (x, Y);			(* Nonterms in local FIRST(x)	*)
+      Intersection (Y, Nonterms);
+
+      WHILE NOT IsEmpty (Y) DO
+	y := Extract (Y);
+	IF y = x THEN
+	  Include (vLeftRec, y);
+	ELSIF IsElement (y, X) THEN	(* yet not handled		*)
+	  Exclude (X, y);
+	  Traverse (y);
+	END;
+	IF N^[y] < N^[x] THEN
+	  N^[x] := N^[y];
+	END;
+	First (y, Fy);			(* Terms in local FIRST (y)	*)
+	Intersection (Fy, Terms);
+	Exclude (Fy, Epsilon);
+	Union (Fx, Fy);
+      END;
+      SetFirst (x, Fx);			(* store FIRST (x)		*)
+      IF N^[x] = d THEN
+	IF Top (S) = x THEN
+	  y := Pop (S);
+	  N^[y] := infinite;
+	ELSE
+	  REPEAT
+	    y := Pop (S);
+	    N^[y] := infinite;
+	    SetFirst (y, Fx);		(* store FIRST (y)		*)
+	    Include (vLeftRec, y);
+	  UNTIL y = x;
+	END;
+      END;
+      ReleaseSet (Y);			(* release sets			*)
+      ReleaseSet (Fx);
+      ReleaseSet (Fy);
+    END Traverse;
+
+  VAR
+    s: LONGINT;
+    x: tIdent;
+
+  BEGIN
+    MakeSet (vLeftRec, MaxId);
+    infinite := MaxId + 1;
+    MakeStack (S);
+    s := MaxId + 1;
+    MakeArray (N, s, TSIZE (INTEGER));
+    FOR x := 0 TO MaxId DO
+      N^[x] := 0;
+    END;
+    MakeSet (Terms, MaxId);
+    Terminals (Terms);
+    MakeSet (Nonterms, MaxId);
+    Nonterminals (Nonterms);
+    MakeSet (X, MaxId);
+    Nonterminals (X);
+    WHILE NOT IsEmpty (X) DO
+      x := Extract (X);
+      Traverse (x);
+    END;
+    ReleaseSet (Terms);
+    ReleaseSet (Nonterms);
+    ReleaseSet (X);
+    ReleaseArray (N, s, TSIZE (INTEGER));
+    ReleaseStack (S);
+  END GlobalFirsts;
+
+PROCEDURE IsLeftRec (nt: tIdent): BOOLEAN;
+  BEGIN
+    RETURN IsElement (nt, vLeftRec);
+  END IsLeftRec;
+
+PROCEDURE TreeFirst (t: tTree);
+  BEGIN
+    MakeSet (t^.expr.first, MaxId);
+    CASE t^.Kind OF
+    | Option: WITH t^.Option DO
+	TreeFirst (expr);
+	Assign (first, expr^.expr.first);
+	Include (first, Epsilon);
+      END;
+    | Times: WITH t^.Times DO
+	TreeFirst (expr);
+	Assign (first, expr^.expr.first);
+	Include (first, Epsilon);
+      END;
+    | Plus: WITH t^.Plus DO
+	TreeFirst (expr);
+	Assign (first, expr^.expr.first);
+      END;
+    | List: WITH t^.List DO
+	TreeFirst (body);
+	Assign (first, body^.expr.first);
+	TreeFirst (sep);
+	IF IsElement (Epsilon, first) THEN
+	  Exclude (first, Epsilon);
+	  Union (first, sep^.expr.first);
+	END;
+      END;
+    | Action: WITH t^.Action DO
+	AssignElmt (first, Epsilon);
+      END;
+    | Leaf: WITH t^.Leaf DO
+	First (id^.Id.ident, first);
+      END;
+    | Alternative0: WITH t^.Alternative0 DO
+	AssignEmpty (first);
+      END;
+    | Alternative: WITH t^.Alternative DO
+	TreeFirst (expr);
+	Assign (first, expr^.expr.first);
+	TreeFirst (alternative);
+	Union (first, alternative^.expr.first);
+      END;
+    | Sequence0: WITH t^.Sequence0 DO
+	AssignElmt (first, Epsilon);
+      END;
+    | Sequence: WITH t^.Sequence DO
+	TreeFirst (expr);
+	Assign (first, expr^.expr.first);
+	TreeFirst (sequence);
+	IF IsElement (Epsilon, first) THEN
+	  Exclude (first, Epsilon);
+	  Union (first, sequence^.expr.first);
+	END;
+      END;
+    END;
+  END TreeFirst;
+
+PROCEDURE TreeFirsts;
+  VAR
+    N: tSet;
+    n: tIdent;
+  BEGIN
+    MakeSet (N, MaxId);
+
+    Nonterminals (N);
+    WHILE NOT IsEmpty (N) DO
+      n := Extract (N);
+      TreeFirst (Expr (n));
+    END;
+
+    ReleaseSet (N);
+  END TreeFirsts;
+
+PROCEDURE Firsts;
+  BEGIN
+    LocalFirsts;
+    GlobalFirsts;
+    TreeFirsts;
+  END Firsts;
+
+END First.

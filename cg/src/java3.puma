@@ -1,0 +1,475 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 23.5.1989 */
+
+TRAFO EvalJava
+TREE Tree
+PUBLIC EvalImplJava EvalImplHead GenEvaluator
+
+EXPORT { VAR Class: Tree.tTree; }
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT ADR;
+FROM IO		IMPORT WriteS, WriteN, WriteNl;
+FROM Idents	IMPORT tIdent, NoIdent;
+FROM StringM	IMPORT WriteString;
+FROM Texts	IMPORT WriteText, IsEmpty;
+FROM Sets	IMPORT IsElement;
+FROM Semantic	IMPORT CodeClass;
+FROM TreeJav1	IMPORT BSS;
+FROM TreeJav2	IMPORT WriteLine;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Child		, NoCodeClass	,
+   Computed	, Reverse	, Write		, Read		,
+   Inherited	, Synthesized	, Input		, Output	,
+   CopyDef	, CopyUse	, Thread	, Virtual	,
+   Test		, Left		, Right		, Abstract	,
+   Ignore	,
+   NonBaseComp	, First		, Dummy		, Trace		,
+   Options	, TreeRoot	, iMain		, iModule	,
+   itTree	, TreeTypeNames	, ForallClasses	, f		,
+   WI		, WN		,
+   IdentifyClass, IdentifyAttribute, GrammarClass, cOAG		,
+   MaxVisit	, iNoTree	, iPackage	, iEvalClass	,
+   iEvalPackage	, iTreeNode;
+
+VAR
+   n		: SHORTCARD;
+   Node		,
+   Attr		,
+   ChildsClass	: tTree;
+   UserImport	: BOOLEAN;
+   UserBegin	: BOOLEAN;
+   UserClose	: BOOLEAN;
+   ConstCount	: INTEGER;
+}
+
+PROCEDURE EvalImplHead (t: Tree)
+	
+Ag (..) :- {
+	IF iEvalPackage # NoIdent THEN
+	   !package ! WI (iEvalPackage); !;!
+	   !!
+	END;
+	UserImport := FALSE;
+	IF NOT IsEmpty (EvalCodes^.Codes.Import) THEN
+	   WriteLine (EvalCodes^.Codes.ImportLine);
+	   WriteText (f, EvalCodes^.Codes.Import);
+	   UserImport := TRUE;
+	END;
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   IF NOT IsEmpty (Node^.Module.EvalCodes^.Codes.Import) THEN
+	      WriteLine (Node^.Module.EvalCodes^.Codes.ImportLine);
+	      WriteText (f, Node^.Module.EvalCodes^.Codes.Import);
+	      UserImport := TRUE;
+	   END;
+	   Node := Node^.Module.Next;
+	END;
+	IF NOT UserImport THEN
+	   IF iPackage # NoIdent THEN
+	      !import ! WI (iPackage); !.! WI (iModule); !;!
+	      !import ! WI (iPackage); !.! WI (iModule); !.*;!
+	   ELSE
+//	      !import ! WI (iModule); !.*;!
+	   END;
+	   IF IsElement (ORD ('Y'), Options) OR
+	      IsElement (ORD ('Z'), Options) THEN
+	      !import de.cocolab.reuse.CocktailWriter;!
+	      !import de.cocolab.reuse.MaskedException;!
+	   END;
+	END;
+	WriteLine (EvalCodes^.Codes.GlobalLine);
+	WriteText (f, EvalCodes^.Codes.Global);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.GlobalLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Global);
+	   Node := Node^.Module.Next;
+	END;
+	!!
+	!# define DEP(a, b) a!
+	!!
+      IF IsElement (ORD ('X'), Options) THEN
+	@#include "yy@ WI (iModule); @.h"@
+	!# define yyWrite! WI (iMain); !(a) yyout.write (a)!
+	!!
+      END;
+	!public class ! WI (iEvalClass); ! {!
+	!!
+	(* copy the tree type constants so that user does not have to qualify with
+	   the tree class name.
+	*)
+	ConstCount := 0; ForallClasses (Classes, ConstDecls);
+	!!
+	WriteLine (EvalCodes^.Codes.ExportLine);
+	WriteText (f, EvalCodes^.Codes.Export);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.EvalCodes^.Codes.ExportLine);
+	   WriteText (f, Node^.Module.EvalCodes^.Codes.Export);
+	   Node := Node^.Module.Next;
+	END;
+      IF IsElement (ORD ('Y'), Options) OR
+         IsElement (ORD ('Z'), Options) THEN
+	!!
+	!   private static CocktailWriter yyout = new CocktailWriter (System.out, true);!
+      END;
+      IF IsElement (ORD ('X'), Options) THEN
+	!!
+	!   private static boolean yyb;!
+	!!
+	!   private static void yyWriteNl () throws java.io.IOException {!
+	!      if (yyTrace) {!
+	!         yyout.writeNl ();!
+	!      }!
+	!   }!
+      END;
+      IF IsElement (ORD ('Y'), Options) OR
+         IsElement (ORD ('Z'), Options) THEN
+	!!
+	!   private static boolean yyTrace = true;!
+	!!
+	!   private static void yyWriteSpaces (int yyn) throws java.io.IOException {!
+	!      for (int yyi = 1; yyi <= yyn; yyi ++) yyout.write (' ');!
+	!   }!
+	!!
+	!   private static void yyWriteS (String yys) throws java.io.IOException {!
+	@      yyout.write (yys); yyWriteSpaces (16 - yys.length ());@
+	!   }!
+	!!
+	!   private static void yyWriteType (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	!# ifdef NODEOP!
+	!      NODEOP!
+	!# endif!
+	!      switch (yyt.yyKind ()) {!
+	ForallClasses (Classes, WriteType);
+	!         default: break;!
+	!      }!
+	!   }!
+      END;
+      IF IsElement (ORD ('X'), Options) THEN
+	!!
+	!   private static void yyWriteAddr (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	@      if (yyt == null) yyout.write ("@ WI (iNoTree); @");@
+	!      else yyout.write (Integer.toHexString (yyt.hashCode ()));!
+	!   }!
+	!!
+	!   private static void yyWriteEval (! WI (iTreeNode); ! yyt, String yys) throws java.io.IOException {!
+	!      if (yyTrace) {!
+	!         yyWriteType (yyt);!
+	@         yyout.write (" e "); yyout.write (yys);@
+	!         yyWriteSpaces (24 - yys.length ());!
+	@         yyout.write (" = "); yyout.flush ();@
+	!      }!
+	!   }!
+      ELSIF IsElement (ORD ('Y'), Options) THEN
+	!!
+	!   private static void yyWriteEval (!WI (iTreeNode); ! yyt, String yys) throws java.io.IOException {!
+	!      if (yyTrace) {!
+	!         yyWriteType (yyt);!
+	@         yyout.write (" e "); yyout.write (yys); yyout.writeNl ();@
+	!      }!
+	!   }!
+      END;
+      IF IsElement (ORD ('Z'), Options) THEN
+	!!
+	!   private static void yyWriteVisit (!WI (iTreeNode); ! yyt, String yys) throws java.io.IOException {!
+	!      if (yyTrace) {!
+	!         yyWriteType (yyt);!
+	@         yyout.write (" v "); yyout.write (yys); yyout.writeNl ();@
+	!      }!
+	!   }!
+	!!
+	!   private static void yyVisitParent (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	@      yyWriteVisit (yyt, "parent");@
+	!   }!
+      END;
+	!!
+}; .
+
+PROCEDURE ConstDecls (t: Tree)
+
+Class (..) :-
+	CONDITION NOT (Abstract IN Properties);
+	INC (ConstCount);
+	CONDITION NOT (Ignore IN Properties);
+	!   private static final int k! WI (Name); ! = ! WN (ConstCount); !;!
+	.
+
+PROCEDURE EvalImplJava (t: Tree)
+	
+Ag (..) :- {
+	EvalImplHead (t);
+	!   public static void eval (! WI (iTreeNode); ! yyt) {!
+	IF MaxVisit > 0 THEN
+	   IF IsElement (ORD ('Y'), Options) OR
+             IsElement (ORD ('Z'), Options) THEN
+	      !      try {!
+	      !         yyVisit1 (yyt);!
+	      !      } catch (java.io.IOException e) {!
+	      !         throw new MaskedException (e);!
+	      !      }!
+	   ELSE
+	      !      yyVisit1 (yyt);!
+	   END;
+	END;
+	!   }!
+	!!
+	FOR n := 1 TO MaxVisit DO
+	   !   private static void yyVisit! WN (n); ! (! WI (iTreeNode); ! yyt)! 
+	   IF IsElement (ORD ('Y'), Options) OR
+            IsElement (ORD ('Z'), Options) THEN
+	      ! throws java.io.IOException! 
+	   END;
+	   ! {!
+	   WriteLine (EvalCodes^.Codes.LocalLine);
+	   WriteText (f, EvalCodes^.Codes.Local);
+	   Node := Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	      WriteLine (Node^.Module.EvalCodes^.Codes.LocalLine);
+	      WriteText (f, Node^.Module.EvalCodes^.Codes.Local);
+	      Node := Node^.Module.Next;
+	   END;
+	   !      switch (yyt.yyKind ()) {!
+	   IF cOAG IN GrammarClass THEN		(* generate evaluator	*)
+	      ForallClasses (Classes, GenEvaluator);
+	   END;
+	   !         default:!
+	   IF IsElement (ORD ('Z'), Options) THEN
+	      !            yyVisitParent (yyt);!
+	   END;
+	   !            break;!
+	   !      }!
+	   !   }!
+	   !!
+	END;
+	UserBegin := FALSE;
+	IF NOT IsEmpty (EvalCodes^.Codes.Begin) THEN
+	   UserBegin := TRUE;
+	END;
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   IF NOT IsEmpty (Node^.Module.EvalCodes^.Codes.Begin) THEN
+	      UserBegin := TRUE;
+	   END;
+	   Node := Node^.Module.Next;
+	END;
+	IF UserBegin THEN
+	   !   public static void begin () {!
+	   WriteLine (EvalCodes^.Codes.BeginLine);
+	   WriteText (f, EvalCodes^.Codes.Begin);
+	   Node := Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	      WriteLine (Node^.Module.EvalCodes^.Codes.BeginLine);
+	      WriteText (f, Node^.Module.EvalCodes^.Codes.Begin);
+	      Node := Node^.Module.Next;
+	   END;
+	   !   }!
+	   !!
+	END;
+	UserClose := FALSE;
+	IF NOT IsEmpty (EvalCodes^.Codes.Close) THEN
+	   UserClose := TRUE;
+	END;
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   IF NOT IsEmpty (Node^.Module.EvalCodes^.Codes.Close) THEN
+	      UserClose := TRUE;
+	   END;
+	   Node := Node^.Module.Next;
+	END;
+	IF UserClose THEN
+	   !   public static void close () {!
+	   WriteLine (EvalCodes^.Codes.CloseLine);
+	   WriteText (f, EvalCodes^.Codes.Close);
+	   Node := Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	      WriteLine (Node^.Module.EvalCodes^.Codes.CloseLine);
+	      WriteText (f, Node^.Module.EvalCodes^.Codes.Close);
+	      Node := Node^.Module.Next;
+	   END;
+	   !   }!
+	   !!
+	END;
+	IF UserBegin THEN
+           !   static {!
+	   !      begin ();!
+	   !   }!
+	END;
+	!}!
+}; .
+
+
+PROCEDURE WriteType (t: Tree)
+
+Class (..) :-
+	CONDITION NoCodeClass * Properties = {{}};
+	CONDITION Trace IN Properties;
+	!         case k! WI (Name); !:!
+	@            yyWriteS ("@ WI (Name); @");@
+	!            break;!
+	.
+
+PROCEDURE GenEvaluator (t: Tree)
+
+Class (..) :-
+	CONDITION NoCodeClass * Properties = {{}};
+{	IF (Generated = InstCount) OR (Visits < n) THEN RETURN; END;
+	!         case k! WI (Name); !:!
+	!            ! WI (TreeRoot^.Ag.TreeName); !.! WI (Name); ! yyt! WI (Name);
+	              ! = (! WI (TreeRoot^.Ag.TreeName); !.! WI (Name); !) yyt;!
+	!# undef SELF!
+	!# define SELF yyt! WI (Name); !!
+	Class := t;
+	LOOP
+	   IF Generated = InstCount THEN EXIT; END;
+	   INC (Generated);
+	   WITH Instance^ [Instance^ [Generated].Order] DO
+	      IF (Left IN Properties) AND (Attribute^.Child.Partition > n) THEN
+	         DEC (Generated); EXIT;
+	      END;
+	      IF ({Inherited, Right, First} <= Properties) AND NOT (Virtual IN Properties) THEN
+      IF IsElement (ORD ('X'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @            yyWriteEval (yyt, "@ WI (Selector^.Child.Name); !:! WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+		 !!
+		 IF (Attribute^.Kind = Tree.Child) OR (Attribute^.Attribute.Type = itTree) THEN
+		    !            yyWriteAddr! 
+		 ELSE
+		    !            write! WI (Attribute^.Child.CppType);
+		 END;
+		 ! (yyt! WI (Name); !.! WI (Selector^.Child.Name); !.! WI (Attribute^.Child.Name); !); yyWriteNl ();!
+      ELSIF IsElement (ORD ('Y'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @   yyWriteEval (yyt, "@ WI (Selector^.Child.Name); @:@ WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      ELSE
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      END;
+	      END;
+	      IF ({Synthesized, Left, First} <= Properties) AND ({Dummy, Virtual} * Properties = {}) THEN
+      IF IsElement (ORD ('X'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @   yyWriteEval (yyt, "@ WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END; !!
+		 IF Test IN Properties THEN
+		    !   writeboolean (yyb); yyWriteNl ();!
+		 ELSIF (Attribute^.Kind = Tree.Child)
+		    OR (IsElement (Attribute^.Attribute.CppType, TreeTypeNames)) THEN
+		    !   yyWriteAddr! 
+		    ! (yyt! WI (Name); !.! WI (Attribute^.Child.Name); !); yyWriteNl ();!
+		 ELSE
+		    !   write! WI (Attribute^.Child.CppType);
+		    !(yyt! WI (Name); !.! WI (Attribute^.Child.Name); !); yyWriteNl ();!
+		 END;
+      ELSIF IsElement (ORD ('Y'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @   yyWriteEval (yyt, "@ WI (Attribute^.Child.Name); @");@
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      ELSE
+		 IF Action # tTree (ADR (Action)) THEN GenEvaluator (Action); END;
+      END;
+	      END;
+	      IF ({Synthesized, Right, First} <= Properties) AND
+		 (Attribute^.Child.Partition <= Selector^.Child.Class^.Class.Visits) THEN
+      IF IsElement (ORD ('Z'), Options) AND (Trace IN t^.Class.Properties) THEN
+		 @            yyWriteVisit (yyt, "@ WI (Selector^.Child.Name); ! ! 
+		 WN (Attribute^.Child.Partition); @");@
+      END;
+		 !            yyVisit! WN (Attribute^.Child.Partition);
+		 ! (yyt! WI (Name); !.! WI (Selector^.Child.Name); !);!
+	      END;
+	   END;
+	END;
+      IF IsElement (ORD ('Z'), Options) AND (Trace IN t^.Class.Properties) THEN
+	!            yyVisitParent (yyt);!
+      END;
+        !            break;!
+}; .
+Assign (..) :- {
+	WriteLine (Pos);
+	!         ! GenEvaluator (Results); ! = ! GenEvaluator (Arguments); !;!
+}; .
+Copy (..) :- {
+	WriteLine (Pos);
+	!         ! GenEvaluator (Results); ! = ! GenEvaluator (Arguments); !;!
+}; .
+TargetCode (..) :- {
+	WriteLine (Pos);
+	!         ! GenEvaluator (Code); !!
+}; .
+Check (..) :- {
+	WriteLine (Pos);
+	IF Condition # NoTree THEN
+      IF IsElement (ORD ('X'), Options) THEN
+	   !         yyb = ! GenEvaluator (Condition); @; if (!yyb) { @
+      ELSE
+	   @         if (!(@;
+	   GenEvaluator (Condition); !)) {! 
+      END;
+	   GenEvaluator (Statement); !;!
+	   IF Actions^.Kind = Tree.Check THEN
+	      !         } else {!
+	      GenEvaluator (Actions); !!
+	   END;
+	   !         }!
+	ELSE
+      IF IsElement (ORD ('X'), Options) THEN
+	   !         yyb = false; ! 
+      END;
+	   GenEvaluator (Statement); !;!
+	   GenEvaluator (Actions); !!
+	END;
+}; .
+Designator (..) :- {
+	Attr := IdentifyAttribute (Class, Selector);
+	IF Attr # NoTree THEN
+	   ChildsClass := Attr^.Child.Class;
+	   Attr := IdentifyAttribute (ChildsClass, Attribute);
+	   IF NOT (Virtual IN Attr^.Attribute.Properties) THEN
+	      !   yyt! WI (Class^.Class.Name); !.! 
+	        WI (Selector); !.! WI (Attribute);
+	   END;
+	ELSE
+	   WI (Selector); !:! WI (Attribute);
+	END;
+	GenEvaluator (Next);
+}; .
+Ident (..) :- {
+	Attr := IdentifyAttribute (Class, Attribute);
+	IF Attr # NoTree THEN
+	   IF NOT (Virtual IN Attr^.Attribute.Properties) THEN
+	      !yyt! WI (Class^.Class.Name); !.! WI (Attribute);
+	   END;
+	ELSE
+	   WI (Attribute);
+	END;
+	GenEvaluator (Next);
+}; .
+Remote (..) :-
+   TheClass: Class; k: INTEGER;
+   TheClass := IdentifyClass (TreeRoot^.Ag.Classes, Type);
+{  IF TheClass # NoTree THEN
+      Attr := IdentifyAttribute (TheClass, Attribute);
+      IF Attr # NoTree THEN
+	 WITH Attr^.Attribute DO
+	    (* For OAG just access the attribute directly, and trust that the
+	       user knows it has been evaluated.
+	     *)
+	    GenEvaluator (Designators); !.! WI (Attribute);
+	 END;
+      END;
+   END;
+   GenEvaluator (Next);
+}; .
+Any (..) :- {
+	WriteString (f, Code);
+	GenEvaluator (Next);
+}; .
+Anys (..) :- {
+	GenEvaluator (Layouts);
+	GenEvaluator (Next);
+}; .
+LayoutAny (..) :- {
+	WriteString (f, Code);
+	GenEvaluator (Next);
+}; .
+

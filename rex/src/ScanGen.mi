@@ -1,0 +1,1591 @@
+(* $Id: ScanGen.mi,v 3.41 2013/01/15 13:54:39 grosch Exp $ *)
+
+(*
+ * $Log: ScanGen.mi,v $
+ * Revision 3.41  2013/01/15 13:54:39  grosch
+ * allow generation of large scanners in Java
+ *
+ * Revision 3.40  2008/09/25 15:01:34  grosch
+ * revised handling of # line directives
+ * renamed WriteLine -> WriteDirective, AppendLine -> MakeDirective
+ *
+ * Revision 3.39  2008/09/17 18:42:13  grosch
+ * fixed handling of line comments/directives
+ *
+ * Revision 3.38  2001/08/08 14:57:56  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 3.37  2001/01/08 20:25:26  grosch
+ * added error message "can not generate multibyte scanner in Modula-2"
+ *
+ * Revision 3.36  2001/01/05 12:09:56  grosch
+ * added prefix to xxMaxCharacter
+ *
+ * Revision 3.35  2000/09/12 17:42:28  grosch
+ * added support for Unicode
+ * moved the default of some target code sections to skeletons
+ *
+ * Revision 3.33  2000/02/28 14:41:55  grosch
+ * modified contribution of Thomas Mueller
+ *
+ * Revision 3.32  1999/11/16 17:52:34  grosch
+ * added generation of Java
+ *
+ * Revision 3.31  1999/05/27 16:04:00  grosch
+ * ANSI C++ requires type in const declaration
+ *
+ * Revision 3.30  1998/04/21 10:31:02  grosch
+ * truncation of file and module names to 8.3 format
+ * cosmetic changes
+ * improved error messages in case of missing files
+ * added macro yySetPosition
+ *
+ * Revision 3.29  1997/04/17 09:09:20  grosch
+ * added support for # line 'dir\file' under Windows
+ *
+ * Revision 3.28  1997/03/03  14:09:17  grosch
+ * added prefix yy to labels L<n>
+ *
+ * Revision 3.27  1997/01/17  21:29:43  grosch
+ * removed Errors module, use the one from reuse
+ *
+ * Revision 3.26  1996/10/22  15:14:24  grosch
+ * added casts: Attribute.Position.Column = (int) ...
+ *
+ * Revision 3.25  1996/07/26  12:44:53  grosch
+ * changed extension for C++ from .cc to .cxx
+ *
+ * Revision 3.24  1996/05/06  16:50:43  grosch
+ * removed superfluous extern C for C++
+ *
+ * Revision 3.23  1996/05/01  21:51:38  grosch
+ * handling of source module was adapted to C++
+ *
+ * Revision 3.22  1996/04/25  09:43:30  grosch
+ * added option for specification of a file to be used as skeleton
+ *
+ * Revision 3.21  1996/01/16  20:51:06  grosch
+ * update to Eiffel 3 and to latest version of gnat
+ *
+ * Revision 3.20  1995/06/26  17:30:07  grosch
+ * inverted operation of option -y
+ *
+ * Revision 3.19  1995/06/26  13:06:04  grosch
+ * omit unused objects
+ * suppress warnings (gcc -Wall)
+ *
+ * Revision 3.18  1995/04/24  11:18:57  grosch
+ * renamed Positions to Position because of MVS
+ *
+ * Revision 3.17  1995/04/15  17:23:26  grosch
+ * added option x that requires explicit definitions for identifiers
+ *
+ * Revision 3.16  1994/11/08  21:46:50  grosch
+ * switched from gmdupd to gupd
+ *
+ * Revision 3.15  1994/09/13  12:43:56  grosch
+ * added generation of Ada code
+ *
+ * Revision 3.14  1994/08/01  08:36:11  grosch
+ * make tab action depend on yyTabSpace
+ *
+ * Revision 3.13  1994/04/05  09:11:01  grosch
+ * added handling of CHARACTER_SET
+ *
+ * Revision 3.12  1994/03/23  14:49:28  grosch
+ * added generation of C++
+ * read options from environment variable REX
+ * added touching of output files only if necessary
+ *
+ * Revision 3.11  1993/05/28  14:09:53  grosch
+ * added target language Eiffel
+ *
+ * Revision 3.10  1992/11/09  16:45:23  grosch
+ * improved labels to suppress warnings for unreachable statements
+ *
+ * Revision 3.9  1992/08/18  09:06:44  grosch
+ * removed limitation for length of token and lookahead
+ *
+ * Revision 3.8  1992/08/07  15:10:26  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 3.7  1992/02/11  16:43:56  grosch
+ * replaced tString = unsigned char * by char *
+ *
+ * Revision 3.6  1992/01/30  15:29:14  grosch
+ * added labels to suppress warnings for unreachable statements
+ *
+ * Revision 3.5  1992/01/30  13:29:56  grosch
+ * redesign of interface to operating system
+ *
+ * Revision 3.4  1991/11/21  14:42:49  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.3  91/09/18  15:05:38  grosch
+ * added option to control generation of # line directives
+ *
+ * Revision 3.2  91/04/26  16:16:02  grosch
+ * introduced ARGS trick for ANSI C compatibility
+ *
+ * Revision 3.1  91/04/08  15:51:16  grosch
+ * corrected LastCh to OldLastCh
+ *
+ * Revision 3.0  91/04/04  18:07:40  grosch
+ * introduced partitioning of character set
+ *
+ * Revision 2.0  91/03/08  18:18:10  grosch
+ * turned tables into initialized arrays (in C)
+ * reduced case size
+ * changed interface for source position
+ *
+ * Revision 1.11  91/02/13  11:35:17  grosch
+ * moved tables from file to initialization in C; reduced case size
+ *
+ * Revision 1.10  90/10/09  17:33:54  grosch
+ * output one case label per line, only
+ *
+ * Revision 1.9  90/09/20  10:12:20  grosch
+ * calmed down lint
+ *
+ * Revision 1.8  90/06/11  11:25:44  grosch
+ * minimal layout improvements
+ *
+ * Revision 1.7  89/11/06  12:36:26  grosch
+ * renamed module Rex to GenTabs to avoid name clash with rex under VMS
+ *
+ * Revision 1.6  89/08/29  11:44:47  grosch
+ * make all char constants unsigned
+ *
+ * Revision 1.5  89/03/01  10:59:43  grosch
+ * improve default action
+ *
+ * Revision 1.4  89/02/23  15:55:43  grosch
+ * added include files
+ * added DEFAULT section
+ * added completeness check for the automaton
+ * improved handling of right context
+ *
+ * Revision 1.3  89/01/17  15:01:50  grosch
+ * correction and redesign of source position handling
+ *
+ * Revision 1.2  88/11/22  19:19:25  grosch
+ * fixed bug: changed variables Context2 and Context4 for variable right context in Modula
+ *
+ * Revision 1.1  88/11/06  14:55:00  grosch
+ * terminate case labels with superfluous ; to avoid yacc stack overflow with SUN's cc
+ *
+ * Revision 1.0  88/10/04  11:59:44  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Nov. 1987 *)
+
+IMPLEMENTATION MODULE ScanGen;
+
+FROM SYSTEM	IMPORT
+   ADDRESS	, ADR		;
+
+FROM General	IMPORT
+   MinCard	;
+
+FROM Checks	IMPORT
+   ErrorCheck	;
+
+FROM rSystem	IMPORT
+   rSystem	;
+
+FROM IO		IMPORT
+   ReadOpen	, WriteOpen	, WriteClose	, ReadClose	,
+   EndOfFile	, WriteN	, WriteS	, WriteC	,
+   WriteI	, tFile		, WriteCard	;
+
+FROM Texts	IMPORT
+   tText	, MakeText	;
+
+FROM Sets	IMPORT
+   IsEmpty	, Card		, Select	, Extract	,
+   Include	, tSet		, IsElement	, MakeSet	,
+   ReleaseSet	, AssignEmpty	;
+
+FROM Strings	IMPORT
+   tString	, Char		, ReadL		, Length	,
+   ArrayToString, StringToArray	, Assign	, Append	,
+   Concatenate	, IntToString;
+
+FROM StringM	IMPORT
+   tStringRef	, PutString	, GetString	;
+
+FROM Idents	IMPORT
+   tIdent	, NoIdent	, WriteIdent	, MakeIdent	;
+
+FROM Errors	IMPORT
+   Message	, MessageI	, Fatal		, Warning	, Information	;
+
+FROM Scanner	IMPORT
+   Attribute	;
+
+FROM DefTable	IMPORT
+   GetKind	, DefRange	, DefCount	, tKind		,
+   GetStartDef	;
+
+FROM Dfa	IMPORT
+   FirstCh	, EolCh		, EobCh		,
+   DStateRange	, DStateCount	, LastCh	, GetDSemantics	;
+
+FROM ScanTabs	IMPORT
+   TableSize, PutComb, PutBase, PutDefault, PutEobTrans, PutAction,
+   PutToClassUpb, PutToClassClass, PutToClassArray, PutTableParts,
+   CopyTableParts;
+
+FROM GenTabs	IMPORT
+   RuleToCodePtr, PatternTablePtr, EobAction	, DefaultAction	,
+   PatternCount	, VariableContext, LeftJustUsed	;
+
+FROM Tree	IMPORT
+   CharCode	;
+
+FROM Classes	IMPORT
+   LastClass	, ToClassCount	, ToClassArraySize;
+
+FROM UniCode	IMPORT
+   UCHAR	;
+
+IMPORT IO, Lists, Texts, Strings, Idents, Errors, Position;
+
+CONST
+   ScannerMd	= "Scanner.md"	;	(* file names for Modula-2	*)
+   ScannerMi	= "Scanner.mi"	;
+   SourceMd	= "Source.md"	;
+   SourceMi	= "Source.mi"	;
+   ScanDrvMi	= "ScanDrv.mi"	;
+
+   ScannerH	= "Scanner.h"	;	(* file names for C		*)
+   ScannerC	= "Scanner.c"	;
+   SourceH	= "Source.h"	;
+   SourceC	= "Source.c"	;
+   ScanDrvC	= "ScanDrv.c"	;
+
+   ScannerHh	= "Scanner.hh"	;	(* file names for C++		*)
+   ScannerCc	= "Scanner.cxx"	;
+   ScanDrvCc	= "ScanDrv.cxx"	;
+   SourceHh	= "Source.hh"	;
+   SourceCc	= "Source.cxx"	;
+					(* file names for Eiffel		*)
+
+   ScannerE	= "scanner.e"	;	(* main part of the scanner		*)
+   ScannerEi	= "scanner.doc" ;	(* simple interface, not needed		*)
+   BufferE	= "buffer.e"	;	(* source buffer for scanner		*)
+   SourceE	= "source.e"	;	(* input interface for scanner		*)
+   ScanDrvE	= "scandrv.e"	;	(* test driver for scanner		*)
+ ScanAttributeE	= "scanattr.e"	;	(* user attribute for scanner		*)
+   AttributeE	= "attribut.e"	;	(* user attribute for parser		*)
+   PositionE	= "position.e"	;	(* source position			*)
+   RFileE	= "rfile.e"	;	(* input and output			*)
+
+   ScannerAds	= "scanner.ads"	;	(* file names for Ada		*)
+   ScannerAdb	= "scanner.adb"	;
+   SourceAds	= "source.ads"	;
+   SourceAdb	= "source.adb"	;
+   ScanDrvAdb	= "scandrv.adb"	;
+
+   ScannerJava	= "Scanner.java";	(* file names for Java		*)
+   ScanDrvJava	= "ScanDrv.java";
+
+   ExtMd	= ".md";
+   ExtMi	= ".mi";
+   ExtH		= ".h";
+   ExtC		= ".c";
+   ExtCc	= ".cxx";
+   ExtE		= ".e";
+   ExtEi	= ".doc";
+   ExtAds	= ".ads";
+   ExtAdb	= ".adb";
+   ExtJava	= ".java";
+   Ext		= "";
+
+VAR
+   Case1	,
+   Case2	,
+   Context1	,
+   Context2	,
+   Context3	,
+   Context4	,
+   Trailer	: tText;
+   PathS	: tString;
+   PathI	: tIdent;
+   LineCount	,
+   LabelCount	,
+   DummyCount	: CARDINAL;
+   Scanner	,
+   Source	,
+   Drv		: ARRAY [0..9] OF CHAR;
+
+PROCEDURE WriteNl (File: tFile);
+   BEGIN IO.WriteNl (File); INC (LineCount); END WriteNl;
+
+PROCEDURE WriteL (File: tFile; String: tString);
+   BEGIN Strings.WriteL (File, String); INC (LineCount); END WriteL;
+
+PROCEDURE WriteText (File: tFile; Text: tText);
+   BEGIN Texts.WriteText (File, Text); INC (LineCount, Lists.Length (Text)); END WriteText;
+
+PROCEDURE SmartOpen (FileName: tString): tFile;
+   VAR
+      PathS	: tString;
+      PathA	: ARRAY [0..255] OF CHAR;
+      n		: INTEGER;
+   BEGIN
+      IF t THEN
+	 ArrayToString	("yy", PathS);
+	 Concatenate	(PathS, FileName);
+	 Append		(PathS, 0C);
+	 StringToArray	(PathS, PathA);
+      ELSE
+	 Append		(FileName, 0C);
+	 StringToArray	(FileName, PathA);
+      END;
+      n := WriteOpen	(PathA);
+   (* ErrorCheck	(PathA, n); *)
+      IF n < 0 THEN
+	 MessageI ("can not access file", Errors.Fatal, Position.NoPosition,
+	    Errors.Array, ADR (PathA));
+      END;
+      RETURN n;
+   END SmartOpen;
+
+PROCEDURE SmartClose (FileName: tString; f: tFile);
+   VAR
+      String	,
+      PathS	: tString;
+      PathA	: ARRAY [0..255] OF CHAR;
+      n		: INTEGER;
+   BEGIN
+      WriteClose	(f);
+      IF t THEN
+	 ArrayToString	("gupd ", PathS);
+	 Concatenate	(PathS, FileName);
+	 ArrayToString	(" yy", String);
+	 Concatenate	(PathS, String);
+	 Concatenate	(PathS, FileName);
+	 Append		(PathS, 0C);
+	 StringToArray	(PathS, PathA);
+	 n := rSystem	(PathA);
+      END;
+   END SmartClose;
+
+PROCEDURE ExpandLine (Out: tFile; Line: tString);
+   VAR
+      Ch	: CHAR;
+      i		: CARDINAL;
+   BEGIN
+      i := 3;
+      LOOP
+	 INC (i);
+	 IF i > Length (Line) THEN WriteNl (Out); EXIT; END;
+	 Ch := Char (Line, i);
+	 CASE Ch OF
+	 | '@' : IF ScannerName = NoIdent
+		 THEN WriteS (Out, Scanner);
+		 ELSE WriteIdent (Out, ScannerName); END;
+	 | '$' : IF ScannerName = NoIdent
+		 THEN IF Char (Line, i + 1) = '_' THEN INC (i); END;
+		 ELSE WriteIdent (Out, ScannerName); END;
+	 ELSE	 WriteC (Out, Ch);
+	 END;
+      END;
+   END ExpandLine;
+
+PROCEDURE CopyFile (InputA: ARRAY OF CHAR; OutputS: tString; SuffixA: ARRAY OF CHAR);
+   VAR
+      In, Out	: tFile;
+      FileNameS	,
+      PathS	,
+      Line	: tString;
+      PathA	: ARRAY [0..255] OF CHAR;
+      n		: INTEGER;
+   BEGIN
+      ArrayToString	(InputA, FileNameS);
+      Assign		(PathS, RexLib);
+      Concatenate	(PathS, FileNameS);
+      Append		(PathS, 0C);
+      StringToArray	(PathS, PathA);
+      In := ReadOpen	(PathA);
+   (* ErrorCheck	(PathA, In); *)
+      IF In < 0 THEN
+	 MessageI ("can not access file", Errors.Fatal, Position.NoPosition,
+	    Errors.Array, ADR (PathA));
+      END;
+
+      ArrayToString	(SuffixA, FileNameS);
+      Concatenate	(OutputS, FileNameS);
+      Out := SmartOpen	(OutputS);
+
+      WHILE NOT EndOfFile (In) DO
+	 ReadL		(In, Line);
+	 IF (Length (Line) >= 2) AND (Char (Line, 1) = '$') THEN
+	    CASE Char (Line, 2) OF
+	    |  '@': ExpandLine		(Out, Line);
+	    |  '#': IF PackageName # NoIdent THEN
+		       WriteS		(Out, "package ");
+		       WriteIdent	(Out, PackageName);
+		       WriteS		(Out, ";");
+		       WriteNl		(Out);
+		    END;
+	    |  'V': GenerateDefines1	(Out);
+	    END;
+	 ELSE
+	    WriteL	(Out, Line);
+	 END;
+      END;
+      ReadClose		(In);
+      SmartClose	(OutputS, Out);
+
+      IF (Language = Java) THEN
+	 ArrayToString	("gcpp ", FileNameS);		(* call cpp *)
+	 Concatenate	(FileNameS, OutputS);
+	 Append		(FileNameS, 0C);
+	 StringToArray	(FileNameS, PathA);
+	 n := rSystem	(PathA);
+      END;
+   END CopyFile;
+
+PROCEDURE WriteCode (In, Out: tFile; LibLine: tString; TextLine: CARDINAL;
+      TextFile: tIdent; Text: tText);
+   VAR
+      Line	: tString;
+   BEGIN
+      IF Texts.IsEmpty (Text) THEN
+         (* There may be a default supplied in the skeleton file: include it. *)
+         IF (Length (LibLine) >= 3) AND (Char (LibLine, 3) = '[') THEN
+             LOOP
+                IF EndOfFile (In) THEN EXIT; END;
+                ReadL (In, Line);
+		IF (Length (Line) >= 2) AND ((Char (Line, 1) = '$')) THEN
+                   IF (Char (Line, 2) = ']') THEN EXIT; END;
+                   IF (Char (Line, 2) = '@') THEN ExpandLine (Out, Line);
+                   ELSE Message ("missing $] in skeleton?", Fatal, Position.NoPosition);
+                   END;
+                ELSE
+                   WriteL (Out, Line);
+		END;
+             END;
+         END;
+      ELSE
+         (* If there is a default supplied in the skeleton file skip it *)
+         IF (Length (LibLine) >= 3) AND (Char (LibLine, 3) = '[') THEN
+             LOOP
+                IF EndOfFile (In) THEN
+                   Message ("missing $] in skeleton?", Fatal, Position.NoPosition);
+                   EXIT;
+		END;
+                ReadL (In, Line);
+		IF (Length (Line) >= 2) AND ((Char (Line, 1) = '$')) THEN
+                   IF (Char (Line, 2) = ']') THEN EXIT; END;
+                   IF (Char (Line, 2) # '@') THEN
+                       Message ("missing $] in skeleton?", Fatal, Position.NoPosition);
+                   END;
+		END;
+             END;
+         END;
+         WriteDirective	(Out, TextLine, TextFile);
+         WriteText	(Out, Text);
+         WriteDirective	(Out, LineCount + 2, PathI);
+      END;
+   END WriteCode;
+
+PROCEDURE GenerateSupport;
+   VAR
+      SourceName, DriverName, Suffix	: tString;
+   BEGIN
+      Idents.GetString (ScannerName, SourceName);
+      ArrayToString (Source, Suffix);
+      Concatenate (SourceName, Suffix);
+      IF ScannerName = NoIdent THEN
+	 ArrayToString (Scanner, DriverName);
+      ELSE
+	 Idents.GetString (ScannerName, DriverName);
+      END;
+      ArrayToString (Drv, Suffix);
+      Concatenate (DriverName, Suffix);
+      CASE Language OF
+      | Modula	: CopyFile (SourceMd	, SourceName, ExtMd);
+		  CopyFile (SourceMi	, SourceName, ExtMi);
+		  CopyFile (ScanDrvMi	, DriverName, ExtMi);
+
+      | C	: CopyFile (SourceH	, SourceName, ExtH);
+		  CopyFile (SourceC	, SourceName, ExtC);
+		  CopyFile (ScanDrvC	, DriverName, ExtC);
+
+      | Cpp	: CopyFile (SourceHh	, SourceName, ExtH);
+		  CopyFile (SourceCc	, SourceName, ExtCc);
+		  CopyFile (ScanDrvCc	, DriverName, ExtCc);
+
+      | Eiffel	: CopyFile (SourceE	, SourceName, ExtE);
+		  CopyFile (ScanDrvE	, DriverName, ExtE);
+	 ArrayToString (AttributeE	, Suffix); CopyFile (AttributeE, Suffix, Ext);
+	 ArrayToString (ScanAttributeE	, Suffix); CopyFile (ScanAttributeE, Suffix, Ext);
+	 ArrayToString (PositionE	, Suffix); CopyFile (PositionE, Suffix, Ext);
+	 ArrayToString (RFileE		, Suffix); CopyFile (RFileE, Suffix, Ext);
+
+      | Ada	: CopyFile (SourceAds	, SourceName, ExtAds);
+		  CopyFile (SourceAdb	, SourceName, ExtAdb);
+		  CopyFile (ScanDrvAdb	, DriverName, ExtAdb);
+
+      | Java	: CopyFile (ScanDrvJava	, DriverName, ExtJava);
+      END;
+   END GenerateSupport;
+
+PROCEDURE GenerateInterface;
+   VAR
+      In, Out	: tFile;
+      FileNameS	,
+      String	,
+      Line	: tString;
+      PathA	: ARRAY [0..255] OF CHAR;
+   BEGIN
+      CASE Language OF
+      | Modula	: ArrayToString	(ScannerMd	, FileNameS);
+      | C	: ArrayToString	(ScannerH	, FileNameS);
+      | Cpp	: ArrayToString	(ScannerHh	, FileNameS);
+      | Eiffel	: RETURN; ArrayToString	(ScannerEi	, FileNameS);
+      | Ada	: ArrayToString	(ScannerAds	, FileNameS);
+      | Java	: RETURN;
+      END;
+
+      Assign		(PathS, RexLib);
+      Concatenate	(PathS, FileNameS);
+      Append		(PathS, 0C);
+      StringToArray	(PathS, PathA);
+      In := ReadOpen	(PathA);
+   (* ErrorCheck	(PathA, In); *)
+      IF In < 0 THEN
+	 MessageI ("can not access file", Errors.Fatal, Position.NoPosition,
+	    Errors.Array, ADR (PathA));
+      END;
+
+      IF ScannerName = NoIdent THEN
+	 ArrayToString (Scanner, PathS);
+      ELSE
+	 Idents.GetString (ScannerName, PathS);
+      END;
+      CASE Language OF
+      | Modula	: ArrayToString (ExtMd	, FileNameS);
+      | C, Cpp	: ArrayToString (ExtH	, FileNameS);
+      | Eiffel	: ArrayToString (ExtEi	, FileNameS);
+      | Ada	: ArrayToString (ExtAds	, FileNameS);
+      END;
+      Concatenate	(PathS, FileNameS);
+      Out := SmartOpen	(PathS);
+      PathI := MakeIdent (PathS);
+      LineCount := 0;
+
+      WHILE NOT EndOfFile (In) DO
+	 ReadL (In, Line);
+	 IF (Length (Line) >= 2) AND (Char (Line, 1) = '$') THEN
+	    CASE Char (Line, 2) OF
+	    | '-': WriteCode		(In, Out, Line, ImportLine, ImportFile, Import);
+	    | 'E': WriteCode		(In, Out, Line, ExportLine, ExportFile, Export);
+	    | 'V': GenerateDefines1	(Out);
+	    | 'W': GenerateDefines2	(Out);
+	    | '@': ExpandLine		(Out, Line);
+	    | ']': Message ("unpaired $] in interface skeleton",
+			     Fatal, Position.NoPosition);
+	    END;
+	 ELSE
+	    WriteL (Out, Line);
+	 END;
+      END;
+      ReadClose  (In);
+      SmartClose (PathS, Out);
+   END GenerateInterface;
+
+PROCEDURE GenerateScanner	(ReduceCaseSize, Warnings: BOOLEAN);
+   VAR
+      In, Out	: tFile;
+      PathA	: ARRAY [0..255] OF CHAR;
+      FileNameS, Line, BufferName, Suffix, s	: tString;
+      n		: INTEGER;
+      Ch	: CHAR;
+   BEGIN
+      IF Length (ScannerFrame) = 0 THEN
+	 CASE Language OF
+	 | Modula	: ArrayToString	(ScannerMi	, FileNameS);
+	 | C		: ArrayToString	(ScannerC	, FileNameS);
+	 | Cpp		: ArrayToString	(ScannerCc	, FileNameS);
+	 | Eiffel	: ArrayToString	(ScannerE	, FileNameS);
+	 | Ada		: ArrayToString	(ScannerAdb	, FileNameS);
+	 | Java		: ArrayToString	(ScannerJava	, FileNameS);
+	 END;
+	 Assign		(PathS, RexLib);
+	 Concatenate	(PathS, FileNameS);
+      ELSE
+	 Assign		(PathS, ScannerFrame);
+      END;
+      Append		(PathS, 0C);
+      StringToArray	(PathS, PathA);
+      In := ReadOpen	(PathA);
+   (* ErrorCheck	(PathA, In); *)
+      IF In < 0 THEN
+	 MessageI ("can not access file", Errors.Fatal, Position.NoPosition,
+	    Errors.Array, ADR (PathA));
+      END;
+
+      IF ScannerName = NoIdent THEN
+	 ArrayToString (Scanner, PathS);
+      ELSE
+	 Idents.GetString (ScannerName, PathS);
+      END;
+      CASE Language OF
+      | Modula	: ArrayToString (ExtMi	, FileNameS);
+      | C	: ArrayToString (ExtC	, FileNameS);
+      | Cpp	: ArrayToString (ExtCc	, FileNameS);
+      | Eiffel	: ArrayToString (ExtE	, FileNameS);
+      | Ada	: ArrayToString (ExtAdb	, FileNameS);
+      | Java	: ArrayToString (ExtJava, FileNameS);
+      END;
+      Concatenate	(PathS, FileNameS);
+      Out := SmartOpen	(PathS);
+      PathI := MakeIdent (PathS);
+      LineCount := 0;
+
+      IF ScannerName = NoIdent THEN
+	ArrayToString (Scanner, s);
+	prefix := MakeIdent (s);
+      ELSE
+	prefix := ScannerName;
+      END;
+
+      WHILE NOT EndOfFile (In) DO
+	 ReadL (In, Line);
+	 IF (Length (Line) >= 2) AND (Char (Line, 1) = '$') THEN
+	    Ch := Char (Line, 2);
+	    CASE Ch OF
+	    |  'G': WriteCode		(In, Out, Line, GlobalLine, GlobalFile, Global);
+		    (* yySetPosition is now defined in the skeleton *)
+	    |  'C': GenerateConstants	(Out);
+	    |  'V': GenerateDefines1	(Out);
+	    |  'W': GenerateDefines2	(Out);
+	    |  'M': IF ReduceCaseSize THEN
+		       Line.Chars [1] := ' ';
+		       Line.Chars [2] := ' ';
+		       WriteL (Out, Line);
+		    END;
+	    |  'L': WriteCode		(In, Out, Line, LocalLine, LocalFile, Local);
+	    |  'J': IF LeftJustUsed THEN
+		       Line.Chars [1] := ' ';
+		       Line.Chars [2] := ' ';
+		       WriteL (Out, Line);
+		    END;
+	    |  'A': GenerateActions	(Out, ReduceCaseSize, Warnings);
+	    |  'N': IF ReduceCaseSize THEN
+		       GenerateCaseLabel (Out, PatternCount + 1);
+		    ELSE
+		       GenerateCaseLabels (Out, PatternTablePtr^[0].Finals);
+		    END;
+	    |  'P': IF ReduceCaseSize THEN
+		       GenerateCaseLabel (Out, DefaultAction);
+		    ELSE
+		       GenerateCaseLabel (Out, Select (PatternTablePtr^[DefaultAction].Finals));
+		    END;
+	    |  'D': WriteCode		(In, Out, Line, DefaultLine, DefaultFile, Default);
+	    |  'O': IF ReduceCaseSize THEN
+		       GenerateCaseLabel (Out, EobAction);
+		    ELSE
+		       GenerateCaseLabel (Out, Select (PatternTablePtr^[EobAction].Finals));
+		    END;
+	    |  '-': WriteCode		(In, Out, Line, ImportLine, ImportFile, Import);
+	    |  'X': WriteCode		(In, Out, Line, ExportLine, ExportFile, Export);
+	    |  'E': WriteCode		(In, Out, Line, EofLine, EofFile, Eof);
+	    |  'I': WriteCode		(In, Out, Line, BeginLine, BeginFile, Begin);
+	    |  'F': WriteCode		(In, Out, Line, CloseLine, CloseFile, Close);
+	    |  'T': PutComb		(Out);
+	    |  'B': PutBase		(Out);
+	    |  'U': PutDefault		(Out);
+	    |  'R': PutEobTrans		(Out);
+	    |  'Q': IF ReduceCaseSize THEN PutAction (Out); END;
+	    |  'H': PutTableParts	(Out, ReduceCaseSize);
+	    |  'K': CopyTableParts	(Out, ReduceCaseSize);
+	    |  '@': ExpandLine		(Out, Line);
+	    |  '#': IF PackageName # NoIdent THEN
+		       WriteS		(Out, "package ");
+		       WriteIdent	(Out, PackageName);
+		       WriteS		(Out, ";");
+		       WriteNl		(Out);
+		    END;
+	    |  'Y': IF LastCh >= UCHAR (ToClassArraySize) THEN PutToClassUpb (Out); END;
+	    |  'S': IF LastCh >= UCHAR (ToClassArraySize) THEN PutToClassClass (Out); END;
+	    |  'Z': IF z THEN PutToClassArray (Out); END;
+	    |  ']': Message ("unpaired $] in scanner skeleton",
+			     Fatal, Position.NoPosition);
+	    ELSE
+	       MessageI ("unknown $ directive in skeleton", Fatal,
+		  Position.NoPosition, Errors.Character, ADR (Ch));
+	    END;
+	 ELSE
+	    WriteL (Out, Line);
+	 END;
+      END;
+      ReadClose  (In);
+      SmartClose (PathS, Out);
+
+      IF Language = Eiffel THEN
+	 Idents.GetString (ScannerName, BufferName);
+	 ArrayToString (BufferE, Suffix);
+	 Concatenate (BufferName, Suffix);
+	 CopyFile (BufferE, BufferName, Ext);
+      END;
+
+      IF (Language = Modula) OR (Language = Ada) OR (Language = Eiffel) OR (Language = Java) THEN
+	 ArrayToString	("gcpp ", FileNameS);		(* call cpp *)
+	 Concatenate	(FileNameS, PathS);
+	 Append		(FileNameS, 0C);
+	 StringToArray	(FileNameS, PathA);
+	 n := rSystem	(PathA);
+      END;
+   END GenerateScanner;
+
+PROCEDURE GenerateConstants (Out: tFile);
+   VAR
+      Definition: DefRange	;
+      String	: tString	;
+      Ident	: tIdent	;
+      Number	: LONGCARD	;
+   BEGIN
+      ArrayToString		("yyFirstCh"	, String);
+      GenerateCharConstDef	(Out, String, CHR (FirstCh));
+      IF Language = Modula THEN
+	 IF LastCh < 256 THEN
+	    ArrayToString	("yyLastCh"	, String);
+	    GenerateCharConstDef(Out, String, CHR (LastCh));
+	 ELSE
+	    Message ("can not generate multibyte scanner in Modula-2",
+	       Errors.Error, Position.NoPosition);
+	 END;
+      END;
+      ArrayToString		("yyEolCh"	, String);
+      GenerateCharConstDef	(Out, String, CharCode [CHR (EolCh)]);
+      ArrayToString		("yyEobCh"	, String);
+      GenerateCharConstDef	(Out, String, CharCode [CHR (EobCh)]);
+      ArrayToString		("yyDStateCount", String);
+      GenerateDecConstDef	(Out, String, DStateCount);
+      ArrayToString		("yyTableSize"	, String);
+      GenerateDecConstDef	(Out, String, TableSize	);
+      ArrayToString		("yyEobState"	, String);
+      GenerateDecConstDef	(Out, String, Select (PatternTablePtr^[EobAction].Finals));
+      ArrayToString		("yyDefaultState", String);
+      GenerateDecConstDef	(Out, String, Select (PatternTablePtr^[DefaultAction].Finals));
+      IF z THEN
+	 ArrayToString		("yyToClassArraySize", String);
+	 GenerateDefineValue	(Out, String, MinCard (LastCh, ToClassArraySize -1) + 1);
+	 IF LastCh >= UCHAR (ToClassArraySize) THEN
+	    ArrayToString	("yyToClassRangeSize", String);
+	    GenerateDecConstDef (Out, String, ToClassCount + 1);
+	 END;
+      ELSE
+	 ArrayToString		("yyToClassArraySize", String);
+	 GenerateDecConstDef	(Out, String, 0);
+      END;
+
+      FOR Definition := 1 TO DefCount DO
+	 IF GetKind (Definition) = Start THEN
+	    GetStartDef (Definition, Ident, Number);
+	    Idents.GetString (Ident, String);
+	    GenerateDecConstDef (Out, String, Number);
+	 END;
+      END;
+   END GenerateConstants;
+
+PROCEDURE GenerateDefines1 (Out: tFile);
+   VAR
+      String	,
+      String2	: tString	;
+   BEGIN
+      IF ScannerName = NoIdent THEN
+	 ArrayToString	("xxMaxCharacter", String);
+      ELSE
+	 Idents.GetString (ScannerName, String);
+	 Append		(String, '_');
+	 ArrayToString	("xxMaxCharacter", String2);
+	 Concatenate	(String, String2);
+      END;
+      GenerateDefineValue (Out, String, LastCh);
+   END GenerateDefines1;
+
+PROCEDURE GenerateDefines2 (Out: tFile);
+   VAR
+      String	: tString	;
+   BEGIN
+      IF pGetWord IN Procedures THEN
+	 ArrayToString	("xxGetWord", String);
+	 GenerateDefine	(Out, String);
+      END;
+      IF pGetLower IN Procedures THEN
+	 ArrayToString	("xxGetLower", String);
+	 GenerateDefine	(Out, String);
+      END;
+      IF pGetUpper IN Procedures THEN
+	 ArrayToString	("xxGetUpper", String);
+	 GenerateDefine	(Out, String);
+      END;
+      IF pinput IN Procedures THEN
+	 ArrayToString	("xxinput", String);
+	 GenerateDefine	(Out, String);
+      END;
+      IF pyyPush IN Procedures THEN
+	 ArrayToString	("xxyyPush", String);
+	 GenerateDefine	(Out, String);
+      END;
+      IF pyyPop IN Procedures THEN
+	 ArrayToString	("xxyyPop", String);
+	 GenerateDefine	(Out, String);
+      END;
+   END GenerateDefines2;
+
+PROCEDURE GenerateActions (Out: tFile; ReduceCaseSize, Warnings: BOOLEAN);
+   VAR
+      Rule	,
+      Pattern	,
+      Pattern2	: SHORTCARD	;
+      String	,
+      String2	: tString	;
+      Label	: CARDINAL	;
+      State	: DStateRange	;
+      dSemantics,
+      Lines	: tSet		;
+   BEGIN
+      MakeSet (dSemantics, PatternCount);
+      MakeSet (Lines	 , Attribute.Position.Line);
+      IF ReduceCaseSize THEN
+	 WriteText (Out, Case2);
+      ELSE
+	 WriteText (Out, Case1);
+      END;
+      FOR Pattern := 1 TO PatternCount - 2 DO	(* omit special rules *)
+	 IF NOT IsEmpty (PatternTablePtr^[Pattern].Finals) THEN
+	    IF ReduceCaseSize THEN
+	       GenerateCaseLabel (Out, Pattern);
+	    ELSE
+	       GenerateCaseLabels (Out, PatternTablePtr^[Pattern].Finals);
+	    END;
+	    IF PatternTablePtr^[Pattern].ContextLng = VariableContext THEN
+	       IF Card (PatternTablePtr^[Pattern].DContext) = 1 THEN
+		  WriteText (Out, Context1);
+		  WriteI (Out, Select (PatternTablePtr^[Pattern].DContext), 0);
+		  WriteText (Out, Context2);
+	       ELSE
+		  WriteText (Out, Context3);
+		  GenerateCaseLabels (Out, PatternTablePtr^[Pattern].DContext);
+		  CASE Language OF
+		  | C, Cpp:
+		     Label := MakeLabel ();
+		     GenerateGoto (Out, Label);
+		     WriteText (Out, Context4);
+		     GenerateLabel (Out, Label);
+		  ELSE
+		     WriteText (Out, Context4);
+		  END;
+	       END;
+	    ELSIF PatternTablePtr^[Pattern].ContextLng > 0 THEN
+	       CASE Language OF
+	       | Eiffel:
+		  WriteS (Out, "yyChBufferIndex := yyChBufferIndex - ");
+		  WriteI (Out, PatternTablePtr^[Pattern].ContextLng, 0);
+		  WriteS (Out, ";");
+		  WriteNl (Out);
+	       ELSE
+		  ArrayToString ("yyChBufferIndex", String);
+		  GenerateDecrement (Out, String, PatternTablePtr^[Pattern].ContextLng);
+	       END;
+	       CASE Language OF
+	       | C:
+		  IF ScannerName = NoIdent THEN
+		     ArrayToString ("TokenLength", String);
+		  ELSE
+		     Idents.GetString (ScannerName, String);
+		     Append (String, '_');
+		     ArrayToString ("TokenLength", String2);
+		     Concatenate (String, String2);
+		  END;
+	       | Java:
+		  ArrayToString ("tokenLength", String);
+	       ELSE
+		  ArrayToString ("TokenLength", String);
+	       END;
+	       GenerateDecrement (Out, String, PatternTablePtr^[Pattern].ContextLng);
+	    ELSIF PatternTablePtr^[Pattern].ContextLng < 0 THEN
+	       WriteS (Out, "yyLess (");
+	       WriteI (Out, - PatternTablePtr^[Pattern].ContextLng, 0);
+	       WriteS (Out, ");");
+	       WriteNl (Out);
+	    END;
+	    Rule := PatternTablePtr^[Pattern].Rule;
+	    IF RuleToCodePtr^[Rule].CodeMode = HasPosition THEN
+	       WriteS (Out, "yySetPosition");
+	       WriteNl (Out);
+	    END;
+	    WriteDirective (Out, RuleToCodePtr^[Rule].TextLine, RuleToCodePtr^[Rule].TextFile);
+	    CASE Language OF
+	    | C, Cpp, Java: WriteC (Out, '{');
+	    ELSE
+	    END;
+	    WriteText (Out, RuleToCodePtr^[Rule].Text);
+	    WriteDirective (Out, LineCount + 2, PathI);
+	    CASE Language OF
+	    | C, Cpp:
+	       WriteS (Out, "} ");
+	       IF NOT y THEN
+		  INC (DummyCount);
+		  WriteS (Out, "yyy");
+		  WriteI (Out, DummyCount, 0);
+		  WriteS (Out, ": ");
+	       END;
+	    | Java:
+	       WriteS (Out, "} ");
+	       IF NOT y THEN	(* avoid error message: Statement not reached *)
+		  INC (DummyCount);
+		  WriteS (Out, "case yyDStateCount + ");
+		  WriteI (Out, DummyCount, 0);
+		  WriteS (Out, ": ");
+	       END;
+	    ELSE
+	    END;
+	    WriteText (Out, Trailer);
+	 ELSIF (PatternTablePtr^[Pattern].Position.Line # 0) AND Warnings THEN
+            Message ("pattern will never match", Warning, PatternTablePtr^[Pattern].Position);
+	    AssignEmpty (Lines);
+	    FOR State := 1 TO DStateCount DO
+	       GetDSemantics (State, dSemantics);
+	       IF IsElement (Pattern, dSemantics) THEN
+		  LOOP
+		     Pattern2 := Extract (dSemantics);
+		     IF Pattern2 = Pattern THEN EXIT; END;
+		     IF NOT IsElement (PatternTablePtr^[Pattern2].Position.Line, Lines) THEN
+			MessageI ("because of pattern at position",
+			   Information, PatternTablePtr^[Pattern].Position,
+			   Errors.Position, ADR (PatternTablePtr^[Pattern2].Position));
+			Include (Lines, PatternTablePtr^[Pattern2].Position.Line);
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      ReleaseSet (dSemantics);
+      ReleaseSet (Lines	    );
+   END GenerateActions;
+
+PROCEDURE GenerateDefine (Out: tFile; Name: tString);
+   BEGIN
+      WriteS (Out, "# define ");
+      Strings.WriteS (Out, Name);
+      WriteNl (Out);
+   END GenerateDefine;
+
+PROCEDURE GenerateDefineValue (Out: tFile; Name: tString; Value: LONGCARD);
+   BEGIN
+      WriteS (Out, "# define ");
+      Strings.WriteS (Out, Name);
+      WriteC (Out, "	");
+      WriteCard (Out, Value, 0);
+      WriteNl (Out);
+   END GenerateDefineValue;
+
+PROCEDURE GenerateDecConstDef (Out: tFile; Name: tString; Value: LONGCARD);
+   BEGIN
+      CASE Language OF
+      | Modula:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	= ");
+	 WriteCard (Out, Value, 0);
+	 WriteC (Out, ';');
+	 WriteNl (Out);
+      | C:
+	 GenerateDefineValue (Out, Name, Value);
+      | Cpp:
+	 WriteS (Out, "static const long ");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	= ");
+	 WriteCard (Out, Value, 0);
+	 WriteC (Out, ';');
+	 WriteNl (Out);
+      | Eiffel:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " : INTEGER is ");
+	 WriteCard (Out, Value, 0);
+	 WriteC (Out, ';');
+	 WriteNl (Out);
+      | Ada:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " : constant Integer := ");
+	 WriteCard (Out, Value, 0);
+	 WriteC (Out, ';');
+	 WriteNl (Out);
+      | Java:
+	 WriteS (Out, "    static final int ");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	= ");
+	 WriteCard (Out, Value, 0);
+	 WriteC (Out, ';');
+	 WriteNl (Out);
+      END;
+   END GenerateDecConstDef;
+
+PROCEDURE GenerateCharConstDef (Out: tFile; Name: tString; Value: CHAR);
+   BEGIN
+      CASE Language OF
+      | Modula:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	= ");
+	 WriteN (Out, ORD (Value), 1, 8);
+	 WriteS (Out, "C;");
+	 WriteNl (Out);
+      | C:
+	 WriteS (Out, "# define ");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	(yytusChar) '\");
+	 WriteN (Out, ORD (Value), 1, 8);
+	 WriteC (Out, "'");
+	 WriteNl (Out);
+      | Cpp:
+	 WriteS (Out, "static const yytusChar ");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	= (yytusChar) '\");
+	 WriteN (Out, ORD (Value), 1, 8);
+	 WriteS (Out, "';");
+	 WriteNl (Out);
+      | Eiffel:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " : CHARACTER is '%/");
+	 WriteI (Out, ORD (Value), 0);
+	 WriteS (Out, "/';");
+	 WriteNl (Out);
+      | Ada:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " : constant Character := Character'val (");
+	 WriteI (Out, ORD (Value), 0);
+	 WriteS (Out, ");");
+	 WriteNl (Out);
+      | Java:
+	 WriteS (Out, "    static final yytChar ");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, "	= (yytChar) '\");
+	 WriteN (Out, ORD (Value), 1, 8);
+	 WriteS (Out, "';");
+	 WriteNl (Out);
+      END;
+   END GenerateCharConstDef;
+
+PROCEDURE GenerateDecrement (Out: tFile; Name: tString; Value: INTEGER);
+   BEGIN
+      CASE Language OF
+      | Modula:
+	 WriteS (Out, "DEC (");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, ", ");
+	 WriteI (Out, Value, 0);
+	 WriteS (Out, ");");
+	 WriteNl (Out);
+      | C, Cpp, Java:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " -= ");
+	 WriteI (Out, Value, 0);
+	 WriteC (Out, ";");
+	 WriteNl (Out);
+      | Eiffel, Ada:
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " := ");
+	 Strings.WriteS (Out, Name);
+	 WriteS (Out, " - ");
+	 WriteI (Out, Value, 0);
+	 WriteC (Out, ";");
+	 WriteNl (Out);
+      END;
+   END GenerateDecrement;
+
+PROCEDURE GenerateCaseLabel (Out: tFile; Label: INTEGER);
+   BEGIN
+      CASE Language OF
+      | Modula:
+	 WriteS (Out, "| ");
+	 WriteI (Out, Label, 0);
+	 WriteC (Out, ':');
+	 WriteNl (Out);
+      | C, Cpp, Java:
+	 WriteS (Out, "case ");
+	 WriteI (Out, Label, 0);
+	 WriteC (Out, ':');
+	 WriteNl (Out);
+      | Eiffel:
+	 WriteS (Out, "when ");
+	 WriteI (Out, Label, 0);
+	 WriteS (Out, " then");
+	 WriteNl (Out);
+      | Ada:
+	 WriteS (Out, "when ");
+	 WriteI (Out, Label, 0);
+	 WriteS (Out, " =>");
+	 WriteNl (Out);
+      END;
+   END GenerateCaseLabel;
+
+PROCEDURE GenerateCaseLabels (Out: tFile; Set: tSet);
+   VAR FirstTime	: BOOLEAN;
+   BEGIN
+      CASE Language OF
+      | Modula:
+	 FirstTime := TRUE;
+	 WriteC (Out, '|');
+	 WHILE NOT IsEmpty (Set) DO
+	    IF FirstTime THEN
+	       FirstTime := FALSE;
+	    ELSE
+	       WriteC (Out, ',');
+	    END;
+	    WriteI (Out, Extract (Set), 0);
+	    WriteNl (Out);
+	 END;
+	 WriteC (Out, ':');
+	 WriteNl (Out);
+      | C, Cpp, Java:
+	 WHILE NOT IsEmpty (Set) DO
+	    WriteS (Out, "case ");
+	    WriteI (Out, Extract (Set), 0);
+	    WriteS (Out, ":;");   (* ; helps to avoid yacc stack overflow in SUN's cc *)
+	    WriteNl (Out);
+	 END;
+      | Eiffel:
+	 FirstTime := TRUE;
+	 WriteS (Out, "when ");
+	 WHILE NOT IsEmpty (Set) DO
+	    IF FirstTime THEN
+	       FirstTime := FALSE;
+	    ELSE
+	       WriteC (Out, ',');
+	    END;
+	    WriteI (Out, Extract (Set), 0);
+	    WriteNl (Out);
+	 END;
+	 WriteS (Out, "then");
+	 WriteNl (Out);
+      | Ada:
+	 FirstTime := TRUE;
+	 WriteS (Out, "when ");
+	 WHILE NOT IsEmpty (Set) DO
+	    IF FirstTime THEN
+	       FirstTime := FALSE;
+	    ELSE
+	       WriteC (Out, '|');
+	    END;
+	    WriteI (Out, Extract (Set), 0);
+	    WriteNl (Out);
+	 END;
+	 WriteS (Out, "=>");
+	 WriteNl (Out);
+      END;
+   END GenerateCaseLabels;
+
+PROCEDURE MakeLabel (): CARDINAL;
+   BEGIN
+      INC (LabelCount);
+      RETURN LabelCount;
+   END MakeLabel;
+
+PROCEDURE GenerateGoto (Out: tFile; Label: CARDINAL);
+   BEGIN
+      WriteS (Out, "goto yyL");
+      WriteI (Out, Label, 0);
+      WriteC (Out, ';');
+      WriteNl (Out);
+   END GenerateGoto;
+
+PROCEDURE GenerateLabel (Out: tFile; Label: CARDINAL);
+   BEGIN
+      WriteS (Out, "yyL");
+      WriteI (Out, Label, 0);
+      WriteS (Out, ": ;");
+      WriteNl (Out);
+   END GenerateLabel;
+
+PROCEDURE MakeDirective (VAR Result: tString; Line: CARDINAL; File: tIdent);
+
+   PROCEDURE AppendS (VAR Result: tString; VAR In: ARRAY OF CHAR);
+     VAR s: tString;
+     BEGIN
+       ArrayToString (In, s);
+       Concatenate (Result, s);
+     END AppendS;
+
+   PROCEDURE AppendI (VAR Result: tString; In: INTEGER);
+     VAR s: tString;
+     BEGIN
+       IntToString (In, s);
+       Concatenate (Result, s);
+     END AppendI;
+
+   PROCEDURE AppendIdent (VAR Result: tString; In: tIdent);
+     VAR s: tString;
+     BEGIN
+       Idents.GetString (In, s);
+       Concatenate (Result, s);
+     END AppendIdent;
+
+   PROCEDURE AppendIdentEscaped (VAR Result: tString; Ident: tIdent);
+      VAR
+         i	: CARDINAL;
+         ch	: CHAR;
+         s	: tString;
+      BEGIN
+         Idents.GetString (Ident, s);
+         FOR i := 1 TO Length (s) DO
+	    ch := Char (s, i);
+	    IF ch = '\' THEN Append (Result, ch); END;
+	    Append (Result, ch);
+         END;
+      END AppendIdentEscaped;
+
+   BEGIN
+      Strings.AssignEmpty (Result);
+      CASE Language OF
+      | Modula:
+	 AppendS (Result, "(* line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 AppendS (Result, '" *)');
+      | C, Cpp:
+	 IF g THEN
+	    AppendS (Result, "# line ");
+	    AppendI (Result, Line);
+	    AppendS (Result, ' "');
+	    AppendIdentEscaped (Result, File);
+	    Append (Result, '"');
+	 ELSE
+	    AppendS (Result, "/* line ");
+	    AppendI (Result, Line);
+	    AppendS (Result, ' "');
+	    AppendIdent (Result, File);
+	    AppendS (Result, '" */');
+	 END;
+      | Java:
+	 AppendS (Result, "/* line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 AppendS (Result, '" */');
+      | Eiffel, Ada:
+	 AppendS (Result, "-- line ");
+	 AppendI (Result, Line);
+	 AppendS (Result, ' "');
+	 AppendIdent (Result, File);
+	 Append (Result, '"');
+      END;
+   END MakeDirective;
+
+PROCEDURE WriteDirective (Out: tFile; Line: CARDINAL; File: tIdent);
+   VAR s: tString;
+   BEGIN
+      IF Line # 0 THEN
+	 MakeDirective (s, Line, File);
+	 Strings.WriteL (Out, s);
+	 INC (LineCount);
+      END;
+   END WriteDirective;
+
+PROCEDURE ConvertAppend (a: ARRAY OF CHAR; VAR Text: tText);
+   VAR String	: tString;
+   BEGIN
+      ArrayToString (a, String);
+      Texts.Append  (Text, String);
+   END ConvertAppend;
+
+PROCEDURE ConvertAppend2 (a1, a2: ARRAY OF CHAR; VAR Text: tText);
+   VAR String1, String2	: tString;
+   BEGIN
+      ArrayToString (a1, String1);
+      IF ScannerName # NoIdent THEN
+	 Idents.GetString (ScannerName, String2);
+	 Concatenate (String1, String2);
+	 Append (String1, '_');
+      END;
+      ArrayToString (a2, String2);
+      Concatenate (String1, String2);
+      Texts.Append  (Text, String1);
+   END ConvertAppend2;
+
+PROCEDURE InitScanGen;
+   BEGIN
+      Scanner	:= "Scanner";
+      Source	:= "Source";
+      Drv	:= "Drv";
+CASE Language OF
+      (* defaults for user code sections are now in the skeletons *)
+| Modula:
+   ConvertAppend ("CASE yyStateStack^ [TokenLength] OF"		, Case1);
+
+   ConvertAppend ("CASE yyAction [yyStateStack^ [TokenLength]] OF", Case2);
+
+   ConvertAppend ("yyRestart := FALSE; EXIT;"			, Trailer);
+
+   ConvertAppend ("(* BlankAction *)"				, BlankText);
+   ConvertAppend ("WHILE yyChBufferPtr^ [yyChBufferIndex] = ' ' DO INC (yyChBufferIndex); END;", BlankText);
+
+   ConvertAppend ("(* TabAction *)"				, TabText);
+   ConvertAppend ("yyTab;"					, TabText);
+
+   ConvertAppend ("(* EolAction *)"				, EolText);
+   ConvertAppend ("yyEol (0);"					, EolText);
+
+   ConvertAppend ("WHILE yyStateStack^ [TokenLength] # "	, Context1);
+
+   ConvertAppend (" DO"						, Context2);
+   ConvertAppend ("   DEC (yyChBufferIndex);"			, Context2);
+   ConvertAppend ("   DEC (TokenLength);"			, Context2);
+   ConvertAppend ("END;"					, Context2);
+
+   ConvertAppend ("LOOP"					, Context3);
+   ConvertAppend ("   CASE yyStateStack^ [TokenLength] OF"	, Context3);
+
+   ConvertAppend ("      EXIT;"					, Context4);
+   ConvertAppend ("   ELSE"					, Context4);
+   ConvertAppend ("      DEC (yyChBufferIndex);"		, Context4);
+   ConvertAppend ("      DEC (TokenLength);"			, Context4);
+   ConvertAppend ("   END;"					, Context4);
+   ConvertAppend ("END;"					, Context4);
+
+| C:
+   ConvertAppend ("switch (* -- yyStatePtr) {"			, Case1);
+
+   ConvertAppend ("switch (yyAction [* -- yyStatePtr]) {"	, Case2);
+
+   ConvertAppend ("goto yyBegin;"				, Trailer);
+
+   ConvertAppend ("/* BlankAction */"				, BlankText);
+   ConvertAppend ("while (* yyChBufferIndexReg ++ == ' ') ;"	, BlankText);
+   ConvertAppend2("", "TokenPtr = (yytChar *) -- yyChBufferIndexReg;", BlankText);
+   ConvertAppend ("yyState = yyStartState;"			, BlankText);
+   ConvertAppend ("yyStatePtr = & yyStateStack [1];"		, BlankText);
+   ConvertAppend ("goto yyContinue;"				, BlankText);
+
+   ConvertAppend ("/* TabAction */"				, TabText);
+   ConvertAppend ("yyTab;"					, TabText);
+
+   ConvertAppend ("/* EolAction */"				, EolText);
+   ConvertAppend ("yyEol (0);"					, EolText);
+
+   ConvertAppend ("while (* yyStatePtr != "			, Context1);
+
+   ConvertAppend (") {"						, Context2);
+   ConvertAppend ("   yyChBufferIndex --;"			, Context2);
+   ConvertAppend2("   ", "TokenLength --;"			, Context2);
+   ConvertAppend ("   yyStatePtr --;"				, Context2);
+   ConvertAppend ("}"						, Context2);
+
+   ConvertAppend ("for (;;) {"					, Context3);
+   ConvertAppend ("   switch (* yyStatePtr) {"			, Context3);
+
+   ConvertAppend ("   default:"					, Context4);
+   ConvertAppend ("      yyChBufferIndex --;"			, Context4);
+   ConvertAppend2("      ", "TokenLength --;"			, Context4);
+   ConvertAppend ("      yyStatePtr --;"			, Context4);
+   ConvertAppend ("   }"					, Context4);
+   ConvertAppend ("}"						, Context4);
+
+| Cpp:
+   ConvertAppend ("switch (* -- yyStatePtr) {"			, Case1);
+
+   ConvertAppend ("switch (yyAction [* -- yyStatePtr]) {"	, Case2);
+
+   ConvertAppend ("goto yyBegin;"				, Trailer);
+
+   ConvertAppend ("/* BlankAction */"				, BlankText);
+   ConvertAppend ("while (* yyChBufferIndexReg ++ == ' ') ;"	, BlankText);
+   ConvertAppend ("TokenPtr = (yytChar *) -- yyChBufferIndexReg;"	, BlankText);
+   ConvertAppend ("yyState = yyStartState;"			, BlankText);
+   ConvertAppend ("yyStatePtr = & yyStateStack [1];"		, BlankText);
+   ConvertAppend ("goto yyContinue;"				, BlankText);
+
+   ConvertAppend ("/* TabAction */"				, TabText);
+   ConvertAppend ("yyTab;"					, TabText);
+
+   ConvertAppend ("/* EolAction */"				, EolText);
+   ConvertAppend ("yyEol (0);"					, EolText);
+
+   ConvertAppend ("while (* yyStatePtr != "			, Context1);
+
+   ConvertAppend (") {"						, Context2);
+   ConvertAppend ("   yyChBufferIndex --;"			, Context2);
+   ConvertAppend ("   TokenLength --;"				, Context2);
+   ConvertAppend ("   yyStatePtr --;"				, Context2);
+   ConvertAppend ("}"						, Context2);
+
+   ConvertAppend ("for (;;) {"					, Context3);
+   ConvertAppend ("   switch (* yyStatePtr) {"			, Context3);
+
+   ConvertAppend ("   default:"					, Context4);
+   ConvertAppend ("      yyChBufferIndex --;"			, Context4);
+   ConvertAppend ("      TokenLength --;"			, Context4);
+   ConvertAppend ("      yyStatePtr --;"			, Context4);
+   ConvertAppend ("   }"					, Context4);
+   ConvertAppend ("}"						, Context4);
+
+| Eiffel:
+   Scanner	:= "scanner";
+   Source	:= "source";
+   Drv		:= "drv";
+
+   ConvertAppend ("        inspect yyStateStack.item (TokenLength)", Case1);
+
+   ConvertAppend ("        inspect yyAction.item (yyStateStack.item (TokenLength))", Case2);
+
+   ConvertAppend ("           yyfinish_L4 := TRUE;"		, Trailer);
+
+   ConvertAppend ("-- BlankAction"				, BlankText);
+   ConvertAppend ("           from until yyChBuffer.item (yyChBufferIndex) /= ' ' loop", BlankText);
+   ConvertAppend ("              yyChBufferIndex := yyChBufferIndex + 1;", BlankText);
+   ConvertAppend ("           end;"				, BlankText);
+
+   ConvertAppend ("-- TabAction"				, TabText);
+   ConvertAppend ("           yyLineStart := yyLineStart - ((yyTabSpace - 1 - (yyChBufferIndex - yyLineStart - 2) \\ yyTabSpace));", TabText);
+
+   ConvertAppend ("-- EolAction"				, EolText);
+   ConvertAppend ("           yyLineCount := yyLineCount + 1;"	, EolText);
+   ConvertAppend ("           yyLineStart := yyChBufferIndex - 1;", EolText);
+
+   ConvertAppend ("           from until yyStateStack.item (TokenLength) = ", Context1);
+
+   ConvertAppend ("loop"					, Context2);
+   ConvertAppend ("   yyChBufferIndex := yyChBufferIndex - 1;"	, Context2);
+   ConvertAppend ("   TokenLength := TokenLength - 1;"		, Context2);
+   ConvertAppend ("end;"					, Context2);
+
+   ConvertAppend ("from yyfinish_L1 := FALSE until yyfinish_L1 loop", Context3);
+   ConvertAppend ("   inspect yyStateStack.item (TokenLength)"	, Context3);
+
+   ConvertAppend ("      yyfinish_L1 := TRUE;"			, Context4);
+   ConvertAppend ("   else"					, Context4);
+   ConvertAppend ("      yyChBufferIndex := yyChBufferIndex - 1;"	, Context4);
+   ConvertAppend ("      TokenLength := TokenLength - 1;"	, Context4);
+   ConvertAppend ("   end;"					, Context4);
+   ConvertAppend ("end;"					, Context4);
+
+| Ada:
+   Scanner	:= "scanner";
+   Source	:= "source";
+   Drv		:= "drv";
+
+   ConvertAppend ("case yyStateStack (TokenLength) is"		, Case1);
+
+   ConvertAppend ("case yyAction (yyStateStack (TokenLength)) is", Case2);
+
+   ConvertAppend ("goto yyBegin;"				, Trailer);
+
+   ConvertAppend ("-- BlankAction"				, BlankText);
+   ConvertAppend ("while yyChBufferPtr (yyChBufferIndex) = ' ' loop", BlankText);
+   ConvertAppend ("   yyChBufferIndex := yyChBufferIndex + 1;"	, BlankText);
+   ConvertAppend ("end loop;"					, BlankText);
+
+   ConvertAppend ("-- TabAction"				, TabText);
+   ConvertAppend ("yyTab;"					, TabText);
+
+   ConvertAppend ("-- EolAction "				, EolText);
+   ConvertAppend ("yyEol (0);"					, EolText);
+
+   ConvertAppend ("while yyStateStack (TokenLength) /= "	, Context1);
+
+   ConvertAppend ("loop"					, Context2);
+   ConvertAppend ("   yyChBufferIndex := yyChBufferIndex - 1;"	, Context2);
+   ConvertAppend ("   TokenLength := TokenLength - 1;"		, Context2);
+   ConvertAppend ("end loop;"					, Context2);
+
+   ConvertAppend ("loop"					, Context3);
+   ConvertAppend ("   case yyStateStack (TokenLength) is"	, Context3);
+
+   ConvertAppend ("      exit;"					, Context4);
+   ConvertAppend ("   when others =>"				, Context4);
+   ConvertAppend ("      yyChBufferIndex := yyChBufferIndex - 1;", Context4);
+   ConvertAppend ("      TokenLength := TokenLength - 1;"	, Context4);
+   ConvertAppend ("   end case;"				, Context4);
+   ConvertAppend ("end loop;"					, Context4);
+
+| Java:
+   ConvertAppend ("switch (yyStateStack [tokenLength]) {"	, Case1);
+
+   ConvertAppend ("switch (yyAction [yyStateStack [tokenLength]]) {", Case2);
+
+   ConvertAppend ("break yyMiddle;"				, Trailer);
+
+   ConvertAppend ("/* BlankAction */"				, BlankText);
+   ConvertAppend ("while (yyChBuffer [yyChBufferIndex ++] == ' ') ;", BlankText);
+   ConvertAppend ("yyChBufferIndex --;"				, BlankText);
+   ConvertAppend ("break yyMiddle;"				, BlankText);
+
+   ConvertAppend ("/* TabAction */"				, TabText);
+   ConvertAppend ("yyTab ();"					, TabText);
+
+   ConvertAppend ("/* EolAction */"				, EolText);
+   ConvertAppend ("yyEol (0);"					, EolText);
+
+   ConvertAppend ("while (yyStateStack [tokenLength] != "	, Context1);
+
+   ConvertAppend (") {"						, Context2);
+   ConvertAppend ("   yyChBufferIndex --;"			, Context2);
+   ConvertAppend ("   tokenLength --;"				, Context2);
+   ConvertAppend ("}"						, Context2);
+
+   ConvertAppend ("yyContext3: for (;;) {"			, Context3);
+   ConvertAppend ("  switch (yyStateStack [tokenLength]) {"	, Context3);
+
+   ConvertAppend ("  break yyContext3;"				, Context4);
+   ConvertAppend ("  default:"					, Context4);
+   ConvertAppend ("    yyChBufferIndex --;"			, Context4);
+   ConvertAppend ("    tokenLength --;"				, Context4);
+   ConvertAppend ("  }"						, Context4);
+   ConvertAppend ("}"						, Context4);
+
+END;
+   END InitScanGen;
+
+BEGIN
+   PackageName	:= NoIdent;
+   ScannerName	:= NoIdent;
+   BeginLine	:= 0;
+   CloseLine	:= 0;
+   DefaultLine	:= 0;
+   DummyCount	:= 0;
+   EofLine	:= 0;
+   ImportLine	:= 0;
+   ExportLine	:= 0;
+   GlobalLine	:= 0;
+   LabelCount	:= 0;
+   LocalLine	:= 0;
+   BeginFile	:= NoIdent;
+   CloseFile	:= NoIdent;
+   DefaultFile	:= NoIdent;
+   EofFile	:= NoIdent;
+   ImportFile	:= NoIdent;
+   ExportFile	:= NoIdent;
+   GlobalFile	:= NoIdent;
+   LocalFile	:= NoIdent;
+   Procedures	:= {};
+   SmallTables	:= FALSE;
+   MakeText (Begin);
+   MakeText (BlankText);
+   MakeText (Case1);
+   MakeText (Case2);
+   MakeText (Close);
+   MakeText (Context1);
+   MakeText (Context2);
+   MakeText (Context3);
+   MakeText (Context4);
+   MakeText (Default);
+   MakeText (Eof);
+   MakeText (EolText);
+   MakeText (Import);
+   MakeText (Export);
+   MakeText (Global);
+   MakeText (Local);
+   MakeText (TabText);
+   MakeText (Trailer);
+END ScanGen.

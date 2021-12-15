@@ -1,0 +1,412 @@
+(* $Id: Environs.mi,v 2.1 1993/08/18 15:18:10 grosch rel $ *)
+
+IMPLEMENTATION MODULE Environs;
+
+FROM Convert	IMPORT  IdToAdr, AdrToId;
+FROM DynArray	IMPORT	MakeArray, ExtendArray;
+FROM Grammar	IMPORT	NodeIdent;
+FROM Idents	IMPORT	tIdent, WriteIdent;
+FROM IO		IMPORT	tFile, WriteNl, WriteS, WriteI;
+FROM Layout	IMPORT	WriteSpaces;
+FROM rMemory	IMPORT	Alloc;
+FROM Patterns	IMPORT	tPattern, tRelation, MakePattern, ReleasePattern,
+			NormPattern, Relation, PatternClasses;
+FROM Queues	IMPORT	tQueue, MakeQueue, AssignEmpty, Assign,
+			IsEmpty, Append, Length, GetElement;
+FROM Scanner	IMPORT	NoIdent, MaxIdent;
+FROM Sets	IMPORT	tSet, MakeSet, Include, IsElement, Intersection,
+			ReleaseSet;
+FROM SYSTEM	IMPORT	TSIZE, ADDRESS;
+FROM Types	IMPORT	tType, Type;
+
+IMPORT	Sets;
+
+(* ENV_ *)
+FROM Errors	IMPORT	ERROR;
+(* _ENV *)
+
+CONST
+  cTREE		= 'yyt';
+  cKIND		= 'Kind';
+  cCLASS	= 'yyClass';
+  cCOST		= 'Cost';
+  BitsPerBitset	= 32;
+  InitTableSize	= 100;
+
+TYPE
+  tAccessList = POINTER TO tAccess;
+
+  tAccess =
+    RECORD
+      Path:      tQueue;
+      Sel:       tIdent;
+      Ident:     tIdent;
+      Sure:      BOOLEAN;
+      Functions: tQueue;
+      Next:      tAccessList;
+      CallCount: INTEGER;
+      Pat:       tPattern;
+    END;
+
+  tTableEntry =
+    RECORD
+      Pat:        tPattern;
+      Cond:       BOOLEAN;		(* directive has a condition *)
+      Selectors:  tSet;
+      Accesses:    tAccessList;
+      Last:       tAccessList;
+    END;
+
+  tFunctions = POINTER TO tFunctionL;
+  tFunctionL =
+    RECORD
+      Funct: tFunction;
+      Next:  tFunctions;
+    END;
+      
+
+VAR
+  Table: POINTER TO ARRAY [0..1000] OF tTableEntry;
+  TableSize, TableCount: LONGINT;
+  vMaxCalls: INTEGER;
+  Functions: tFunctions;
+
+PROCEDURE MakeFunctEnv		(name: tIdent; domain: tSet): tFunction;
+  VAR
+    f: tFunction;
+    l: tFunctions;
+  BEGIN
+    f := Alloc (TSIZE (tFunctionR));
+    l := Alloc (TSIZE (tFunctionL));
+    l^.Funct := f;
+    l^.Next := Functions;
+    Functions := l;
+    f^.Name := name;
+    MakeQueue (f^.Pats);
+    MakeSet (f^.Domain, MaxIdent);
+    Sets.Assign (f^.Domain, domain);
+    RETURN f;
+  END MakeFunctEnv;
+
+PROCEDURE InDomain		(name: tIdent; pat: tPattern): BOOLEAN;
+  VAR
+    f: tFunction;
+    in: BOOLEAN;
+    classes: tSet;
+  BEGIN
+    f := Function (name);
+    MakeSet (classes, MaxIdent);
+    PatternClasses (pat, classes);
+    Intersection (classes, f^.Domain);
+    in := NOT Sets.IsEmpty (classes);
+    ReleaseSet (classes);
+    RETURN in;
+  END InDomain;
+
+PROCEDURE Function		(name: tIdent): tFunction;
+  VAR
+    l: tFunctions;
+  BEGIN
+    l := Functions;
+    LOOP
+      (* ENV_ *)
+      IF l = NIL THEN
+	ERROR ('Environs.Function: not found');
+      END;
+      (* _ENV *)
+      IF l^.Funct^.Name = name THEN
+	RETURN l^.Funct;
+      END;
+      l := l^.Next;
+    END;
+  END Function;
+
+PROCEDURE MakeDirective		(funct: tFunction): tDirNo;
+  VAR
+    no: INTEGER;
+  BEGIN
+    INC (TableCount);
+    IF TableCount >= TableSize THEN
+      IF TableSize = 0 THEN
+	TableSize := InitTableSize;
+	MakeArray (Table, TableSize, TSIZE (tTableEntry));
+      ELSE
+	ExtendArray (Table, TableSize, TSIZE (tTableEntry));
+      END;
+    END;
+    no := TableCount;
+    Append (funct^.Pats, ADDRESS (no));
+    WITH Table^[no] DO
+      Pat := NIL;
+      MakeSet (Selectors, MaxIdent);
+      Accesses := NIL;
+      Last := NIL;
+    END;
+    RETURN TableCount;
+  END MakeDirective;
+
+PROCEDURE GetPatterns		(funct: tFunction; VAR pats: tQueue);
+  VAR
+    no, pos: INTEGER;
+  BEGIN
+    AssignEmpty (pats);
+    FOR pos := 1 TO Length (funct^.Pats) DO
+      no := INTEGER (GetElement (funct^.Pats, pos));
+      IF NOT Table^[no].Cond THEN
+	Append (pats, Table^[no].Pat);
+      END;
+    END;
+  END GetPatterns;
+
+PROCEDURE GetCondPatterns	(funct: tFunction; VAR pats: tQueue);
+  VAR
+    no, pos: INTEGER;
+  BEGIN
+    AssignEmpty (pats);
+    FOR pos := 1 TO Length (funct^.Pats) DO
+      no := INTEGER (GetElement (funct^.Pats, pos));
+      IF Table^[no].Cond THEN
+	Append (pats, Table^[no].Pat);
+      END;
+    END;
+  END GetCondPatterns;
+
+PROCEDURE MaxDirective		(): tDirNo;
+  BEGIN
+    RETURN TableCount;
+  END MaxDirective;
+
+PROCEDURE SetPattern		(no: tDirNo; pat: tPattern);
+  BEGIN
+    WITH Table^[no] DO
+      Pat := pat;
+      Cond := FALSE;
+    END;
+  END SetPattern;
+
+PROCEDURE SetCondPattern	(no: tDirNo; pat: tPattern);
+  BEGIN
+    WITH Table^[no] DO
+      Pat := pat;
+      Cond := TRUE;
+    END;
+  END SetCondPattern;
+
+PROCEDURE GetPattern		(no: tDirNo): tPattern;
+  BEGIN
+    RETURN Table^[no].Pat;
+  END GetPattern;
+
+PROCEDURE DefineAccess	(no: tDirNo; path: tQueue;
+			 sel, ident: tIdent; sure: BOOLEAN);
+  VAR
+    access: tAccessList;
+  BEGIN
+    IF sel # NoIdent THEN
+      Include (Table^[no].Selectors, sel);
+    END;
+    access := Alloc (TSIZE (tAccess));
+    WITH access^ DO
+      MakeQueue (Path);
+      Assign (Path, path);
+      MakeQueue (Functions);
+      Sel := sel;
+      Ident := ident;
+      Sure := sure OR (ident = NoIdent);
+      Next := NIL;
+      CallCount := 0;
+    END;
+    IF Table^[no].Last = NIL THEN
+      IF Type (ident) = cNode THEN
+	(* if the first access belongs to a node it is always sure *)
+	access^.Sure := TRUE;
+      END;
+      Table^[no].Accesses := access;
+    ELSE
+      Table^[no].Last^.Next := access;
+    END;
+    Table^[no].Last := access;
+  END DefineAccess;
+
+PROCEDURE Defined		(no: tDirNo; sel: tIdent): BOOLEAN;
+  BEGIN
+    RETURN IsElement (sel, Table^[no].Selectors);
+  END Defined;
+
+PROCEDURE DefineSelPat		(no: tDirNo; sel: tIdent; pat: tPattern);
+  VAR
+    access: tAccessList;
+  BEGIN
+    access := Definition (no, sel);
+    access^.Pat := pat;
+  END DefineSelPat;
+
+PROCEDURE SelPattern		(no: tDirNo; sel: tIdent): tPattern;
+  VAR
+    access: tAccessList;
+  BEGIN
+    access := Definition (no, sel);
+    RETURN access^.Pat;
+  END SelPattern;
+
+PROCEDURE Definition		(no: tDirNo; sel: tIdent): tAccessList;
+  VAR
+    access: tAccessList;
+  BEGIN
+    access := Table^[no].Accesses;
+    LOOP
+      IF access^.Sel = sel THEN
+	RETURN access;
+      END;
+      access := access^.Next;
+    END;
+  END Definition;
+
+PROCEDURE CallFunction		(no: tDirNo; sel, name: tIdent);
+  VAR
+    access: tAccessList;
+  BEGIN
+    access := Definition (no, sel);
+    INC (access^.CallCount);
+    IF access^.CallCount > vMaxCalls THEN
+      vMaxCalls := access^.CallCount;
+    END;
+    Append (access^.Functions, IdToAdr (name));
+  END CallFunction;
+
+PROCEDURE HeadCalled		(no: tDirNo): BOOLEAN;
+  BEGIN
+    RETURN NOT IsEmpty (Table^[no].Accesses^.Functions);
+  END HeadCalled;
+
+PROCEDURE IsHead		(no: tDirNo; sel: tIdent): BOOLEAN;
+  BEGIN
+    RETURN (Table^[no].Accesses^.Sel = sel);
+  END IsHead;
+
+PROCEDURE MaxCalls		(): INTEGER;
+  BEGIN
+    RETURN vMaxCalls;
+  END MaxCalls;
+
+PROCEDURE WriteQueue		(f: tFile; Path: tQueue);
+  VAR
+    pos: INTEGER;
+  BEGIN
+    WriteS (f, cTREE);
+    FOR pos := 1 TO Length (Path) - 1 DO
+      IF ODD (pos) THEN
+	WriteS (f, '^.');
+      ELSE
+	WriteS (f, '.');
+      END;
+      WriteIdent (f, AdrToId (GetElement (Path, pos)));
+    END;
+  END WriteQueue;
+
+PROCEDURE WritePath		(f: tFile; no: tDirNo; sel: tIdent);
+  VAR
+    access: tAccessList;
+  BEGIN
+    access := Definition (no, sel);
+    WriteQueue (f, access^.Path);
+  END WritePath;
+
+PROCEDURE WriteAccess		(f: tFile; no: tDirNo; sel: tIdent);
+  VAR
+    access: tAccessList;
+  BEGIN
+    access := Definition (no, sel);
+    WriteQueue (f, access^.Path);
+    WriteS (f, '^.');
+    WriteIdent (f, access^.Ident);
+  END WriteAccess;
+
+PROCEDURE AlwaysMatch		(no: tDirNo; node: tIdent): BOOLEAN;
+  VAR pat: tPattern; relation: tRelation;
+  BEGIN
+    pat := NormPattern (MakePattern (node));
+    relation := Relation (Table^[no].Pat, pat);
+    ReleasePattern (pat);
+    RETURN (relation = cEqual) OR (relation = cSupersumes);
+  END AlwaysMatch;
+
+PROCEDURE HasCondition		(no: tDirNo): BOOLEAN;
+  BEGIN
+    RETURN Table^[no].Cond;
+  END HasCondition;
+
+PROCEDURE WriteMatch		(f: tFile; no: tDirNo; margin: INTEGER;
+				 GrammarName: tIdent);
+  VAR
+    access: tAccessList;
+    started: BOOLEAN;
+  BEGIN
+    started := FALSE;
+    access := Table^[no].Accesses;
+    WHILE access # NIL DO
+      IF NOT access^.Sure THEN
+	IF started THEN
+	  WriteNl	(f);
+	  WriteSpaces	(f, 2 * margin);
+	  WriteS	(f, ' & ');
+	END;
+	started := TRUE;
+	IF Type (access^.Ident) = cNode THEN
+	  WriteS	(f, '(');
+	  WriteQueue	(f, access^.Path);
+	  WriteS	(f, '^.');
+	  WriteS	(f, cKIND);
+	  WriteS	(f, ' = ');
+	  WriteIdent	(f, GrammarName);
+	  WriteS	(f, '.');
+	  WriteIdent	(f, NodeIdent (access^.Ident));
+	  WriteS	(f, ')');
+	ELSE
+	  WriteS	(f, cCLASS);
+	  WriteS	(f, ' (');
+	  WriteQueue	(f, access^.Path);
+	  WriteS	(f, ', yyC');
+	  WriteIdent	(f, access^.Ident);
+	  WriteS	(f, ' MOD yyBitsPerBitset');
+	  WriteS	(f, ', yyC');
+	  WriteIdent	(f, access^.Ident);
+	  WriteS	(f, ' DIV yyBitsPerBitset');
+	  WriteS	(f, ')');
+	END;
+      END;
+      access := access^.Next;
+    END;
+    IF NOT started THEN
+      WriteS 		(f, 'TRUE');
+    END;
+  END WriteMatch;
+
+PROCEDURE WriteCost		(f: tFile; no: tDirNo; margin: INTEGER);
+  VAR
+    access: tAccessList;
+    pos: INTEGER;
+  BEGIN
+    access := Table^[no].Accesses;
+    WHILE access # NIL DO
+      FOR pos := 1 TO Length (access^.Functions) DO
+	WriteNl 	(f);
+	WriteSpaces	(f, 2 * margin);
+	WriteS		(f, '+ ');
+	WriteS		(f, cCOST);
+	WriteIdent	(f, AdrToId (GetElement (access^.Functions, pos)));
+	WriteS		(f, ' (');
+	WriteQueue	(f, access^.Path);
+	WriteS		(f, ')');
+      END;
+      access := access^.Next;
+    END;
+  END WriteCost;
+
+
+BEGIN
+  TableCount := 0;
+  TableSize := 0;
+  vMaxCalls := 1;
+  Functions := NIL;
+END Environs.

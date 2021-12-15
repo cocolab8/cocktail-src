@@ -1,0 +1,403 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 23.5.1989 */
+
+TRAFO Optimize
+TREE Tree
+PUBLIC LifeTime1 LifeTime3
+
+EXPORT {
+VAR
+   ChildrenDyn	,
+   ChildrenIn	,
+   AttributeIn	,
+   AttributeOut	,
+   AttributeTree,
+   AttributeParam,
+   AttributeVar	,
+   AttributeDemand,
+   AttributeStack: SHORTCARD;
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT TSIZE;
+FROM General	IMPORT Max;
+FROM DynArray	IMPORT MakeArray, ReleaseArray;
+FROM IO		IMPORT StdOutput, WriteI, WriteS, WriteNl;
+FROM Idents	IMPORT WriteIdent;
+
+FROM Sets	IMPORT
+   tSet		, IsElement	, AssignElmt	, Union		,
+   Assign	, Minimum	, Maximum	, Include	;
+
+FROM Relation	IMPORT
+   IsRelated	;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, tInstance	,
+   Computed	, Reverse	, Write		, Read		,
+   Inherited	, Synthesized	, Input		, Output	,
+   Stack	, Parameter	, Variable	,
+   CopyDef	, CopyUse	, Thread	, Test		,
+   Left		, Right		, Def		, Use		,
+   ChildUse	, ParentUse	, NonBaseComp	, First		,
+   Dummy	, Virtual	, Demand	, f		,
+   WriteName	, Options	, ForallClasses	, ForallAttributes;
+
+FROM Order	IMPORT WriteOrderEval, IndexToClass;
+
+TYPE tLife	= RECORD Birth, Death: SHORTCARD; END;
+
+VAR
+   Children	,
+   Parents	,
+   Relevant	: tSet;
+   ClassIndex	,
+   MaxChildUse	,
+   MaxParentUse	,
+   Attr		,
+   Comp		,
+   Last		,
+   ChildsVisit	,
+   i, i2, j, j2, k, Visit, v	: SHORTCARD;
+   ActChild	,
+   ActClass	,
+   ChildsClass	: tTree;
+   LifeSize	: LONGINT;
+   LifePtr	: POINTER TO ARRAY [0 .. 10000] OF tLife;
+}
+
+PROCEDURE LifeTime1 (t: Tree)
+
+Class (..) :- {
+# ifdef Debug
+WriteNl (StdOutput); WriteIdent (StdOutput, Name); WriteNl (StdOutput);
+# endif
+	LifeSize := InstCount + 1;
+	MakeArray (LifePtr, LifeSize, TSIZE (tLife));
+	FOR i := 1 TO InstCount DO
+	   LifePtr^ [i].Birth := 0;
+	   LifePtr^ [i].Death := 0;
+	END;
+	Visit := 1;
+	FOR i := 1 TO InstCount DO
+	   i2 := Instance^ [i].Order;
+	   WITH Instance^ [i2] DO
+	      IF {Left, Inherited, First} <= Properties THEN
+		 Visit := Attribute^.Child.Partition;
+# ifdef Debug
+WriteName (Instance^[i2]); WriteS (StdOutput, "	VISIT	");
+WriteI (StdOutput, Visit, 5); WriteNl (StdOutput);
+# endif
+	      END;
+	      IF {Left, Synthesized} <= Properties THEN
+		 LifePtr^ [i2].Birth := Visit;
+		 INCL (Attribute^.Child.Usage, Visit);
+# ifdef Debug
+WriteName (Instance^[i2]); WriteS (StdOutput, "	BIRTHl	");
+WriteI (StdOutput, Visit, 5); WriteNl (StdOutput);
+# endif
+	      END;
+	      IF Right IN Properties THEN
+		 LifePtr^ [i2].Birth := Visit;
+# ifdef Debug
+WriteName (Instance^[i2]); WriteS (StdOutput, "	BIRTHr	");
+WriteI (StdOutput, Visit, 5); WriteNl (StdOutput);
+# endif
+	      END;
+	      IF ({Left, Synthesized, First} <= Properties) AND NOT (Dummy IN Properties) OR
+		 ({Right,  Inherited, First} <= Properties) THEN
+		 FOR j := 1 TO AttrCount DO
+		    IF IsRelated (i2, j, DP) THEN
+		       LifePtr^ [j].Death := Visit;
+		       INCL (Instance^ [j].Attribute^.Child.Usage, Visit);
+# ifdef Debug
+WriteName (Instance^[j]); WriteS (StdOutput, "	DEATHl	");
+WriteI (StdOutput, Visit, 5); WriteNl (StdOutput);
+# endif
+		    END;
+		 END;
+		 FOR j := AttrCount + 1 TO InstCount DO
+		    IF IsRelated (i2, j, DP) THEN
+		       LifePtr^ [j].Death := Visit;
+# ifdef Debug
+WriteName (Instance^[j]); WriteS (StdOutput, "	DEATHr	");
+WriteI (StdOutput, Visit, 5); WriteNl (StdOutput);
+# endif
+		    END;
+		 END;
+	      END;
+	      IF {Right, Synthesized, First} <= Properties THEN
+		 ActClass := t;
+		 ActChild := Selector;
+		 ChildsClass := Selector^.Child.Class;
+		 ChildsVisit := Attribute^.Child.Partition;
+		 LifeTime2 (ChildsClass);
+		 ForallClasses (ChildsClass^.Class.Extensions, LifeTime2);
+	      END;
+	   END;
+	END;
+	FOR i := 1 TO AttrCount DO
+	   WITH Instance^ [i] DO
+	      IF (Synthesized IN Properties) AND (LifePtr^ [i].Birth < LifePtr^ [i].Death) THEN
+		 INCL (Attribute^.Child.Properties, Tree.Tree);
+	      END;
+	   END;
+# ifdef Debug
+WriteName (Instance^[i]); WriteS (StdOutput, "	LIFEl	");
+WriteI (StdOutput, LifePtr^[i].Birth, 5); WriteI (StdOutput, LifePtr^[i].Death, 5); WriteNl (StdOutput);
+# endif
+	END;
+	FOR i := AttrCount + 1 TO InstCount DO
+	   IF LifePtr^ [i].Birth < LifePtr^ [i].Death THEN
+	      WITH Instance^ [i] DO
+		 INCL (Attribute^.Child.Properties, Tree.Tree);
+	      END;
+	   END;
+# ifdef Debug
+WriteName (Instance^[i]); WriteS (StdOutput, "	LIFEr	");
+WriteI (StdOutput, LifePtr^[i].Birth, 5); WriteI (StdOutput, LifePtr^[i].Death, 5); WriteNl (StdOutput);
+# endif
+	END;
+	ReleaseArray (LifePtr, LifeSize, TSIZE (tLife));
+}; .
+
+
+PROCEDURE LifeTime2 (t: Tree)
+
+Class (..) :- {
+	v := 1;
+	FOR j := 1 TO InstCount DO
+	   j2 := Instance^ [j].Order;
+	   WITH Instance^ [j2] DO
+	      IF {Left, Inherited, First} <= Properties THEN
+		 v := Attribute^.Child.Partition;
+# ifdef Debug
+WriteIdent (StdOutput, Name); WriteS (StdOutput, "	");
+WriteName (Instance^[j2]); WriteS (StdOutput, "	VISIT2	");
+WriteI (StdOutput, v, 5); WriteNl (StdOutput);
+# endif
+		 IF v > ChildsVisit THEN RETURN; END;
+	      END;
+	      IF NOT (Dummy IN Properties) AND (ChildsVisit = v) THEN
+		 FOR k := 1 TO ChildsClass^.Class.AttrCount DO
+		    IF IsRelated (j2, k, DP) THEN
+		       LifePtr^ [ActClass^.Class.AttrCount + ActChild^.Child.InstOffset + k].Death := Visit;
+# ifdef Debug
+WriteIdent (StdOutput, Name); WriteS (StdOutput, "	");
+WriteName (Instance^[j2]); WriteS (StdOutput, "	");
+WriteName (Instance^[k]); WriteS (StdOutput, "	");
+WriteName (ActClass^.Class.Instance^[ActClass^.Class.AttrCount + ActChild^.Child.InstOffset + k]);
+WriteS (StdOutput, "	DEATH	"); WriteI (StdOutput, Visit, 5); WriteNl (StdOutput);
+# endif
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE LifeTime3 (t: Tree)
+
+Class (..) :- {
+	ActClass := t;
+	ForallAttributes (Attributes, LifeTime3);
+}; .
+Child (..) :- {
+	INCL (Properties, Tree.Tree);
+	IF Input IN Properties THEN
+	   INC (ChildrenIn);
+	ELSE
+	   INC (ChildrenDyn);
+	END;
+}; .
+Attribute (..) :- {
+      IF IsElement (ORD ('0'), Options) THEN
+	IF (Input IN Properties) OR (Output IN Properties) THEN
+	   INCL (Properties, Tree.Tree);
+	   IF Input IN Properties THEN
+	      INC (AttributeIn);
+	   ELSE
+	      INC (AttributeOut);
+	   END;
+	END;
+	IF NOT (Tree.Tree IN Properties) THEN
+	   INCL (Properties, Parameter);
+	END;
+      ELSE
+	INCL (Properties, Tree.Tree);
+      END;
+	IF {Test, Dummy, Virtual, Demand} * Properties # {} THEN
+	   EXCL (Properties, Tree.Tree);
+	   EXCL (Properties, Parameter);
+	END;
+      IF IsElement (ORD ('3'), Options) THEN
+	IF ({Test, Dummy, Virtual, Input, Output} * Properties) = {} THEN
+	   WriteIdent	(StdOutput, ActClass^.Class.Name);
+	   WriteS	(StdOutput, "	= ");
+	   WriteIdent	(StdOutput, Name);
+	   WriteS	(StdOutput, "	");
+	   IF Tree.Tree IN Properties THEN
+	      WriteS	(StdOutput, "Tree"	); INC (AttributeTree);
+	   ELSIF Parameter IN Properties THEN
+	      WriteS	(StdOutput, "Parameter"	); INC (AttributeParam);
+	   ELSIF Stack IN Properties THEN
+	      WriteS	(StdOutput, "Stack"	); INC (AttributeStack);
+	   ELSIF Variable IN Properties THEN
+	      WriteS	(StdOutput, "Variable"	); INC (AttributeVar);
+	   ELSIF Demand IN Properties THEN
+	      WriteS	(StdOutput, "Demand"	); INC (AttributeDemand);
+	   END;
+	   WriteNl	(StdOutput);
+	END;
+      END;
+}; .
+
+
+/*
+PROCEDURE LifeTime4 (t: Tree)
+
+Class (..) :- {
+	AssignElmt (Children, Index);
+	Assign (Parents, Users);
+	ForallClasses (Extensions, LifeTime5);
+	ForallAttributes (Attributes, LifeTime4);
+}; .
+Attribute (..) :- {
+	IF ({Test, Dummy, Virtual, Input, Output} * Properties) = {} THEN
+WriteS (StdOutput, "attr = "); WriteIdent (StdOutput, Name); WriteNl (StdOutput);
+	   MaxChildUse := 0;
+	   FOR ClassIndex := Minimum (Children) TO Maximum (Children) DO
+	      IF IsElement (ClassIndex, Children) THEN
+		 ActClass := IndexToClass^[ClassIndex];
+		 WITH ActClass^.Class.Instance^ [AttrIndex] DO
+		    IF Synthesized IN Properties THEN INCL (Properties, Def); END;
+		 END;
+		 Last := 0;
+		 Visit := 1;
+		 WITH ActClass^.Class DO
+		    FOR i := 1 TO InstCount DO
+		       i2 := Instance^ [i].Order;
+		       WITH Instance^ [i2] DO
+			  IF {Left, Inherited, First} <= Properties THEN
+			     Visit := Attribute^.Child.Partition;
+			  END;
+			  IF (({Left, Synthesized, First} <= Properties) OR
+			     ({Right, Inherited, First} <= Properties)) AND
+			     NOT (Dummy IN Properties) AND IsRelated (i2, AttrIndex, DP) THEN
+			     IF ({ChildUse, ParentUse} * Properties) # {} THEN 
+WriteS (StdOutput, "multiple use = "); WriteI (StdOutput, i2, 0); WriteNl (StdOutput);
+WriteI (StdOutput, MaxChildUse, 0); WriteNl (StdOutput);
+WriteOrderEval (ActClass);
+				RETURN;
+			     END;
+			     INCL (Properties, ChildUse);
+			     IF Last # 0 THEN EXCL (Instance^ [Last].Properties, ChildUse); END;
+			     Last := i2;
+			     MaxChildUse := Max (MaxChildUse, Visit);
+			  END;
+		       END;
+		    END;
+		 END;
+	      END;
+	   END;
+
+	   Attr := AttrIndex;
+	   MaxParentUse := 0;
+	   FOR ClassIndex := Minimum (Parents) TO Maximum (Parents) DO
+	      IF IsElement (ClassIndex, Parents) THEN
+		 ActClass := IndexToClass^[ClassIndex];
+		 ForallAttributes (ActClass, LifeTime5);
+	      END;
+	   END;
+
+WriteS (StdOutput, "MaxChildUse  = "); WriteI (StdOutput, MaxChildUse, 0); WriteNl (StdOutput);
+WriteS (StdOutput, "MaxParentUse = "); WriteI (StdOutput, MaxParentUse, 0); WriteNl (StdOutput);
+
+	   IF MaxParentUse >= MaxChildUse THEN
+	      FOR ClassIndex := Minimum (Children) TO Maximum (Children) DO
+		 IF IsElement (ClassIndex, Children) THEN
+		    ActClass := IndexToClass^[ClassIndex];
+		    WITH ActClass^.Class DO
+		       FOR i := 1 TO InstCount DO
+			  WITH Instance^ [i] DO
+			     EXCL (Properties, ChildUse);
+			  END;
+		       END;
+		    END;
+		 END;
+	      END;
+	   ELSE
+	      FOR ClassIndex := Minimum (Parents) TO Maximum (Parents) DO
+		 IF IsElement (ClassIndex, Parents) THEN
+		    ActClass := IndexToClass^[ClassIndex];
+		    WITH ActClass^.Class DO
+		       FOR i := 1 TO InstCount DO
+			  WITH Instance^ [i] DO
+			     EXCL (Properties, ParentUse);
+			  END;
+		       END;
+		    END;
+		 END;
+	      END;
+	   END;
+
+	   Assign (Relevant, Children);
+	   Union (Relevant, Parents);
+	   FOR ClassIndex := Minimum (Relevant) TO Maximum (Relevant) DO
+	      IF IsElement (ClassIndex, Relevant) THEN
+		 ActClass := IndexToClass^[ClassIndex];
+WriteOrderEval (ActClass);
+		 WITH ActClass^.Class DO
+		    FOR i := 1 TO InstCount DO
+		       WITH Instance^[i] DO
+			  Properties := Properties - {Def, Use, ChildUse, ParentUse};
+		       END;
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE LifeTime5 (t: Tree)
+
+Class (..) :- {
+	Include (Children, Index);
+	Union (Parents, Users);
+}; .
+Child (..) :- {
+	Comp := ActClass^.Class.AttrCount + InstOffset + Attr;
+	Last := 0;
+	WITH ActClass^.Class.Instance^ [Comp] DO
+	   IF Inherited IN Properties THEN INCL (Properties, Def); END;
+	END;
+	Visit := 0;
+	WITH ActClass^.Class DO
+	   FOR i := 1 TO InstCount DO
+	      i2 := Instance^ [i].Order;
+	      WITH Instance^ [i2] DO
+		 IF ({Right, Synthesized, First} <= Properties) AND (Selector = t) THEN
+		    Visit := Attribute^.Child.Partition;
+		 END;
+		 IF (({Left, Synthesized, First} <= Properties) OR
+		    ({Right, Inherited, First} <= Properties)) AND
+		    NOT (Dummy IN Properties) AND IsRelated (i2, Comp, DP) THEN
+		    IF ({ChildUse, ParentUse} * Properties) # {} THEN 
+WriteS (StdOutput, "multiple use = "); WriteI (StdOutput, i2, 0); WriteNl (StdOutput);
+WriteI (StdOutput, MaxChildUse, 0); WriteNl (StdOutput);
+WriteOrderEval (ActClass);
+		       RETURN;
+		    END;
+		    INCL (Properties, ParentUse);
+		    IF Last # 0 THEN EXCL (Instance^ [Last].Properties, ParentUse); END;
+		    Last := i2;
+		    MaxParentUse := Max (MaxParentUse, Visit);
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+*/

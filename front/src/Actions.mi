@@ -1,0 +1,257 @@
+(* handle global actions and comments *)
+
+(* $Id: Actions.mi,v 1.10 2008/08/25 13:08:53 grosch rel $ *)
+
+(*
+ * $Log: Actions.mi,v $
+ * Revision 1.10  2008/08/25 13:08:53  grosch
+ * cared for pointer operations on 64 bit platforms: introduced module Pointers
+ *
+ * Revision 1.9  1997/05/27 15:04:18  grosch
+ * truncated module names to 8 characters:
+ * Characte, StringM, Position
+ *
+ * Revision 1.8  1993/08/18 15:11:56  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 1.7  1993/05/28  14:13:21  grosch
+ * added target language Eiffel
+ *
+ * Revision 1.6  1993/01/16  11:53:48  grosch
+ * fixed bug in default GLOBAL section
+ *
+ * Revision 1.5  1992/08/07  15:13:51  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 1.4  1991/12/04  16:21:41  grosch
+ * unified escape conventions for all tools
+ *
+ * Revision 1.3  1991/11/21  14:47:50  grosch
+ * new version of RCS on SPARC
+ *
+ * Revision 1.2  90/06/11  18:44:36  grosch
+ * layout improvements
+ * 
+ * Revision 1.1	 89/01/12  18:07:10  vielsack
+ * line number is printed before an action is output
+ * 
+ * Revision 1.0	 88/10/04  14:26:33  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE Actions;
+
+FROM IO		IMPORT WriteC, WriteS, WriteI, WriteNl, tFile;
+FROM Lists	IMPORT MakeList, IsEmpty, Head, Tail, tList;
+FROM rMemory	IMPORT Alloc;
+FROM Strings	IMPORT Char, Length, tStringIndex, tString, ArrayToString, Append, Concatenate;
+FROM StringM	IMPORT GetString, tStringRef, WriteString, PutString;
+FROM Idents	IMPORT NoIdent;
+FROM SYSTEM	IMPORT TSIZE, ADDRESS;
+FROM Pointers	IMPORT INTPTR, PTRINT;
+FROM TokenTab	IMPORT PosType;
+FROM WriteTok	IMPORT tLanguage, Language, SourceFileName;
+
+IMPORT Lists, Idents;
+
+  CONST EOL	= 12C;
+
+  TYPE
+    ElmtType	= 
+      RECORD
+	Act	: tList;
+	ActPos	: PosType;
+	Comm	: tList;
+	CommPos : PosType;
+      END;
+
+  VAR
+    ActionMode	  : tActionMode;
+    KeyPos	  : ARRAY tActionMode OF PosType;
+    Action	  : ARRAY tActionMode OF ElmtType;
+    ActionComm	  : ARRAY tActionMode OF tList;
+    ActionCommPos : ARRAY tActionMode OF PosType;
+    dummyPos	  : PosType;
+  
+  PROCEDURE PutComment (kind: tActionMode; kp: PosType; c: tList; cp: PosType);
+    BEGIN
+      KeyPos [kind] := kp;
+      ActionComm [kind] := c;
+      ActionCommPos [kind] := cp;
+    END PutComment;
+
+  PROCEDURE GetComment (kind: tActionMode; VAR kp: PosType; VAR c: tList; VAR cp: PosType);
+    BEGIN
+      kp := KeyPos [kind];
+      c	 := ActionComm [kind];
+      cp := ActionCommPos [kind];
+    END GetComment;
+
+  PROCEDURE PutAction (kind: tActionMode; a: tList; ap: PosType; c: tList; cp: PosType);
+    BEGIN
+      WITH Action [kind] DO
+	Act := a;
+	ActPos := ap;
+	Comm := c;
+	CommPos := cp;
+      END;
+    END PutAction;
+
+  PROCEDURE GetAction (kind: tActionMode; VAR a: tList; VAR ap: PosType; VAR c: tList; VAR cp: PosType);
+    BEGIN
+      WITH Action [kind] DO
+	a  := Act;
+	ap := ActPos;
+	c  := Comm;
+	cp := CommPos;
+      END;
+    END GetAction;
+
+  PROCEDURE WriteActions (kind: tActionMode; f: tFile; Line: BOOLEAN);
+    BEGIN
+      IF Action [kind].ActPos.Line # 0 THEN
+	CASE Language OF
+	| Modula2:
+	  WriteS (f, '(* line ');
+	  WriteI (f, Action [kind].ActPos.Line, 0);
+	  WriteS (f, ' "');
+	  WriteS (f, SourceFileName);
+	  WriteS (f, '" *)');
+	  WriteNl (f);
+	| C:
+	  IF Line THEN
+	     WriteS (f, '# line ');
+	     WriteI (f, Action [kind].ActPos.Line, 0);
+	     WriteS (f, ' "');
+	     WriteS (f, SourceFileName);
+	     WriteC (f, '"');
+	     WriteNl (f);
+	  ELSE
+	     WriteS (f, '/* line ');
+	     WriteI (f, Action [kind].ActPos.Line, 0);
+	     WriteS (f, ' "');
+	     WriteS (f, SourceFileName);
+	     WriteS (f, '" */');
+	     WriteNl (f);
+	  END;
+        | Eiffel:
+	  WriteS (f, '-- line ');
+	  WriteI (f, Action [kind].ActPos.Line, 0);
+	  WriteS (f, ' "');
+	  WriteS (f, SourceFileName);
+	  WriteC (f, '"');
+	  WriteNl (f);
+	END;
+      END;
+      WriteSemanticAction (f, Action [kind].Act, 0);
+    END WriteActions;
+
+  PROCEDURE WriteSemanticAction (f: tFile; a: tList; t: CARDINAL);
+  VAR
+    c : CHAR;
+    s : tString;
+    i : tStringIndex;
+    i1, i2 : tStringIndex;
+    Delimiter : CHAR;
+    
+    PROCEDURE Tab;
+      BEGIN
+	FOR i := 1 TO t DO
+	  WriteC (f, ' ');
+	  WriteC (f, ' ');
+	END;
+      END Tab;
+
+    BEGIN
+      i1 := 2;	(* Erstes Zeichen des ersten Strings ist Randbegrenzung *)
+      WHILE NOT IsEmpty (a) DO
+	GetString (tStringRef (PTRINT (Head (a))), s);
+	Tail (a);
+	i2 := Length (s);
+	IF IsEmpty (a) THEN
+	  DEC (i2);  (* letztes Zeichen des letzten Strings ist Randbegrenzung *)
+	END;
+	Tab;
+	i := i1;
+	WHILE i <= i2 DO
+	  c := Char (s, i); INC (i);
+	  IF c = '\' THEN
+	    WriteC (f, Char (s, i)); INC (i);
+	  ELSIF (c = '"') OR (c = "'") THEN
+	    Delimiter := c;
+	    WriteC (f, c);
+	    REPEAT
+	      c := Char (s, i); INC (i);
+	      WriteC (f, c);
+	      IF (Language = C) AND (c = '\') THEN
+	        WriteC (f, Char (s, i)); INC (i);
+	      END;
+	    UNTIL c = Delimiter;
+	  ELSE
+	    WriteC (f, c);
+	  END;
+	END;
+	i1 := 1;
+      END;
+      WriteNl (f);
+    END WriteSemanticAction;
+
+    PROCEDURE WriteStringList (file: tFile; slist: tList);
+      BEGIN
+	WHILE NOT IsEmpty (slist) DO
+	  WriteString (file, tStringRef (PTRINT (Head (slist))));
+	  Tail (slist);
+	END;
+      END WriteStringList;
+
+  PROCEDURE InitDefaultActions;
+  VAR
+    act: tList;
+    pos: PosType;
+    com: tList;
+    cpos: PosType;
+    s, s2: tString;
+  BEGIN
+    MakeList (act); pos.Line := 0;	pos.Column := 0;
+    MakeList (com); cpos.Line := 0;	cpos.Column := 0;
+
+      ArrayToString ('{', s);
+	Append (s, EOL); Lists.Append (act, INTPTR (PutString (s)));
+    CASE Language OF
+    | Modula2:
+      ArrayToString ('TYPE tParsAttribute = RECORD Scan: ', s);
+      IF ScannerName # NoIdent
+      THEN Idents.GetString (ScannerName, s2);
+      ELSE ArrayToString ("Scanner", s2);
+      END;
+      Concatenate (s, s2);
+      ArrayToString ('.tScanAttribute; END;', s2); Concatenate (s, s2);
+	Append (s, EOL); Lists.Append (act, INTPTR (PutString (s)));
+    | C:
+      ArrayToString ('typedef struct { ', s);
+      IF ScannerName # NoIdent
+      THEN Idents.GetString (ScannerName, s2); Concatenate (s, s2); Append (s, '_');
+      END;
+      ArrayToString ('tScanAttribute Scan; } tParsAttribute;', s2); Concatenate (s, s2);
+	Append (s, EOL); Lists.Append (act, INTPTR (PutString (s)));
+    | Eiffel:
+    END;
+      ArrayToString ('}', s);
+	Lists.Append (act, INTPTR (PutString (s)));
+    PutAction (Global, act, pos, com, cpos);
+  END InitDefaultActions;
+
+BEGIN
+  dummyPos.Line := 0;
+  dummyPos.Column := 0;
+  FOR ActionMode := MIN (tActionMode) TO MAX (tActionMode) DO
+    KeyPos [ActionMode]		:= dummyPos;
+    MakeList (ActionComm [ActionMode]);
+    ActionCommPos [ActionMode]	:= dummyPos;
+    MakeList (Action [ActionMode].Act);
+    Action [ActionMode].ActPos	:= dummyPos;
+    MakeList (Action [ActionMode].Comm);
+    Action [ActionMode].CommPos := dummyPos;
+  END;
+END Actions.

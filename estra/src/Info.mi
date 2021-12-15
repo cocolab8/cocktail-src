@@ -1,0 +1,175 @@
+(* $Id: Info.mi,v 2.2 1993/08/18 15:18:10 grosch rel $ *)
+
+IMPLEMENTATION MODULE Info;
+
+IMPORT	Strings;
+
+FROM	Errors		IMPORT	eNone,		eInteger,	eShort,
+				eLong,		eReal,		eBoolean,
+				eCharacter,	eString,	eIdent,
+				eArray,		eIdentSet;
+FROM	Idents		IMPORT	tIdent,		WriteIdent;
+FROM	IO		IMPORT	StdError,	tFile,
+				WriteS,		WriteI,		WriteB,
+				WriteR,		WriteC,		WriteLong,
+				WriteNl;
+FROM	Layout		IMPORT	WriteChar;
+FROM	rMemory		IMPORT	Alloc;
+FROM	Patterns	IMPORT	ePattern,	tPattern,
+				CopyPattern,	WritePattern;
+FROM	Sets		IMPORT	tSet,
+				MakeSet,	Assign,		Extract,
+				Size,		IsEmpty,	ReleaseSet;
+FROM	Strings		IMPORT	tString;
+FROM	SYSTEM		IMPORT	ADDRESS,	TSIZE;
+
+
+PROCEDURE SaveInfo  (InfoClass	: INTEGER; Info: ADDRESS): ADDRESS;
+  VAR
+    InfPtrToInteger,	PtrToInteger	: POINTER TO INTEGER;
+    InfPtrToShort,	PtrToShort	: POINTER TO SHORTCARD;
+    InfPtrToLong,	PtrToLong	: POINTER TO LONGINT;
+    InfPtrToReal,	PtrToReal	: POINTER TO REAL;
+    InfPtrToBoolean,	PtrToBoolean	: POINTER TO BOOLEAN;
+    InfPtrToCharacter,	PtrToCharacter	: POINTER TO CHAR;
+    InfPtrToString,	PtrToString	: POINTER TO tString;
+    InfPtrToArray,	PtrToArray	: POINTER TO ARRAY [0..255] OF CHAR;
+    InfPtrToSet,	PtrToSet	: POINTER TO tSet;
+    InfPtrToIdent,	PtrToIdent	: POINTER TO tIdent;
+    InfPtrToPattern,	PtrToPattern	: POINTER TO tPattern;
+
+  BEGIN
+    CASE InfoClass OF
+
+    | eInteger:
+	InfPtrToInteger := Alloc (TSIZE (INTEGER));
+	PtrToInteger := Info;
+	InfPtrToInteger^ := PtrToInteger^;
+	RETURN InfPtrToInteger;
+    | eShort:
+	InfPtrToShort := Alloc (TSIZE (SHORTCARD));
+	PtrToShort := Info;
+	InfPtrToShort^ := PtrToShort^;
+	RETURN InfPtrToShort;
+    | eLong:
+	InfPtrToLong := Alloc (TSIZE (LONGINT));
+	PtrToLong := Info;
+	InfPtrToLong^ := PtrToLong^;
+	RETURN InfPtrToLong;
+    | eReal:
+	InfPtrToReal := Alloc (TSIZE (REAL));
+	PtrToReal := Info;
+	InfPtrToReal^ := PtrToReal^;
+	RETURN InfPtrToReal;
+    | eBoolean:
+	InfPtrToBoolean := Alloc (TSIZE (BOOLEAN));
+	PtrToBoolean := Info;
+	InfPtrToBoolean^ := PtrToBoolean^;
+	RETURN InfPtrToBoolean;
+    | eCharacter:
+	InfPtrToCharacter := Alloc (TSIZE (CHAR));
+	PtrToCharacter := Info;
+	InfPtrToCharacter^ := PtrToCharacter^;
+	RETURN InfPtrToCharacter;
+    | eString:
+	InfPtrToString := Alloc (TSIZE (tString));
+	PtrToString := Info;
+	Strings.Assign (InfPtrToString^, PtrToString^);
+	RETURN InfPtrToString;
+    | eArray:
+	InfPtrToArray := Alloc (256);
+	PtrToArray := Info;
+	InfPtrToArray^ := PtrToArray^;
+	RETURN InfPtrToArray;
+    | eIdent:
+	InfPtrToIdent := Alloc (TSIZE (tIdent));
+	PtrToIdent := Info;
+	InfPtrToIdent^ := PtrToIdent^;
+	RETURN InfPtrToIdent;
+    |  eIdentSet:
+	InfPtrToSet := Alloc (TSIZE (tSet));
+	PtrToSet := Info;
+	MakeSet (InfPtrToSet^, Size (PtrToSet^));
+	Assign (InfPtrToSet^, PtrToSet^);
+	RETURN InfPtrToSet;
+    |  ePattern:
+	InfPtrToPattern := Alloc (TSIZE (tPattern));
+	PtrToPattern := Info;
+	InfPtrToPattern^ := CopyPattern (PtrToPattern^);
+	RETURN InfPtrToPattern;
+    ELSE
+	RETURN NIL;
+    END;
+  END SaveInfo;
+
+PROCEDURE WriteInfo (InfoClass: INTEGER; Info: ADDRESS);
+  VAR
+    PtrToInteger	: POINTER TO INTEGER;
+    PtrToShort		: POINTER TO SHORTCARD;
+    PtrToLong		: POINTER TO LONGINT;
+    PtrToReal		: POINTER TO REAL;
+    PtrToBoolean	: POINTER TO BOOLEAN;
+    PtrToCharacter	: POINTER TO CHAR;
+    PtrToString		: POINTER TO tString;
+    PtrToArray		: POINTER TO ARRAY [0..255] OF CHAR;
+    PtrToSet		: POINTER TO tSet;
+    PtrToIdent		: POINTER TO tIdent;
+    PtrToPattern	: POINTER TO tPattern;
+  BEGIN
+    IF InfoClass = eNone THEN RETURN END;
+    CASE InfoClass OF
+      | eInteger:
+	  PtrToInteger := Info;
+	  WriteI (StdError, PtrToInteger^, 1);
+      | eShort:
+	  PtrToShort := Info;
+	  WriteI (StdError, PtrToShort^, 1);
+      | eLong:
+	  PtrToLong := Info;
+	  WriteLong (StdError, PtrToLong^, 1);
+      | eReal:
+	  PtrToReal := Info;
+	  WriteR (StdError, PtrToReal^, 1, 10, 1);
+      | eBoolean:
+	  PtrToBoolean := Info;
+	  WriteB (StdError, PtrToBoolean^);
+      | eCharacter:
+	  PtrToCharacter := Info;
+	  WriteChar (StdError, PtrToCharacter^);
+      | eString:
+	  PtrToString := Info;
+	  Strings.WriteS (StdError, PtrToString^);
+      | eArray:
+	  PtrToArray := Info;
+	  WriteS (StdError, PtrToArray^);
+      | eIdent:
+	  PtrToIdent := Info;
+	  WriteIdent (StdError, PtrToIdent^);
+      | eIdentSet:
+	  PtrToSet := Info;
+	  WriteIdentSet (StdError, PtrToSet^);
+      | ePattern:
+	  PtrToPattern := Info;
+	  WritePattern (StdError, PtrToPattern^);
+    ELSE        WriteS (StdError, 'info class: ');
+      WriteI (StdError, InfoClass, 1);
+    END;
+  END WriteInfo;
+
+PROCEDURE WriteIdentSet (f: tFile; s: tSet);
+  VAR h: tSet;
+  BEGIN
+    MakeSet (h, Size (s));
+    Assign (h, s);
+    IF NOT IsEmpty (h) THEN
+      LOOP
+	WriteIdent (f, Extract (h));
+	IF IsEmpty (h) THEN EXIT; END;
+	WriteC (f, ' ');
+      END;
+    END;
+    ReleaseSet (h);
+  END WriteIdentSet;
+
+END Info.
+

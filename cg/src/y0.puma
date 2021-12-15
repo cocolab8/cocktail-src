@@ -1,0 +1,512 @@
+TRAFO GramYacc
+TREE Tree
+PUBLIC ParsSpec
+
+GLOBAL {
+
+FROM IO		IMPORT WriteS, WriteNl;
+FROM Strings	IMPORT tString, ArrayToString, Append, Concatenate, IntToString;
+FROM StringM	IMPORT WriteString;
+FROM Idents	IMPORT NoIdent, tIdent, MakeIdent, GetString;
+FROM Texts	IMPORT WriteText;
+FROM Sets	IMPORT IsElement, Include;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Input		, Reverse	,
+   Class	, NoClass	, Child		, Attribute	,
+   ActionPart	, HasSelector	, HasAttributes	, NoCodeAttr	,
+   Referenced	, Options	, TreeRoot	, QueryTree	,
+   ClassCount	, iNoTree	, itTree	, iModule	,
+   f		, WI, WN	, ForallClasses	, ForallAttributes,
+   Nonterminal	, Terminal	, IdentifyAttribute,
+   Generated	, String	;
+
+IMPORT Strings;
+
+VAR	Node		,
+	ActClass	,
+	TheClass	,
+	TheAttr		: tTree;
+	ActActionIndex	,
+	PrevActionIndex	: SHORTCARD;
+	IsImplicit, gAct, gUCAct, gPred, gPrec, gResult	: BOOLEAN;
+	s, s2		: tString;
+	AlternativeCount: CARDINAL;
+
+PROCEDURE GetBaseClass (Class: tTree): tTree;
+   BEGIN
+      WHILE Class^.Class.BaseClass^.Kind # NoClass DO
+	 Class := Class^.Class.BaseClass;
+      END;
+      RETURN Class;
+   END GetBaseClass;
+
+PROCEDURE Wnt (class: tTree) : tIdent;
+				(* A name for an action *)
+   BEGIN
+      WITH class^.Class DO
+         IF String IN Properties THEN
+            ArrayToString ("yy", s);
+            IntToString (Name, s2);
+            Concatenate (s, s2);
+         ELSE
+            GetString (Name, s);
+         END;
+      END;
+      Append (s, '_');
+      IntToString (AlternativeCount, s2);
+      Concatenate (s, s2);
+      RETURN MakeIdent (s);
+   END Wnt;
+}
+
+PROCEDURE ParsSpec (t: Tree)
+
+Ag (..) :- {
+	!%{!
+	@# include "Scanner.h"@
+	!/* IMPORT */!
+	WriteText (f, ParserCodes^.Codes.Import);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	  WriteText (f, Node^.Module.ParserCodes^.Codes.Import);
+	  Node := Node^.Module.Next;
+	END;
+	!/* EXPORT */!
+	WriteText (f, ParserCodes^.Codes.Export);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	  WriteText (f, Node^.Module.ParserCodes^.Codes.Export);
+	  Node := Node^.Module.Next;
+	END;
+	!/* GLOBAL */!
+	WriteText (f, ParserCodes^.Codes.Global);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteText (f, Node^.Module.ParserCodes^.Codes.Global);
+	   Node := Node^.Module.Next;
+	END;
+	!/* LOCAL */!
+	WriteText (f, ParserCodes^.Codes.Local);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	  WriteText (f, Node^.Module.ParserCodes^.Codes.Local);
+	  Node := Node^.Module.Next;
+	END;
+	!!
+	!void BeginParser ()!
+	!{!
+	WriteText (f, ParserCodes^.Codes.Begin);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	  WriteText (f, Node^.Module.ParserCodes^.Codes.Begin);
+	  Node := Node^.Module.Next;
+	END;
+	!}!
+	!!
+	!void CloseParser ()!
+	!{!
+	WriteText (f, ParserCodes^.Codes.Close);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	  WriteText (f, Node^.Module.ParserCodes^.Codes.Close);
+	  Node := Node^.Module.Next;
+	END;
+	!}!
+	!!
+      IF NOT IsElement (ORD ('v'), Options) THEN
+        ParsVariant (Classes);
+      END;
+	!%}!
+	!!
+	!%union {!
+	! tScanAttribute Scan;!
+      IF NOT IsElement (ORD ('v'), Options) THEN
+	Node := Classes;
+	WHILE Node^.Kind = Class DO
+	  WITH Node^.Class DO
+	     IF (Nonterminal IN Properties) AND
+		(({Referenced, HasAttributes} <= Properties) OR
+	        IsReferenced (Extensions, HasAttributes IN Properties)) THEN
+	       IF (String IN Properties) AND NOT (HasSelector IN Properties) THEN
+		 ! yy! WN (Name); ! /* ! WI (Name); ! */ yy! WN (Name); !;!
+	       ELSE
+		 ! yy! WI (Selector); ! ! WI (Selector); !;!
+	       END;
+	     END;
+	     Node := Next;
+	  END;
+	END;
+      END;
+	!}!
+	!!
+	!%token!
+	ForallClasses (Classes, Token);
+	!!
+	PrecDefs (Precs);
+	!!
+	!%%!
+	!!
+	ForallClasses (Classes, ParsSpec);
+}; .
+Class (..) :- {
+	IF {Nonterminal, Referenced} <= Properties THEN
+	   TheClass := t;
+	   AlternativeCount := 0;
+	   Grammar (t);
+	END;
+}; .
+
+
+PROCEDURE ParsVariant (t: Tree)
+
+Class (..) :- {
+	IF (Nonterminal IN Properties) AND
+	   (({Referenced, HasAttributes} <= Properties) OR
+	   IsReferenced (Extensions, HasAttributes IN Properties)) THEN
+	  !typedef struct { ! 
+	  ForallAttributes (Attributes, RecordField);
+	  GenExt (Extensions);
+          IF (String IN Properties) AND NOT (HasSelector IN Properties) THEN
+	    !} /* ! WI (Name); ! */ yy! WN (Name); !;!
+	  ELSE
+	    !} yy! WI (Selector); !;!
+	  END;
+	END;
+	ParsVariant (Next);
+}; .
+
+
+PROCEDURE GenExt (t: Tree)
+
+Class (..) :- {
+	ForallAttributes (Attributes, RecordField);
+	GenExt (Extensions);
+	GenExt (Next);
+}; .
+
+
+PROCEDURE Token (t: Tree)
+
+Class (..) :- {
+	IF {Terminal, Referenced} <= Properties THEN
+	   ! ! WI (Name); ! ! WN (Code); !!
+	END;
+}; .
+
+
+PROCEDURE RecordField (t: Tree)
+
+Attribute (..) :- {
+	IF (NoCodeAttr * Properties) = {} THEN 
+	   WI (Type); ! ! WI (Name); !; ! 
+	END;
+}; .
+
+
+PROCEDURE PrecDefs (t: Tree)
+
+LeftAssoc (..) :- {
+	!%left ! PrecDefs (Names); !!
+	PrecDefs (Next);
+}; .
+RightAssoc (..) :- {
+	!%right! PrecDefs (Names); !!
+	PrecDefs (Next);
+}; .
+NonAssoc (..) :- {
+	!%nonassoc ! PrecDefs (Names); !!
+	PrecDefs (Next);
+}; .
+Name (..) :- {
+	! ! WI (Name);
+	PrecDefs (Next);
+}; .
+
+
+PROCEDURE Grammar (t: Tree)
+
+Class (..) :- {
+	IF Extensions^.Kind = Tree.NoClass THEN		(* Low ? *)
+	   WITH TheClass^.Class DO
+	      IF String IN Properties THEN !yy! WN (Name); ELSE WI (Name); END;
+	   END;
+	   !	: ! 
+	   ActClass := t;
+	   PrevActionIndex := 0;
+	   IsImplicit := FALSE;
+	   INC (AlternativeCount);
+	   ForallAttributes (t, Prod);
+	   !;!
+	   PrevActionIndex := 0;
+	   IsImplicit := TRUE;
+	   ForallAttributes (t, Implicit);
+	ELSE
+	   Prod (Extensions);
+	END;
+}; .
+
+PROCEDURE Prod (t: Tree)
+
+Class (..) :-
+	Grammar (t);
+	Prod (Next);
+	.
+Child (..) :- {
+	IF {String, Nonterminal} <= Class^.Class.Properties THEN !yy! WN (Type); ELSE WI (Type); END; ! ! 
+}; .
+ActionPart (..) :- {
+      IF NOT IsElement (ORD ('v'), Options) THEN
+	IF IsLastItem (ActClass, t) THEN
+	   !{! 
+	   IF PrevActionIndex # 0 THEN
+	      Node := GetBaseClass (TheClass);
+	      WITH Node^.Class DO
+		 ! $$.! 
+		 IF String IN Properties THEN !yy! WN (Name); ELSE WI (Name); END;
+		 ! = $! WN (PrevActionIndex); !.! 
+		 IF String IN Properties THEN !yy! WN (Name); ELSE WI (Name); END;
+		 !;!
+	      END;
+	   END;
+	   Prod (Actions);
+	   !} ! 
+	ELSE
+	   IF Name = 0 THEN
+	      Name := Wnt (TheClass);
+	   END;
+	   !xx_! WI (Name); !_! WN (ParsIndex); ! ! 
+	END;
+	PrevActionIndex := ParsIndex;
+      END;
+}; .
+PrecClause (..) :- !%prec ! WI (Prec); ! ! .
+
+Assign (..) :-
+	Prod (Results); !=! Prod (Arguments); !;!
+	Prod (Next);
+	.
+Copy (..) :-
+	Prod (Results); ! = ! Prod (Arguments); !;!
+	Prod (Next);
+	.
+TargetCode (..) :-
+	Prod (Code); !;!
+	Prod (Next);
+	.
+Order (..) :-
+	Prod (Next);
+	.
+Check (..) :- {
+	IF Statement # NoTree THEN
+	   IF Condition # NoTree THEN
+	      !if (! Prod (Condition); !) ; else { ! Prod (Statement); ! }!
+	   ELSE
+	      Prod (Statement);
+	   END;
+	END;
+};
+	Prod (Next);
+	.
+Designator (..) :- {
+	TheAttr := IdentifyAttribute (ActClass, Selector);
+	IF TheAttr # NoTree THEN
+	  Node := TheAttr^.Child.Class;
+	  IF Node # NoTree THEN
+	    !$! 
+	    IF NOT IsImplicit THEN
+	       WN (TheAttr^.Child.ParsIndex);
+	    ELSE
+	       WN (SHORTINT (TheAttr^.Child.ParsIndex + 1 - ActActionIndex));
+	    END;
+	    IF Nonterminal IN Node^.Class.Properties THEN	(* nonterminal *)
+	      Node := GetBaseClass (Node);
+	      IF (String IN Node^.Class.Properties) AND NOT (HasSelector IN Node^.Class.Properties) THEN
+	        !.yy! WN (Node^.Class.Name);
+	      ELSE
+	        !.! WI (Node^.Class.Name);
+	      END;
+	    ELSE						(* terminal *)
+	      IF (String IN Node^.Class.Properties) AND NOT (HasSelector IN Node^.Class.Properties) THEN
+	        !.Scan.yy! WN (Node^.Class.Code);
+	      ELSE
+	        !.Scan.! WI (Node^.Class.Selector);
+	      END;
+	    END;
+	    !.! WI (Attribute);
+	  ELSE
+	    WI (Selector); !:! WI (Attribute);
+	  END;
+	ELSE
+	  WI (Selector); !:! WI (Attribute);
+	END;
+};
+	Prod (Next);
+	.
+Ident (..) :- {
+	TheAttr := IdentifyAttribute (ActClass, Attribute);
+	Node := GetBaseClass (TheClass);
+	IF (TheAttr = NoTree) OR (String IN TheAttr^.Attribute.Properties) OR
+	   (TheAttr^.Kind = Child) THEN
+	  WI (Attribute);
+	ELSIF (String IN Node^.Class.Properties) AND NOT (HasSelector IN Node^.Class.Properties) THEN
+	  !$$.yy! WN (Node^.Class.Name); !.! WI (Attribute);
+	ELSE
+	  !$$.! WI (Node^.Class.Name); !.! WI (Attribute);
+	END;
+};
+	Prod (Next);
+	.
+Any (..) :-
+	WriteString (f, Code);
+	Prod (Next);
+	.
+Anys (..) :-
+	Prod (Layouts);
+	Prod (Next);
+	.
+LayoutAny (..) :-
+	WriteString (f, Code);
+	Prod (Next);
+	.
+
+/*
+PROCEDURE Rhs (t: Tree)
+
+Designator (..) :- {
+	TheAttr := IdentifyAttribute (ActClass, Selector);
+	IF TheAttr # NoTree THEN
+	  Node := TheAttr^.Child.Class;
+	  IF Node # NoTree THEN
+	    !$! 
+	    IF NOT IsImplicit THEN
+	       WN (TheAttr^.Child.ParsIndex);
+	    ELSE
+	       WN (SHORTINT (TheAttr^.Child.ParsIndex + 1 - ActActionIndex));
+	    END;
+	    IF Nonterminal IN Node^.Class.Properties THEN	(* nonterminal *)
+	      Node := GetBaseClass (Node);
+	      IF (String IN Node^.Class.Properties) AND NOT (HasSelector IN Node^.Class.Properties) THEN
+	        !.yy! WN (Node^.Class.Name);
+	      ELSE
+	        !.! WI (Node^.Class.Name);
+	      END;
+	    ELSE						(* terminal *)
+	      IF (String IN Node^.Class.Properties) AND NOT (HasSelector IN Node^.Class.Properties) THEN
+	        !.Scan.yy! WN (Node^.Class.Code);
+	      ELSE
+	        !.Scan.! WI (Node^.Class.Selector);
+	      END;
+	    END;
+	    !.! WI (Attribute);
+	  ELSE
+	    WI (Selector); !:! WI (Attribute);
+	  END;
+	ELSE
+	  WI (Selector); !:! WI (Attribute);
+	END;
+};
+	Rhs (Next);
+	.
+Ident (..) :-
+	WI (Attribute);
+	Rhs (Next);
+	.
+Any (..) :-
+	WriteString (f, Code);
+	Rhs (Next);
+	.
+Anys (..) :-
+	Rhs (Layouts);
+	Rhs (Next);
+	.
+LayoutAny (..) :-
+	WriteString (f, Code);
+	Rhs (Next);
+	.
+*/
+
+PROCEDURE Implicit (t: Tree)
+
+ActionPart (..) :- {
+      IF NOT IsElement (ORD ('v'), Options) THEN
+	IF NOT (Generated IN Properties) AND NOT IsLastItem (ActClass, t) THEN
+	   INCL (Properties, Generated);
+	   ActActionIndex := ParsIndex;
+	   !xx_! WI (Name); !_! WN (ParsIndex); !	: {! 
+	   IF PrevActionIndex # 0 THEN
+	      Node := GetBaseClass (TheClass);
+	      WITH Node^.Class DO
+		 ! $$.! 
+		 IF String IN Properties THEN !yy! WN (Name); ELSE WI (Name); END;
+		 ! = $! WN (SHORTINT (PrevActionIndex + 1 - ActActionIndex)); !.! 
+		 IF String IN Properties THEN !yy! WN (Name); ELSE WI (Name); END;
+		 !;!
+	      END;
+	   END;
+	   Prod (Actions);
+	   !} .!
+	END;
+	PrevActionIndex := ParsIndex;
+      END;
+}; .
+
+PREDICATE IsLastItem (Classes, Item: AttrOrAction)
+
+t, _ :-
+   gAct		:= FALSE;
+   gUCAct	:= FALSE;
+   gPred	:= FALSE;
+   gPrec	:= FALSE;
+   gResult	:= FALSE;
+   IsLastItem2 (t, Item);
+   CONDITION gResult;
+   .
+PROCEDURE IsLastItem2 (t: [Classes, Attributes], item: AttrOrAction)
+
+Class (..), _ :-
+   IsLastItem2 (Attributes, item);
+   CONDITION NOT gResult;
+   IsLastItem2 (BaseClass, item);
+   .
+Child (..), _ :-
+   IsLastItem2 (Next, item);
+   gAct   := TRUE;
+   gUCAct := TRUE;
+   gPred  := TRUE;
+   gPrec  := TRUE;
+   .
+Attribute (..), _ :-
+   IsLastItem2 (Next, item);
+   .
+ActionPart (..), _ :-
+   IsLastItem2 (Next, item);
+{  IF (t = item) AND NOT gAct THEN gResult := TRUE; END; };
+   gAct   := TRUE;
+   .
+UCActionPart (..), _ :-
+   IsLastItem2 (Next, item);
+{  IF (t = item) AND NOT gUCAct THEN gResult := TRUE; END; };
+   gUCAct := TRUE;
+   gAct   := TRUE;
+   .
+TrialParse (..), _ ;
+CondParse  (..), _ :-
+   IsLastItem2 (Next, item);
+{  IF (t = item) AND NOT gPred THEN gResult := TRUE; END; };
+   gPred := TRUE;
+   .
+PrecClause (..), _ :-
+   IsLastItem2 (Next, item);
+{  IF (t = item) AND NOT gPrec THEN gResult := TRUE; END; };
+   gPrec := TRUE;
+   .
+
+PREDICATE IsReferenced (Classes, HasAttr: BOOLEAN)
+
+Class (..), .. :-
+   CONDITION (HasAttr OR (HasAttributes IN Properties)) AND (Referenced IN Properties); .
+Class (..), .. :-
+   IsReferenced (Extensions, HasAttr OR (HasAttributes IN Properties)); .
+Class (..), .. :-
+   IsReferenced (Next, HasAttr); .

@@ -1,0 +1,1554 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 23.5.1989 */
+
+TRAFO Order
+TREE Tree
+PUBLIC Order WriteOrderDecl WriteOrderEval WriteVisitSequence
+
+EXPORT {
+VAR IndexToClass: POINTER TO ARRAY [0 .. 10000] OF Tree.tTree;
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM rMemory	IMPORT Alloc, Free;
+FROM DynArray	IMPORT MakeArray;
+FROM IO		IMPORT StdOutput, WriteI, WriteS, WriteNl;
+FROM Idents	IMPORT WriteIdent;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, IsElement	,
+   Extract	, AssignEmpty	, Minimum	, Maximum	,
+   Include	, Exclude	, Union		, Card		;
+
+FROM Relation	IMPORT
+   tRelation	, MakeRelation	, ReleaseRelation, Closure	,
+   HasReflexive	, IsRelated	, Assign	, Difference	,
+   IsCyclic	, GetCyclics	, WriteRelation	;
+
+FROM Queue	IMPORT
+   MakeQueue	, ReleaseQueue	, IsEmpty	, Enqueue	, Dequeue	;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, tInstance	, Referenced	,
+   Computed	, Reverse	, Write		, Read		,
+   Inherited	, Synthesized	, Input		, Output	,
+   Stack	, Variable	,
+   CopyDef	, CopyUse	, Thread	, Test		,
+   Left		, Right		, Def		, Use		,
+   ChildUse	, ParentUse	, NonBaseComp	, First		,
+   Dummy	, Demand	, f		, WriteName	,
+   WriteInstance, WriteDependencies, WriteClassProperties, WriteCyclics,
+   WriteClass	, MaxVisit	, MaxSet	,
+   GrammarClass	, cLNC	, cDNC	, cLAG	, cOAG	, cSAG	, cSNC	, cWAG,
+   Options	, ForallClasses	, ForallAttributes, tSetOfRel	,
+   tSetOfRelPtr	;
+
+FROM Optimize	IMPORT LifeTime1, LifeTime3,
+			ChildrenIn, ChildrenDyn, AttributeIn, AttributeOut, AttributeTree,
+			AttributeParam, AttributeVar, AttributeDemand, AttributeStack;
+
+IMPORT Sets, Relation, Queue, Errors;
+
+CONST
+# include "yyconsts2"
+
+VAR
+   HasCycle	,
+   Children	,
+   Parents	,
+   Relevant	,
+   Cyclics	,
+   IsComputed	,
+   IsComputable	: tSet;
+   Prio		,
+   UserIndex	,
+   ClassCount	,
+   Kind		,
+   i, i2, j, k, n, Visit	: SHORTCARD;
+   Reporting	,
+   Success	,
+   Stable	: BOOLEAN;
+   ActClass	,
+   UserClass	,
+   ChildsClass	: tTree;
+   AttrInstance	: tInstance;
+   IndexSize	: LONGINT;
+
+(*
+PROCEDURE OptimizeVisits (t: tTree): BOOLEAN;
+   VAR Success	: BOOLEAN;
+   BEGIN
+      CASE t^.Kind OF
+      | Tree.Class	:
+	 WITH t^.Class DO
+	    Success := FALSE;
+	    IF OptimizeVisits (Extensions) THEN
+	       n := InstCount;
+	       LOOP
+		  WITH Instance^ [Instance^ [n].Order] DO
+		     IF (Input IN Properties) OR ({Synthesized, Left, Dummy} <= Properties) THEN
+		     ELSE EXIT;
+		     END;
+		  END;
+		  DEC (n);
+		  IF n = 0 THEN EXIT; END;
+	       END;
+	       Success := TRUE;
+	       LOOP
+		  WITH Instance^ [Instance^ [n].Order] DO
+		     IF (Left IN Properties) AND (Attribute^.Child.Partition > 0) AND
+			(Attribute^.Child.Partition = Visits - 1) THEN
+			EXIT;
+		     END;
+		     IF {Synthesized, Right} * Properties # {} THEN
+			Success := FALSE; EXIT;
+		     END;
+		  END;
+		  DEC (n);
+		  IF n = 0 THEN EXIT; END;
+	       END;
+	       IF Success THEN DEC (Visits);
+	       END;
+	    END;
+	    RETURN OptimizeVisits (Next) AND Success;
+	 END;
+      | Tree.NoClass	:
+	 RETURN TRUE;
+      END;
+   END OptimizeVisits;
+*)
+
+PROCEDURE IsComputable3a (i: SHORTCARD; t: tTree): BOOLEAN;
+   VAR j	: SHORTCARD;
+   BEGIN
+      WITH t^.Class DO
+	 FOR j := 1 TO InstCount DO
+	    IF IsRelated (i, j, OAG) AND NOT IsElement (j, IsComputed) THEN
+	       RETURN FALSE;
+	    END;
+	 END;
+	 RETURN TRUE;
+      END;
+   END IsComputable3a;
+
+PROCEDURE IsComputable3b (i: SHORTCARD; t: tTree): BOOLEAN;
+   VAR j	: SHORTCARD;
+   BEGIN
+      WITH t^.Class DO
+	 IF ({Synthesized, Right} <= Instance^[i].Properties) OR
+	    ({Inherited, Left} <= Instance^[i].Properties) THEN
+	    FOR j := 1 TO InstCount DO
+	       IF (First IN Instance^ [j].Properties) AND IsRelated (j, i, OAG) AND
+		  NOT IsElement (j, IsComputed) THEN
+		  RETURN FALSE;
+	       END;
+	    END;
+	 ELSE
+	    FOR j := 1 TO InstCount DO
+	       IF IsRelated (j, i, OAG) AND NOT IsElement (j, IsComputed) THEN
+		  RETURN FALSE;
+	       END;
+	    END;
+	 END;
+	 RETURN TRUE;
+      END;
+   END IsComputable3b;
+}
+
+PROCEDURE Order (t: Tree)
+
+Ag (..) :- {
+	Order (Classes);
+}; .
+Class (..) :- {
+	Success := TRUE;
+	ForallClasses (t, CheckNormalForm);	(* normal form?		*)
+	IF Success THEN
+	   ? GrammarIsInNormalForm I ?
+	ELSE
+	   ? GrammarIsNotInNormalForm I ?
+	END;
+
+IF cLNC IN GrammarClass THEN
+
+	ForallClasses (t, CompIndex);	(* absolutely non circular?	*)
+	IndexSize := ClassCount + 1;
+	MakeArray (IndexToClass, IndexSize, TSIZE (tTree));
+	MakeQueue (ClassCount);
+	MakeSet (HasCycle, ClassCount);
+	ForallClasses (t, CompIndexToClass);
+	ForallClasses (t, CompUsers);
+
+	WHILE NOT IsEmpty () DO
+	   ActClass := IndexToClass^[Dequeue ()];
+	   Closure (ActClass^.Class.SNC);
+	   CompSNC1 (ActClass^.Class.BaseClass);
+	   FOR UserIndex := Minimum (ActClass^.Class.Users) TO Maximum (ActClass^.Class.Users) DO
+	      IF IsElement (UserIndex, ActClass^.Class.Users) THEN
+		 UserClass := IndexToClass^[UserIndex];
+		 ForallAttributes (UserClass, CompSNC1);
+	      END;
+	   END;
+	END;
+
+	ForallClasses (t, CompSNC2);
+	IF Sets.IsEmpty (HasCycle) THEN INCL (GrammarClass, cSNC);
+	ELSIF NOT IsElement (ORD ('L'), Options) THEN
+	   ? SwitchedOnOptionL I ?
+	   Include (Options, ORD ('L'));
+	END;
+
+  IF cSNC IN GrammarClass THEN
+
+	WHILE NOT IsEmpty () DO		(* double closure non circular?	*)
+	   ActClass := IndexToClass^[Dequeue ()];
+	   Closure (ActClass^.Class.DNC);
+	   ForallClasses (ActClass^.Class.Extensions, CompDNC1);
+	   ForallAttributes (ActClass, CompDNC1);
+	END;
+
+	ReleaseQueue;
+	Success := TRUE;
+	ForallClasses (t, CompDNC2);
+	IF Success THEN INCL (GrammarClass, cDNC);
+	ELSIF NOT IsElement (ORD ('L'), Options) THEN
+	   ? SwitchedOnOptionL I ?
+	   Include (Options, ORD ('L'));
+	END;
+
+    IF cDNC IN GrammarClass THEN
+						(* compute partitions: numbers	*)
+      IF IsElement (ORD ('/'), Options) THEN
+	ForallClasses (t, CompOAG0a);		(* as early as possible		*)
+      ELSE
+	ForallClasses (t, CompOAG0b);		(* as late as possible		*)
+	ForallClasses (t, CompOAG0c);
+	ForallClasses (t, CompOAG0d);
+      END;
+	ForallClasses (t, CompOAG1);		(* compute partitions: dependencies *)
+	Success := TRUE;
+	ForallClasses (t, CompOAG2);		(* ordered ?			*)
+	IF Success THEN INCL (GrammarClass, cOAG);
+	ELSIF NOT IsElement (ORD ('L'), Options) THEN
+	   ? SwitchedOnOptionL I ?
+	   Include (Options, ORD ('L'));
+	END;
+
+      IF cOAG IN GrammarClass THEN
+	IF NOT IsElement (ORD ('L'), Options) THEN
+						(* visit sequences		*)
+      IF IsElement (ORD ('/'), Options) THEN
+	ForallClasses (t, CompOAG3a);		(* as early as possible		*)
+      ELSE
+	ForallClasses (t, CompOAG3b);		(* as late as possible		*)
+      END;
+(*	Success := OptimizeVisits (t); *)	(* optimize sequences		*)
+      IF IsElement (ORD ('0'), Options) THEN
+	ForallClasses (t, LifeTime1);
+(*	MakeSet (Children, ClassCount);
+	MakeSet (Parents , ClassCount);
+	MakeSet (Relevant, ClassCount);
+	ForallClasses (t, LifeTime4);
+	ReleaseSet (Children);
+	ReleaseSet (Parents );
+	ReleaseSet (Relevant); *)
+      IF IsElement (ORD ('3'), Options) THEN
+	WriteNl (StdOutput);
+	WriteS (StdOutput, "Attribute Storage Assignment"); WriteNl (StdOutput);
+	WriteS (StdOutput, "----------------------------"); WriteNl (StdOutput);
+	WriteNl (StdOutput);
+	ChildrenDyn	:= 0;
+	ChildrenIn	:= 0;
+	AttributeIn	:= 0;
+	AttributeOut	:= 0;
+	AttributeTree	:= 0;
+	AttributeParam	:= 0;
+	AttributeVar	:= 0;
+	AttributeDemand	:= 0;
+	AttributeStack	:= 0;
+      END;
+	ForallClasses (t, LifeTime3);
+      IF IsElement (ORD ('3'), Options) THEN
+	WriteNl (StdOutput);
+	IF ChildrenIn > 0 THEN
+	   WriteS (StdOutput, "Children  Input		");
+	   WriteI (StdOutput, ChildrenIn, 3); WriteNl (StdOutput);
+	END;
+	IF ChildrenDyn > 0 THEN
+	   WriteS (StdOutput, "Children  Dynamic	");
+	   WriteI (StdOutput, ChildrenDyn, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeIn > 0 THEN
+	   WriteS (StdOutput, "Attribute Input		");
+	   WriteI (StdOutput, AttributeIn, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeOut > 0 THEN
+	   WriteS (StdOutput, "Attribute Output	");
+	   WriteI (StdOutput, AttributeOut, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeTree > 0 THEN
+	   WriteS (StdOutput, "Attribute Tree		");
+	   WriteI (StdOutput, AttributeTree, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeParam > 0 THEN
+	   WriteS (StdOutput, "Attribute Parameter	");
+	   WriteI (StdOutput, AttributeParam, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeVar > 0 THEN
+	   WriteS (StdOutput, "Attribute Variable	");
+	   WriteI (StdOutput, AttributeVar, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeDemand > 0 THEN
+	   WriteS (StdOutput, "Attribute Demand	");
+	   WriteI (StdOutput, AttributeDemand	, 3); WriteNl (StdOutput);
+	END;
+	IF AttributeStack > 0 THEN
+	   WriteS (StdOutput, "Attribute Stack	");
+	   WriteI (StdOutput, AttributeStack	, 3); WriteNl (StdOutput);
+	END;
+      END;
+      END;
+	END;
+
+	Success := TRUE;
+	ForallClasses (t, CheckLAG);		(* LAG?			*)
+	IF Success THEN INCL (GrammarClass, cLAG); END;
+
+	IF cLAG IN GrammarClass THEN
+
+	  Success := TRUE;
+	  ForallClasses (t, CheckSAG);		(* SAG?			*)
+	  IF Success THEN INCL (GrammarClass, cSAG); END;
+
+	  IF cSAG IN GrammarClass THEN
+	   ? GrammarIsSAG I ?
+	  ELSE
+	   ? GrammarIsLAG I ?
+	  END;
+	ELSE
+	   ? GrammarIsOAG I ?
+	END;
+      ELSE
+	   ? GrammarIsDNC I ?
+      END;
+    ELSE 
+	   ? GrammarIsSNC I ?
+    END;
+  ELSE 
+
+	ReleaseQueue;				(* WAG?			*)
+	MakeQueue (ClassCount);
+	MakeSet (Relevant, ClassCount);
+	MakeSet (Cyclics, ClassCount);
+	Sets.Assign (Cyclics, HasCycle);
+	WHILE NOT Sets.IsEmpty (Cyclics) DO
+	   InitWAG (IndexToClass^[Extract (Cyclics)]);
+	END;
+	Reporting := FALSE;
+	WHILE NOT Sets.IsEmpty (HasCycle) DO
+	   CheckWAG0 (IndexToClass^[Extract (HasCycle)]);
+	END;
+	ReleaseSet (Cyclics);
+
+	WHILE NOT IsEmpty () DO
+	   CheckWAG2 (IndexToClass^[Dequeue ()]);
+	END;
+
+	IF Sets.IsEmpty (HasCycle) THEN INCL (GrammarClass, cWAG);
+	   ? GrammarIsWAG I ?
+	ELSE
+	   Reporting := TRUE;
+	   WHILE NOT Sets.IsEmpty (HasCycle) DO
+	      CheckWAG2 (IndexToClass^[Extract (HasCycle)]);
+	   END;
+	   ? GrammarIsNotWAG I ?
+	END;
+	ReleaseSet (HasCycle);
+	ReleaseQueue;
+
+  END;
+ELSE 
+	   ? GrammarIsNotWAG I ?
+END;
+}; .
+
+
+PROCEDURE CompIndex (t: Tree)
+
+Class (..) :- {
+	INC (ClassCount);
+	Index := ClassCount;
+	MakeRelation (SNC, InstCount, InstCount);
+	Assign (SNC, DP);
+}; .
+
+
+PROCEDURE CompIndexToClass (t: Tree)
+
+Class (..) :- {
+	IndexToClass^ [Index] := t;
+	MakeSet (Users, ClassCount);
+	Enqueue (Index);
+}; .
+
+
+PROCEDURE CompUsers (t: Tree)
+
+Class (..) :- {
+	ActClass := t;
+	ForallAttributes (t, CompUsers);
+}; .
+Child (..) :- {
+	ChildsClass := Class;
+	IF ChildsClass # NoTree THEN
+	   Include (ChildsClass^.Class.Users, ActClass^.Class.Index);
+	END;
+}; .
+
+
+PROCEDURE CompSNC1 (t: Tree)
+
+Class (..) :- {
+	FOR i := 1 TO AttrCount DO
+	   FOR j := 1 TO AttrCount DO
+	      IF IsRelated (i, j, ActClass^.Class.SNC) THEN
+		 IF NOT IsRelated (i, j, SNC) THEN
+		    Relation.Include (SNC, i, j);
+		    Enqueue (Index);
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+Child (..) :-
+	CONDITION Class # NoTree;
+	ChildsClass := Class;
+	CONDITION (ChildsClass = ActClass) OR Queue.IsElement (ChildsClass^.Class.Index);
+{	FOR i := 1 TO ChildsClass^.Class.AttrCount DO
+	   FOR j := 1 TO ChildsClass^.Class.AttrCount DO
+	      IF IsRelated (i, j, ChildsClass^.Class.SNC) THEN
+		 IF NOT IsRelated (UserClass^.Class.AttrCount + InstOffset + i, UserClass^.Class.AttrCount + InstOffset + j, UserClass^.Class.SNC) THEN
+		    Relation.Include (UserClass^.Class.SNC, UserClass^.Class.AttrCount + InstOffset + i, UserClass^.Class.AttrCount + InstOffset + j);
+		    Enqueue (UserClass^.Class.Index);
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE CompSNC2 (t: Tree)
+
+Class (..) :- {
+	IF HasReflexive (SNC) THEN
+      IF NOT IsElement (ORD ('L'), Options) THEN
+	   ? CycleInSNC W Ident Name ?
+	   MakeSet (Cyclics, InstCount);
+	   GetCyclics (SNC, Cyclics);
+	   WriteS (StdOutput, "Attribute Dependencies SNC (cyclic, only)");
+	   WriteNl (StdOutput); WriteNl (StdOutput);
+	   WriteDependencies (t, SNC, Cyclics);
+	(*
+	   WriteS (StdOutput, "Cyclic Attributes");
+	   WriteNl (StdOutput); WriteNl (StdOutput);
+	   WriteCyclics (t, Cyclics); WriteNl (StdOutput);
+	*)
+	   ReleaseSet (Cyclics);
+      END;
+	   Include (HasCycle, Index);
+	END;
+      IF IsElement (ORD ('S'), Options) THEN
+	WriteDependencies (t, SNC, MaxSet);
+      END;
+	MakeRelation (DNC, InstCount, InstCount);
+	Assign (DNC, SNC);
+	Enqueue (Index);
+}; .
+
+
+PROCEDURE CompDNC1 (t: Tree)
+
+Class (..) :- {
+	FOR i := 1 TO ActClass^.Class.AttrCount DO
+	   FOR j := 1 TO ActClass^.Class.AttrCount DO
+	      IF IsRelated (i, j, ActClass^.Class.DNC) THEN
+		 IF NOT IsRelated (i, j, DNC) THEN
+		    Relation.Include (DNC, i, j);
+		    Enqueue (Index);
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+Child (..) :-
+	CONDITION Class # NoTree;
+	ChildsClass := Class;
+{	FOR i := 1 TO ChildsClass^.Class.AttrCount DO
+	   FOR j := 1 TO ChildsClass^.Class.AttrCount DO
+	      IF IsRelated (ActClass^.Class.AttrCount + InstOffset + i, ActClass^.Class.AttrCount + InstOffset + j, ActClass^.Class.DNC) THEN
+		 IF NOT IsRelated (i, j, ChildsClass^.Class.DNC) THEN
+		    Relation.Include (ChildsClass^.Class.DNC, i, j);
+		    Enqueue (ChildsClass^.Class.Index);
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE CompDNC2 (t: Tree)
+
+Class (..) :- {
+	IF HasReflexive (DNC) THEN
+      IF NOT IsElement (ORD ('L'), Options) THEN
+	   ? CycleInDNC W Ident Name ?
+	   MakeSet (Cyclics, InstCount);
+	   GetCyclics (DNC, Cyclics);
+	   WriteS (StdOutput, "Attribute Dependencies DNC (cyclic, only)");
+	   WriteNl (StdOutput); WriteNl (StdOutput);
+	   WriteDependencies (t, DNC, Cyclics);
+	(*
+	   WriteS (StdOutput, "Cyclic Attributes");
+	   WriteNl (StdOutput); WriteNl (StdOutput);
+	   WriteCyclics (t, Cyclics); WriteNl (StdOutput);
+	*)
+	   ReleaseSet (Cyclics);
+      END;
+	   Success := FALSE;
+	END;
+      IF IsElement (ORD ('N'), Options) THEN
+	WriteDependencies (t, DNC, MaxSet);
+      END;
+	MakeRelation (OAG, InstCount, InstCount);
+	Assign (OAG, DNC);
+}; .
+
+
+PROCEDURE CompOAG0a (t: Tree)
+
+Class (..) :- {
+	ActClass := t;
+	IF BaseClass^.Kind = Tree.Class THEN
+	   n := BaseClass^.Class.AttrCount;	(* compute partition for
+					   	additional attributes only *)
+	ELSE
+	   n := 0;
+	END;
+	k := 0;
+
+	REPEAT
+	   INC (k);
+	   REPEAT
+	      Stable := TRUE;
+	      Kind := Inherited;
+	      ForallAttributes (Attributes, CompOAG0a);
+	   UNTIL Stable;
+	   REPEAT
+	      Stable := TRUE;
+	      Kind := Synthesized;
+	      ForallAttributes (Attributes, CompOAG0a);
+	   UNTIL Stable;
+	UNTIL n = AttrCount;
+
+	IF (BaseClass^.Kind = Tree.Class) AND (BaseClass^.Class.Visits > k) THEN
+	   k := BaseClass^.Class.Visits;
+	END;
+	Visits := k;
+	IF MaxVisit < k THEN MaxVisit := k; END;
+}; .
+Child (..) :- {
+	IF Partition = 9999 THEN
+	   IF (Input IN Properties) OR
+	      ((Properties * {Inherited, Synthesized}) = {}) THEN
+	      Partition := 0; INC (n); RETURN;
+	   END;
+	   IF Kind IN Properties THEN
+	      FOR i := 1 TO ActClass^.Class.AttrCount DO
+		 IF IsRelated (AttrIndex, i, ActClass^.Class.OAG) AND
+		    (ActClass^.Class.Instance^[i].Attribute^.Child.Partition > k) THEN
+		    RETURN;
+		 END;
+	      END;
+	      Partition := k; INC (n); Stable := FALSE;
+	   END;
+	END;
+}; .
+Attribute (..) :- {
+	IF Partition = 9999 THEN
+	   IF (Input IN Properties) OR
+	      ((Properties * {Inherited, Synthesized}) = {}) THEN
+	      Partition := 0; INC (n); RETURN;
+	   END;
+	   IF Kind IN Properties THEN
+	      FOR i := 1 TO ActClass^.Class.AttrCount DO
+		 IF IsRelated (AttrIndex, i, ActClass^.Class.OAG) AND
+		    (ActClass^.Class.Instance^[i].Attribute^.Attribute.Partition > k) THEN
+		    RETURN;
+		 END;
+	      END;
+	      Partition := k; INC (n); Stable := FALSE;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE CompOAG0b (t: Tree)
+
+Class (..) :- {
+	ActClass := t;
+	IF BaseClass^.Kind = Tree.Class THEN
+	   n := BaseClass^.Class.AttrCount;	(* compute partition for
+					   	additional attributes only *)
+	ELSE
+	   n := 0;
+	END;
+	k := 0;
+
+	REPEAT
+	   INC (k);
+	   REPEAT
+	      Kind := Synthesized;
+	      Stable := TRUE;
+	      ForallAttributes (Attributes, CompOAG0b);
+	   UNTIL Stable;
+	   REPEAT
+	      Stable := TRUE;
+	      Kind := Inherited;
+	      ForallAttributes (Attributes, CompOAG0b);
+	   UNTIL Stable;
+	UNTIL n = AttrCount;
+
+	IF (BaseClass^.Kind = Tree.Class) AND (BaseClass^.Class.Visits > k) THEN
+	   k := BaseClass^.Class.Visits;
+	END;
+	Visits := k;
+	IF MaxVisit < k THEN MaxVisit := k; END;
+}; .
+Child (..) :- {
+	IF Partition = 9999 THEN
+	   IF (Input IN Properties) OR
+	      ((Properties * {Inherited, Synthesized}) = {}) THEN
+	      Partition := 0; INC (n); RETURN;
+	   END;
+	   IF Kind IN Properties THEN
+	      FOR i := 1 TO ActClass^.Class.AttrCount DO
+		 IF IsRelated (i, AttrIndex, ActClass^.Class.OAG) AND
+		    (ActClass^.Class.Instance^[i].Attribute^.Child.Partition > k) THEN
+		    RETURN;
+		 END;
+	      END;
+	      Partition := k; INC (n); Stable := FALSE;
+	   END;
+	END;
+}; .
+Attribute (..) :- {
+	IF Partition = 9999 THEN
+	   IF (Input IN Properties) OR
+	      ((Properties * {Inherited, Synthesized}) = {}) THEN
+	      Partition := 0; INC (n); RETURN;
+	   END;
+	   IF Kind IN Properties THEN
+	      FOR i := 1 TO ActClass^.Class.AttrCount DO
+		 IF IsRelated (i, AttrIndex, ActClass^.Class.OAG) AND
+		    (ActClass^.Class.Instance^[i].Attribute^.Attribute.Partition > k) THEN
+		    RETURN;
+		 END;
+	      END;
+	      Partition := k; INC (n); Stable := FALSE;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE CompOAG0c (t: Tree)
+
+Class (..) :- {
+	k := Visits + 1;
+	ForallAttributes (Attributes, CompOAG0c);
+}; .
+Child (..) :- {
+	IF Partition # 0 THEN Partition := k - Partition; END;
+}; .
+Attribute (..) :- {
+	IF Partition # 0 THEN Partition := k - Partition; END;
+}; .
+
+
+PROCEDURE CompOAG0d (t: Tree)
+
+Class (..) :- {
+	ActClass := t;
+	k := 0;
+	REPEAT
+	   INC (k);
+	   REPEAT
+	      Stable := TRUE;
+	      ForallAttributes (Attributes, CompOAG0d);
+	   UNTIL Stable;
+	   REPEAT
+	      Stable := TRUE;
+	      ForallAttributes (Attributes, CompOAG0e);
+	   UNTIL Stable;
+	UNTIL k = Visits;
+}; .
+Child (..) :- {
+	IF (Partition > k) AND (Synthesized IN Properties) AND
+	   ((({Output, Test} * Properties) # {}) OR (({Read, Dummy} * Properties) = {})) THEN
+	   FOR i := 1 TO ActClass^.Class.AttrCount DO
+	      IF IsRelated (AttrIndex, i, ActClass^.Class.OAG) AND
+		 (ActClass^.Class.Instance^[i].Attribute^.Child.Partition > k) THEN
+		 RETURN;
+	      END;
+	   END;
+# ifdef Debug
+WriteS (StdOutput, "CHG	"); WriteIdent (StdOutput, ActClass^.Class.Name);
+WriteS (StdOutput, "	"); WriteName (ActClass^.Class.Instance^[AttrIndex]);
+WriteI (StdOutput, Partition, 5); WriteI (StdOutput, k, 5); WriteNl (StdOutput);
+# endif
+	   Partition := k; Stable := FALSE;
+	END;
+}; .
+Attribute (..) :- {
+	IF (Partition > k) AND (Synthesized IN Properties) AND
+	   ((({Output, Test} * Properties) # {}) OR (({Read, Dummy} * Properties) = {})) THEN
+	   FOR i := 1 TO ActClass^.Class.AttrCount DO
+	      IF IsRelated (AttrIndex, i, ActClass^.Class.OAG) AND
+		 (ActClass^.Class.Instance^[i].Attribute^.Attribute.Partition > k) THEN
+		 RETURN;
+	      END;
+	   END;
+# ifdef Debug
+WriteS (StdOutput, "CHG	"); WriteIdent (StdOutput, ActClass^.Class.Name);
+WriteS (StdOutput, "	"); WriteName (ActClass^.Class.Instance^[AttrIndex]);
+WriteI (StdOutput, Partition, 5); WriteI (StdOutput, k, 5); WriteNl (StdOutput);
+# endif
+	   Partition := k; Stable := FALSE;
+	END;
+}; .
+
+
+PROCEDURE CompOAG0e (t: Tree)
+
+Child (..) :- {
+	IF (Partition > k) AND (Inherited IN Properties) AND
+	   ((({Output, Test} * Properties) # {}) OR (({Read, Dummy} * Properties) = {})) THEN
+	   FOR i := 1 TO ActClass^.Class.AttrCount DO
+	      WITH ActClass^.Class.Instance^[i] DO
+		 IF IsRelated (AttrIndex, i, ActClass^.Class.OAG) AND
+		   ((Inherited IN Properties) AND (Attribute^.Child.Partition > k) OR
+		    (Synthesized IN Properties) AND (Attribute^.Child.Partition >= k)) THEN
+		    RETURN;
+		 END;
+	      END;
+	   END;
+# ifdef Debug
+WriteS (StdOutput, "CHG	"); WriteIdent (StdOutput, ActClass^.Class.Name);
+WriteS (StdOutput, "	"); WriteName (ActClass^.Class.Instance^[AttrIndex]);
+WriteI (StdOutput, Partition, 5); WriteI (StdOutput, k, 5); WriteNl (StdOutput);
+# endif
+	   Partition := k; Stable := FALSE;
+	END;
+}; .
+Attribute (..) :- {
+	IF (Partition > k) AND (Inherited IN Properties) AND
+	   ((({Output, Test} * Properties) # {}) OR (({Read, Dummy} * Properties) = {})) THEN
+	   FOR i := 1 TO ActClass^.Class.AttrCount DO
+	      WITH ActClass^.Class.Instance^[i] DO
+		 IF IsRelated (AttrIndex, i, ActClass^.Class.OAG) AND
+		   ((Inherited IN Properties) AND (Attribute^.Attribute.Partition > k) OR
+		    (Synthesized IN Properties) AND (Attribute^.Attribute.Partition >= k)) THEN
+		    RETURN;
+		 END;
+	      END;
+	   END;
+# ifdef Debug
+WriteS (StdOutput, "CHG	"); WriteIdent (StdOutput, ActClass^.Class.Name);
+WriteS (StdOutput, "	"); WriteName (ActClass^.Class.Instance^[AttrIndex]);
+WriteI (StdOutput, Partition, 5); WriteI (StdOutput, k, 5); WriteNl (StdOutput);
+# endif
+	   Partition := k; Stable := FALSE;
+	END;
+}; .
+
+
+PROCEDURE CompOAG1 (t: Tree)
+
+Class (..) :- {
+	FOR i := 1 TO AttrCount DO
+	   WITH Instance^[i] DO
+	      IF Synthesized IN Properties THEN
+		 FOR j := 1 TO AttrCount DO
+		    IF (Inherited IN Instance^[j].Properties) AND
+		       (Attribute^.Child.Partition = Instance^[j].Attribute^.Child.Partition) THEN
+		       Relation.Include (OAG, i, j);
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+
+	FOR i := 1 TO AttrCount DO
+	   WITH Instance^[i] DO
+	      IF (Inherited IN Properties) AND (Attribute^.Child.Partition >= 2) THEN
+		 FOR j := 1 TO AttrCount DO
+		    IF (Synthesized IN Instance^[j].Properties) AND
+		       (Attribute^.Child.Partition - 1 = Instance^[j].Attribute^.Child.Partition) THEN
+		       Relation.Include (OAG, i, j);
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+
+      IF IsElement (ORD ('C'), Options) THEN
+	MakeRelation (Part, InstCount, InstCount);
+	Assign (Part, OAG);
+	Difference (Part, DNC);
+	WriteDependencies (t, Part, MaxSet); WriteNl (StdOutput);
+	ReleaseRelation (Part);
+      END;
+}; .
+
+
+PROCEDURE CompOAG2 (t: Tree)
+
+Class (..) :- {
+	ActClass := t;
+	ForallAttributes (t, CompOAG2);
+	IF IsCyclic (OAG) THEN
+      IF NOT IsElement (ORD ('L'), Options) THEN
+	   ? CycleInOAG W Ident Name ?
+	   WriteS (StdOutput, "Cyclic Attributes and Artificially Introduced Dependencies");
+	   WriteNl (StdOutput); WriteNl (StdOutput);
+	   MakeRelation (Part, InstCount, InstCount);
+	   MakeSet (Cyclics, InstCount);
+	   GetCyclics (OAG, Cyclics);
+	   Assign (Part, OAG);
+	   Difference (Part, DNC);
+	   WriteDependencies (t, Part, Cyclics);
+	   ReleaseRelation (Part);
+	   ReleaseSet (Cyclics);
+      END;
+	   Success := FALSE;
+	END;
+      IF IsElement (ORD ('O'), Options) THEN
+	WriteDependencies (t, OAG, MaxSet);
+      END;
+}; .
+Child (..) :-
+	CONDITION Class # NoTree;
+	ChildsClass := Class;
+{	FOR i := 1 TO ChildsClass^.Class.AttrCount DO
+	   FOR j := 1 TO ChildsClass^.Class.AttrCount DO
+	      IF IsRelated (i, j, ChildsClass^.Class.OAG) THEN
+		 Relation.Include (ActClass^.Class.OAG, ActClass^.Class.AttrCount + InstOffset + i, ActClass^.Class.AttrCount + InstOffset + j);
+	      END;
+	   END;
+	END;
+}; .
+
+
+/*
+PROCEDURE CompOAG3 (t: Tree)
+
+Class (..) :- {
+	n := 0;					(* strategy: as early as possible *)
+	MakeSet (IsComputed, InstCount);
+	REPEAT
+	   i := InstCount;
+	   LOOP
+	      WITH Instance^ [i] DO
+		 IF NOT IsElement (i, IsComputed) AND IsComputable3a (i, t) THEN
+		    INC (n);
+		    Instance^[n].Order := i;
+		    Include (IsComputed, i);
+		    INCL (Properties, First);
+		    Visit := Attribute^.Child.Partition;
+		    IF {Inherited, Left} <= Properties THEN
+		       FOR i2 := 1 TO AttrCount DO	(* complete visit parent *)
+			  WITH Instance^ [i2] DO
+			     IF NOT IsElement (i2, IsComputed) AND
+				(Inherited IN Properties) AND
+				(Attribute^.Child.Partition = Visit) THEN
+				INC (n);
+				Instance^[n].Order := i2;
+				Include (IsComputed, i2);
+			     END;
+			  END;
+		       END;
+		    ELSIF {Synthesized, Right} <= Properties THEN
+		       IF Selector # NoTree THEN	(* complete visit child	*)
+			  ChildsClass := Selector^.Child.Class;
+			  FOR i2 := AttrCount + Selector^.Child.InstOffset + 1 TO
+			     AttrCount + Selector^.Child.InstOffset + ChildsClass^.Class.AttrCount DO
+			     WITH Instance^ [i2] DO
+				IF NOT IsElement (i2, IsComputed) AND
+				   (Synthesized IN Properties) AND
+				   (Attribute^.Child.Partition = Visit) THEN
+				   INC (n);
+				   Instance^[n].Order := i2;
+				   Include (IsComputed, i2);
+				END;
+			     END;
+			  END;
+		       END;
+		    ELSE
+		       FOR i2 := 1 TO InstCount DO	(* add group members *) (* optimize! *)
+			  IF NOT IsElement (i2, IsComputed) AND
+			     (Instance^[i2].Action = Action) THEN
+			     INC (n);
+			     Instance^[n].Order := i2;
+			     Include (IsComputed, i2);
+			  END;
+		       END;
+		    END;
+		    EXIT;
+		 END;
+	      END;
+	      DEC (i);
+	   END;
+	UNTIL n = InstCount;
+	ReleaseSet (IsComputed);
+
+      IF IsElement (ORD ('G'), Options) THEN WriteOrderDecl (t); END;
+      IF IsElement (ORD ('E'), Options) THEN WriteOrderEval (t); END;
+      IF IsElement (ORD ('V'), Options) THEN WriteVisitSequence (t); END;
+}; .
+
+*/
+
+PROCEDURE CompOAG3a (t: Tree)
+
+Class (..) :- {
+# ifdef Debug
+WriteNl (StdOutput); WriteIdent (StdOutput, Name); WriteNl (StdOutput);
+# endif
+	n := 0;					(* strategy: as early as possible *)
+	MakeSet (IsComputed, InstCount);
+	MakeSet (IsComputable, InstCount);
+	FOR i := 1 TO InstCount DO
+	   IF IsComputable3a (i, t) THEN Include (IsComputable, i);
+# ifdef Debug
+WriteS (StdOutput, "INIT	"); WriteName (Instance^[i]); WriteNl (StdOutput);
+# endif
+	   END;
+	END;
+
+	WHILE NOT Sets.IsEmpty (IsComputable) DO
+	   i2 := Minimum (IsComputable);
+	   j  := Maximum (IsComputable);
+	   LOOP
+	      IF IsElement (i2, IsComputable) THEN
+		 i := i2;
+		 IF NOT ({Inherited, Left} <= Instance^[i2].Properties) THEN EXIT; END;
+	      END;
+	      INC (i2);
+	      IF i2 > j THEN EXIT; END;
+	   END;
+
+	   WITH Instance^ [i] DO
+	      INC (n);
+	      Instance^[n].Order := i;
+	      Include (IsComputed, i);
+	      Exclude (IsComputable, i);
+# ifdef Debug
+WriteS (StdOutput, "SET	"); WriteName (Instance^[i]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+	      INCL (Properties, First);
+	      Visit := Attribute^.Child.Partition;
+	      IF {Inherited, Left} <= Properties THEN
+		 FOR i2 := 1 TO AttrCount DO	(* complete visit parent *)
+		    WITH Instance^ [i2] DO
+		       IF NOT IsElement (i2, IsComputed) AND
+			  (Inherited IN Properties) AND
+			  (Attribute^.Child.Partition = Visit) THEN
+			  INC (n);
+			  Instance^[n].Order := i2;
+			  Include (IsComputed, i2);
+			  Exclude (IsComputable, i2);
+# ifdef Debug
+WriteS (StdOutput, "SETp	"); WriteName (Instance^[i2]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+		       END;
+		    END;
+		 END;
+	      ELSIF {Synthesized, Right} <= Properties THEN
+		 IF Selector # NoTree THEN	(* complete visit child	*)
+		    ChildsClass := Selector^.Child.Class;
+		    FOR i2 := AttrCount + Selector^.Child.InstOffset + 1 TO
+		       AttrCount + Selector^.Child.InstOffset + ChildsClass^.Class.AttrCount DO
+		       WITH Instance^ [i2] DO
+			  IF NOT IsElement (i2, IsComputed) AND
+			     (Synthesized IN Properties) AND
+			     (Attribute^.Child.Partition = Visit) THEN
+			     INC (n);
+			     Instance^[n].Order := i2;
+			     Include (IsComputed, i2);
+			     Exclude (IsComputable, i2);
+# ifdef Debug
+WriteS (StdOutput, "SETc	"); WriteName (Instance^[i2]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+			  END;
+		       END;
+		    END;
+		 END;
+	      ELSE
+		 FOR i2 := 1 TO InstCount DO	(* add group members *) (* optimize! *)
+		    IF NOT IsElement (i2, IsComputed) AND
+		       (Instance^[i2].Action = Action) THEN
+		       INC (n);
+		       Instance^[n].Order := i2;
+		       Include (IsComputed, i2);
+		       Exclude (IsComputable, i2);
+# ifdef Debug
+WriteS (StdOutput, "SETg	"); WriteName (Instance^[i2]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+		    END;
+		 END;
+	      END;
+
+	      FOR i2 := 1 TO InstCount DO
+		  IF NOT IsElement (i2, IsComputed) AND
+		     NOT IsElement (i2, IsComputable) AND
+		     IsComputable3a (i2, t) THEN
+		     Include (IsComputable, i2);
+# ifdef Debug
+WriteS (StdOutput, "ADD	"); WriteName (Instance^[i2]); WriteNl (StdOutput);
+# endif
+		  END;
+	      END;
+	   END;
+	END;
+	IF n # InstCount THEN
+	   ? InternalErrorCompOAG E Ident Name ?
+	   Exclude (Options, ORD ('o'));
+	END;
+	ReleaseSet (IsComputed);
+	ReleaseSet (IsComputable);
+
+      IF IsElement (ORD ('G'), Options) THEN WriteOrderDecl (t); END;
+      IF IsElement (ORD ('E'), Options) THEN WriteOrderEval (t); END;
+      IF IsElement (ORD ('V'), Options) THEN WriteVisitSequence (t); END;
+}; .
+
+
+PROCEDURE CompOAG3b (t: Tree)
+
+Class (..) :- {
+# ifdef Debug
+WriteNl (StdOutput); WriteIdent (StdOutput, Name); WriteNl (StdOutput);
+# endif
+	MakeSet (IsComputed, InstCount);	(* strategy: as late as possible *)
+
+	n := 0;					(* set property First	*)
+	REPEAT
+	   i := InstCount;
+	   LOOP
+	      WITH Instance^ [i] DO
+		 IF NOT IsElement (i, IsComputed) AND IsComputable3a (i, t) THEN
+		    INC (n);
+		    Include (IsComputed, i);
+		    INCL (Properties, First);
+		    Visit := Attribute^.Child.Partition;
+		    IF {Inherited, Left} <= Properties THEN
+		       FOR i2 := 1 TO AttrCount DO	(* complete visit parent *)
+			  WITH Instance^ [i2] DO
+			     IF NOT IsElement (i2, IsComputed) AND
+				(Inherited IN Properties) AND
+				(Attribute^.Child.Partition = Visit) THEN
+				INC (n);
+				Include (IsComputed, i2);
+				FOR j := 1 TO InstCount DO
+				   IF IsRelated (j, i2, OAG) THEN
+				      Relation.Include (OAG, j, i);
+				   END;
+				END;
+			     END;
+			  END;
+		       END;
+		    ELSIF {Synthesized, Right} <= Properties THEN
+		       IF Selector # NoTree THEN	(* complete visit child	*)
+			  ChildsClass := Selector^.Child.Class;
+			  FOR i2 := AttrCount + Selector^.Child.InstOffset + 1 TO
+			     AttrCount + Selector^.Child.InstOffset + ChildsClass^.Class.AttrCount DO
+			     WITH Instance^ [i2] DO
+				IF NOT IsElement (i2, IsComputed) AND
+				   (Synthesized IN Properties) AND
+				   (Attribute^.Child.Partition = Visit) THEN
+				   INC (n);
+				   Include (IsComputed, i2);
+				   FOR j := 1 TO InstCount DO
+				      IF IsRelated (j, i2, OAG) THEN
+					 Relation.Include (OAG, j, i);
+				      END;
+				   END;
+				END;
+			     END;
+			  END;
+		       END;
+		    ELSE
+		       FOR i2 := 1 TO InstCount DO	(* add group members *) (* optimize! *)
+			  IF NOT IsElement (i2, IsComputed) AND
+			     (Instance^[i2].Action = Action) THEN
+			     INC (n);
+			     Include (IsComputed, i2);
+			     FOR j := 1 TO InstCount DO
+				IF IsRelated (j, i2, OAG) THEN
+				   Relation.Include (OAG, j, i);
+				END;
+			     END;
+			  END;
+		       END;
+		    END;
+		    EXIT;
+		 END;
+	      END;
+	      DEC (i);
+	   END;
+	UNTIL n = InstCount;
+
+	AssignEmpty (IsComputed);		(* determine order	*)
+	MakeSet (IsComputable, InstCount);
+	FOR i := 1 TO InstCount DO
+	   IF IsComputable3b (i, t) THEN
+# ifdef Debug
+WriteS (StdOutput, "INIT	"); WriteName (Instance^[i]); WriteNl (StdOutput);
+# endif
+	   Include (IsComputable, i); END;
+	END;
+
+	WHILE NOT Sets.IsEmpty (IsComputable) DO
+	   Prio := 0;
+	   i2 := Minimum (IsComputable);
+	   j  := Maximum (IsComputable);
+	   LOOP
+	      IF IsElement (i2, IsComputable) THEN
+		 WITH Instance^[i2] DO
+		    IF ((Test IN Properties) OR NOT (Read IN Properties)) AND (Prio < 1) THEN
+		       i := i2; Prio := 1;
+		    ELSIF ({Inherited, Left} <= Properties) AND (Prio < 2) THEN
+		       i := i2; Prio := 2;
+		    ELSIF (Output IN Properties) AND (Prio < 3) THEN
+		       i := i2; Prio := 3;
+		    ELSE
+		       i := i2; (* Prio := 4; *) EXIT;
+		    END;
+		 END;
+	      END;
+	      INC (i2);
+	      IF i2 > j THEN EXIT; END;
+	   END;
+
+	   WITH Instance^ [i] DO
+	      Include (IsComputed, i);
+	      Visit := Attribute^.Child.Partition;
+	      IF {Inherited, Left} <= Properties THEN
+		 FOR i2 := 1 TO AttrCount DO	(* complete visit parent *)
+		    WITH Instance^ [i2] DO
+		       IF NOT IsElement (i2, IsComputed) AND
+			  (Inherited IN Properties) AND
+			  (Attribute^.Child.Partition = Visit) THEN
+# ifdef Debug
+WriteS (StdOutput, "SETp	"); WriteName (Instance^[i2]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+			  Include (IsComputed, i2);
+			  Instance^[n].Order := i2;
+			  DEC (n);
+			  Exclude (IsComputable, i2);
+		       END;
+		    END;
+		 END;
+	      ELSIF {Synthesized, Right} <= Properties THEN
+		 IF Selector # NoTree THEN	(* complete visit child	*)
+		    ChildsClass := Selector^.Child.Class;
+		    FOR i2 := AttrCount + Selector^.Child.InstOffset + 1 TO
+		       AttrCount + Selector^.Child.InstOffset + ChildsClass^.Class.AttrCount DO
+		       WITH Instance^ [i2] DO
+			  IF NOT IsElement (i2, IsComputed) AND
+			     (Synthesized IN Properties) AND
+			     (Attribute^.Child.Partition = Visit) THEN
+# ifdef Debug
+WriteS (StdOutput, "SETc	"); WriteName (Instance^[i2]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+			     Include (IsComputed, i2);
+			     Instance^[n].Order := i2;
+			     DEC (n);
+			     Exclude (IsComputable, i2);
+			  END;
+		       END;
+		    END;
+		 END;
+	      ELSE
+		 FOR i2 := 1 TO InstCount DO	(* add group members *) (* optimize! *)
+		    IF NOT IsElement (i2, IsComputed) AND
+		       (Instance^[i2].Action = Action) THEN
+# ifdef Debug
+WriteS (StdOutput, "SETg	"); WriteName (Instance^[i2]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+		       Include (IsComputed, i2);
+		       Instance^[n].Order := i2;
+		       DEC (n);
+		       Exclude (IsComputable, i2);
+		    END;
+		 END;
+	      END;
+
+# ifdef Debug
+WriteS (StdOutput, "SET	"); WriteName (Instance^[i]); WriteI (StdOutput, n, 5); WriteNl (StdOutput);
+# endif
+	      Instance^[n].Order := i;
+	      DEC (n);
+	      Exclude (IsComputable, i);
+	      FOR i2 := 1 TO InstCount DO
+		  IF (First IN Instance^[i2].Properties) AND
+		     NOT IsElement (i2, IsComputed) AND
+		     NOT IsElement (i2, IsComputable) AND
+		     IsComputable3b (i2, t) THEN
+# ifdef Debug
+WriteS (StdOutput, "ADD	"); WriteName (Instance^[i2]); WriteNl (StdOutput);
+# endif
+		     Include (IsComputable, i2);
+		  END;
+	      END;
+	   END;
+        END;
+	ReleaseSet (IsComputed);
+	ReleaseSet (IsComputable);
+	IF n # 0 THEN
+	   CompOAG3a (t);
+	ELSE
+      IF IsElement (ORD ('G'), Options) THEN WriteOrderDecl (t); END;
+      IF IsElement (ORD ('E'), Options) THEN WriteOrderEval (t); END;
+      IF IsElement (ORD ('V'), Options) THEN WriteVisitSequence (t); END;
+	END;
+}; .
+
+
+PROCEDURE WriteOrderDecl (t: Tree)
+
+Class (..) :- {
+	WriteIdent	(StdOutput, Name);
+        WriteS		(StdOutput, "	");
+        WriteClassProperties (StdOutput, Properties);
+        WriteNl		(StdOutput);
+	WriteNl		(StdOutput);
+	FOR i := 1 TO InstCount DO
+	   WriteI (StdOutput, i, 2); WriteInstance (Instance^ [i]);
+        END;
+	WriteNl (StdOutput);
+}; .
+
+
+PROCEDURE WriteOrderEval (t: Tree)
+
+Class (..) :- {
+	WriteIdent	(StdOutput, Name);
+        WriteS		(StdOutput, "	");
+        WriteClassProperties (StdOutput, Properties);
+        WriteNl		(StdOutput);
+	WriteNl		(StdOutput);
+	FOR i := 1 TO InstCount DO
+	   WriteI (StdOutput, Instance^ [i].Order, 2); WriteInstance (Instance^ [Instance^ [i].Order]);
+        END;
+	WriteNl (StdOutput);
+}; .
+
+
+PROCEDURE WriteVisitSequence (t: Tree)
+
+Class (..) :- {
+	WriteIdent	(StdOutput, Name);
+        WriteS		(StdOutput, "	");
+        WriteClassProperties (StdOutput, Properties);
+        WriteNl		(StdOutput);
+	WriteNl		(StdOutput);
+	FOR i := 1 TO InstCount DO
+	   AttrInstance := Instance^ [Instance^ [i].Order];
+	   WITH AttrInstance DO
+	      IF Inherited IN Properties THEN
+		 IF Left IN Properties THEN
+		    IF First IN Properties THEN
+		       WriteS  (StdOutput, "visit	parent ");
+		       WriteI  (StdOutput, Attribute^.Child.Partition, 0);
+		       WriteS  (StdOutput, ". time to compute");
+		       WriteNl (StdOutput);
+		    END;
+		    WriteS     (StdOutput, "	");
+		    WriteName  (AttrInstance);
+		    WriteNl    (StdOutput);
+		 END;
+		 IF Right IN Properties THEN
+		    IF First IN Properties THEN
+		       WriteS  (StdOutput, "compute	");
+		    ELSE
+		       WriteS  (StdOutput, "	");
+		    END;
+		    WriteName  (AttrInstance);
+		    WriteNl    (StdOutput);
+		 END;
+	      END;
+	      IF Synthesized IN Properties THEN
+		 IF (Left IN Properties) AND NOT (Dummy IN Properties) THEN
+		    IF Test IN Properties THEN
+		       WriteS  (StdOutput, "check	condition ");
+		    ELSIF First IN Properties THEN
+		       WriteS  (StdOutput, "compute	");
+		    ELSE
+		       WriteS  (StdOutput, "	");
+		    END;
+		    WriteIdent (StdOutput, Attribute^.Child.Name);
+		    WriteNl    (StdOutput);
+		 END;
+		 IF Right IN Properties THEN
+		    IF {First, Dummy} <= Properties THEN
+		       WriteS     (StdOutput, "visit	");
+		       WriteIdent (StdOutput, Selector^.Child.Name);
+		       WriteI     (StdOutput, Attribute^.Child.Partition, 2);
+		       WriteS     (StdOutput, ". time");
+		       WriteNl    (StdOutput);
+		    END;
+		    IF NOT (Dummy IN Properties) THEN
+		       IF First IN Properties THEN
+			  WriteS  (StdOutput, "visit	");
+			  WriteIdent (StdOutput, Selector^.Child.Name);
+			  WriteI  (StdOutput, Attribute^.Child.Partition, 2);
+			  WriteS  (StdOutput, ". time to compute");
+			  WriteNl (StdOutput);
+		       END;
+		       WriteS     (StdOutput, "	");
+		       WriteName  (AttrInstance);
+		       WriteNl    (StdOutput);
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+	WriteS  (StdOutput, "visit	parent");
+	WriteNl (StdOutput);
+	WriteNl (StdOutput);
+}; .
+
+
+PROCEDURE CheckNormalForm (t: Tree)
+
+Class (..) :- {
+	FOR i := 1 TO InstCount DO
+           IF NOT (Dummy IN Instance^ [i].Properties) THEN
+	      FOR j := 1 TO InstCount DO
+		 IF IsRelated (i, j, DP) THEN
+		    WITH Instance^ [j] DO
+		       IF ({Left, Synthesized} <= Properties) OR
+			  ({Right,  Inherited} <= Properties) THEN
+			  Success := FALSE; RETURN;
+		       END;
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE CheckLAG (t: Tree)
+
+Class (..) :- {
+	FOR i := AttrCount + 1 TO InstCount DO
+	   FOR j := 1 TO AttrCount DO
+	      IF (Synthesized IN Instance^ [j].Properties) AND
+		 IsRelated (i, j, DP) THEN
+		 Success := FALSE; RETURN;
+	      END;
+	   END;
+
+	   WITH Instance^ [i] DO
+	      IF Selector # NoTree THEN
+		 ChildsClass := Selector^.Child.Class;
+		 FOR j := AttrCount + Selector^.Child.InstOffset + 1 TO
+		    AttrCount + Selector^.Child.InstOffset + ChildsClass^.Class.AttrCount DO
+		    IF (Synthesized IN Instance^ [j].Properties) AND
+		       IsRelated (i, j, DP) THEN
+		       Success := FALSE; RETURN;
+		    END;
+		 END;
+
+		 FOR j := AttrCount + Selector^.Child.InstOffset + ChildsClass^.Class.AttrCount + 1 TO InstCount DO
+		    IF IsRelated (i, j, DP) THEN
+		       Success := FALSE; RETURN;
+		    END;
+		 END;
+	      END;
+	   END;
+	END;
+}; .
+
+
+PROCEDURE CheckSAG (t: Tree)
+
+Class (..) :- {
+	FOR i := AttrCount + 1 TO InstCount DO
+	   FOR j := 1 TO InstCount DO
+	      IF IsRelated (i, j, DP) THEN
+		 Success := FALSE; RETURN;
+	      END;
+	   END;
+	END;
+}; .
+
+PROCEDURE InitWAG (t: Tree)
+
+Class (..) :-
+	CONDITION NOT IsElement (Index, Relevant);
+	Include (Relevant, Index);
+	ForallAttributes (t, InitWAG);
+	ForallClasses (Extensions, InitWAG);
+	.
+Child (..) :-
+	InitWAG (Class);
+	.
+
+PROCEDURE CheckWAG0 (t: Tree)
+
+Class (..) :-
+	ForallAttributes (t, CheckWAG0);
+	.
+Child (..) :-
+	CheckWAG1 (Class);
+	.
+
+PROCEDURE CheckWAG1 (t: Class)
+
+Class (..) :-
+   A: tRelation;
+	CONDITION NOT IsElement (Index, Cyclics);
+	Include (Cyclics, Index);
+	ReleaseRelation (DNC);
+	MakeRelation (A, InstCount, InstCount);
+	Relation.Assign (A, DP);
+	ActClass := t;
+	D := NIL;
+	CheckWAG5 (t, A);
+	ReleaseRelation (A);
+	CheckWAG0 (t);
+	ForallClasses (Extensions, CheckWAG1);
+	.
+
+PROCEDURE CheckWAG2 (t: Class)
+
+Class (..) :-
+   A: tRelation;
+	MakeRelation (A, InstCount, InstCount);
+	Relation.Assign (A, DP);
+	ActClass := t;
+	CheckWAG3 (Attributes, A);
+	ReleaseRelation (A);
+	.
+
+PROCEDURE CheckWAG3 (Attributes, tRelation)
+
+t: Child (..), A :-
+	CheckWAG4 (Class, A, Next, t);
+	.
+NoAttribute (..), A :-
+	CheckWAG5 (ActClass, A);
+	.
+Attribute (..), A ;
+ActionPart (..), A :-
+	CheckWAG3 (Next, A);
+	.
+
+PROCEDURE CheckWAG4 (Class, tRelation, Attributes, Child)
+
+Class (..), A, NextAttr, ActChild :-
+   B: tRelation, ActD: tSetOfRelPtr;
+	MakeRelation (B, ActClass^.Class.InstCount, ActClass^.Class.InstCount);
+	ActD := D;
+{	WHILE ActD # NIL DO
+	   Relation.Assign (B, A);
+	   FOR i := 2 TO ActChild^.Child.Class^.Class.AttrCount DO
+	      FOR j := 2 TO ActChild^.Child.Class^.Class.AttrCount DO
+		 IF IsRelated (i, j, ActD^.Relation) THEN
+		    Relation.Include (B, ActClass^.Class.AttrCount + ActChild^.Child.InstOffset + i, ActClass^.Class.AttrCount + ActChild^.Child.InstOffset + j);
+		 END;
+	      END;
+	   END;
+	   CheckWAG3 (NextAttr, B);
+	   ActD := ActD^.Next;
+	END;
+	ReleaseRelation (B);
+}; .
+
+PROCEDURE CheckWAG5 (t: Class, tRelation)
+   LOCAL { TYPE tSetOfRelPtrPtr = POINTER TO tSetOfRelPtr; }
+
+Class (..), A :-
+   B: tRelation, ActD: tSetOfRelPtr, LastNext: tSetOfRelPtrPtr;
+{
+	IF Reporting THEN
+	   MakeSet (Cyclics, InstCount);
+	   GetCyclics (A, Cyclics);
+	   IF NOT Sets.IsEmpty (Cyclics) THEN
+	      ? CycleInWAG E Ident Name ?
+	      WriteS (StdOutput, "Attribute Dependencies WAG (cyclic, only)");
+	      WriteNl (StdOutput); WriteNl (StdOutput);
+	      WriteDependencies (t, A, Cyclics);
+	   (*
+	      WriteS (StdOutput, "Cyclic Attributes");
+	      WriteNl (StdOutput); WriteNl (StdOutput);
+	      WriteCyclics (ActClass, Cyclics); WriteNl (StdOutput);
+	   *)
+	   END;
+	   ReleaseSet (Cyclics);
+	ELSE
+	   IF (Referenced IN Properties) OR (BaseClass^.Kind = Tree.NoClass) THEN
+	      Closure (A);
+	      IF HasReflexive (A) THEN
+		 Include (HasCycle, ActClass^.Class.Index);
+	      END;
+	      MakeRelation (B, AttrCount, AttrCount);
+	      FOR i := 2 TO AttrCount DO		(* project on left-hand side *)
+		 FOR j := 2 TO AttrCount DO
+		    IF IsRelated (i, j, A) THEN
+		       Relation.Include (B, i, j);
+		    END;
+		 END;
+	      END;
+	      IF Relation.IsEmpty (B) THEN
+		 ReleaseRelation (B);
+		 RETURN;
+	      END;
+	      ActD := D;	(* is B already covered by (subset of) some x in D? *)
+	      WHILE ActD # NIL DO
+		 IF Relation.IsSubset (B, ActD^.Relation) THEN
+		    ReleaseRelation (B);
+		    RETURN;
+		 END;
+		 ActD := ActD^.Next;
+	      END;
+	      ActD := D;		(* remove all x in D covered by (subset of) B *)
+	      LastNext := ADR (D);
+	      WHILE ActD # NIL DO
+		 IF Relation.IsSubset (ActD^.Relation, B) THEN
+		    ActD := ActD^.Next;
+		    Free (TSIZE (tSetOfRel), LastNext^);
+		    LastNext^ := ActD;
+		 ELSE
+		    LastNext := ADR (ActD^.Next);
+		    ActD := ActD^.Next;
+		 END;
+	      END;
+	      ActD := Alloc (TSIZE (tSetOfRel));	(* include B in D *)
+	      ActD^.Next := D;
+	      ActD^.Relation := B;
+	      D := ActD;
+	      FOR UserIndex := Minimum (Users) TO Maximum (Users) DO
+		 IF IsElement (UserIndex, Users) AND IsElement (UserIndex, Relevant) THEN
+		    Enqueue (UserIndex);
+		 END;
+	      END;
+	   END;
+	   IF BaseClass^.Kind # Tree.NoClass THEN
+	      CheckWAG5 (BaseClass, A);
+	   END;
+	END;
+}; .

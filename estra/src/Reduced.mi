@@ -1,0 +1,282 @@
+(* $Id: Reduced.mi,v 2.1 1993/08/18 15:18:10 grosch rel $ *)
+
+IMPLEMENTATION MODULE Reduced;
+
+FROM	DynArray	IMPORT	MakeArray, ReleaseArray;
+
+FROM	Grammar		IMPORT	tLayout, Layout, Subclasses, Arity, SuperClass,
+				SonClass, NodesOfClass;
+
+FROM	Errors		IMPORT	eError, eIdent,
+				ErrorMessageI, ErrorMessage;
+
+FROM	Idents		IMPORT	tIdent;
+
+FROM	rMemory		IMPORT	Alloc, Free;
+
+FROM	Scanner		IMPORT	MaxIdent, NoIdent, NoValue;
+
+FROM	Sets		IMPORT	tSet, MakeSet, ReleaseSet,
+				IsEmpty, IsElement, Include,
+				Extract, Exclude, Assign,
+				Difference, Intersection, Union;
+
+FROM	Stack		IMPORT	tStack, MakeStack, ReleaseStack,
+				Pop, Push,
+				IsEmptyStack;
+
+FROM	SYSTEM		IMPORT	ADR, TSIZE;
+
+FROM	Types		IMPORT	tType, Type, AllClasses;
+
+IMPORT	Lists, Stack;
+
+
+CONST
+  infinite	= 10000;
+
+
+PROCEDURE TestReduced (StartClasses: tSet);
+  BEGIN
+    IsReduced := TRUE;
+    MakeSet (UnReachable, MaxIdent);
+    MakeSet (UnDerivable, MaxIdent);
+    Reachable (StartClasses);
+    Derivable;
+  END TestReduced;
+
+PROCEDURE Reachable (StartClasses: tSet);
+  VAR
+    UnReached, Pending, Classes, Nodes: tSet;
+    node, class, sonclass: tIdent;
+    layout: tLayout;
+    pos: INTEGER;
+  BEGIN
+    MakeSet (UnReached, MaxIdent);
+    AllClasses (UnReached);		(* no class is reached *)
+    MakeSet (Pending, MaxIdent);
+    Union (Pending, StartClasses);	(* start class is pending *)
+    MakeSet (Classes, MaxIdent);
+    MakeSet (Nodes, MaxIdent);
+    Difference (UnReached, Pending);	(* but not unreached *)
+    WHILE NOT IsEmpty (Pending) DO
+      class := Extract (Pending);
+      NodesOfClass (class, Nodes);
+      WHILE NOT IsEmpty (Nodes) DO
+	node := Extract (Nodes);
+	IF Arity (node) # NoValue THEN
+	  layout := Layout (node, class);
+	  FOR pos := 1 TO Arity (node) DO
+	    sonclass := SonClass (layout, pos);
+	    IF IsElement (sonclass, UnReached) THEN
+	      Exclude (UnReached, sonclass);
+	      Include (Pending, sonclass);
+	    END;
+	  END;
+	END;
+      END;
+
+      Subclasses (class, Classes);		(* subclasses *)
+      Intersection (Classes, UnReached);	(* new reached *)
+      Difference (UnReached, Classes);		(* no longer unreached *)
+      Union (Pending, Classes);			(* but pending *)
+
+    END;
+
+    IF NOT IsEmpty (UnReached) THEN
+      IsReduced := FALSE;
+      Assign (UnReachable, UnReached);
+    END;
+    ReleaseSet (Classes);
+    ReleaseSet (Nodes);
+    ReleaseSet (UnReached);
+    ReleaseSet (Pending);
+  END Reachable;
+
+
+TYPE
+  tClassTask =
+    RECORD
+      Done: BOOLEAN;
+      Pred: tStack;
+    END;
+  
+  tNodeTask =
+    RECORD
+      Count: INTEGER;
+      Class: tIdent; 
+      Node: tIdent;
+    END;
+
+  tClassTaskPtr= POINTER TO tClassTask;
+  tNodeTaskPtr= POINTER TO tNodeTask;
+
+VAR
+  ClassArray: POINTER TO ARRAY [0..infinite] OF tClassTaskPtr;
+  Size: LONGINT;
+  NodeStack: tStack;
+  ReadyTasks: tStack;
+
+PROCEDURE Derivable;
+  BEGIN
+    MakeStack (ReadyTasks);
+    MakeClassTasks;
+    MakeNodeTasks;
+
+    DoTasks;
+    
+    CheckClasses;
+
+    (*		reporting the errors for the classes is enough
+    *)
+    CheckNodes;
+    (*
+    *)
+
+    ReleaseClassTasks;
+    ReleaseStack (ReadyTasks);
+  END Derivable;
+
+
+PROCEDURE DoTasks;
+  VAR NodeTask: tNodeTaskPtr;
+  class: tIdent;
+  start: tIdent;
+  BEGIN
+    WHILE NOT IsEmptyStack (ReadyTasks) DO
+      NodeTask := Pop (ReadyTasks);
+      class := NodeTask^.Class;
+      start := class;
+      LOOP
+	WITH ClassArray^[class]^ DO
+	  IF NOT Done THEN
+	    WHILE NOT IsEmptyStack (Pred) DO
+	      NodeTask := Pop (Pred);
+	      WITH NodeTask^ DO
+		DEC (Count);
+		IF Count = 0 THEN
+		  Push (ReadyTasks, NodeTask);
+		END;
+	      END;
+	    END;
+	    Done := TRUE;
+	  END;
+	  class := SuperClass (class);
+	  IF (class = NoIdent) OR (class = start) THEN EXIT END;
+	END;
+      END;
+    END;
+  END DoTasks;
+
+PROCEDURE MakeClassTasks;
+  VAR class: tIdent; Classes: tSet;
+  BEGIN
+    MakeSet (Classes, MaxIdent);
+    AllClasses (Classes);
+    Size := MaxIdent + 1;
+    MakeArray (ClassArray, Size, TSIZE (tClassTaskPtr));
+    WHILE NOT IsEmpty (Classes) DO
+      class := Extract (Classes);
+      ClassArray^[class] := Alloc (TSIZE (tClassTask));
+      WITH ClassArray^ [class]^ DO
+	Done := FALSE;
+	MakeStack (Pred);
+      END;
+    END;
+    ReleaseSet (Classes);
+  END MakeClassTasks;
+
+
+PROCEDURE ReleaseClassTasks;
+  VAR class: tIdent; Classes: tSet;
+  BEGIN
+    MakeSet (Classes, MaxIdent);
+    AllClasses (Classes);
+    WHILE NOT IsEmpty (Classes) DO
+      class := Extract (Classes);
+      ReleaseStack (ClassArray^[class]^.Pred);
+      Free (TSIZE (tClassTask), ClassArray^[class]);
+    END;
+    ReleaseArray (ClassArray, Size, TSIZE(tClassTaskPtr));
+    ReleaseSet (Classes);
+  END ReleaseClassTasks;
+
+
+PROCEDURE MakeNodeTasks;
+  VAR
+    NodeTask: tNodeTaskPtr;
+    Nodes, Classes: tSet;
+    layout: tLayout; 
+    sonclass, class, node: tIdent;
+    pos: INTEGER;
+  BEGIN
+    MakeStack (NodeStack);
+    MakeSet (Nodes, MaxIdent);
+    MakeSet (Classes, MaxIdent);
+    AllClasses (Classes);
+    WHILE NOT IsEmpty (Classes) DO
+      class := Extract (Classes);
+      NodesOfClass (class, Nodes);
+      WHILE NOT IsEmpty (Nodes) DO
+	node := Extract (Nodes);
+	IF Arity (node) # NoValue THEN
+	  layout := Layout (node, class);
+	  NodeTask := Alloc (TSIZE (tNodeTask));
+	  WITH NodeTask^ DO
+	    Count := Arity (node);
+	    Class := class;
+	    Node := node;
+	  END;
+	  IF Arity (node) = 0 THEN
+	    Push (ReadyTasks, NodeTask)
+	  END;
+	  FOR pos := 1 TO Arity (node) DO
+	    sonclass := SonClass (layout, pos);
+	    IF sonclass # NoIdent THEN
+	      Push (ClassArray^[sonclass]^.Pred, NodeTask);
+	    END;
+	  END;
+	  Push (NodeStack, NodeTask);
+	END;
+      END;
+    END;
+    ReleaseSet (Classes);
+    ReleaseSet (Nodes);
+  END MakeNodeTasks;
+
+
+PROCEDURE CheckClasses;
+  VAR class: tIdent; Classes: tSet;
+  BEGIN
+    MakeSet (Classes, MaxIdent);
+    WHILE NOT IsEmpty (Classes) DO
+      class := Extract (Classes);
+      WITH ClassArray^[class]^ DO
+	IF NOT Done THEN
+	  Include (UnDerivable, class);
+	END;
+      END;
+    END;
+    ReleaseSet (Classes);
+  END CheckClasses;
+
+
+PROCEDURE CheckNodes;
+  VAR Nodes: tStack; NodeTask: tNodeTaskPtr;
+  BEGIN
+    MakeStack (Nodes);
+    Stack.Assign (Nodes, NodeStack);
+    WHILE NOT IsEmptyStack (Nodes) DO
+      NodeTask := Pop (Nodes);
+      WITH NodeTask^ DO
+	IF Count > 0 THEN
+	  (* ??? *)
+	END;
+      END;
+    END;
+    ReleaseStack (Nodes);
+  END CheckNodes;
+
+BEGIN
+  IsReduced := FALSE;
+END Reduced.

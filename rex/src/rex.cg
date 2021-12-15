@@ -1,0 +1,262 @@
+/* $Id: rex.cg,v 3.10 2007/03/27 09:49:25 grosch rel $ */
+
+/*
+ * $Log: rex.cg,v $
+ * Revision 3.10  2007/03/27 09:49:25  grosch
+ * fixed overflow of variable NodeCount
+ * changed some INT types to CARD
+ *
+ * Revision 3.9  2001/08/28 20:50:52  grosch
+ * added option and call for DrawTree
+ *
+ * Revision 3.8  2001/08/08 14:57:56  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 3.7  2001/01/08 20:26:22  grosch
+ * made writeUCHAR work for Unicode characters
+ *
+ * Revision 3.6  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 3.5  1998/04/21 10:33:20  grosch
+ * cosmetic changes
+ * truncation of file and module names to 8.3 format
+ *
+ * Revision 3.4  1993/08/18 15:11:05  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 3.3  1992/08/07  15:11:08  grosch
+ * allow several scanner and parsers; extend module Errors
+ * 
+ * Revision 3.2  1992/01/14  10:42:44  grosch
+ * fixed bug: multiply NodeCount by Card (StartStates)
+ * 
+ * Revision 3.1  1991/11/21  14:42:27  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ * 
+ * Revision 3.0  91/04/04  18:26:41  grosch
+ * Initial revision
+ * 
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, March 1991/August 2000 */
+
+TREE Tree0
+
+IMPORT	{
+FROM Sets	IMPORT tSet;
+FROM HugeSets	IMPORT tHugeSet;
+FROM Texts	IMPORT tText;
+FROM StringM	IMPORT tStringRef;
+FROM Position	IMPORT tPosition;
+FROM Idents	IMPORT tIdent;
+FROM Tree	IMPORT tTree;
+FROM UniCode	IMPORT UCHAR;
+}
+
+GLOBAL	{
+FROM Sets	IMPORT tSet;
+FROM HugeSets	IMPORT tHugeSet, WriteSet;
+FROM Texts	IMPORT tText;
+FROM StringM	IMPORT tStringRef;
+FROM Position	IMPORT tPosition;
+FROM Idents	IMPORT tIdent;
+FROM UniCode	IMPORT UCHAR, WriteChar;
+
+# define writetHugeSet(a) WriteSet (yyf, a);
+# define writeUCHAR(a)	  WriteChar (yyf, a);
+}
+
+RULE
+
+Node			= <
+   Node1		= Son1: Node <
+      Option		= .
+      Repetition	= .
+   > .
+   Node2		= Son1: Node REV Son2: Node <
+      List		= .
+      Sequence		= .
+      Alternative	= .
+   > .
+   Ch			= [Ch: UCHAR] .
+   Set			= [Set: tHugeSet] .
+   String		= [String: tStringRef] .
+   Rule			= Patterns: Node [TargetCode: tText] 
+			  [File: tIdent] [Line: CARDINAL]
+			  [CodeMode: SHORTCARD] [RuleNr: SHORTCARD] .
+   Pattern		= [StartStates: tSet] RegExpr: Node RightContext: Node
+			  [PatternNr: SHORTCARD] [Position: tPosition] .
+> .
+
+MODULE Tree
+
+EVAL GLOBAL {
+FROM General	IMPORT MinCard;
+FROM Strings	IMPORT tString, AssignEmpty, Length, Append, Char;
+FROM StringM	IMPORT GetString, PutWString;
+FROM HugeSets	IMPORT tHugeSet, MakeSet, Card, Assign, Intersection, Select,
+			Extract, IsEmpty, Union;
+FROM Classes	IMPORT ToClass, IsInSetMem, SetMemPtr, CharSet, LastClass;
+FROM Dfa	IMPORT LastCh;
+
+IMPORT StringM, Sets, WStrings;
+
+FROM Tree	IMPORT
+   tTree	, NoTree	, MakeTree1	, MakeTree2	,
+   MakeTreeRule	, MakeTreePattern, MakeTreeCh	, MakeTreeSet	,
+   MakeTreeString, nList	, nRule		, nPattern	,
+   nAlternative	, nSequence	, nRepetition	, nOption	,
+   nChar	, nSet		, nString	;
+
+VAR
+   Set1			: tHugeSet;
+}
+
+LOCAL {
+VAR
+   String1		: tString;
+   String2		: WStrings.tString;
+   Set2			: Sets.tSet;
+   i, j			: CARDINAL;
+   Lwb, Upb, k		: LONGCARD;
+}
+
+BEGIN { MakeSet (Set1); }
+
+DECLARE Node	= -> [Tree: tTree] .
+	Set	= -> [card: LONGCARD] .
+
+RULE
+
+Node		= { Tree := NoTree;						} .
+Option		= { Tree := MakeTree1 (nOption, Son1:Tree);			} .
+Repetition	= { Tree := MakeTree1 (nRepetition, Son1:Tree);			} .
+List		= { Tree := MakeTree2 (nList, Son1:Tree, Son2:Tree);		} .
+Sequence	= { Tree := MakeTree2 (nSequence, Son1:Tree, Son2:Tree);	} .
+Alternative	= { Tree := MakeTree2 (nAlternative, Son1:Tree, Son2:Tree);	} .
+Ch		= { Tree := MakeTreeCh (nChar, ToClass (Ch));			} .
+Set		= { Tree card := {
+		    j := IsInSetMem (Set);
+		    IF j # 0 THEN
+		       card := Sets.Card (SetMemPtr^[j].Classes);
+		       Assign (Set1, Set);
+		       Intersection (Set1, CharSet);
+		       INC (card, Card (Set1));
+		       IF card = 1 THEN
+			  IF Sets.Card (SetMemPtr^[j].Classes) = 1 THEN
+			     Tree := MakeTreeCh (nChar, Sets.Select (SetMemPtr^[j].Classes));
+			  ELSE
+			     Tree := MakeTreeCh (nChar, ToClass (Select (Set1)));
+			  END;
+		       ELSE
+			  Sets.MakeSet (Set2, LastClass);
+					(* map chars from CharSet to classes *)
+			  WHILE NOT IsEmpty (Set1) DO
+			     Extract (Set1, Lwb, Upb);
+			     FOR k := Lwb TO Upb DO
+				Sets.Include (Set2, ToClass (k));
+			     END;
+			  END;
+					(* add classes for sets *)
+			  Sets.Union (Set2, SetMemPtr^[j].Classes);
+			  Tree := MakeTreeSet (nSet, Set2);
+		       END;
+		    ELSE		(* chars are not classified *)
+		       card := Card (Set);
+		       IF card = 1 THEN
+			  Tree := MakeTreeCh (nChar, Select (Set));
+		       ELSE
+			  Sets.MakeSet (Set2, LastClass);
+					(* convert tHugeSet to tSet *)
+			  Assign (Set1, Set);
+			  WHILE NOT IsEmpty (Set1) DO
+			     Extract (Set1, Lwb, Upb);
+			     FOR k := Lwb TO MinCard (Upb, LastCh) DO
+				Sets.Include (Set2, ToClass (k));
+			     END;
+			  END;
+			  Tree := MakeTreeSet (nSet, Set2);
+		       END;
+		    END;
+		  };								} .
+String		= { Tree := {
+		       GetString (String, String1);
+		       WStrings.AssignEmpty (String2);
+		       FOR i := 1 TO Length (String1) DO
+			  WStrings.Append (String2, ToClass (ORD (Char (String1, i))));
+		       END;
+		       Tree := MakeTreeString (nString, PutWString (String2));
+		    };								} .
+Rule		= { Tree := MakeTreeRule (nRule, Patterns:Tree, TargetCode,
+			File, Line, CodeMode, RuleNr);				} .
+Pattern		= { Tree := MakeTreePattern (nPattern, StartStates, RegExpr:Tree, RightContext:Tree,
+				RegExpr:IsConstantRE AND RightContext:IsConstantRE, PatternNr, Position);	} .
+
+END Tree
+
+MODULE IsConstantRE
+
+DECLARE Node	= -> [IsConstantRE: BOOLEAN] .
+
+RULE
+
+Node		= { IsConstantRE := TRUE;					} .
+Option		= { IsConstantRE := FALSE;					} .
+Repetition	= { IsConstantRE := FALSE;					} .
+Sequence	= { IsConstantRE := Son1:IsConstantRE AND Son2:IsConstantRE;	} .
+Alternative	= { IsConstantRE := FALSE;					} .
+Ch		= { IsConstantRE := TRUE;					} .
+Set		= { IsConstantRE := card = 1;					} .
+String		= { IsConstantRE := TRUE;					} .
+
+END IsConstantRE
+
+MODULE LeafCount
+
+DECLARE Node	= -> [LeafCount: SHORTCARD] .
+
+RULE
+
+Node		= { LeafCount := 0;					} .
+Node1		= { LeafCount := Son1:LeafCount;			} .
+Node2		= { LeafCount := Son1:LeafCount + Son2:LeafCount;	} .
+Ch		= { LeafCount := 1;					} .
+Set		= { LeafCount := 1;					} .
+String		= { LeafCount := StringM.Length (String);		} .
+Rule		= { LeafCount := Patterns:LeafCount;			} .
+Pattern		= { LeafCount := {
+		       IF NOT (RegExpr:IsConstantRE AND RightContext:IsConstantRE) THEN
+			  LeafCount := RegExpr:LeafCount + RightContext:LeafCount;
+		       ELSE
+			  LeafCount := 0;
+		       END;
+		    };							} .
+
+END LeafCount
+
+MODULE NodeCount
+
+DECLARE Node	= -> [NodeCount: SHORTCARD] .
+	Pattern	= -> [card: SHORTCARD] .
+
+RULE
+
+Node		= { NodeCount := 0;					} .
+Node1		= { NodeCount := Son1:NodeCount;			} .
+Node2		= { NodeCount := Son1:NodeCount + Son2:NodeCount;	} .
+Ch		= { NodeCount := 1;					} .
+Set		= { NodeCount := 1;					} .
+String		= { NodeCount := StringM.Length (String);		} .
+Rule		= { NodeCount := Patterns:NodeCount;			} .
+Pattern		= { NodeCount card := {
+		       IF RegExpr:IsConstantRE AND RightContext:IsConstantRE THEN
+			  card := Sets.Card (StartStates);
+			  NodeCount := (RegExpr:NodeCount + RightContext:NodeCount) * card;
+		       ELSE
+			  NodeCount := 0;
+		       END;
+		    };							} .
+
+END NodeCount

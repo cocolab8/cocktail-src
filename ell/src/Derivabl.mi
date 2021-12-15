@@ -1,0 +1,98 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Derivabl.mi,v $
+ *	
+ *	purpose:	check derivability of each nonterminal
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+IMPLEMENTATION MODULE Derivabl;
+
+FROM General	IMPORT	Min;
+FROM Idents	IMPORT	tIdent;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsElement, IsEmpty,
+			Include, Exclude, Maximum, Minimum, Extract;
+FROM Table	IMPORT	Expr, Length, SetLength, MaxId;
+FROM Tree	IMPORT	tTree, Option, Times, Plus, List, Action, Leaf,
+			Alternative0, Alternative, Sequence0, Sequence;
+FROM Types	IMPORT	Terminals, Nonterminals;
+
+VAR infinite: INTEGER;
+
+PROCEDURE TestDerivable;
+  VAR
+    N: tSet;
+    nt: tIdent;
+    t: tTree;
+    success: BOOLEAN;
+  BEGIN
+    MakeSet (N, MaxId);
+    REPEAT
+      Nonterminals (N);
+      success := FALSE;
+      WHILE NOT IsEmpty (N) DO
+	nt := Extract (N);
+	t := Expr (nt);
+	YetLength (t);
+	IF t^.expr.length < Length (nt) THEN
+	  success := TRUE;
+	  SetLength (nt, t^.expr.length);
+	END;
+      END;
+    UNTIL NOT success;
+    ReleaseSet (N);
+  END TestDerivable;
+
+PROCEDURE YetLength (t: tTree);
+  BEGIN
+    CASE t^.Kind OF
+    | Option:
+	YetLength (t^.Option.expr);
+	t^.Option.length := 0;
+    | Times:
+	YetLength (t^.Times.expr);
+	t^.Times.length := 0;
+    | Plus:
+	YetLength (t^.Plus.expr);
+	t^.Plus.length := t^.Plus.expr^.expr.length;
+    | List:
+	YetLength (t^.List.body);
+	YetLength (t^.List.sep);
+	t^.List.length := t^.List.body^.expr.length;
+    | Action:
+	t^.Action.length := 0;
+    | Leaf:
+	t^.Leaf.length := Length (t^.Leaf.id^.Id.ident)
+    | Alternative0:
+	t^.Alternative0.length := infinite;
+    | Alternative:
+	YetLength (t^.Alternative.expr);
+	YetLength (t^.Alternative.alternative);
+	t^.Alternative.length :=
+	  Min (t^.Alternative.expr^.expr.length, t^.Alternative.alternative^.expr.length)
+    | Sequence0:
+	t^.Sequence0.length := 0;
+    | Sequence:
+	YetLength (t^.Sequence.expr);
+	YetLength (t^.Sequence.sequence);
+	t^.Sequence.length :=
+	  Min (t^.Sequence.sequence^.expr.length + t^.Sequence.expr^.expr.length, infinite);
+    END;
+  END YetLength;
+
+PROCEDURE IsDerivable	(Nonterm: tIdent): BOOLEAN;
+  BEGIN
+    RETURN Length (Nonterm) < infinite;
+  END IsDerivable;
+
+PROCEDURE IsNullable	(Nonterm: tIdent): BOOLEAN;
+  BEGIN
+    RETURN Length (Nonterm) = 0;
+  END IsNullable;
+
+BEGIN
+  infinite := MAX (INTEGER) DIV 2;
+END Derivabl.

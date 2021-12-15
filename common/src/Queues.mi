@@ -1,0 +1,303 @@
+(* adt queue	*)
+
+(* $Id: Queues.mi,v 1.6 2008/09/12 14:03:45 grosch rel $ *)
+
+(*
+ * $Log: Queues.mi,v $
+ * Revision 1.6  2008/09/12 14:03:45  grosch
+ * cosmetic changes
+ *
+ * Revision 1.5  1997/05/27 14:58:14  grosch
+ * cosmetic changes
+ *
+ * Revision 1.4  1994/02/23 22:12:34  grosch
+ * deleted unused objects
+ *
+ * Revision 1.3  1993/08/18  15:09:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 1.2  1990/06/12  18:33:42  grosch
+ * layout improvements
+ *
+ * Revision 1.1  89/01/31	15:59:23  vielsack
+ * Initial revision
+ *
+ *)
+
+IMPLEMENTATION MODULE Queues;
+
+(*
+FROM	Errors		IMPORT	ERROR;
+*)
+FROM	IO		IMPORT	tFile,		StdError,	WriteS,
+				WriteI,		WriteNl;
+FROM	rMemory		IMPORT	Alloc,		Free;
+FROM	SYSTEM		IMPORT	ADDRESS,	TSIZE;
+
+CONST
+  InitSize = 2;
+
+VAR
+  ElmtSize: tIndex;
+
+PROCEDURE MakeQueue	(VAR Queue: tQueue);
+  BEGIN
+    WITH Queue DO
+      Size  := InitSize;
+      First := 0;
+      Last  := Size - 1;
+      Array := Alloc (Size * ElmtSize);
+    END;
+  END MakeQueue;
+
+PROCEDURE ReleaseQueue	(VAR Queue: tQueue);
+  BEGIN
+    WITH Queue DO
+      Free (Size * ElmtSize, Array);
+      Array := NIL;
+      Size := 0;
+    END;
+  END ReleaseQueue;
+
+PROCEDURE AssignEmpty	(VAR Queue: tQueue);
+  BEGIN
+    WITH Queue DO
+      First := 0;
+      Last  := Size - 1;
+    END;
+  END AssignEmpty;
+
+PROCEDURE Append	(VAR Queue: tQueue; Elmt: tElmt);
+  BEGIN
+    WITH Queue DO
+      INC (Last);
+      IF Last = Size THEN Last := 0 END;
+      Array^[Last] := Elmt;
+      IF IsEmpty (Queue) THEN		(* overflow *)
+	ExtendQueue (Queue);
+      END;
+    END;
+  END Append;
+
+PROCEDURE Head		(    Queue: tQueue): tElmt;
+  BEGIN
+    WITH Queue DO
+(*
+      IF IsEmpty (Queue) THEN
+	ERROR ('Queues: "Head" of empty queue is not defined');
+      END;
+*)
+      RETURN Array^[First];
+    END;
+  END Head;
+
+PROCEDURE Last		(    Queue: tQueue): tElmt;
+  BEGIN
+    WITH Queue DO
+(*
+      IF IsEmpty (Queue) THEN
+	ERROR ('Queues: "Last" of empty queue is not defined');
+      END;
+*)
+      RETURN Array^[Last];
+    END;
+  END Last;
+
+PROCEDURE Tail		(VAR Queue: tQueue);
+  BEGIN
+    ClearHead (Queue);
+  END Tail;
+
+PROCEDURE ClearHead	(VAR Queue: tQueue);
+  BEGIN
+    WITH Queue DO
+(*
+      IF IsEmpty (Queue) THEN
+	ERROR ('Queues: "ClearHead" of empty queue is not defined');
+      END;
+*)
+      INC (First);
+      IF First = Size THEN First := 0 END;
+    END;
+  END ClearHead;
+
+PROCEDURE ClearLast	(VAR Queue: tQueue);
+  BEGIN
+    WITH Queue DO
+(*
+      IF IsEmpty (Queue) THEN
+	ERROR ('Queues: "ClearLast" of empty queue is not defined');
+      END;
+*)
+      IF Last = 0 THEN Last := Size END;
+      DEC (Last);
+    END;
+  END ClearLast;
+
+PROCEDURE Insert	(VAR Queue: tQueue; Elmt: tElmt);
+  BEGIN
+    WITH Queue DO
+      IF First = 0 THEN First := Size END;
+      DEC (First);
+      Array^[First] := Elmt;
+      IF IsEmpty (Queue) THEN	(* overflow *)
+	ExtendQueue (Queue);
+      END;
+    END;
+  END Insert;
+
+PROCEDURE IsEmpty	(    Queue: tQueue): BOOLEAN;
+  BEGIN
+    WITH Queue DO
+      RETURN (Last + 1) MOD Size = First;
+    END;
+  END IsEmpty;
+
+PROCEDURE Length	(    Queue: tQueue): tIndex;
+  VAR
+    Len: tIndex;
+  BEGIN
+    WITH Queue DO
+      Len := Last + 1 - First;
+      IF Len < 0 THEN
+	INC (Len, Size);
+      ELSIF Len >= Size THEN
+	DEC (Len, Size);
+      END;
+      RETURN Len;
+    END;
+  END Length;
+
+PROCEDURE GetElement	(    Queue: tQueue; Pos: tIndex): tElmt;
+  VAR
+    Index: tIndex;
+  BEGIN
+    WITH Queue DO
+(*
+      IF (Pos < 1) OR (Pos > Length (Queue)) THEN
+	ERROR ('Queues: "pos" in "GetElement" is out of range');
+      END;
+*)
+      Index := First + Pos - 1;
+      IF Index >= Size THEN
+	DEC (Index, Size);
+      END;
+      RETURN Array^[Index];
+    END;
+  END GetElement;
+
+PROCEDURE Assign	(VAR Queue1: tQueue; Queue2: tQueue);
+  VAR
+    len, i: tIndex;
+  BEGIN
+    len := Length (Queue2);
+    IF len = 0 THEN
+      AssignEmpty (Queue1);
+    ELSE
+      WITH Queue1 DO
+	IF len >= Size THEN
+	  Free (Size * ElmtSize, Array);
+	  Size := len+1;
+	  Array := Alloc (Size * ElmtSize);
+	END;
+	First := 0;
+	Last := -1;		(* index to write in Queue1	*)
+	i := Queue2.First;	(* index to read from Queue2	*)
+	IF i > Queue2.Last THEN (* Queue is not compact		*)
+	  REPEAT
+	    INC (Last);
+	    Array^[Last] := Queue2.Array^[i];
+	    INC (i);
+	  UNTIL i = Queue2.Size;
+	  i := 0;
+	END;
+	REPEAT
+	  INC (Last);
+	  Array^[Last] := Queue2.Array^[i];
+	  INC (i);
+	UNTIL i > Queue2.Last;
+      END;
+    END;
+  END Assign;
+
+PROCEDURE TakeHead (VAR Queue: tQueue): tElmt;
+  VAR
+    Elmt: tElmt;
+  BEGIN
+    Elmt := Head (Queue);
+    ClearHead (Queue);
+    RETURN Elmt;
+  END TakeHead;
+
+PROCEDURE TakeLast (VAR Queue: tQueue): tElmt;
+  VAR
+    Elmt: tElmt;
+  BEGIN
+    Elmt := Last (Queue);
+    ClearLast (Queue);
+    RETURN Elmt;
+  END TakeLast;
+
+(*
+PROCEDURE PackQueue (VAR Queue: tQueue);
+  VAR
+    hQueue: tQueue;
+  BEGIN
+    WITH hQueue DO
+      Size := Length (Queue) + 1;
+      Array := Alloc (Size * ElmtSize);
+      Assign (hQueue, Queue);
+    END;
+    Free (Queue.Size * ElmtSize, Queue.Array);
+    Queue := hQueue;
+  END PackQueue;
+*)
+
+PROCEDURE ExtendQueue	(VAR Queue: tQueue);
+  VAR
+    i: tIndex;
+    hArray: tArrayPtr;
+  BEGIN
+    WITH Queue DO
+      hArray := Alloc (2 * Size * ElmtSize);
+
+      IF First <= Last THEN
+
+	FOR i := First TO Last DO
+	  hArray^[i] := Array^[i];
+	END;
+
+      ELSE
+
+	FOR i := 0 TO Last DO
+	  hArray^[i] := Array^[i];
+	END;
+	FOR i := First TO Size - 1 DO
+	  hArray^[i + Size] := Array^[i];
+	END;
+	INC (First, Size);
+
+      END;
+      Free (Size * ElmtSize, Array);
+      Size := 2 * Size;
+      Array := hArray;
+    END;
+  END ExtendQueue;
+
+(*
+PROCEDURE WriteQueue	(file: tFile; Queue: tQueue);
+  BEGIN
+    WITH Queue DO
+      WriteS (file, 'Size:  '); WriteI (file, Size, 1); WriteNl (file);
+      WriteS (file, 'First: '); WriteI (file, First, 1); WriteNl (file);
+      WriteS (file, 'Last:  '); WriteI (file, Last, 1); WriteNl (file);
+    END;
+  END WriteQueue;
+*)
+
+BEGIN
+  ElmtSize := TSIZE (tElmt);
+  IF ODD (ElmtSize) & (ElmtSize > 1) THEN
+    INC (ElmtSize);
+  END;
+END Queues.

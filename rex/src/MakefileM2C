@@ -1,0 +1,168 @@
+                # Modula-2 library
+LIB	= ../../reuse/src
+
+                # options for modula compiler
+MFLAGS	= -nobounds -norange -M. -M$(LIB)
+
+                # option to name linked program
+OUT	= ; mv a.out
+
+MD	= m2c $(MFLAGS)		# command to compile definition module
+MI	= m2c $(MFLAGS)		# command to compile implementation module
+MP	= m2c $(MFLAGS)		# command to compile program module
+ML	= m2c $(MFLAGS) -e	# command to link program
+
+ED	= .def	# extension for definition module
+EI	= .mod	# extension for implementation module
+EP	= .mod	# extension for program module
+ES	= .sym	# extension for symbol file (compiled definition)
+EO	= .o	# extension for object file (compiled implementation)
+
+SD	= .def	# compiler suffix for definition module
+SI	= .mod	# compiler suffix for implementation module
+SP	= .mod	# compiler suffix for program module
+
+all	:
+
+# HEAD
+
+Classes$(ES)	: Classes$(ED)	; $(MD) Classes$(SD)
+
+Classes$(EO)	: Classes$(EI)	; $(MI) Classes$(SI)
+Classes$(EO)	: Classes$(ES)
+Classes$(EO)	: Tree0$(ES)
+Classes$(EO)	: Dfa$(ES)
+
+DefTable$(ES)	: DefTable$(ED)	; $(MD) DefTable$(SD)
+DefTable$(ES)	: Tree$(ES)
+
+DefTable$(EO)	: DefTable$(EI)	; $(MI) DefTable$(SI)
+DefTable$(EO)	: DefTable$(ES)
+DefTable$(EO)	: Tree$(ES)
+
+Dfa$(ES)	: Dfa$(ED)	; $(MD) Dfa$(SD)
+
+Dfa$(EO)	: Dfa$(EI)	; $(MI) Dfa$(SI)
+Dfa$(EO)	: Dfa$(ES)
+Dfa$(EO)	: GenTabs$(ES)
+Dfa$(EO)	: Classes$(ES)
+
+Errors$(ES)	: Errors$(ED)	; $(MD) Errors$(SD)
+
+Errors$(EO)	: Errors$(EI)	; $(MI) Errors$(SI)
+Errors$(EO)	: Errors$(ES)
+
+Eval$(ES)	: Eval$(ED)	; $(MD) Eval$(SD)
+Eval$(ES)	: Tree0$(ES)
+
+Eval$(EO)	: Eval$(EI)	; $(MI) Eval$(SI)
+Eval$(EO)	: Eval$(ES)
+Eval$(EO)	: Tree0$(ES)
+Eval$(EO)	: Classes$(ES)
+Eval$(EO)	: Dfa$(ES)
+Eval$(EO)	: Tree$(ES)
+
+GenTabs$(ES)	: GenTabs$(ED)	; $(MD) GenTabs$(SD)
+GenTabs$(ES)	: Tree$(ES)
+
+GenTabs$(EO)	: GenTabs$(EI)	; $(MI) GenTabs$(SI)
+GenTabs$(EO)	: GenTabs$(ES)
+GenTabs$(EO)	: DefTable$(ES)
+GenTabs$(EO)	: Tree$(ES)
+GenTabs$(EO)	: Nfa$(ES)
+GenTabs$(EO)	: Dfa$(ES)
+GenTabs$(EO)	: Traces$(ES)
+GenTabs$(EO)	: ScanTabs$(ES)
+GenTabs$(EO)	: ScanGen$(ES)
+GenTabs$(EO)	: Classes$(ES)
+
+Nfa$(ES)	: Nfa$(ED)	; $(MD) Nfa$(SD)
+Nfa$(ES)	: ScanTabs$(ES)
+
+Nfa$(EO)	: Nfa$(EI)	; $(MI) Nfa$(SI)
+Nfa$(EO)	: Nfa$(ES)
+Nfa$(EO)	: ScanTabs$(ES)
+Nfa$(EO)	: GenTabs$(ES)
+
+Parser$(ES)	: Parser$(ED)	; $(MD) Parser$(SD)
+
+Parser$(EO)	: Parser$(EI)	; $(MI) Parser$(SI)
+Parser$(EO)	: Parser$(ES)
+Parser$(EO)	: Scanner$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Errors$(ES)
+Parser$(EO)	: Tree0$(ES)
+Parser$(EO)	: Tree$(ES)
+Parser$(EO)	: DefTable$(ES)
+Parser$(EO)	: GenTabs$(ES)
+Parser$(EO)	: Dfa$(ES)
+Parser$(EO)	: ScanGen$(ES)
+
+ScanGen$(ES)	: ScanGen$(ED)	; $(MD) ScanGen$(SD)
+
+ScanGen$(EO)	: ScanGen$(EI)	; $(MI) ScanGen$(SI)
+ScanGen$(EO)	: ScanGen$(ES)
+ScanGen$(EO)	: Errors$(ES)
+ScanGen$(EO)	: Scanner$(ES)
+ScanGen$(EO)	: DefTable$(ES)
+ScanGen$(EO)	: Dfa$(ES)
+ScanGen$(EO)	: ScanTabs$(ES)
+ScanGen$(EO)	: GenTabs$(ES)
+ScanGen$(EO)	: Tree$(ES)
+ScanGen$(EO)	: Errors$(ES)
+
+ScanTabs$(ES)	: ScanTabs$(ED)	; $(MD) ScanTabs$(SD)
+
+ScanTabs$(EO)	: ScanTabs$(EI)	; $(MI) ScanTabs$(SI)
+ScanTabs$(EO)	: ScanTabs$(ES)
+ScanTabs$(EO)	: Dfa$(ES)
+ScanTabs$(EO)	: GenTabs$(ES)
+ScanTabs$(EO)	: Classes$(ES)
+ScanTabs$(EO)	: ScanGen$(ES)
+ScanTabs$(EO)	: Tree$(ES)
+
+Scanner$(ES)	: Scanner$(ED)	; $(MD) Scanner$(SD)
+
+Scanner$(EO)	: Scanner$(EI)	; $(MI) Scanner$(SI)
+Scanner$(EO)	: Scanner$(ES)
+Scanner$(EO)	: Errors$(ES)
+Scanner$(EO)	: ScanGen$(ES)
+
+Traces$(ES)	: Traces$(ED)	; $(MD) Traces$(SD)
+Traces$(ES)	: Dfa$(ES)
+
+Traces$(EO)	: Traces$(EI)	; $(MI) Traces$(SI)
+Traces$(EO)	: Traces$(ES)
+Traces$(EO)	: Dfa$(ES)
+Traces$(EO)	: GenTabs$(ES)
+
+Tree$(ES)	: Tree$(ED)	; $(MD) Tree$(SD)
+
+Tree$(EO)	: Tree$(EI)	; $(MI) Tree$(SI)
+Tree$(EO)	: Tree$(ES)
+
+Tree0$(ES)	: Tree0$(ED)	; $(MD) Tree0$(SD)
+Tree0$(ES)	: Tree$(ES)
+
+Tree0$(EO)	: Tree0$(EI)	; $(MI) Tree0$(SI)
+Tree0$(EO)	: Tree0$(ES)
+
+all	: rex
+rex$(EO)	: rex$(EP)	; $(MP) rex$(SP)
+rex$(EO)	: Scanner$(ES)
+rex$(EO)	: Parser$(ES)
+rex$(EO)	: Errors$(ES)
+rex$(EO)	: Classes$(ES)
+rex$(EO)	: Eval$(ES)
+rex$(EO)	: Tree$(ES)
+rex$(EO)	: Tree0$(ES)
+rex$(EO)	: Dfa$(ES)
+rex$(EO)	: GenTabs$(ES)
+rex$(EO)	: ScanGen$(ES)
+
+rex	: rex$(EO) ScanGen$(EO) Errors$(EO) Tree$(EO) GenTabs$(EO) Classes$(EO) Dfa$(EO) Tree0$(EO) ScanTabs$(EO) Traces$(EO) Nfa$(EO) DefTable$(EO) Scanner$(EO) Eval$(EO) Parser$(EO)	; $(ML) rex $(OUT) rex
+
+# TAIL
+
+# CLEAN	:	; rm -f core *.[dimor] ERRORS LISTING
+CLEAN	:	; rm -f core *.sym *.o

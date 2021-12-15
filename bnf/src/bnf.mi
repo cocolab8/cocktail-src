@@ -1,0 +1,87 @@
+(* $Id: bnf.mi,v 2.5 1997/05/27 15:17:02 grosch rel $ *)
+
+(*
+ * $Log: bnf.mi,v $
+ * Revision 2.5  1997/05/27 15:17:02  grosch
+ * truncated module names to 8 characters:
+ * Characte, StringM, Position
+ *
+ * Revision 2.4  1993/08/18 15:13:04  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 2.3  1992/08/07  15:34:15  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 2.2  1992/01/30  14:10:10  grosch
+ * redesign of interface to operating system
+ *
+ * Revision 2.1  1991/11/21  14:50:01  grosch
+ * new version of RCS on SPARC
+ *
+ * Revision 2.0  91/03/08  18:34:34  grosch
+ * turned tables into initialized arrays (in C)
+ * moved mapping tokens -> strings from Errors to Parser
+ * changed interface for source position
+ * 
+ * Revision 1.2  90/06/12  15:50:34  grosch
+ * renamed main program to bnf, layout improvements
+ * 
+ * Revision 1.1	 89/02/24  14:03:08  vielsack
+ * BeginSource is no longer called
+ * 
+ * Revision 1.0	 88/10/04  14:47:22  vielsack
+ * Initial revision
+ * 
+ *)
+
+MODULE bnf;
+
+FROM ArgCheck	IMPORT Generate, ArgCheck;
+FROM Errors	IMPORT eError, ErrorCount, BeginErrors, CloseErrors, ErrorTable;
+FROM IO		IMPORT StdOutput, CloseIO;
+FROM MakeBNF	IMPORT MakeBnf;
+FROM Parser	IMPORT Parser;
+FROM Path	IMPORT InsertPath;
+FROM Scanner	IMPORT BeginScanner;
+FROM StringM	IMPORT InitStringMemory;
+FROM Idents	IMPORT InitIdents;
+FROM rSystem	IMPORT rExit;
+FROM TokenTab	IMPORT InitTokenTable;
+
+CONST ErrorTab = 'ErrorTab';
+
+VAR
+  errors : CARDINAL;
+  GoOn	 : BOOLEAN;
+  Status : INTEGER;
+
+BEGIN
+  InitStringMemory;
+  InitIdents;
+
+  ErrorTable := ErrorTab;
+  InsertPath (ErrorTable);
+  BeginErrors;
+
+  ArgCheck;
+  GoOn := Generate;
+
+  IF GoOn THEN
+    InitTokenTable;
+    BeginScanner;
+
+    errors := Parser ();
+    GoOn := ErrorCount [eError] = 0;
+  END;
+
+  IF GoOn THEN
+    MakeBnf (StdOutput);
+    Status := 0;
+  ELSE
+    Status := 1;
+  END;
+
+  CloseErrors;
+  CloseIO;
+  rExit (Status);
+END bnf. 

@@ -1,0 +1,804 @@
+(* $Id: rex.lrk,v 3.24 2007/06/21 16:23:49 grosch rel $ *)
+
+(*
+ * $Log: rex.lrk,v $
+ * Revision 3.24  2007/06/21 16:23:49  grosch
+ * CHARACTER_SET not compatible with options -k and -z
+ *
+ * Revision 3.23  2007/03/27 09:49:25  grosch
+ * fixed overflow of variable NodeCount
+ * changed some INT types to CARD
+ *
+ * Revision 3.22  2006/11/09 15:07:07  grosch
+ * removed 2 grammar conflicts
+ * keywords are not reserved identifiers anymore
+ *
+ * Revision 3.21  2006/08/01 14:14:28  grosch
+ * provide exclusive start states like flex
+ * provide new syntax for all (inclusive and exclusive) start states: #*#
+ * provide alternative syntax for complement of set of start states: - #...#
+ * NOT is not a reserved keyword anymore
+ * introduced separate name spaces for start states and definitions
+ *
+ * Revision 3.20  2001/08/08 14:57:56  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 3.19  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 3.17  2000/02/28 14:41:55  grosch
+ * modified contribution of Thomas Mueller
+ *
+ * Revision 3.16  1999/11/16 17:52:34  grosch
+ * added generation of Java
+ *
+ * Revision 3.15  1998/04/21 10:37:27  grosch
+ * truncation of file and module names to 8.3 format
+ * cosmetic changes
+ *
+ * Revision 3.14  1997/01/17 21:29:43  grosch
+ * removed Errors module, use the one from reuse
+ *
+ * Revision 3.13  1996/04/25  09:42:59  grosch
+ * added option for omitting the predefined rules for skipping of white space
+ *
+ * Revision 3.12  1995/04/15  17:22:56  grosch
+ * added option x that requires explicit definitions for identifiers
+ *
+ * Revision 3.11  1994/11/08  21:47:18  grosch
+ * allow declarations in any order
+ *
+ * Revision 3.10  1994/09/29  11:10:01  grosch
+ * improved error detection for target code sections
+ *
+ * Revision 3.9  1994/09/13  12:44:12  grosch
+ * added generation of Ada code
+ *
+ * Revision 3.8  1994/07/14  12:37:23  grosch
+ * respect that START is a keyword now
+ *
+ * Revision 3.7  1994/04/05  09:11:01  grosch
+ * added handling of CHARACTER_SET
+ *
+ * Revision 3.6  1994/03/15  09:41:46  grosch
+ * removed unused objects
+ *
+ * Revision 3.5  1993/08/31  14:39:46  grosch
+ * fixed runtime errors (range check)
+ *
+ * Revision 3.4  1993/05/28  14:09:53  grosch
+ * added target language Eiffel
+ *
+ * Revision 3.3  1992/08/07  15:11:08  grosch
+ * allow several scanner and parsers; extend module Errors
+ *
+ * Revision 3.2  1992/01/30  13:29:56  grosch
+ * redesign of interface to operating system
+ *
+ * Revision 3.1  1991/11/21  14:42:27  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.0  91/04/04  18:08:06  grosch
+ * introduced partitioning of character set
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, March 1991 *)
+
+EXPORT {
+VAR Explicit, SkipWS	: BOOLEAN;
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT
+   ADDRESS	, ADR		;
+
+FROM IO		IMPORT
+   StdError	, WriteI	, WriteS	, WriteNl	;
+
+FROM Errors	IMPORT
+   Message	, MessageI	, Error		, Warning	,
+   Short	, Long		, String	, WCharacter	;
+
+FROM Tree0	IMPORT
+   tTree0	, Tree0Root	,
+   mNode	, mRule		, mPattern	,
+   mCh		, mSet		, mString	, mList		,
+   mAlternative	, mSequence	, mRepetition	, mOption	;
+
+FROM Scanner	IMPORT
+   ErrorCount	, startCode	, startCharset	, startSet	, startRules;
+
+FROM Tree	IMPORT
+   tTree	, CharCode	;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, Assign	, IsElement	,
+   Union	, Include	, Exclude	, Complement	, IsEmpty	,
+   Difference	, Extract	;
+
+FROM Strings	IMPORT
+   tString	, ArrayToString	, IntToString	;
+
+FROM Lists	IMPORT
+   tList	;
+
+FROM StringM	IMPORT
+   tStringRef	, PutString	;
+
+FROM Idents	IMPORT
+   tIdent	, MakeIdent	, GetString	, GetStringRef	, NoIdent	;
+
+FROM DefTable	IMPORT
+   NoDef	, DefRange	, MakeDefineDef	, MakeStartDef	,
+   tKind	, GetDef	, GetDefineDef	, GetStartDef	;
+
+FROM GenTabs	IMPORT
+   StartStateCount, RuleCount	, PatternCount	, LeftJustUsed	,
+   InclStartStateCount;
+
+FROM Dfa	IMPORT
+   BlankCh	, TabCh		, EolCh		, LastCh	;
+
+FROM ScanGen	IMPORT
+   Import	, Export	, Global	, Local		, Begin		,
+   Close	, Eof		, HasPosition	, NoPosition	,
+   ImportLine	, ExportLine	, GlobalLine	, LocalLine	, BeginLine	,
+   CloseLine	, EofLine	, DefaultLine	, Default	,
+   BlankText	, TabText	, EolText	, RexLib	,
+   Language	, tLanguage	, PackageName	, ScannerName	, InitScanGen	,
+   ImportFile	, ExportFile	, GlobalFile	, LocalFile	, BeginFile	,
+   CloseFile	, DefaultFile	, EofFile	, z		;
+
+FROM UniCode	IMPORT
+   UCHAR	;
+
+IMPORT HugeSets;
+
+TYPE
+   tParsAttribute = RECORD
+      CASE : INTEGER OF
+      | 1: Scan		: Scanner.tScanAttribute;
+      | 2: Tree		: tTree0	;
+	   Position	: Position.tPosition;
+      | 3: IsLeftJust	: BOOLEAN	;
+      END;
+   END;
+
+VAR
+   Count	: SHORTCARD	;
+   Number	: LONGCARD	;
+   ch		: UCHAR		;
+   HasCharSet	: BOOLEAN	;
+   string	: tString	;
+   stringref	: tStringRef	;
+   UsedChars	,
+   UsedCodes	,
+   InclStartStates,
+   Set		: tSet		;
+   HugeSet	: HugeSets.tSet	;
+   tree		: tTree0	;
+   tree1	: tTree		;
+   Definition	: DefRange	;
+   iNOT		,
+   Identifier	: tIdent	;
+   nNode	,
+   EOLTree	: tTree0	;
+   tmpString1	: tString	;
+   tmpString2	: tString	;
+   i		: SHORTCARD	;
+
+PROCEDURE AppendRule (Tree: tTree0; Ch: UCHAR; Text: tList): tTree0;
+   VAR
+      Set	: tSet	;
+      t		: tTree0;
+   BEGIN
+      MakeSet (Set, StartStateCount);
+      Assign (Set, InclStartStates);
+      t := mCh (Ch);
+      INC (PatternCount);
+      t := mPattern (Set, t, nNode, PatternCount, Position.NoPosition);
+      t := mList (nNode, t);
+      INC (RuleCount);
+      t := mRule (t, Text, NoIdent, 0, NoPosition, RuleCount);
+      RETURN mList (Tree, t);
+   END AppendRule;
+
+PROCEDURE CheckId (Ident: tIdent; Position: Position.tPosition);
+   BEGIN
+      IF Ident # NoIdent THEN
+	 Message ("name already defined", Error, Position);
+	 INC (ErrorCount);
+      END;
+   END CheckId;
+
+PROCEDURE Check (VAR Line: CARDINAL; VAR File: tIdent; Position: Position.tPosition);
+   BEGIN
+      IF Line # 0 THEN
+	 Message ("code section already used", Error, Position);
+	 INC (ErrorCount);
+      END;
+      Line := Position.Line;
+      File := Position.File;
+   END Check;
+
+PROCEDURE makeIdent (a: ARRAY OF CHAR): tIdent;
+   VAR s: tString;
+   BEGIN
+      ArrayToString (a, s);
+      RETURN MakeIdent (s);
+   END makeIdent;
+}
+
+BEGIN {
+  nNode := mNode (); HasCharSet := FALSE;
+  ArrayToString ("NOT", string);
+  iNOT := MakeIdent (string);
+}
+
+TOKEN
+
+   Ident	= 1
+   Number	= 2
+   String	= 3
+   Char		= 4
+   TargetCode	= 5
+   SCANNER	= 37
+   'IMPORT'	= 39
+   'EXPORT'	= 32
+   'GLOBAL'	= 6
+   'LOCAL'	= 31
+   'BEGIN'	= 7
+   'CLOSE'	= 8
+   EOF		= 34
+   DEFAULT	= 36
+   CHARACTER_SET= 38
+   DEFINE	= 9
+   \START	= 10
+   RULES	= 11
+   '.'		= 12
+   ','		= 13
+   '='		= 14
+   ':'		= 15
+   ':-'		= 35
+   '#'		= 33
+   '/'		= 16
+   '|'		= 17
+   '+'		= 18
+   '-'		= 19
+   '*'		= 20
+   '?'		= 21
+   '('		= 22
+   ')'		= 23
+   '['		= 24
+   ']'		= 25
+   '{'		= 26
+   '}'		= 27
+   '<'		= 28
+   '>'		= 29
+   \RULE	= 30
+
+PREC
+
+   LEFT	'|'
+   LEFT	'+' '*' '?' '[' '-'
+   LEFT	'(' '{'
+   LEFT	Ident Char String Number
+
+RULE
+
+input		:
+		{ StartStateCount	:= 0;
+		  InclStartStateCount	:= 0;
+		  RuleCount		:= 0;
+		  PatternCount		:= 0;
+		  LeftJustUsed		:= FALSE;
+		  EOLTree		:= mCh (EolCh);
+		  ScannerName		:= NoIdent;
+
+		  ArrayToString ("ANY", string);
+		  HugeSets.MakeSet (HugeSet);
+		  HugeSets.Complement (HugeSet);
+		  HugeSets.Exclude (HugeSet, EolCh);
+		  MakeDefineDef (MakeIdent (string), ADDRESS (mSet (HugeSet)));
+
+		  ArrayToString ("STD", string);
+		  MakeStartDef (MakeIdent (string), StartStateCount + 1);
+		  INC (StartStateCount, 2);
+		}
+
+		  decls
+
+		{ IF InclStartStateCount = 0 THEN
+		    InclStartStateCount := StartStateCount;
+		  END;
+		  MakeSet (InclStartStates, StartStateCount);
+		  FOR i := 1 TO InclStartStateCount DO
+		    Include (InclStartStates, i);
+		  END;
+		  InitScanGen;
+		}
+
+		  rules
+
+		{ IF HasCharSet THEN
+		     MakeSet (Set, 256);
+		     Assign (Set, UsedCodes);
+		     Difference (Set, UsedChars);
+		     IF NOT IsEmpty (Set) THEN
+			WriteS (StdError, "Warning: multiply used codes:"); WriteNl (StdError);
+			Count := 0;
+			WHILE NOT IsEmpty (Set) DO
+			   WriteI (StdError, Extract (Set), 5); INC (Count);
+			   IF Count = 15 THEN WriteNl (StdError); Count := 0; END;
+			END;
+			WriteNl (StdError);
+		     END;
+		     Assign (Set, UsedChars);
+		     Difference (Set, UsedCodes);
+		     IF NOT IsEmpty (Set) THEN
+			WriteS (StdError, "Warning: unused codes:"); WriteNl (StdError);
+			Count := 0;
+			WHILE NOT IsEmpty (Set) DO
+			   WriteI (StdError, Extract (Set), 5); INC (Count);
+			   IF Count = 15 THEN WriteNl (StdError); Count := 0; END;
+			END;
+			WriteNl (StdError);
+		     END;
+		     ReleaseSet (Set);
+		     ReleaseSet (UsedChars);
+		     ReleaseSet (UsedCodes);
+		  END;
+		}
+		.
+decls		:
+		| decls name
+		| decls code
+		| decls character_set
+		| decls define
+		| decls start
+		.
+name		: SCANNER	{ CheckId (ScannerName, $1.Scan.Position);
+				  IF Language = Eiffel THEN
+				     ArrayToString ("scanner", string);
+				  ELSE
+				     ArrayToString ("Scanner", string);
+				  END;
+				  ScannerName := MakeIdent (string);	}
+		| SCANNER DottedIdentifier
+				{ IF (Language # Java) AND (PackageName # NoIdent) THEN
+				     Message ("dotted scanner name only allowed when generating Java", Error, $1.Scan.Position);
+				  END;					}
+		.
+DottedIdentifier: DottedIdentifier '.' Ident
+				{ GetString ($1.Scan.Ident, tmpString1);
+				  Strings.Append (tmpString1, '.');
+				  GetString ($3.Scan.Ident, tmpString2);
+				  Strings.Concatenate (tmpString1, tmpString2);
+				  PackageName	:= $1.Scan.Ident;
+				  ScannerName	:= $3.Scan.Ident;
+				  $$.Scan.Ident := MakeIdent (tmpString1);	}
+		| Ident		{ CheckId (ScannerName, $1.Scan.Position);
+				  $$.Scan.Ident := $1.Scan.Ident;
+				  ScannerName	:= $1.Scan.Ident;	}
+		.
+code		: 'IMPORT' { startCode; } '{' TargetCode
+		{ Import  := $4.Scan.Text;
+		  Check (ImportLine, ImportFile, $3.Scan.Position); }
+		| 'EXPORT' { startCode; } '{' TargetCode
+		{ Export  := $4.Scan.Text;
+		  Check (ExportLine, ExportFile, $3.Scan.Position); }
+		| 'GLOBAL' { startCode; } '{' TargetCode
+		{ Global  := $4.Scan.Text;
+		  Check (GlobalLine, GlobalFile, $3.Scan.Position); }
+		| 'LOCAL'  { startCode; } '{' TargetCode
+		{ Local   := $4.Scan.Text;
+		  Check (LocalLine, LocalFile, $3.Scan.Position); }
+		| 'BEGIN'  { startCode; } '{' TargetCode
+		{ Begin   := $4.Scan.Text;
+		  Check (BeginLine, BeginFile, $3.Scan.Position); }
+		| 'CLOSE'  { startCode; } '{' TargetCode
+		{ Close   := $4.Scan.Text;
+		  Check (CloseLine, CloseFile, $3.Scan.Position); }
+		| DEFAULT  { startCode; } '{' TargetCode
+		{ Default := $4.Scan.Text;
+		  Check (DefaultLine, DefaultFile, $3.Scan.Position); }
+		| EOF	   { startCode; } '{' TargetCode
+		{ Eof     := $4.Scan.Text;
+		  Check (EofLine, EofFile, $3.Scan.Position); }
+		.
+character_set	: { MakeSet (UsedChars, 256); MakeSet (UsedCodes, 256);
+		    IF HasCharSet THEN
+		       Message ("CHARACTER_SET already defined", Error, Scanner.Attribute.Position);
+		       INC (ErrorCount);
+		    END;
+		    HasCharSet := TRUE;
+		    IF z THEN
+		       Message ("CHARACTER_SET not compatible with options -k and -z", Error, Scanner.Attribute.Position);
+		       INC (ErrorCount);
+		    END;
+		  }
+		  CHARACTER_SET { startCharset; } '{' codeList '}'
+		.
+codeList	:
+		| codeList char Number
+		{ IF IsElement (ORD ($2.Scan.Ch), UsedChars) THEN
+		     Number := ORD ($2.Scan.Ch);
+		     MessageI ("character already defined", Error,
+			$2.Scan.Position, Long, ADR (Number));
+		     INC (ErrorCount);
+		  ELSE
+		     Include (UsedChars, ORD ($2.Scan.Ch));
+		  END;
+		  IF $3.Scan.Number >= 256 THEN
+		     MessageI ("illegal code", Error, $3.Scan.Position,
+			Long, ADR ($3.Scan.Number));
+		     INC (ErrorCount);
+		  ELSIF IsElement ($3.Scan.Number, UsedCodes) THEN
+		     MessageI ("code already used", Error, $3.Scan.Position,
+			Long, ADR ($3.Scan.Number));
+		     INC (ErrorCount);
+		  ELSE
+		     Include (UsedCodes, $3.Scan.Number);
+		     CharCode [CHR ($2.Scan.Ch)] := CHR ($3.Scan.Number);
+		  END;							}
+		.
+char		: Char
+		{ $$.Scan := $1.Scan;
+		  IF $1.Scan.Ch >= 256 THEN
+		     MessageI ("illegal code", Error, $1.Scan.Position,
+			Long, ADR ($1.Scan.Ch));
+		     INC (ErrorCount);
+		     $$.Scan.Ch := $1.Scan.Ch MOD 256;
+		  END;							}
+
+		| Number
+		{ IF $1.Scan.Number >= 256 THEN
+		     MessageI ("illegal code", Error, $1.Scan.Position,
+			Long, ADR ($1.Scan.Number));
+		     INC (ErrorCount);
+		  END;
+		  $$.Scan.Ch := $1.Scan.Number MOD 256;
+		  $$.Scan.Position := $1.Scan.Position;			}
+		.
+define		: DEFINE definitionList
+		.
+start		: START identListDef
+		.
+rules		: { startRules; } rules_kw ruleList
+		{ Tree0Root := $3.Tree;
+		  IF SkipWS THEN
+		     Tree0Root := AppendRule (Tree0Root, BlankCh, BlankText);
+		     Tree0Root := AppendRule (Tree0Root, TabCh  , TabText  );
+		     Tree0Root := AppendRule (Tree0Root, EolCh  , EolText  );
+		  END;							}
+		.
+rules_kw	: RULE
+		| RULES
+		.
+definitionList	:
+		| definitionList definition
+		.
+ruleList	:
+		{ $$.Tree := nNode;					}
+
+		| ruleList rule
+		{ $$.Tree := mList ($1.Tree, $2.Tree);			}
+		.
+identListDef	:
+		| identListDef IdentDef
+		| identListDef ',' IdentDef
+		| identListDef '-'
+		{ InclStartStateCount := StartStateCount;		}
+		.
+IdentDef	: Ident
+		{ Definition := GetDef ($1.Scan.Ident, Start);
+		  IF Definition = NoDef THEN
+		     MakeStartDef ($1.Scan.Ident, StartStateCount + 1);
+		     INC (StartStateCount, 2);
+		  ELSE
+		     GetString ($1.Scan.Ident, string);
+		     MessageI ("identifier already defined", Error,
+			$1.Scan.Position, String, ADR (string));
+		     INC (ErrorCount);
+		  END;							}
+		.
+identListUse	: IdentUse
+		{ MakeSet (Set, StartStateCount);
+		  Include (Set, $1.Scan.Number);
+		  Include (Set, $1.Scan.Number + 1);			}
+
+		| identListUse IdentUse
+		{ Include (Set, $2.Scan.Number);
+		  Include (Set, $2.Scan.Number + 1);			}
+
+		| identListUse ',' IdentUse
+		{ Include (Set, $3.Scan.Number);
+		  Include (Set, $3.Scan.Number + 1);			}
+		.
+IdentUse	: Ident
+		{ Definition := GetDef ($1.Scan.Ident, Start);
+		  IF Definition = NoDef THEN
+		     IF $1.Scan.Ident # NoIdent THEN
+		       GetString ($1.Scan.Ident, string);
+		       MessageI ("identifier not defined", Error,
+			 $1.Scan.Position, String, ADR (string));
+		       INC (ErrorCount);
+		     END;
+		     $$.Scan.Number := 0;
+		  ELSE
+		     GetStartDef (Definition, Identifier, $$.Scan.Number);
+		  END;							}
+		.
+definition	: Ident '=' regExpr '.'
+		{ Definition := GetDef ($1.Scan.Ident, Define);
+		  IF Definition = NoDef THEN
+		     MakeDefineDef ($1.Scan.Ident, ADDRESS ($3.Tree));
+		  ELSE
+		     GetString ($1.Scan.Ident, string);
+		     MessageI ("identifier already defined", Error,
+			$1.Scan.Position, String, ADR (string));
+		     INC (ErrorCount);
+		  END;							}
+		.
+rule		: patternList ':' { startCode; } '{' TargetCode
+		{ INC (RuleCount);
+		  $$.Tree := mRule ($1.Tree, $5.Scan.Text, $4.Scan.Position.File,
+			$4.Scan.Position.Line, HasPosition, RuleCount);	}
+		| patternList ':-' { startCode; } '{' TargetCode
+		{ INC (RuleCount);
+		  $$.Tree := mRule ($1.Tree, $5.Scan.Text, $4.Scan.Position.File,
+			$4.Scan.Position.Line, NoPosition, RuleCount);	}
+		.
+patternList	: pattern
+		{ $$.Tree := mList (nNode, $1.Tree);			}
+
+		| patternList ',' pattern
+		{ $$.Tree := mList ($1.Tree, $3.Tree);			}
+		.
+pattern		: regExpr rightContext rightJust
+		{ IF $2.Tree = nNode THEN
+		     tree := $3.Tree;
+		  ELSE
+		     IF $3.Tree = nNode THEN
+			tree := $2.Tree;
+		     ELSE
+			tree := mSequence ($2.Tree, $3.Tree);
+		     END;
+		  END;
+
+		  MakeSet (Set, StartStateCount);
+		  Assign (Set, InclStartStates);
+		  INC (PatternCount);
+		  $$.Tree := mPattern (Set, $1.Tree, tree,
+		     PatternCount, $1.Position);			}
+
+		| '<' regExpr rightContext rightJust
+		{ IF $3.Tree = nNode THEN
+		     tree := $4.Tree;
+		  ELSE
+		     IF $4.Tree = nNode THEN
+			tree := $3.Tree;
+		     ELSE
+			tree := mSequence ($3.Tree, $4.Tree);
+		     END;
+		  END;
+
+		  LeftJustUsed := TRUE;
+		  MakeSet (Set, StartStateCount);
+		  Assign (Set, InclStartStates);
+		  FOR Number := 1 TO StartStateCount BY 2 DO
+		    Exclude (Set, Number);
+		  END;
+		  INC (PatternCount);
+		  $$.Tree := mPattern (Set, $2.Tree, tree,
+		     PatternCount, $2.Position);			}
+
+		| startStates leftJust regExpr rightContext rightJust
+		{ IF $4.Tree = nNode THEN
+		     tree := $5.Tree;
+		  ELSE
+		     IF $5.Tree = nNode THEN
+			tree := $4.Tree;
+		     ELSE
+			tree := mSequence ($4.Tree, $5.Tree);
+		     END;
+		  END;
+
+		  IF $2.IsLeftJust THEN
+		     FOR Number := 1 TO StartStateCount BY 2 DO
+			Exclude (Set, Number);
+		     END;
+		  END;
+
+		  INC (PatternCount);
+		  $$.Tree := mPattern (Set, $3.Tree, tree,
+		     PatternCount, $3.Position);			}
+		.
+startStates	: '#' '*' '#'
+		{ MakeSet (Set, StartStateCount);
+		  Complement (Set);
+		  Exclude (Set, 0);					}
+
+		| '#' identListUse '#'
+
+		| Ident '#' identListUse '#'		// NOT
+		{ Complement (Set);
+		  Exclude (Set, 0);
+		  IF $1.Scan.Ident # iNOT THEN
+		    Message ("NOT expected", Error, $1.Scan.Position);
+		    INC (ErrorCount);
+		  END							}
+
+		| '-' '#' identListUse '#'
+		{ Complement (Set);
+		  Exclude (Set, 0);					}
+		.
+leftJust	:
+		{ $$.IsLeftJust := FALSE;				}
+
+		| '<'
+		{ $$.IsLeftJust := TRUE;
+		  LeftJustUsed  := TRUE;				}
+		.
+rightContext	:
+		{ $$.Tree := nNode;					}
+
+		| '/' regExpr
+		{ $$.Tree := $2.Tree;					}
+		.
+rightJust	:
+		{ $$.Tree := nNode;					}
+
+		| '>'
+		{ $$.Tree := EOLTree;					}
+		.
+regExpr		: regExpr '|' regTerm
+		{ $$.Tree := mAlternative ($1.Tree, $3.Tree);
+		  $$.Position := $1.Position;				}
+
+		| regTerm
+		{ $$.Tree := $1.Tree;
+		  $$.Position := $1.Position;				}
+		.
+regTerm		: regTerm regFactor
+		{ $$.Tree := mSequence ($1.Tree, $2.Tree);
+		  $$.Position := $1.Position;				}
+
+		| regFactor
+		{ $$.Tree := $1.Tree;
+		  $$.Position := $1.Position;				}
+		.
+regFactor	: regFactor '+'
+		{ $$.Tree := mRepetition ($1.Tree);
+		  $$.Position := $1.Position;				}
+
+		| regFactor '*'
+		{ $$.Tree := mOption (mRepetition ($1.Tree));
+		  $$.Position := $1.Position;				}
+
+		| regFactor '?'
+		{ $$.Tree := mOption ($1.Tree);
+		  $$.Position := $1.Position;				}
+
+		| regFactor '[' Number ']'
+		{ $$.Tree := nNode;
+		  FOR Number := 1 TO $3.Scan.Number DO
+		     $$.Tree := mSequence ($1.Tree, $$.Tree);
+		  END;
+		  $$.Position := $1.Position;				}
+
+		| regFactor '[' Number '-' Number ']'
+		{ $$.Tree := nNode;
+		  tree := mOption ($1.Tree);
+		  FOR Number := $3.Scan.Number + 1 TO $5.Scan.Number DO
+		     $$.Tree := mSequence (tree, $$.Tree);
+		  END;
+		  FOR Number := 1 TO $3.Scan.Number DO
+		     $$.Tree := mSequence ($1.Tree, $$.Tree);
+		  END;
+		  $$.Position := $1.Position;				}
+
+		| '(' regExpr ')'
+		{ $$.Tree := $2.Tree;
+		  $$.Position := $1.Scan.Position;			}
+
+		| charSet
+		{ $$.Tree := mSet (HugeSet);
+		  $$.Position := $1.Position;				}
+
+		| Char
+		{ $$.Tree := mCh ($1.Scan.Ch);
+		  IF $1.Scan.Ch > LastCh THEN
+		     MessageI ("character out of bounds", Warning,
+			$1.Scan.Position, WCharacter, ADR ($1.Scan.Ch));
+		  END;
+		  $$.Position := $1.Scan.Position;			}
+
+		| ident
+		{ Definition := GetDef ($1.Scan.Ident, Define);
+		  IF Definition = NoDef THEN
+		     IF Explicit THEN
+			GetString ($1.Scan.Ident, string);
+			MessageI ("identifier not defined", Error,
+			   $1.Scan.Position, String, ADR (string));
+			INC (ErrorCount);
+		     END;
+		     stringref := GetStringRef ($1.Scan.Ident);
+		     $$.Tree := mString (stringref);
+		  ELSE
+		     GetDefineDef (Definition, Identifier, tree1);
+		     $$.Tree := ADDRESS (tree1);
+		  END;
+		  $$.Position := $1.Scan.Position;			}
+
+		| String
+		{ $$.Tree := mString ($1.Scan.String);
+		  $$.Position := $1.Scan.Position;			}
+
+		| Number
+		{ IntToString ($1.Scan.Number, string);
+		  $$.Tree := mString (PutString (string));
+		  $$.Position := $1.Scan.Position;			}
+		.
+ident		: Ident
+		{ $$.Scan := $1.Scan; }
+		| SCANNER
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("SCANNER"); }
+		| 'IMPORT'
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("IMPORT"); }
+		| 'EXPORT'
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("EXPORT"); }
+		| 'GLOBAL'
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("GLOBAL"); }
+		| 'LOCAL'
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("LOCAL"); }
+		| 'BEGIN'
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("BEGIN"); }
+		| 'CLOSE'
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("CLOSE"); }
+		| EOF
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("EOF"); }
+		| DEFAULT
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("DEFAULT"); }
+		| CHARACTER_SET
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("CHARACTER_SET"); }
+		| DEFINE
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("DEFINE"); }
+		| \START
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("START"); }
+		| RULE
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("RULE"); }
+		| RULES
+		{ $$.Scan := $1.Scan; $1.Scan.Ident := makeIdent ("RULES"); }
+		.
+charSet		: '-' charSet
+		{ HugeSets.Complement (HugeSet);
+		  $$.Position := $1.Scan.Position;			}
+
+		| { startSet; } '{' rangeList '}'
+		{ $$.Position := $2.Scan.Position;			}
+		.
+rangeList	:
+		{ HugeSets.MakeSet (HugeSet);				}
+
+		| rangeList Char
+		{ HugeSets.Include (HugeSet, $2.Scan.Ch);
+		  IF $2.Scan.Ch > LastCh THEN
+		     MessageI ("character out of bounds", Warning,
+			$2.Scan.Position, WCharacter, ADR ($2.Scan.Ch));
+		  END;							}
+
+		| rangeList Char '-' Char
+		{ HugeSets.IncludeRange (HugeSet, $2.Scan.Ch, $4.Scan.Ch);
+		  IF $2.Scan.Ch > LastCh THEN
+		     MessageI ("character out of bounds", Warning,
+			$2.Scan.Position, WCharacter, ADR ($2.Scan.Ch));
+		  END;
+		  IF $4.Scan.Ch > LastCh THEN
+		     MessageI ("character out of bounds", Warning,
+			$4.Scan.Position, WCharacter, ADR ($4.Scan.Ch));
+		  END;							}
+		.

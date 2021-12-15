@@ -1,0 +1,916 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: Sem.estra,v $
+ *	
+ *	purpose:	semantic analysis
+ *
+ *	$Author: grosch $
+ *	$Date: 2016/04/22 07:21:56 $
+ *)
+
+TRANSFORMATION	Semantic
+
+GLOBAL {
+FROM ArgCheck	IMPORT	tLanguage, LANGUAGE, ImplicitDecl;
+FROM Codes	IMPORT	IsCoded, IsCode, SetCode, SetDefCode, EmptyRecSetIndex,
+			cNoIndex, SetIndex, RecSetIndex;
+FROM Derivabl	IMPORT	TestDerivable, IsDerivable;
+FROM Errors	IMPORT	Error, Warning, Ident, String, Integer,
+			Message, MessageI, GetCount;
+FROM Position	IMPORT	NoPosition, tPosition;
+FROM First	IMPORT	Firsts, IsLeftRec;
+FROM Follow	IMPORT	Follows;
+FROM Idents	IMPORT	tIdent, MaxIdent, GetString;
+FROM Reachabl	IMPORT	WindThrough, IsReachable;
+FROM Scanner	IMPORT	NoIdent, NoValue, EndOfToken, Epsilon;
+FROM Sets	IMPORT	tSet, MakeSet, ReleaseSet, IsEmpty, IsSubset, IsEqual,
+			IsElement, Assign, Union, Difference, Include,
+			Exclude, AssignEmpty, Intersection, Card, Minimum,
+			Maximum;
+FROM SYSTEM	IMPORT	ADR;
+FROM Table	IMPORT	InitTable, SetExpr, SetLeaf, MaxId;
+FROM Tree	IMPORT	tTree, NoTree;
+FROM Types	IMPORT	BeginTypes, MakeTerm, MakeNonterm, IsDeclared,
+			Terminals, IsTerm, IsNonterm;
+
+IMPORT Strings;
+
+CONST
+  eEnter1	= "never entered";
+  eEnter2	= "never entered with";
+  eSkip1	= "never skipped";
+  eSkip2	= "never skipped with";
+  eLeave1	= "never left";
+  eLeave2	= "never left with";
+
+VAR
+  LeftSide: tIdent;
+  EmptySet, EpsilonSet: tSet;
+
+PROCEDURE IdentSetToString (s: tSet; VAR Result: Strings.tString);
+  VAR
+    String	: Strings.tString;
+    id		: tIdent;
+  BEGIN
+    Strings.AssignEmpty (Result);
+    FOR id := Minimum (s) TO Maximum (s) DO
+      IF IsElement (id, s) THEN
+	GetString (id, String);
+        IF (Strings.Length (Result) + Strings.Length (String) + 1 <=
+	    Strings.cMaxStrLength) THEN
+	  Strings.Concatenate (Result, String);
+	  Strings.Append (Result, ' ');
+	END;
+      END;
+    END;
+  END IdentSetToString;
+
+PROCEDURE IdentError (text: ARRAY OF CHAR; class: CARDINAL; pos: tPosition; ident: tIdent);
+  BEGIN
+    IF ident # NoIdent THEN
+      MessageI (text, class, pos, Ident, ADR (ident));
+    END;
+  END IdentError;
+
+PROCEDURE Check (VAR I: tSet; E: tSet; text1, text2: ARRAY OF CHAR; pos: tPosition);
+  VAR str: Strings.tString;
+  BEGIN
+    IF IsSubset (I, E) THEN
+      Message (text1, Error, pos);
+    ELSE
+      Intersection (I, E);
+      IF NOT IsEmpty (I) THEN
+	IdentSetToString (I, str);
+	MessageI (text2, Warning, pos, String, ADR (str));
+      END;
+    END;
+  END Check;
+
+CONST
+  MinSetSizeC		= 2;
+  MinCasesC		= 3;
+  MinSetSizeM2		= 2;
+  MinCasesM2		= 3;
+
+VAR
+  MinSetSize: CARDINAL;
+  MaxDepth: INTEGER;
+  AnySymbol: tSet;
+
+PROCEDURE Index (set: tSet): INTEGER;
+  BEGIN
+    Exclude (set, Epsilon);
+    IF Card (set) < MinSetSize THEN
+      RETURN cNoIndex;
+    ELSE
+      RETURN SetIndex (set);
+    END;
+  END Index;
+
+PROCEDURE ExpIndex (first, follow, recovery: tSet): INTEGER;
+  VAR LocalFollow: tSet;
+  VAR result: INTEGER;
+  BEGIN
+    MakeSet (LocalFollow, MaxId);
+    Assign (LocalFollow, follow);
+    Intersection (LocalFollow, recovery);
+      Union (LocalFollow, first);
+      Exclude (LocalFollow, Epsilon);
+      result := RecSetIndex (LocalFollow);
+    ReleaseSet (LocalFollow);
+    RETURN result;
+  END ExpIndex;
+
+PROCEDURE SetMinSetSize;
+  BEGIN
+    CASE LANGUAGE OF
+    | C:
+	MinSetSize := MinSetSizeC;
+	MaxDepth := MinCasesC - 2;
+    | MODULA2:
+	MinSetSize := MinSetSizeM2;
+	MaxDepth := MinCasesM2 - 2;
+    END;
+  END SetMinSetSize;
+}
+
+GRAMMAR Tree
+
+grammar		= 
+| Grammar	(sections, tokens, rules)
+
+sections	=
+| Sections0	()
+| Sections	(section, sections)
+
+section		=
+| Export	(codes)
+| Global	(codes)
+| Local		(codes)
+| Begin		(codes)
+| Close		(codes)
+
+codes		=
+| Codes0	()
+| Codes		(code, codes)
+
+code		=
+| Code		()
+
+tokens		=
+| Tokens0	()
+| Tokens	(token, tokens)
+
+token		=
+| Token		(id)
+
+id		=
+| Id		()
+
+rules		=
+| Rules0	()
+| Rules		(rule, rules)
+
+rule		=
+| Rule		(id, codes, expr)
+
+expr		=
+| Option	(expr)
+| Times		(expr)
+| Plus		(expr)
+| List		(body: expr, sep: expr)
+| Action	(codes)
+| Leaf		(id)
+
+expr		->
+alternative	=
+| Alternative0	()
+| Alternative	(expr, alternative)
+
+expr		->
+sequence	=
+| Sequence0	()
+| Sequence	(expr, sequence)
+
+
+
+FUNCTION	Analyse	/ grammar, rules /
+
+/*
+ *	semantic analysis
+ */
+
+  Grammar	(sections, tokens, rules)
+		{
+		MaxId := MaxIdent ();
+		BeginTypes;
+		MakeTerm (Epsilon);
+		MakeTerm (EndOfToken);
+		SetCode (EndOfToken, EndOfToken, 0);
+		Declare (tokens);
+		Declare (rules);
+		InitTable;
+		Declared (tokens);
+		Declared (rules);
+		Reduced (Grammar);
+		Analyse (rules);
+		}
+
+  Rules0	()
+		{
+		Message ("rules are missing", Error, NoPosition);
+		}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		DECLARE	{ VAR
+		   RecIn, RecOut, Empty: tSet;
+		   IsCalling: BOOLEAN;
+		} {
+		Firsts;
+		Follows (Id.ident);
+		IF GetCount (Error) > 0 THEN RETURN END;
+
+		MakeSet (EmptySet, MaxId);
+		MakeSet (EpsilonSet, MaxId);
+		Include (EpsilonSet, Epsilon);
+		LL1 (Rules, EmptySet);
+		ReleaseSet (EmptySet);
+		ReleaseSet (EpsilonSet);
+
+		MakeSet (RecIn, MaxId);
+		MakeSet (RecOut, MaxId);
+		Recovery (Rules, RecIn, RecOut);
+		ReleaseSet (RecIn);
+		ReleaseSet (RecOut);
+		SetMinSetSize;
+		MakeSet (AnySymbol, MaxId);
+		Terminals (AnySymbol);
+		Include (AnySymbol, EndOfToken);
+  		MakeSet (Empty, MaxId);
+  		EmptyRecSetIndex := RecSetIndex (Empty);
+		PrepareCode (Rules, AnySymbol, IsCalling);
+		ReleaseSet (AnySymbol);
+  		ReleaseSet (Empty);
+		}
+
+
+FUNCTION	Declare				/ tokens, token, rules /
+
+/*
+ *	declare terminals
+ *	set codes
+ */
+
+  Tokens0	() {}
+
+  Tokens	(token, tokens)
+		{
+		Declare (token);
+		Declare (tokens);
+		}
+
+  Token		(Id ())
+		{
+		IF IsDeclared (Id.ident) THEN
+		  IdentError ("terminal is already declared",
+		    Error, Id.pos, Id.ident);
+		  Id.ident := NoIdent;
+		ELSIF Id.ident # NoIdent THEN
+		  MakeTerm (Id.ident);
+		  IF Token.number # NoValue THEN
+		    IF IsCode (Token.number) THEN
+		      MessageI ("code is already used",
+			Error, Token.pos, Integer, ADR (Token.number));
+		    ELSE
+		      SetCode (Id.ident, Token.string, Token.number);
+		    END;
+		  END;
+		END;
+		}
+
+/*
+ *	declare nonterminals
+ */
+
+  Rules0	() {}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		IF IsDeclared (Id.ident) THEN
+		  IdentError ("nonterminal is already declared",
+		    Error, Id.pos, Id.ident);
+		  Id.ident := NoIdent;
+		ELSE
+		  MakeNonterm (Id.ident);
+		END;
+		Declare (rules);
+		}
+
+
+FUNCTION	Declared			/ tokens, token, rules, expr /
+
+/*
+ *	set default codes for uncoded terminals
+ */
+
+  Tokens0	() {}
+
+  Tokens	(token, tokens)
+		{
+		Declared (token);
+		Declared (tokens);
+		}
+
+  Token		(Id ())
+		{
+		IF (Id.ident # NoIdent) & (NOT IsCoded (Id.ident)) THEN
+		  SetDefCode (Id.ident, Token.string);
+		END;
+		}
+
+/*
+ *	are all leafs declared
+ *	set expression of nonterminals
+ *	collect leafs of nonterminals
+ */
+
+  Rules0	()
+		{}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		LeftSide := Id.ident;
+		SetExpr (LeftSide, expr);
+		Declared (expr);
+		Declared (rules);
+		}
+
+  Option	(expr)
+		{
+		Declared (expr);
+		}
+
+  Times		(expr)
+		{
+		Declared (expr);
+		}
+
+  Plus		(expr)
+		{
+		Declared (expr);
+		}
+
+  List		(body: expr, sep: expr)
+		{
+		Declared (body);
+		Declared (sep);
+		}
+
+  Action	(codes) {}
+
+  Leaf		(Id ())
+		{
+		IF NOT IsDeclared (Id.ident) THEN
+		  IF ImplicitDecl THEN
+		    MakeTerm (Id.ident);
+		    SetDefCode (Id.ident, Id.ident);
+		  ELSE
+		    IdentError ("name is not declared",
+		      Error, Id.pos, Id.ident);
+		  END;
+		ELSE
+		  SetLeaf (LeftSide, Id.ident);
+		END;
+		}
+
+  Alternative0	() {}
+
+  Alternative	(expr, alternative)
+		{
+		Declared (expr);
+		Declared (alternative);
+		}
+
+  Sequence0	() {}
+
+  Sequence	(expr, sequence)
+		{
+		Declared (expr);
+		Declared (sequence);
+		}
+
+
+FUNCTION	Reduced				/ grammar, rules, tokens, token /
+
+/*
+ *	is the grammar reduced ? - report errors
+ */
+
+  Grammar	(sections, tokens, Rules0 ())
+		{
+		}
+	    
+  Grammar	(sections, tokens, Rules (Rule (Id (), codes, expr), rules))
+		{
+		WindThrough (Id.ident);
+		TestDerivable;
+		Reduced (tokens);
+		Reduced (Rules);
+		}
+
+  Tokens0	() {}
+
+  Tokens	(token, tokens)
+		{
+		Reduced (token);
+		Reduced (tokens);
+		}
+
+  Token		(Id ())
+		{
+		IF NOT IsReachable (Id.ident) THEN
+		  IdentError ("terminal is not reachable",
+		    Warning, Id.pos, Id.ident);
+		END;
+		}
+
+  Rules0	()
+		{
+		}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		IF NOT IsReachable (Id.ident) THEN
+		  IdentError ("nonterminal is not reachable",
+		    Warning, Id.pos, Id.ident);
+		END;
+		IF NOT IsDerivable (Id.ident) THEN
+		  IdentError ("nonterminal does not produce any sentences",
+		    Error, Id.pos, Id.ident);
+		END;
+		Reduced (rules);
+		}
+
+
+FUNCTION	LL1	Exclude: tSet -> / rules, expr /
+
+/*
+ *	is the grammar ll1 ? - report errors and repair
+ */
+
+  Rules0	()
+		{}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		IF IsLeftRec (Id.ident) THEN
+		  IdentError ("nonterminal is left recursive",
+		    Error, Id.pos, Id.ident);
+		END;
+		LL1 (expr, Exclude);
+		LL1 (rules, Exclude);
+		}
+
+  Option	(expr)
+		DECLARE	{
+		VAR In, Skip, Set: tSet;
+		} {
+		MakeSet (In, MaxId);
+		MakeSet (Skip, MaxId);
+		MakeSet (Set, MaxId);
+		Assign (In, expr.fifo);
+		Assign (Skip, expr.follow);
+		Assign (Set, expr.fifo);	Union (Set, Exclude);
+		Check (Skip, Set, eSkip1, eSkip2, Option.pos);
+		Check (In, Exclude, eEnter1, eEnter2, Option.pos);
+		ReleaseSet (In);
+		ReleaseSet (Skip);
+		ReleaseSet (Set);
+		LL1 (expr, Exclude);
+		Difference (Option.fifo, Exclude);
+		}
+
+  Times		(expr)
+		DECLARE	{
+		VAR In, Leave, Set: tSet;
+		} {
+		MakeSet (In, MaxId);
+		MakeSet (Leave, MaxId);
+		MakeSet (Set, MaxId);
+		Assign (In, expr.fifo);
+		Assign (Leave, Times.follow);
+		Assign (Set, expr.fifo);	Union (Set, Exclude);
+		Check (Leave, Set, eLeave1, eLeave2, Times.pos);
+		Check (In, Exclude, eEnter1, eEnter2, Times.pos);
+		ReleaseSet (In);
+		ReleaseSet (Leave);
+		ReleaseSet (Set);
+		LL1 (expr, EmptySet);
+		Difference (Times.fifo, Exclude);
+		}
+
+  Plus		(expr)
+		DECLARE	{
+		VAR In, Leave: tSet;
+		} {
+		MakeSet (In, MaxId);
+		MakeSet (Leave, MaxId);
+		Assign (In, Plus.fifo);
+		Assign (Leave, Plus.follow);
+		Check (Leave, In, eLeave1, eLeave2, Plus.pos);
+		Check (In, Exclude, eEnter1, eEnter2, Plus.pos);
+		ReleaseSet (In);
+		ReleaseSet (Leave);
+		LL1 (expr, EmptySet);
+		Difference (Plus.fifo, Exclude);
+		}
+
+  List		(body: expr, sep: expr)
+		DECLARE	{
+		VAR In, Keep, Leave: tSet;
+		} {
+		MakeSet (In, MaxId);
+		MakeSet (Keep, MaxId);
+		MakeSet (Leave, MaxId);
+		Assign (In, List.fifo);
+		Assign (Keep, sep.fifo);
+		Assign (Leave, List.follow);
+		Check (Leave, Keep, eLeave1, eLeave2, List.pos);
+		Check (In, Exclude, eEnter1, eEnter2, List.pos);
+		ReleaseSet (In);
+		ReleaseSet (Keep);
+		ReleaseSet (Leave);
+		LL1 (body, EmptySet);
+		LL1 (sep, EmptySet);
+		Difference (List.fifo, Exclude);
+		}
+
+  Action	(codes)
+		DECLARE	{
+		VAR In: tSet;
+		} {
+		MakeSet (In, MaxId);
+		Assign (In, Action.fifo);
+		Check (In, Exclude, eEnter1, eEnter2, Action.pos);
+		ReleaseSet (In);
+		Difference (Action.fifo, Exclude);
+		}
+
+  Leaf		(Id ())
+		DECLARE	{
+		VAR In: tSet;
+		} {
+		MakeSet (In, MaxId);
+		Assign (In, Leaf.fifo);
+		Check (In, Exclude, eEnter1, eEnter2, Leaf.pos);
+		ReleaseSet (In);
+		Difference (Leaf.fifo, Exclude);
+		}
+
+  Alternative0	() 
+		{
+		Alternative0.depth := 0;
+		Difference (Alternative0.fifo, Exclude);
+		}
+
+  Alternative	(expr, alternative)
+		DECLARE	{
+		VAR E2: tSet;
+		} {
+		LL1 (expr, Exclude);
+		MakeSet (E2, MaxId);
+		Assign (E2, Exclude);
+		Union (E2, expr.fifo);
+		LL1 (alternative, E2);
+		Alternative.depth := alternative.depth + 1;
+		ReleaseSet (E2);
+		Difference (Alternative.fifo, Exclude);
+		}
+
+  Sequence0	()
+		DECLARE	{
+		VAR In: tSet;
+		} {
+		MakeSet (In, MaxId);
+		Assign (In, Sequence0.fifo);
+		Check (In, Exclude, eEnter1, eEnter2, Sequence0.pos);
+		Difference (Sequence0.fifo, Exclude);
+		}
+
+  Sequence	(expr, sequence)
+		{
+		LL1 (expr, Exclude);
+		IF IsEqual (expr.first, EpsilonSet) THEN
+		  LL1 (sequence, Exclude);
+		ELSE
+		  LL1 (sequence, EmptySet);
+		END;
+		Difference (Sequence.fifo, Exclude);
+		}
+
+
+FUNCTION	Recovery	RecIn: tSet -> RecOut: tSet / rules, expr /
+
+/*
+ *	compute the recovery sets
+ */
+
+  Rules0	()
+		{}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		Recovery (expr, RecIn, RecOut);
+		Recovery (rules, RecIn, RecOut);
+		}
+
+  Option	(expr)
+		{
+		MakeSet (Option.recovery, MaxId);
+		Assign (Option.recovery, RecIn);
+		Union (Option.recovery, Option.first);
+		Exclude (Option.recovery, Epsilon);
+		Recovery (expr, RecIn, RecOut);
+		Assign (RecOut, Option.recovery);
+		}
+
+  Times		(expr)
+		{
+		MakeSet (Times.recovery, MaxId);
+		Assign (Times.recovery, RecIn);
+		Union (Times.recovery, Times.first);
+		Exclude (Times.recovery, Epsilon);
+		Recovery (expr, RecIn, RecOut);
+		Assign (RecOut, Times.recovery);
+		}
+
+  Plus		(expr)
+		{
+		MakeSet (Plus.recovery, MaxId);
+		Assign (Plus.recovery, RecIn);
+		Union (Plus.recovery, Plus.first);
+		Exclude (Plus.recovery, Epsilon);
+		Recovery (expr, RecIn, RecOut);
+		Assign (RecOut, Plus.recovery);
+		}
+
+  List		(body: expr, sep: expr)
+		DECLARE	{
+		VAR In: tSet;
+		} {
+		MakeSet (List.recovery, MaxId);
+		Assign (List.recovery, RecIn);
+		Union (List.recovery, body.first);
+		Union (List.recovery, sep.first);
+		Exclude (List.recovery, Epsilon);
+		MakeSet (In, MaxId);
+		Assign (In, RecIn);
+		Union (In, sep.first);
+		Exclude (In, Epsilon);
+		Recovery (body, In, RecOut);
+		Assign (In, RecIn);
+		Union (In, body.first);
+		Exclude (In, Epsilon);
+		Recovery (sep, In, RecOut);
+		ReleaseSet (In);
+		Assign (RecOut, List.recovery);
+		}
+
+  Action	(codes)
+		{
+		MakeSet (Action.recovery, MaxId);
+		Assign (Action.recovery, RecIn);
+		Assign (RecOut, RecIn);
+		}
+
+  Leaf		(Id ())
+		{
+		MakeSet (Leaf.recovery, MaxId);
+		Assign (RecOut, RecIn);
+		Union (RecOut, Leaf.first);
+		Exclude (RecOut, Epsilon);
+		IF IsTerm (Id.ident) THEN
+		  Assign (Leaf.recovery, RecOut);
+		ELSE
+		  Assign (Leaf.recovery, RecIn);
+		END;
+		}
+
+  Alternative0	()
+		{
+		Message ('Sem.estra: Alternative0 unexpected', Error, NoPosition);
+		}
+
+  Alternative	(:expr, :alternative)
+		DECLARE	{
+		VAR RecUnion: tSet;
+		} {
+		MakeSet (RecUnion, MaxId);
+		Assign (RecUnion, RecIn);
+		RecoveryAlt (Alternative, RecIn, RecUnion, RecOut);
+		ReleaseSet (RecUnion);
+		}
+
+  Sequence0	()
+		{
+		MakeSet (Sequence0.recovery, MaxId);
+		Assign (Sequence0.recovery, RecIn);
+		Assign (RecOut, RecIn);
+		}
+
+  Sequence	(expr, sequence)
+		{
+		MakeSet (Sequence.recovery, MaxId);
+		Recovery (sequence, RecIn, RecOut);
+		Recovery (expr, RecOut, Sequence.recovery);
+		Assign (RecOut, Sequence.recovery);
+		}
+
+
+FUNCTION	RecoveryAlt	RecIn: tSet; RecUnion: tSet -> RecOut: tSet
+						/ alternative /
+
+/*
+ *	compute the recovery sets (alternative)
+ */
+
+  Alternative0	()
+		{
+		MakeSet (Alternative0.recovery, MaxId);
+		Exclude (RecUnion, Epsilon);
+		Assign (Alternative0.recovery, RecUnion);
+		Assign (RecOut, RecUnion);
+		}
+
+  Alternative	(expr, alternative)
+		{
+		MakeSet (Alternative.recovery, MaxId);
+		Recovery (expr, RecIn, RecOut);
+		Union (RecUnion, expr.first);
+		RecoveryAlt (alternative, RecIn, RecUnion, RecOut);
+		Assign (Alternative.recovery, RecOut);
+		}
+
+
+FUNCTION	PrepareCode	PossibleTerms: tSet -> IsCalling: BOOLEAN / rules, expr /
+
+/*
+ *	prepare the code generation
+ */
+
+  Rules0	()
+		{}
+
+  Rules		(Rule (Id (), codes, expr), rules)
+		{
+		PrepareCode (expr, PossibleTerms, Rule.iscalling);
+		PrepareCode (rules, PossibleTerms, IsCalling);
+		}
+
+  Option	(expr)
+		{
+		Option.index := Index (Option.first);
+		Option.followindex := Index (Option.follow);
+		Option.expindex := ExpIndex (Option.first, Option.follow, Option.recovery);
+		Option.recindex := RecSetIndex (Option.recovery);
+		PrepareCode (expr, expr.fifo, IsCalling);
+		}
+
+  Times		(expr)
+		{
+		Times.index := Index (Times.first);
+		Times.followindex := Index (Times.follow);
+		Times.expindex := ExpIndex (Times.first, Times.follow, Times.recovery);
+		Times.recindex := RecSetIndex (Times.recovery);
+		PrepareCode (expr, expr.fifo, IsCalling);
+		}
+
+  Plus		(expr)
+		DECLARE	{
+		VAR set: tSet;
+		} {
+		Plus.index := Index (Plus.first);
+		Plus.followindex := Index (Plus.follow);
+		Plus.expindex := ExpIndex (Plus.first, Plus.follow, Plus.recovery);
+		Plus.recindex := RecSetIndex (Plus.recovery);
+		MakeSet (set, MaxId);
+		Assign (set, PossibleTerms);
+		Union (set, expr.fifo);
+		PrepareCode (expr, set, IsCalling);
+		ReleaseSet (set);
+		}
+
+  List		(body: expr, sep: expr)
+		DECLARE	{
+		VAR iscalling: BOOLEAN;
+		} {
+		List.index := Index (List.first);
+		List.followindex := Index (List.follow);
+		List.expindex := ExpIndex (sep.first, List.follow, List.recovery);
+		List.recindex := RecSetIndex (List.recovery);
+		PrepareCode (body, AnySymbol, iscalling);
+		PrepareCode (sep, AnySymbol, IsCalling);
+		IsCalling := IsCalling OR iscalling;
+		}
+
+  Action	(codes) { IsCalling := FALSE; }
+
+  Leaf		(Id ())
+		{
+		Leaf.sure := IsSubset (PossibleTerms, Leaf.fifo);
+		IF Leaf.sure OR IsNonterm (Id.ident) THEN
+		  Leaf.index := cNoIndex;
+		ELSE
+		  Leaf.index := Index (Leaf.first);
+		END;
+		Leaf.recindex := RecSetIndex (Leaf.recovery);
+		(* Leaf.followindex := Index (Leaf.follow); *)
+		IsCalling := IsNonterm (Id.ident);
+		}
+
+  Alternative0	()
+		{
+		Message ('Sem.estra: Alternative0 unexpected', Error, NoPosition);
+		}
+
+  Alternative	(:expr, :alternative)
+		DECLARE	{
+		VAR case: BOOLEAN; maxdepth: INTEGER;
+		} {
+		maxdepth := MaxDepth;
+		IF IsSubset (PossibleTerms, Alternative.fifo) (* OR IsElement (Epsilon, Alternative.first) *) THEN
+		  INC (maxdepth);
+		END;
+		case := Alternative.depth > maxdepth;
+		PrepareCodeAlt (Alternative, case, PossibleTerms, Alternative.first, NoTree, IsCalling);
+		}
+
+  Sequence0	() { IsCalling := FALSE; }
+
+  Sequence	(expr, sequence)
+		DECLARE	{
+		VAR iscalling: BOOLEAN;
+		} {
+		PrepareCode (expr, PossibleTerms, iscalling);
+		IF IsElement (Epsilon, expr.first) & (Card (expr.first) = 1) THEN
+		  PrepareCode (sequence, PossibleTerms, IsCalling);
+		ELSE
+		  PrepareCode (sequence, AnySymbol, IsCalling);
+		END;
+		IsCalling := IsCalling OR iscalling;
+		}
+
+
+FUNCTION	PrepareCodeAlt	Case: BOOLEAN;
+				PossibleTerms: tSet;
+				First: tSet;
+				Default: tTree -> IsCalling: BOOLEAN / alternative /
+
+/*
+ *	prepare the code generation (alternative)
+ */
+
+  Alternative0	()
+		DECLARE {
+		VAR LocalFollow: tSet;
+		} {
+    		MakeSet (LocalFollow, MaxId);
+    		Assign (LocalFollow, Alternative0.follow);
+    		Intersection (LocalFollow, Alternative0.recovery);
+    		IF NOT IsEmpty (LocalFollow) OR NOT IsElement (Epsilon, First) THEN
+      		  Union (LocalFollow, First);
+      		  Exclude (LocalFollow, Epsilon);
+		  Alternative0.expindex := RecSetIndex (LocalFollow);
+    		ELSE
+		  Alternative0.expindex := cNoIndex;
+    		END;
+    		ReleaseSet (LocalFollow);
+
+		Alternative0.case := Case;
+		Alternative0.default := Default;
+		Alternative0.recindex := RecSetIndex (Alternative0.recovery);
+		(* Alternative0.followindex := Index (Alternative0.follow); *)
+		IsCalling := FALSE;
+		}
+
+  Alternative	(e1:expr, alternative)
+		DECLARE	{
+		VAR possible: tSet; iscalling: BOOLEAN;
+		} {
+		Alternative.case := Case;
+		PrepareCode (e1, e1.fifo, iscalling);
+		MakeSet (possible, MaxId);
+		Assign (possible, PossibleTerms);
+		IF (Default = NoTree) OR (Default^.expr.length > e1.length) THEN
+		  Default := e1;
+		END;
+		Difference (possible, e1.fifo);
+		IF NOT Case THEN
+		   Alternative.index := Index (e1.fifo);
+		END;
+		(* Alternative.followindex := Index (Alternative.follow); *)
+		PrepareCodeAlt (alternative, Case, possible, First, Default, IsCalling);
+		IsCalling := IsCalling OR iscalling;
+		ReleaseSet (possible);
+		}

@@ -1,0 +1,158 @@
+% $Id: ErrorTab,v 2.1 1991/03/08 18:51:32 grosch rel $
+%
+%%%	Error Class Text
+%
+1	fatal error 				eFatal
+2	restriction 				eRestriction
+3	error       				eError
+4	warning     				eWarning
+5	repair      				eRepair
+6	note        				eNote
+7	information 				eInformation
+%
+$
+%%%	Error Code Text -------------------------------------------------
+%
+%%%	Parser
+%
+1	syntax error				eSyntaxError
+2	expected $				eExpectedSymbols
+3	restart	point				eRestartPoint
+4	inserted $				eSymbolInserted
+5	parse table mismatch			eWrongParseTable
+6	cannot open parse table			eOpenParseTable
+7	cannot read parse table			eReadParseTable
+%
+%
+%%%	interne Fehler
+%	--------------
+%
+11	internal error $			eInternal
+%
+%
+%%%	Errors
+%
+12	wrong error class 			eWrongClass
+13	wrong error code			eWrongCode
+%
+%
+%%%	ArgCheck
+%	--------
+%
+14	option $ is unknown			eNoOption
+15	too many arguments			eTooManyArgs
+%
+%%%	Scanner (estral.rex)
+%	--------------------
+%
+21	string exceeds line			eEolString
+22	code does not end			eEofCode
+23	string exceeds line			eEofString
+24	comment not closed			eEofComment
+25	illegal character $			eIllegalChar
+26	prefix yy is reserved for internal use	eDoNotUseYY
+%
+%
+%%%	Semantics
+%	---------
+%
+31	$ already declared			eAlreadyDeclraed
+32	$ is not declared			eNotDeclared
+33	$ does not denote a class		eNoClass
+34	$ does not denote a node		eNoNode
+35	coding $ already used			eCodeUsed
+36	coding $ unexpected			eCodeUnexpected
+37	node name $ is unexpected		eNodeNameUnexpected
+39	main class of $ is not clear		eNoMainClass
+40	main class relation of $ is cyclic	eCyclicClass
+42	$ has too few sons			eTooFewSons
+43	$ has too many sons			eTooManySons
+44	subclass of $ expected			eNoSubClass
+45	( expected				eLParExpected
+46	identifier or string expected		eIdOrStrExpected
+47	do not call $ in the condition		eDoNotCallCond
+48	do not call $ in the cost part		eDoNotCallCost
+49	is not a selector			eNoSelector
+50	additional specification for $ extents the language	eExtended
+51	$ is unreachable			eUnReachable
+52	$ is not derivable			eUnDerivable
+53	there is no function to define $	eNoFunction
+54	pattern is not in the domain of $ 	eNotInDomain
+55	identifier expected			eIdentExpected
+56	illegal pattern				eIllegalPattern
+57	$ is already declared in this class	eAlreadyInClass
+58	$ is not in the domain of the function	eNotInFDomain
+%
+%%%	Complete
+%	------
+61	no unconditional pattern matching $	eNoPattern
+62	no pattern at all matching $		eNoPatAtAll
+%%%%%
+%%%	System Errors
+%	-------------
+%
+101	not super-user 
+102	no such file or directory 
+103	no such process 
+104	interrupted system call 
+105	I/O error 
+106	no such device or address 
+107	arg list too long 
+108	exec format error 
+109	bad file number 
+110	no children 
+111	no more processes 
+112	not enough core 
+113	permission denied 
+114	bad address 
+115	block device required 
+116	mount device busy 
+117	file exists 
+118	cross-device link 
+119	no such device 
+120	not a directory 
+121	is a directory 
+122	invalid argument 
+123	file table overflow 
+124	too many open files 
+125	not a typewriter 
+126	text file busy 
+127	file too large 
+128	no space left on device 
+129	illegal seek 
+130	read only file system 
+131	too many links 
+132	broken pipe 
+133	math arg out of domain of func 
+134	math result not representable 
+135	no message of desired type 
+136	identifier removed 
+137	channel number out of range 
+138	level 2 not synchronized 
+139	level 3 halted 
+140	level 3 reset 
+141	link number out of range 
+142	protocol driver not attached 
+143	no CSI structure available 
+144	level 2 halted 
+145	out of swap space 
+146	path continues onto another machine 
+147	unison request for a retry 
+148	record locking deadlock 
+149	could not resolve IP addr, host down 
+150	no available gateway in route table 
+151	symbolic links form endless loop 
+%
+$
+%%%	Error Count Text ------------------------------------------------
+%
+1	fatal error(s)
+2	restriction(s)
+3	error(s)
+4	warning(s)
+5	repair(s)
+6	note(s)
+7	information(s)
+%
+$
+%%%	-----------------------------------------------------------------

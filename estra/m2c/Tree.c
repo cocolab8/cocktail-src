@@ -1,0 +1,3203 @@
+#include "SYSTEM_.h"
+
+#ifndef DEFINITION_rSystem
+#include "rSystem.h"
+#endif
+
+#ifndef DEFINITION_General
+#include "General.h"
+#endif
+
+#ifndef DEFINITION_rMemory
+#include "rMemory.h"
+#endif
+
+#ifndef DEFINITION_DynArray
+#include "DynArray.h"
+#endif
+
+#ifndef DEFINITION_IO
+#include "IO.h"
+#endif
+
+#ifndef DEFINITION_Layout
+#include "Layout.h"
+#endif
+
+#ifndef DEFINITION_StringM
+#include "StringM.h"
+#endif
+
+#ifndef DEFINITION_Strings
+#include "Strings.h"
+#endif
+
+#ifndef DEFINITION_Idents
+#include "Idents.h"
+#endif
+
+#ifndef DEFINITION_Texts
+#include "Texts.h"
+#endif
+
+#ifndef DEFINITION_Sets
+#include "Sets.h"
+#endif
+
+#ifndef DEFINITION_Position
+#include "Position.h"
+#endif
+
+#ifndef DEFINITION_Errors
+#include "Errors.h"
+#endif
+
+#ifndef DEFINITION_Idents
+#include "Idents.h"
+#endif
+
+#ifndef DEFINITION_Position
+#include "Position.h"
+#endif
+
+#ifndef DEFINITION_IO
+#include "IO.h"
+#endif
+
+#ifndef DEFINITION_StringM
+#include "StringM.h"
+#endif
+
+#ifndef DEFINITION_Tree
+#include "Tree.h"
+#endif
+
+Zq0A4_58 Zq0A4_130;
+LONGCARD Zq0A4_131;
+Zq0A4_75 Zq0A4_132;
+ADDRESS Zq0A4_133, Zq0A4_134;
+struct Tree_57 Zq0A4_135;
+struct Tree_58 Zq0A4_136;
+PROC Zq0A4_137;
+BOOLEAN Zq0A4_138, Zq0A4_139;
+INTEGER Zq0A4_140;
+SHORTCARD Zq0A4_141, Zq0A4_142, Zq0A4_143;
+Zp1PEAFD_2 Zq0A4_144;
+
+static ZfM_3 Z136;
+static SHORTCARD Z137, Z138;
+typedef Zq0A4_58 *Z342;
+static SHORTCARD Z343;
+static SHORTCARD Z211;
+static CHAR Z344;
+static Zp1PEAFD_2 Z345;
+static void Z214 ARGS ((Zq0A4_58 Z153));
+#define Z346	32
+static LONGINT Z347;
+static struct S_1 {
+Zq0A4_58 A[50000 + 1];
+} *Z348;
+static INTEGER Z349;
+static SHORTINT Z350;
+static SHORTCARD Z351 ARGS ((Zq0A4_58 Z216));
+static Zq0A4_58 Z353 ARGS ((SHORTCARD Z343));
+static void Z354 ARGS ((void));
+static void Z355 ARGS ((CHAR Z345[], LONGCARD O_1));
+static void Z357 ARGS ((BYTE Z358[], LONGCARD O_2));
+static void Z361 ARGS ((ZfM_3 Z136, Zq0A4_58 Z153));
+static SHORTINT Z364;
+static void Z369 ARGS ((CHAR Z345[], LONGCARD O_3));
+static void Z370 ARGS ((CHAR Z345[], LONGCARD O_4, Zq0A4_58 Z153));
+static void Z371 ARGS ((Zq0A4_58 Z153));
+static void Z374 ARGS ((Zq0A4_58 Z153));
+static void Z376 ARGS ((Zq0A4_58 Z153));
+static void Z377 ARGS ((Zq0A4_58 Z153));
+static void Z378 ARGS ((Zq0A4_58 Z153));
+static void Z379 ARGS ((Zq0A4_58 Z153));
+static void Z383 ARGS ((Zq0A4_58 Z153));
+static void Z384 ARGS ((Zq0A4_58 Z153));
+static void Z385 ARGS ((Zq0A4_58 Z153));
+static void Z389 ARGS ((Zq0A4_58 Z153));
+static void Z390 ARGS ((Zq0A4_58 Z153));
+static void Z391 ARGS ((Zq0A4_58 Z153));
+static void Z392 ARGS ((Zq0A4_58 Z153));
+static void Z393 ARGS ((Zq0A4_58 Z153));
+static void Z394 ARGS ((Zq0A4_58 Z153));
+static void Z395 ARGS ((Zq0A4_58 Z153));
+static void Z396 ARGS ((Zq0A4_58 Z153));
+static void Z397 ARGS ((Zq0A4_58 Z153));
+static void Z399 ARGS ((Zq0A4_58 Z153));
+static void Z400 ARGS ((Zq0A4_58 Z153));
+static void Z401 ARGS ((Zq0A4_58 Z153));
+static void Z402 ARGS ((Zq0A4_58 Z153));
+static void Z403 ARGS ((Zq0A4_58 Z153));
+static void Z404 ARGS ((Zq0A4_58 Z153));
+static void Z405 ARGS ((Zq0A4_58 Z153));
+static void Z406 ARGS ((Zq0A4_58 Z153));
+static void Z407 ARGS ((Zq0A4_58 Z153));
+static void Z408 ARGS ((Zq0A4_58 Z153));
+static void Z409 ARGS ((Zq0A4_58 Z153));
+static void Z368 ARGS ((Zq0A4_58 Z153));
+#define Z411	((CHAR)'\374')
+#define Z412	((CHAR)'\375')
+#define Z413	((CHAR)'\376')
+#define Z414	((CHAR)'\377')
+static BOOLEAN Z427 ARGS ((CHAR Z428[], LONGCARD O_8, CHAR Z429[], LONGCARD O_7));
+static void Z446 ARGS ((void));
+
+Zq0A4_58 Zq0A4_145
+ ARGS ((void))
+{
+Zq0A4_75 Z141;
+
+Z141 = Zq0A4_132;
+Zq0A4_132 = (Zq0A4_75)ZDtgCFKU_1((LONGINT)sizeof (Zq0A4_76));
+Zq0A4_132->Y1 = Z141;
+Zq0A4_133 = ADR (Zq0A4_132->Y0);
+Zq0A4_134 = Zq0A4_133 + (Zq0A4_57 - Z137 + 1);
+INC1(Zq0A4_131, Zq0A4_57);
+return (Zq0A4_58)Zq0A4_133;
+}
+
+void Zq0A4_146
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153, Zp1PEAFD_2 *Z154)
+# else
+(Z153, Z154)
+Zq0A4_58 Z153;
+Zp1PEAFD_2 *Z154;
+# endif
+{
+switch (Z153->U_1.V_1.Y0) {
+case Zq0A4_5:;
+Zp1PEAFD_13((STRING)"spec", 4L, Z154);
+break;
+case Zq0A4_6:;
+Zp1PEAFD_13((STRING)"Spec", 4L, Z154);
+break;
+case Zq0A4_7:;
+Zp1PEAFD_13((STRING)"classes", 7L, Z154);
+break;
+case Zq0A4_8:;
+Zp1PEAFD_13((STRING)"Class0", 6L, Z154);
+break;
+case Zq0A4_9:;
+Zp1PEAFD_13((STRING)"Class", 5L, Z154);
+break;
+case Zq0A4_10:;
+Zp1PEAFD_13((STRING)"nodes", 5L, Z154);
+break;
+case Zq0A4_11:;
+Zp1PEAFD_13((STRING)"Node0", 5L, Z154);
+break;
+case Zq0A4_12:;
+Zp1PEAFD_13((STRING)"Node", 4L, Z154);
+break;
+case Zq0A4_13:;
+Zp1PEAFD_13((STRING)"sons", 4L, Z154);
+break;
+case Zq0A4_14:;
+Zp1PEAFD_13((STRING)"Son0", 4L, Z154);
+break;
+case Zq0A4_15:;
+Zp1PEAFD_13((STRING)"Son", 3L, Z154);
+break;
+case Zq0A4_16:;
+Zp1PEAFD_13((STRING)"attributes", 10L, Z154);
+break;
+case Zq0A4_17:;
+Zp1PEAFD_13((STRING)"Attribute0", 10L, Z154);
+break;
+case Zq0A4_18:;
+Zp1PEAFD_13((STRING)"Attribute", 9L, Z154);
+break;
+case Zq0A4_19:;
+Zp1PEAFD_13((STRING)"functions", 9L, Z154);
+break;
+case Zq0A4_20:;
+Zp1PEAFD_13((STRING)"Function0", 9L, Z154);
+break;
+case Zq0A4_21:;
+Zp1PEAFD_13((STRING)"Function", 8L, Z154);
+break;
+case Zq0A4_22:;
+Zp1PEAFD_13((STRING)"result", 6L, Z154);
+break;
+case Zq0A4_23:;
+Zp1PEAFD_13((STRING)"NoResult", 8L, Z154);
+break;
+case Zq0A4_24:;
+Zp1PEAFD_13((STRING)"Type", 4L, Z154);
+break;
+case Zq0A4_25:;
+Zp1PEAFD_13((STRING)"domain", 6L, Z154);
+break;
+case Zq0A4_26:;
+Zp1PEAFD_13((STRING)"Ident0", 6L, Z154);
+break;
+case Zq0A4_27:;
+Zp1PEAFD_13((STRING)"Ident", 5L, Z154);
+break;
+case Zq0A4_28:;
+Zp1PEAFD_13((STRING)"directives", 10L, Z154);
+break;
+case Zq0A4_29:;
+Zp1PEAFD_13((STRING)"Directive0", 10L, Z154);
+break;
+case Zq0A4_30:;
+Zp1PEAFD_13((STRING)"Directive", 9L, Z154);
+break;
+case Zq0A4_31:;
+Zp1PEAFD_13((STRING)"pattern", 7L, Z154);
+break;
+case Zq0A4_32:;
+Zp1PEAFD_13((STRING)"Pattern1", 8L, Z154);
+break;
+case Zq0A4_33:;
+Zp1PEAFD_13((STRING)"Pattern", 7L, Z154);
+break;
+case Zq0A4_34:;
+Zp1PEAFD_13((STRING)"patterns", 8L, Z154);
+break;
+case Zq0A4_35:;
+Zp1PEAFD_13((STRING)"Patterns0", 9L, Z154);
+break;
+case Zq0A4_36:;
+Zp1PEAFD_13((STRING)"Patterns", 8L, Z154);
+break;
+case Zq0A4_37:;
+Zp1PEAFD_13((STRING)"condition", 9L, Z154);
+break;
+case Zq0A4_38:;
+Zp1PEAFD_13((STRING)"CondD", 5L, Z154);
+break;
+case Zq0A4_39:;
+Zp1PEAFD_13((STRING)"CondF", 5L, Z154);
+break;
+case Zq0A4_40:;
+Zp1PEAFD_13((STRING)"costs", 5L, Z154);
+break;
+case Zq0A4_41:;
+Zp1PEAFD_13((STRING)"CostD", 5L, Z154);
+break;
+case Zq0A4_42:;
+Zp1PEAFD_13((STRING)"CostN", 5L, Z154);
+break;
+case Zq0A4_43:;
+Zp1PEAFD_13((STRING)"CostF", 5L, Z154);
+break;
+case Zq0A4_44:;
+Zp1PEAFD_13((STRING)"code", 4L, Z154);
+break;
+case Zq0A4_45:;
+Zp1PEAFD_13((STRING)"CdStr", 5L, Z154);
+break;
+case Zq0A4_46:;
+Zp1PEAFD_13((STRING)"CdId", 4L, Z154);
+break;
+case Zq0A4_47:;
+Zp1PEAFD_13((STRING)"CdDot", 5L, Z154);
+break;
+case Zq0A4_48:;
+Zp1PEAFD_13((STRING)"CdComma", 7L, Z154);
+break;
+case Zq0A4_49:;
+Zp1PEAFD_13((STRING)"CdLPar", 6L, Z154);
+break;
+case Zq0A4_50:;
+Zp1PEAFD_13((STRING)"CdRPar", 6L, Z154);
+break;
+case Zq0A4_51:;
+Zp1PEAFD_13((STRING)"CdLBra", 6L, Z154);
+break;
+case Zq0A4_52:;
+Zp1PEAFD_13((STRING)"CdRBra", 6L, Z154);
+break;
+case Zq0A4_53:;
+Zp1PEAFD_13((STRING)"CdSpa", 5L, Z154);
+break;
+case Zq0A4_54:;
+Zp1PEAFD_13((STRING)"CdCom", 5L, Z154);
+break;
+case Zq0A4_55:;
+Zp1PEAFD_13((STRING)"CdRst", 5L, Z154);
+break;
+case Zq0A4_56:;
+Zp1PEAFD_13((STRING)"CdEnd", 5L, Z154);
+break;
+default:
+Zp1PEAFD_13((STRING)"UNKNOWN", 7L, Z154);
+break;
+}
+}
+
+Zq0A4_58 Zq0A4_147
+# ifdef HAVE_ARGS
+(SHORTCARD Z211)
+# else
+(Z211)
+SHORTCARD Z211;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Z211]);
+Z153->U_1.V_1.Y0 = Z211;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+BOOLEAN Zq0A4_148
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z216, SHORTCARD Z211)
+# else
+(Z216, Z211)
+Zq0A4_58 Z216;
+SHORTCARD Z211;
+# endif
+{
+return Z216 != Zq0A4_4 && Z211 <= Z216->U_1.V_1.Y0 && Z216->U_1.V_1.Y0 <= Zq0A4_136.A[Z211];
+}
+
+Zq0A4_58 Zq0A4_149
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_5]);
+Z153->U_1.V_1.Y0 = Zq0A4_5;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_150
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z221, ZmtLFGGBG_0 Z222, Zfb3DLQ_0 Z223, ZmtLFGGBG_0 Z224, Zq0A4_58 Z225, Zq0A4_58 Z226, Zq0A4_58 Z227, Zq0A4_58 Z228, Zq0A4_58 Z229, Zq0A4_58 Z230)
+# else
+(Z221, Z222, Z223, Z224, Z225, Z226, Z227, Z228, Z229, Z230)
+Zfb3DLQ_0 Z221;
+ZmtLFGGBG_0 Z222;
+Zfb3DLQ_0 Z223;
+ZmtLFGGBG_0 Z224;
+Zq0A4_58 Z225;
+Zq0A4_58 Z226;
+Zq0A4_58 Z227;
+Zq0A4_58 Z228;
+Zq0A4_58 Z229;
+Zq0A4_58 Z230;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_6]);
+Z153->U_1.V_1.Y0 = Zq0A4_6;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_78 *W_1 = &Z153->U_1.V_4.Y3;
+
+W_1->Y1 = Z221;
+W_1->Y2 = Z222;
+W_1->Y3 = Z223;
+W_1->Y4 = Z224;
+W_1->Y5 = Z225;
+W_1->Y6 = Z226;
+W_1->Y7 = Z227;
+W_1->Y8 = Z228;
+W_1->Y9 = Z229;
+W_1->Y10 = Z230;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_151
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_7]);
+Z153->U_1.V_1.Y0 = Zq0A4_7;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_152
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_8]);
+Z153->U_1.V_1.Y0 = Zq0A4_8;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_153
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z242, ZmtLFGGBG_0 Z243, Zfb3DLQ_0 Z244, ZmtLFGGBG_0 Z245, Zq0A4_58 Z246, Zq0A4_58 Z229, BOOLEAN Z247)
+# else
+(Z242, Z243, Z244, Z245, Z246, Z229, Z247)
+Zfb3DLQ_0 Z242;
+ZmtLFGGBG_0 Z243;
+Zfb3DLQ_0 Z244;
+ZmtLFGGBG_0 Z245;
+Zq0A4_58 Z246;
+Zq0A4_58 Z229;
+BOOLEAN Z247;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_9]);
+Z153->U_1.V_1.Y0 = Zq0A4_9;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_81 *W_2 = &Z153->U_1.V_7.Y6;
+
+W_2->Y1 = Z242;
+W_2->Y2 = Z243;
+W_2->Y3 = Z244;
+W_2->Y4 = Z245;
+W_2->Y5 = Z246;
+W_2->Y6 = Z229;
+W_2->Y7 = Z247;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_154
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_10]);
+Z153->U_1.V_1.Y0 = Zq0A4_10;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_155
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_11]);
+Z153->U_1.V_1.Y0 = Zq0A4_11;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_156
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z221, ZmtLFGGBG_0 Z256, Zfb3DLQ_0 Z257, ZmtLFGGBG_0 Z258, Zq0A4_58 Z259, Zq0A4_58 Z246, BOOLEAN Z247)
+# else
+(Z221, Z256, Z257, Z258, Z259, Z246, Z247)
+Zfb3DLQ_0 Z221;
+ZmtLFGGBG_0 Z256;
+Zfb3DLQ_0 Z257;
+ZmtLFGGBG_0 Z258;
+Zq0A4_58 Z259;
+Zq0A4_58 Z246;
+BOOLEAN Z247;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_12]);
+Z153->U_1.V_1.Y0 = Zq0A4_12;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_84 *W_3 = &Z153->U_1.V_10.Y9;
+
+W_3->Y1 = Z221;
+W_3->Y2 = Z256;
+W_3->Y3 = Z257;
+W_3->Y4 = Z258;
+W_3->Y5 = Z259;
+W_3->Y6 = Z246;
+W_3->Y7 = Z247;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_157
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_13]);
+Z153->U_1.V_1.Y0 = Zq0A4_13;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_158
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_14]);
+Z153->U_1.V_1.Y0 = Zq0A4_14;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_159
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z221, ZmtLFGGBG_0 Z256, Zfb3DLQ_0 Z257, ZmtLFGGBG_0 Z258, Zq0A4_58 Z259, BOOLEAN Z247)
+# else
+(Z221, Z256, Z257, Z258, Z259, Z247)
+Zfb3DLQ_0 Z221;
+ZmtLFGGBG_0 Z256;
+Zfb3DLQ_0 Z257;
+ZmtLFGGBG_0 Z258;
+Zq0A4_58 Z259;
+BOOLEAN Z247;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_15]);
+Z153->U_1.V_1.Y0 = Zq0A4_15;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_87 *W_4 = &Z153->U_1.V_13.Y12;
+
+W_4->Y1 = Z221;
+W_4->Y2 = Z256;
+W_4->Y3 = Z257;
+W_4->Y4 = Z258;
+W_4->Y5 = Z259;
+W_4->Y6 = Z247;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_160
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_16]);
+Z153->U_1.V_1.Y0 = Zq0A4_16;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_161
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_17]);
+Z153->U_1.V_1.Y0 = Zq0A4_17;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_162
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z257, ZmtLFGGBG_0 Z258, Zfb3DLQ_0 Z269, ZmtLFGGBG_0 Z270, Zfb3DLQ_0 Z271, ZmtLFGGBG_0 Z272, Zq0A4_58 Z273)
+# else
+(Z257, Z258, Z269, Z270, Z271, Z272, Z273)
+Zfb3DLQ_0 Z257;
+ZmtLFGGBG_0 Z258;
+Zfb3DLQ_0 Z269;
+ZmtLFGGBG_0 Z270;
+Zfb3DLQ_0 Z271;
+ZmtLFGGBG_0 Z272;
+Zq0A4_58 Z273;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_18]);
+Z153->U_1.V_1.Y0 = Zq0A4_18;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_90 *W_5 = &Z153->U_1.V_16.Y15;
+
+W_5->Y1 = Z257;
+W_5->Y2 = Z258;
+W_5->Y3 = Z269;
+W_5->Y4 = Z270;
+W_5->Y5 = Z271;
+W_5->Y6 = Z272;
+W_5->Y7 = Z273;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_163
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_19]);
+Z153->U_1.V_1.Y0 = Zq0A4_19;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_164
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_20]);
+Z153->U_1.V_1.Y0 = Zq0A4_20;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_165
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z221, ZmtLFGGBG_0 Z256, Zq0A4_58 Z281, Zq0A4_58 Z282, Zq0A4_58 Z283, Zq0A4_58 Z284, Zq0A4_58 Z285, Zq0A4_58 Z230)
+# else
+(Z221, Z256, Z281, Z282, Z283, Z284, Z285, Z230)
+Zfb3DLQ_0 Z221;
+ZmtLFGGBG_0 Z256;
+Zq0A4_58 Z281;
+Zq0A4_58 Z282;
+Zq0A4_58 Z283;
+Zq0A4_58 Z284;
+Zq0A4_58 Z285;
+Zq0A4_58 Z230;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_21]);
+Z153->U_1.V_1.Y0 = Zq0A4_21;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_93 *W_6 = &Z153->U_1.V_19.Y18;
+
+W_6->Y1 = Z221;
+W_6->Y2 = Z256;
+W_6->Y3 = Z281;
+W_6->Y4 = Z282;
+W_6->Y5 = Z283;
+W_6->Y6 = Z284;
+W_6->Y7 = Z285;
+W_6->Y8 = Z230;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_166
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_22]);
+Z153->U_1.V_1.Y0 = Zq0A4_22;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_167
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_23]);
+Z153->U_1.V_1.Y0 = Zq0A4_23;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_168
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z269, ZmtLFGGBG_0 Z270, Zfb3DLQ_0 Z271, ZmtLFGGBG_0 Z272)
+# else
+(Z269, Z270, Z271, Z272)
+Zfb3DLQ_0 Z269;
+ZmtLFGGBG_0 Z270;
+Zfb3DLQ_0 Z271;
+ZmtLFGGBG_0 Z272;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_24]);
+Z153->U_1.V_1.Y0 = Zq0A4_24;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_96 *W_7 = &Z153->U_1.V_22.Y21;
+
+W_7->Y1 = Z269;
+W_7->Y2 = Z270;
+W_7->Y3 = Z271;
+W_7->Y4 = Z272;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_169
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_25]);
+Z153->U_1.V_1.Y0 = Zq0A4_25;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_170
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_26]);
+Z153->U_1.V_1.Y0 = Zq0A4_26;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_171
+# ifdef HAVE_ARGS
+(Zfb3DLQ_0 Z257, ZmtLFGGBG_0 Z258, Zq0A4_58 Z284)
+# else
+(Z257, Z258, Z284)
+Zfb3DLQ_0 Z257;
+ZmtLFGGBG_0 Z258;
+Zq0A4_58 Z284;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_27]);
+Z153->U_1.V_1.Y0 = Zq0A4_27;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_99 *W_8 = &Z153->U_1.V_25.Y24;
+
+W_8->Y1 = Z257;
+W_8->Y2 = Z258;
+W_8->Y3 = Z284;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_172
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_28]);
+Z153->U_1.V_1.Y0 = Zq0A4_28;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_173
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_29]);
+Z153->U_1.V_1.Y0 = Zq0A4_29;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_174
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z297, Zq0A4_58 Z298, Zq0A4_58 Z299, Zq0A4_58 Z300, Zq0A4_58 Z301, Zq0A4_58 Z285, BOOLEAN Z247)
+# else
+(Z297, Z298, Z299, Z300, Z301, Z285, Z247)
+Zq0A4_58 Z297;
+Zq0A4_58 Z298;
+Zq0A4_58 Z299;
+Zq0A4_58 Z300;
+Zq0A4_58 Z301;
+Zq0A4_58 Z285;
+BOOLEAN Z247;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_30]);
+Z153->U_1.V_1.Y0 = Zq0A4_30;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_102 *W_9 = &Z153->U_1.V_28.Y27;
+
+W_9->Y1 = Z297;
+W_9->Y2 = Z298;
+W_9->Y3 = Z299;
+W_9->Y4 = Z300;
+W_9->Y5 = Z301;
+W_9->Y6 = Z285;
+W_9->Y7 = Z247;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_175
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222)
+# else
+(Z222)
+ZmtLFGGBG_0 Z222;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_31]);
+Z153->U_1.V_1.Y0 = Zq0A4_31;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_103 *W_10 = &Z153->U_1.V_29.Y28;
+
+W_10->Y1 = Z222;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_176
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zfb3DLQ_0 Z306, ZmtLFGGBG_0 Z307, Zfb3DLQ_0 Z257, ZmtLFGGBG_0 Z258, BOOLEAN Z247)
+# else
+(Z222, Z306, Z307, Z257, Z258, Z247)
+ZmtLFGGBG_0 Z222;
+Zfb3DLQ_0 Z306;
+ZmtLFGGBG_0 Z307;
+Zfb3DLQ_0 Z257;
+ZmtLFGGBG_0 Z258;
+BOOLEAN Z247;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_32]);
+Z153->U_1.V_1.Y0 = Zq0A4_32;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_104 *W_11 = &Z153->U_1.V_30.Y29;
+
+W_11->Y1 = Z222;
+W_11->Y2 = Z306;
+W_11->Y3 = Z307;
+W_11->Y4 = Z257;
+W_11->Y5 = Z258;
+W_11->Y6 = Z247;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_177
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zfb3DLQ_0 Z306, ZmtLFGGBG_0 Z307, Zfb3DLQ_0 Z257, ZmtLFGGBG_0 Z258, Zq0A4_58 Z311, BOOLEAN Z247)
+# else
+(Z222, Z306, Z307, Z257, Z258, Z311, Z247)
+ZmtLFGGBG_0 Z222;
+Zfb3DLQ_0 Z306;
+ZmtLFGGBG_0 Z307;
+Zfb3DLQ_0 Z257;
+ZmtLFGGBG_0 Z258;
+Zq0A4_58 Z311;
+BOOLEAN Z247;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_33]);
+Z153->U_1.V_1.Y0 = Zq0A4_33;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_105 *W_12 = &Z153->U_1.V_31.Y30;
+
+W_12->Y1 = Z222;
+W_12->Y2 = Z306;
+W_12->Y3 = Z307;
+W_12->Y4 = Z257;
+W_12->Y5 = Z258;
+W_12->Y6 = Z311;
+W_12->Y7 = Z247;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_178
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_34]);
+Z153->U_1.V_1.Y0 = Zq0A4_34;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_179
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_35]);
+Z153->U_1.V_1.Y0 = Zq0A4_35;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_180
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z297, Zq0A4_58 Z311)
+# else
+(Z297, Z311)
+Zq0A4_58 Z297;
+Zq0A4_58 Z311;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_36]);
+Z153->U_1.V_1.Y0 = Zq0A4_36;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_108 *W_13 = &Z153->U_1.V_34.Y33;
+
+W_13->Y1 = Z297;
+W_13->Y2 = Z311;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_181
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_37]);
+Z153->U_1.V_1.Y0 = Zq0A4_37;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_182
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_38]);
+Z153->U_1.V_1.Y0 = Zq0A4_38;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_183
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z318)
+# else
+(Z318)
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_39]);
+Z153->U_1.V_1.Y0 = Zq0A4_39;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_111 *W_14 = &Z153->U_1.V_37.Y36;
+
+W_14->Y1 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_184
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_40]);
+Z153->U_1.V_1.Y0 = Zq0A4_40;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_185
+ ARGS ((void))
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_41]);
+Z153->U_1.V_1.Y0 = Zq0A4_41;
+Z153->U_1.V_2.Y1.Y1 = 0;
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_186
+# ifdef HAVE_ARGS
+(INTEGER Z322, ZmtLFGGBG_0 Z323)
+# else
+(Z322, Z323)
+INTEGER Z322;
+ZmtLFGGBG_0 Z323;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_42]);
+Z153->U_1.V_1.Y0 = Zq0A4_42;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_114 *W_15 = &Z153->U_1.V_40.Y39;
+
+W_15->Y1 = Z322;
+W_15->Y2 = Z323;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_187
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z318)
+# else
+(Z318)
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_43]);
+Z153->U_1.V_1.Y0 = Zq0A4_43;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_115 *W_16 = &Z153->U_1.V_41.Y40;
+
+W_16->Y1 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_188
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222)
+# else
+(Z222)
+ZmtLFGGBG_0 Z222;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_44]);
+Z153->U_1.V_1.Y0 = Zq0A4_44;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_116 *W_17 = &Z153->U_1.V_42.Y41;
+
+W_17->Y1 = Z222;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_189
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zfb3DLQ_0 Z257, Zq0A4_58 Z318)
+# else
+(Z222, Z257, Z318)
+ZmtLFGGBG_0 Z222;
+Zfb3DLQ_0 Z257;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_45]);
+Z153->U_1.V_1.Y0 = Zq0A4_45;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_117 *W_18 = &Z153->U_1.V_43.Y42;
+
+W_18->Y1 = Z222;
+W_18->Y2 = Z257;
+W_18->Y3 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_190
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zfb3DLQ_0 Z257, Zq0A4_58 Z318)
+# else
+(Z222, Z257, Z318)
+ZmtLFGGBG_0 Z222;
+Zfb3DLQ_0 Z257;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_46]);
+Z153->U_1.V_1.Y0 = Zq0A4_46;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_118 *W_19 = &Z153->U_1.V_44.Y43;
+
+W_19->Y1 = Z222;
+W_19->Y2 = Z257;
+W_19->Y3 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_191
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zq0A4_58 Z318)
+# else
+(Z222, Z318)
+ZmtLFGGBG_0 Z222;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_47]);
+Z153->U_1.V_1.Y0 = Zq0A4_47;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_119 *W_20 = &Z153->U_1.V_45.Y44;
+
+W_20->Y1 = Z222;
+W_20->Y2 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_192
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zq0A4_58 Z318)
+# else
+(Z222, Z318)
+ZmtLFGGBG_0 Z222;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_48]);
+Z153->U_1.V_1.Y0 = Zq0A4_48;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_120 *W_21 = &Z153->U_1.V_46.Y45;
+
+W_21->Y1 = Z222;
+W_21->Y2 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_193
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zq0A4_58 Z318)
+# else
+(Z222, Z318)
+ZmtLFGGBG_0 Z222;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_49]);
+Z153->U_1.V_1.Y0 = Zq0A4_49;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_121 *W_22 = &Z153->U_1.V_47.Y46;
+
+W_22->Y1 = Z222;
+W_22->Y2 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_194
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zq0A4_58 Z318)
+# else
+(Z222, Z318)
+ZmtLFGGBG_0 Z222;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_50]);
+Z153->U_1.V_1.Y0 = Zq0A4_50;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_122 *W_23 = &Z153->U_1.V_48.Y47;
+
+W_23->Y1 = Z222;
+W_23->Y2 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_195
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zq0A4_58 Z318)
+# else
+(Z222, Z318)
+ZmtLFGGBG_0 Z222;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_51]);
+Z153->U_1.V_1.Y0 = Zq0A4_51;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_123 *W_24 = &Z153->U_1.V_49.Y48;
+
+W_24->Y1 = Z222;
+W_24->Y2 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_196
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zq0A4_58 Z318)
+# else
+(Z222, Z318)
+ZmtLFGGBG_0 Z222;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_52]);
+Z153->U_1.V_1.Y0 = Zq0A4_52;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_124 *W_25 = &Z153->U_1.V_50.Y49;
+
+W_25->Y1 = Z222;
+W_25->Y2 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_197
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zp1PEAFi_1 Z337, Zq0A4_58 Z318)
+# else
+(Z222, Z337, Z318)
+ZmtLFGGBG_0 Z222;
+Zp1PEAFi_1 Z337;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_53]);
+Z153->U_1.V_1.Y0 = Zq0A4_53;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_125 *W_26 = &Z153->U_1.V_51.Y50;
+
+W_26->Y1 = Z222;
+W_26->Y2 = Z337;
+W_26->Y3 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_198
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zp1PEAFi_1 Z337, Zq0A4_58 Z318)
+# else
+(Z222, Z337, Z318)
+ZmtLFGGBG_0 Z222;
+Zp1PEAFi_1 Z337;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_54]);
+Z153->U_1.V_1.Y0 = Zq0A4_54;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_126 *W_27 = &Z153->U_1.V_52.Y51;
+
+W_27->Y1 = Z222;
+W_27->Y2 = Z337;
+W_27->Y3 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_199
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222, Zp1PEAFi_1 Z337, Zq0A4_58 Z318)
+# else
+(Z222, Z337, Z318)
+ZmtLFGGBG_0 Z222;
+Zp1PEAFi_1 Z337;
+Zq0A4_58 Z318;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_55]);
+Z153->U_1.V_1.Y0 = Zq0A4_55;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_127 *W_28 = &Z153->U_1.V_53.Y52;
+
+W_28->Y1 = Z222;
+W_28->Y2 = Z337;
+W_28->Y3 = Z318;
+}
+return Z153;
+}
+
+Zq0A4_58 Zq0A4_200
+# ifdef HAVE_ARGS
+(ZmtLFGGBG_0 Z222)
+# else
+(Z222)
+ZmtLFGGBG_0 Z222;
+# endif
+{
+Zq0A4_58 Z153;
+
+Z153 = (Zq0A4_58)Zq0A4_133;
+if ((ADDRESS)Z153 >= Zq0A4_134) {
+Z153 = Zq0A4_145();
+}
+INC1(Zq0A4_133, Zq0A4_135.A[Zq0A4_56]);
+Z153->U_1.V_1.Y0 = Zq0A4_56;
+Z153->U_1.V_2.Y1.Y1 = 0;
+{
+register Zq0A4_128 *W_29 = &Z153->U_1.V_54.Y53;
+
+W_29->Y1 = Z222;
+}
+return Z153;
+}
+
+static void Z214
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+for (;;) {
+if (Z153 == Zq0A4_4) {
+return;
+}
+INC(Z153->U_1.V_2.Y1.Y1);
+if (Z153->U_1.V_2.Y1.Y1 > 1) {
+return;
+}
+switch (Z153->U_1.V_1.Y0) {
+case Zq0A4_6:;
+Z214(Z153->U_1.V_4.Y3.Y5);
+Z214(Z153->U_1.V_4.Y3.Y6);
+Z214(Z153->U_1.V_4.Y3.Y7);
+Z214(Z153->U_1.V_4.Y3.Y8);
+Z214(Z153->U_1.V_4.Y3.Y9);
+Z153 = Z153->U_1.V_4.Y3.Y10;
+break;
+case Zq0A4_9:;
+Z214(Z153->U_1.V_7.Y6.Y5);
+Z153 = Z153->U_1.V_7.Y6.Y6;
+break;
+case Zq0A4_12:;
+Z214(Z153->U_1.V_10.Y9.Y5);
+Z153 = Z153->U_1.V_10.Y9.Y6;
+break;
+case Zq0A4_15:;
+Z153 = Z153->U_1.V_13.Y12.Y5;
+break;
+case Zq0A4_18:;
+Z153 = Z153->U_1.V_16.Y15.Y7;
+break;
+case Zq0A4_21:;
+Z214(Z153->U_1.V_19.Y18.Y3);
+Z214(Z153->U_1.V_19.Y18.Y4);
+Z214(Z153->U_1.V_19.Y18.Y5);
+Z214(Z153->U_1.V_19.Y18.Y6);
+Z214(Z153->U_1.V_19.Y18.Y7);
+Z153 = Z153->U_1.V_19.Y18.Y8;
+break;
+case Zq0A4_27:;
+Z153 = Z153->U_1.V_25.Y24.Y3;
+break;
+case Zq0A4_30:;
+Z214(Z153->U_1.V_28.Y27.Y1);
+Z214(Z153->U_1.V_28.Y27.Y2);
+Z214(Z153->U_1.V_28.Y27.Y3);
+Z214(Z153->U_1.V_28.Y27.Y4);
+Z214(Z153->U_1.V_28.Y27.Y5);
+Z153 = Z153->U_1.V_28.Y27.Y6;
+break;
+case Zq0A4_33:;
+Z153 = Z153->U_1.V_31.Y30.Y6;
+break;
+case Zq0A4_36:;
+Z214(Z153->U_1.V_34.Y33.Y1);
+Z153 = Z153->U_1.V_34.Y33.Y2;
+break;
+case Zq0A4_39:;
+Z153 = Z153->U_1.V_37.Y36.Y1;
+break;
+case Zq0A4_43:;
+Z153 = Z153->U_1.V_41.Y40.Y1;
+break;
+case Zq0A4_45:;
+Z153 = Z153->U_1.V_43.Y42.Y3;
+break;
+case Zq0A4_46:;
+Z153 = Z153->U_1.V_44.Y43.Y3;
+break;
+case Zq0A4_47:;
+Z153 = Z153->U_1.V_45.Y44.Y2;
+break;
+case Zq0A4_48:;
+Z153 = Z153->U_1.V_46.Y45.Y2;
+break;
+case Zq0A4_49:;
+Z153 = Z153->U_1.V_47.Y46.Y2;
+break;
+case Zq0A4_50:;
+Z153 = Z153->U_1.V_48.Y47.Y2;
+break;
+case Zq0A4_51:;
+Z153 = Z153->U_1.V_49.Y48.Y2;
+break;
+case Zq0A4_52:;
+Z153 = Z153->U_1.V_50.Y49.Y2;
+break;
+case Zq0A4_53:;
+Z153 = Z153->U_1.V_51.Y50.Y3;
+break;
+case Zq0A4_54:;
+Z153 = Z153->U_1.V_52.Y51.Y3;
+break;
+case Zq0A4_55:;
+Z153 = Z153->U_1.V_53.Y52.Y3;
+break;
+default:
+return;
+break;
+}
+} EXIT_1:;
+}
+
+static SHORTCARD Z351
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z216)
+# else
+(Z216)
+Zq0A4_58 Z216;
+# endif
+{
+INTEGER Z138;
+
+{
+LONGINT B_1 = 1, B_2 = Z349;
+
+if (B_1 <= B_2)
+for (Z138 = B_1;; Z138 += 1) {
+if (Z348->A[Z138] == Z216) {
+return Z138;
+}
+if (Z138 >= B_2) break;
+}
+}
+INC(Z349);
+if (Z349 == Z347) {
+ZarQdhNDD_2((ADDRESS *)&Z348, &Z347, (LONGINT)sizeof (Zq0A4_58));
+}
+Z348->A[Z349] = Z216;
+return Z349;
+}
+
+static Zq0A4_58 Z353
+# ifdef HAVE_ARGS
+(SHORTCARD Z343)
+# else
+(Z343)
+SHORTCARD Z343;
+# endif
+{
+return Z348->A[Z343];
+}
+
+static void Z354
+ ARGS ((void))
+{
+ZfM_33(Z136);
+}
+
+static void Z355
+# ifdef HAVE_ARGS
+(CHAR Z345[], LONGCARD O_1)
+# else
+(Z345, O_1)
+CHAR Z345[];
+LONGCARD O_1;
+# endif
+{
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_1 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z345, O_1, CHAR)
+ZfM_29(Z136, Z345, O_1);
+ZibDRNS_2(Z136, 16 - (INTEGER)(O_1 - 1));
+ZfM_29(Z136, (STRING)" = ", 3L);
+FREE_OPEN_ARRAYS
+}
+
+static void Z357
+# ifdef HAVE_ARGS
+(BYTE Z358[], LONGCARD O_2)
+# else
+(Z358, O_2)
+BYTE Z358[];
+LONGCARD O_2;
+# endif
+{
+INTEGER Z138;
+
+{
+LONGINT B_3 = 0, B_4 = (INTEGER)(O_2 - 1);
+
+if (B_3 <= B_4)
+for (Z138 = B_3;; Z138 += 1) {
+ZfM_28(Z136, ORD((CHAR)Z358[Z138]), 2L, 16L);
+ZfM_24(Z136, ' ');
+if (Z138 >= B_4) break;
+}
+}
+}
+
+static void Z361
+# ifdef HAVE_ARGS
+(ZfM_3 Z136, Zq0A4_58 Z153)
+# else
+(Z136, Z153)
+ZfM_3 Z136;
+Zq0A4_58 Z153;
+# endif
+{
+Zp1PEAFD_2 Z362;
+
+Zq0A4_146(Z153, &Z362);
+Zp1PEAFD_22(Z136, &Z362);
+}
+
+void Zq0A4_201
+# ifdef HAVE_ARGS
+(ZfM_3 Z366, Zq0A4_58 Z153)
+# else
+(Z366, Z153)
+ZfM_3 Z366;
+Zq0A4_58 Z153;
+# endif
+{
+SHORTINT Z367;
+
+Z136 = Z366;
+if (Z350 == 0) {
+Z349 = 0;
+}
+INC(Z350);
+Z214(Z153);
+Z367 = Z364;
+Z364 = 0;
+Z368(Z153);
+Z364 = Z367;
+DEC(Z350);
+}
+
+static void Z369
+# ifdef HAVE_ARGS
+(CHAR Z345[], LONGCARD O_3)
+# else
+(Z345, O_3)
+CHAR Z345[];
+LONGCARD O_3;
+# endif
+{
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_3 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z345, O_3, CHAR)
+ZibDRNS_2(Z136, (LONGINT)Z364);
+Z355(Z345, O_3);
+FREE_OPEN_ARRAYS
+}
+
+static void Z370
+# ifdef HAVE_ARGS
+(CHAR Z345[], LONGCARD O_4, Zq0A4_58 Z153)
+# else
+(Z345, O_4, Z153)
+CHAR Z345[];
+LONGCARD O_4;
+Zq0A4_58 Z153;
+# endif
+{
+OPEN_ARRAY_LOCALS
+
+ALLOC_OPEN_ARRAYS (O_4 * sizeof (CHAR), 1)
+COPY_OPEN_ARRAY (Z345, O_4, CHAR)
+Z369(Z345, O_4);
+Z368(Z153);
+FREE_OPEN_ARRAYS
+}
+
+static void Z371
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"name", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_4.Y3.Y1);
+Z354();
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_4.Y3.Y2);
+Z354();
+Z369((STRING)"grna", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_4.Y3.Y3);
+Z354();
+Z369((STRING)"grpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_4.Y3.Y4);
+Z354();
+Z370((STRING)"export", 6L, Z153->U_1.V_4.Y3.Y5);
+Z370((STRING)"global", 6L, Z153->U_1.V_4.Y3.Y6);
+Z370((STRING)"begin", 5L, Z153->U_1.V_4.Y3.Y7);
+Z370((STRING)"close", 5L, Z153->U_1.V_4.Y3.Y8);
+Z370((STRING)"classes", 7L, Z153->U_1.V_4.Y3.Y9);
+}
+
+static void Z374
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"suid", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_7.Y6.Y1);
+Z354();
+Z369((STRING)"supos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_7.Y6.Y2);
+Z354();
+Z369((STRING)"clid", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_7.Y6.Y3);
+Z354();
+Z369((STRING)"clpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_7.Y6.Y4);
+Z354();
+Z370((STRING)"nodes", 5L, Z153->U_1.V_7.Y6.Y5);
+Z369((STRING)"correct", 7L);
+ZfM_27(Z136, Z153->U_1.V_7.Y6.Y7);
+Z354();
+}
+
+static void Z376
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"name", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_10.Y9.Y1);
+Z354();
+Z369((STRING)"napos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_10.Y9.Y2);
+Z354();
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_10.Y9.Y3);
+Z354();
+Z369((STRING)"idpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_10.Y9.Y4);
+Z354();
+Z370((STRING)"sons", 4L, Z153->U_1.V_10.Y9.Y5);
+Z369((STRING)"correct", 7L);
+ZfM_27(Z136, Z153->U_1.V_10.Y9.Y7);
+Z354();
+}
+
+static void Z377
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"name", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_13.Y12.Y1);
+Z354();
+Z369((STRING)"napos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_13.Y12.Y2);
+Z354();
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_13.Y12.Y3);
+Z354();
+Z369((STRING)"idpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_13.Y12.Y4);
+Z354();
+Z369((STRING)"correct", 7L);
+ZfM_27(Z136, Z153->U_1.V_13.Y12.Y6);
+Z354();
+}
+
+static void Z378
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_16.Y15.Y1);
+Z354();
+Z369((STRING)"idpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_16.Y15.Y2);
+Z354();
+Z369((STRING)"mod", 3L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_16.Y15.Y3);
+Z354();
+Z369((STRING)"mopos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_16.Y15.Y4);
+Z354();
+Z369((STRING)"type", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_16.Y15.Y5);
+Z354();
+Z369((STRING)"typos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_16.Y15.Y6);
+Z354();
+}
+
+static void Z379
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"name", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_19.Y18.Y1);
+Z354();
+Z369((STRING)"napos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_19.Y18.Y2);
+Z354();
+Z370((STRING)"in", 2L, Z153->U_1.V_19.Y18.Y3);
+Z370((STRING)"out", 3L, Z153->U_1.V_19.Y18.Y4);
+Z370((STRING)"result", 6L, Z153->U_1.V_19.Y18.Y5);
+Z370((STRING)"domain", 6L, Z153->U_1.V_19.Y18.Y6);
+Z370((STRING)"directives", 10L, Z153->U_1.V_19.Y18.Y7);
+Z369((STRING)"funct", 5L);
+Z357((WORD *)&Z153->U_1.V_19.Y18.Y9, (LONGCARD)sizeof (Z153->U_1.V_19.Y18.Y9));
+Z354();
+Z369((STRING)"domainset", 9L);
+ZpmCQ_35(Z136, Z153->U_1.V_19.Y18.Y10);
+Z354();
+}
+
+static void Z383
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"mod", 3L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_22.Y21.Y1);
+Z354();
+Z369((STRING)"mopos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_22.Y21.Y2);
+Z354();
+Z369((STRING)"type", 4L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_22.Y21.Y3);
+Z354();
+Z369((STRING)"typos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_22.Y21.Y4);
+Z354();
+}
+
+static void Z384
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_25.Y24.Y1);
+Z354();
+Z369((STRING)"idpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_25.Y24.Y2);
+Z354();
+}
+
+static void Z385
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z370((STRING)"pattern", 7L, Z153->U_1.V_28.Y27.Y1);
+Z370((STRING)"condition", 9L, Z153->U_1.V_28.Y27.Y2);
+Z370((STRING)"costs", 5L, Z153->U_1.V_28.Y27.Y3);
+Z370((STRING)"decl", 4L, Z153->U_1.V_28.Y27.Y4);
+Z370((STRING)"instr", 5L, Z153->U_1.V_28.Y27.Y5);
+Z369((STRING)"correct", 7L);
+ZfM_27(Z136, Z153->U_1.V_28.Y27.Y7);
+Z354();
+Z369((STRING)"number", 6L);
+ZfM_25(Z136, Z153->U_1.V_28.Y27.Y8, 0L);
+Z354();
+Z369((STRING)"pat", 3L);
+Z357((WORD *)&Z153->U_1.V_28.Y27.Y9, (LONGCARD)sizeof (Z153->U_1.V_28.Y27.Y9));
+Z354();
+Z369((STRING)"iter", 4L);
+ZfM_27(Z136, Z153->U_1.V_28.Y27.Y10);
+Z354();
+}
+
+static void Z389
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_29.Y28.Y1);
+Z354();
+}
+
+static void Z390
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_30.Y29.Y1);
+Z354();
+Z369((STRING)"sel", 3L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_30.Y29.Y2);
+Z354();
+Z369((STRING)"sepos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_30.Y29.Y3);
+Z354();
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_30.Y29.Y4);
+Z354();
+Z369((STRING)"idpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_30.Y29.Y5);
+Z354();
+Z369((STRING)"correct", 7L);
+ZfM_27(Z136, Z153->U_1.V_30.Y29.Y6);
+Z354();
+}
+
+static void Z391
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_31.Y30.Y1);
+Z354();
+Z369((STRING)"sel", 3L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_31.Y30.Y2);
+Z354();
+Z369((STRING)"sepos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_31.Y30.Y3);
+Z354();
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_31.Y30.Y4);
+Z354();
+Z369((STRING)"idpos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_31.Y30.Y5);
+Z354();
+Z369((STRING)"correct", 7L);
+ZfM_27(Z136, Z153->U_1.V_31.Y30.Y7);
+Z354();
+}
+
+static void Z392
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z370((STRING)"pattern", 7L, Z153->U_1.V_34.Y33.Y1);
+}
+
+static void Z393
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+}
+
+static void Z394
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"value", 5L);
+ZfM_25(Z136, Z153->U_1.V_40.Y39.Y1, 0L);
+Z354();
+Z369((STRING)"vapos", 5L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_40.Y39.Y2);
+Z354();
+}
+
+static void Z395
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+}
+
+static void Z396
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_42.Y41.Y1);
+Z354();
+}
+
+static void Z397
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_43.Y42.Y1);
+Z354();
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_43.Y42.Y2);
+Z354();
+Z369((STRING)"mode", 4L);
+Z357((WORD *)&Z153->U_1.V_43.Y42.Y4, (LONGCARD)sizeof (Z153->U_1.V_43.Y42.Y4));
+Z354();
+}
+
+static void Z399
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_44.Y43.Y1);
+Z354();
+Z369((STRING)"ident", 5L);
+Zfb3DLQ_7(Z136, Z153->U_1.V_44.Y43.Y2);
+Z354();
+Z369((STRING)"mode", 4L);
+Z357((WORD *)&Z153->U_1.V_44.Y43.Y4, (LONGCARD)sizeof (Z153->U_1.V_44.Y43.Y4));
+Z354();
+}
+
+static void Z400
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_45.Y44.Y1);
+Z354();
+}
+
+static void Z401
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_46.Y45.Y1);
+Z354();
+}
+
+static void Z402
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_47.Y46.Y1);
+Z354();
+}
+
+static void Z403
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_48.Y47.Y1);
+Z354();
+}
+
+static void Z404
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_49.Y48.Y1);
+Z354();
+}
+
+static void Z405
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_50.Y49.Y1);
+Z354();
+}
+
+static void Z406
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_51.Y50.Y1);
+Z354();
+Z369((STRING)"ref", 3L);
+Zp1PEAFi_6(Z136, Z153->U_1.V_51.Y50.Y2);
+Z354();
+}
+
+static void Z407
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_52.Y51.Y1);
+Z354();
+Z369((STRING)"ref", 3L);
+Zp1PEAFi_6(Z136, Z153->U_1.V_52.Y51.Y2);
+Z354();
+}
+
+static void Z408
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_53.Y52.Y1);
+Z354();
+Z369((STRING)"ref", 3L);
+Zp1PEAFi_6(Z136, Z153->U_1.V_53.Y52.Y2);
+Z354();
+}
+
+static void Z409
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+Z361(Z136, Z153);
+Z369((STRING)"pos", 3L);
+ZmtLFGGBG_3(Z136, Z153->U_1.V_54.Y53.Y1);
+Z354();
+}
+
+static void Z368
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153)
+# else
+(Z153)
+Zq0A4_58 Z153;
+# endif
+{
+SHORTCARD Z410;
+
+Z410 = Z364;
+for (;;) {
+if (Z153 == Zq0A4_4) {
+ZfM_29(Z136, (STRING)" NoTree", 7L);
+Z354();
+goto EXIT_2;
+} else if (Z153->U_1.V_2.Y1.Y1 == 0) {
+ZfM_24(Z136, '^');
+ZfM_25(Z136, (LONGINT)Z351(Z153), 0L);
+Z354();
+goto EXIT_2;
+} else if (Z153->U_1.V_2.Y1.Y1 > 1) {
+Z354();
+ZfM_28(Z136, (LONGCARD)Z351(Z153), 6L, 10L);
+ZfM_24(Z136, ':');
+ZibDRNS_2(Z136, (LONGINT)(Z364 - 7));
+} else {
+ZfM_24(Z136, ' ');
+}
+Z153->U_1.V_2.Y1.Y1 = 0;
+INC1(Z364, 2);
+switch (Z153->U_1.V_1.Y0) {
+case Zq0A4_5:;
+ZfM_29(Z136, (STRING)"spec", 4L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_6:;
+Z371(Z153);
+Z369((STRING)"functions", 9L);
+Z153 = Z153->U_1.V_4.Y3.Y10;
+break;
+case Zq0A4_7:;
+ZfM_29(Z136, (STRING)"classes", 7L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_8:;
+ZfM_29(Z136, (STRING)"Class0", 6L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_9:;
+Z374(Z153);
+Z369((STRING)"classes", 7L);
+Z153 = Z153->U_1.V_7.Y6.Y6;
+break;
+case Zq0A4_10:;
+ZfM_29(Z136, (STRING)"nodes", 5L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_11:;
+ZfM_29(Z136, (STRING)"Node0", 5L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_12:;
+Z376(Z153);
+Z369((STRING)"nodes", 5L);
+Z153 = Z153->U_1.V_10.Y9.Y6;
+break;
+case Zq0A4_13:;
+ZfM_29(Z136, (STRING)"sons", 4L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_14:;
+ZfM_29(Z136, (STRING)"Son0", 4L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_15:;
+Z377(Z153);
+Z369((STRING)"sons", 4L);
+Z153 = Z153->U_1.V_13.Y12.Y5;
+break;
+case Zq0A4_16:;
+ZfM_29(Z136, (STRING)"attributes", 10L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_17:;
+ZfM_29(Z136, (STRING)"Attribute0", 10L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_18:;
+Z378(Z153);
+Z369((STRING)"attributes", 10L);
+Z153 = Z153->U_1.V_16.Y15.Y7;
+break;
+case Zq0A4_19:;
+ZfM_29(Z136, (STRING)"functions", 9L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_20:;
+ZfM_29(Z136, (STRING)"Function0", 9L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_21:;
+Z379(Z153);
+Z369((STRING)"functions", 9L);
+Z153 = Z153->U_1.V_19.Y18.Y8;
+break;
+case Zq0A4_22:;
+ZfM_29(Z136, (STRING)"result", 6L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_23:;
+ZfM_29(Z136, (STRING)"NoResult", 8L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_24:;
+Z383(Z153);
+goto EXIT_2;
+break;
+case Zq0A4_25:;
+ZfM_29(Z136, (STRING)"domain", 6L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_26:;
+ZfM_29(Z136, (STRING)"Ident0", 6L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_27:;
+Z384(Z153);
+Z369((STRING)"domain", 6L);
+Z153 = Z153->U_1.V_25.Y24.Y3;
+break;
+case Zq0A4_28:;
+ZfM_29(Z136, (STRING)"directives", 10L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_29:;
+ZfM_29(Z136, (STRING)"Directive0", 10L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_30:;
+Z385(Z153);
+Z369((STRING)"directives", 10L);
+Z153 = Z153->U_1.V_28.Y27.Y6;
+break;
+case Zq0A4_31:;
+Z389(Z153);
+goto EXIT_2;
+break;
+case Zq0A4_32:;
+Z390(Z153);
+goto EXIT_2;
+break;
+case Zq0A4_33:;
+Z391(Z153);
+Z369((STRING)"patterns", 8L);
+Z153 = Z153->U_1.V_31.Y30.Y6;
+break;
+case Zq0A4_34:;
+ZfM_29(Z136, (STRING)"patterns", 8L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_35:;
+ZfM_29(Z136, (STRING)"Patterns0", 9L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_36:;
+Z392(Z153);
+Z369((STRING)"patterns", 8L);
+Z153 = Z153->U_1.V_34.Y33.Y2;
+break;
+case Zq0A4_37:;
+ZfM_29(Z136, (STRING)"condition", 9L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_38:;
+ZfM_29(Z136, (STRING)"CondD", 5L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_39:;
+Z393(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_37.Y36.Y1;
+break;
+case Zq0A4_40:;
+ZfM_29(Z136, (STRING)"costs", 5L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_41:;
+ZfM_29(Z136, (STRING)"CostD", 5L);
+Z354();
+goto EXIT_2;
+break;
+case Zq0A4_42:;
+Z394(Z153);
+goto EXIT_2;
+break;
+case Zq0A4_43:;
+Z395(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_41.Y40.Y1;
+break;
+case Zq0A4_44:;
+Z396(Z153);
+goto EXIT_2;
+break;
+case Zq0A4_45:;
+Z397(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_43.Y42.Y3;
+break;
+case Zq0A4_46:;
+Z399(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_44.Y43.Y3;
+break;
+case Zq0A4_47:;
+Z400(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_45.Y44.Y2;
+break;
+case Zq0A4_48:;
+Z401(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_46.Y45.Y2;
+break;
+case Zq0A4_49:;
+Z402(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_47.Y46.Y2;
+break;
+case Zq0A4_50:;
+Z403(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_48.Y47.Y2;
+break;
+case Zq0A4_51:;
+Z404(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_49.Y48.Y2;
+break;
+case Zq0A4_52:;
+Z405(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_50.Y49.Y2;
+break;
+case Zq0A4_53:;
+Z406(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_51.Y50.Y3;
+break;
+case Zq0A4_54:;
+Z407(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_52.Y51.Y3;
+break;
+case Zq0A4_55:;
+Z408(Z153);
+Z369((STRING)"code", 4L);
+Z153 = Z153->U_1.V_53.Y52.Y3;
+break;
+case Zq0A4_56:;
+Z409(Z153);
+goto EXIT_2;
+break;
+default:
+goto EXIT_2;
+break;
+}
+} EXIT_2:;
+Z364 = Z410;
+}
+
+Zq0A4_58 Zq0A4_202
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z416)
+# else
+(Z416)
+Zq0A4_58 Z416;
+# endif
+{
+Zq0A4_58 Z417, Z418, Z419;
+
+Z417 = Z416;
+Z419 = Z416;
+for (;;) {
+switch (Z416->U_1.V_1.Y0) {
+case Zq0A4_9:;
+Z418 = Z416->U_1.V_7.Y6.Y6;
+Z416->U_1.V_7.Y6.Y6 = Z417;
+break;
+case Zq0A4_12:;
+Z418 = Z416->U_1.V_10.Y9.Y6;
+Z416->U_1.V_10.Y9.Y6 = Z417;
+break;
+case Zq0A4_15:;
+Z418 = Z416->U_1.V_13.Y12.Y5;
+Z416->U_1.V_13.Y12.Y5 = Z417;
+break;
+case Zq0A4_18:;
+Z418 = Z416->U_1.V_16.Y15.Y7;
+Z416->U_1.V_16.Y15.Y7 = Z417;
+break;
+case Zq0A4_21:;
+Z418 = Z416->U_1.V_19.Y18.Y8;
+Z416->U_1.V_19.Y18.Y8 = Z417;
+break;
+case Zq0A4_27:;
+Z418 = Z416->U_1.V_25.Y24.Y3;
+Z416->U_1.V_25.Y24.Y3 = Z417;
+break;
+case Zq0A4_30:;
+Z418 = Z416->U_1.V_28.Y27.Y6;
+Z416->U_1.V_28.Y27.Y6 = Z417;
+break;
+case Zq0A4_36:;
+Z418 = Z416->U_1.V_34.Y33.Y2;
+Z416->U_1.V_34.Y33.Y2 = Z417;
+break;
+case Zq0A4_45:;
+Z418 = Z416->U_1.V_43.Y42.Y3;
+Z416->U_1.V_43.Y42.Y3 = Z417;
+break;
+case Zq0A4_46:;
+Z418 = Z416->U_1.V_44.Y43.Y3;
+Z416->U_1.V_44.Y43.Y3 = Z417;
+break;
+case Zq0A4_47:;
+Z418 = Z416->U_1.V_45.Y44.Y2;
+Z416->U_1.V_45.Y44.Y2 = Z417;
+break;
+case Zq0A4_48:;
+Z418 = Z416->U_1.V_46.Y45.Y2;
+Z416->U_1.V_46.Y45.Y2 = Z417;
+break;
+case Zq0A4_49:;
+Z418 = Z416->U_1.V_47.Y46.Y2;
+Z416->U_1.V_47.Y46.Y2 = Z417;
+break;
+case Zq0A4_50:;
+Z418 = Z416->U_1.V_48.Y47.Y2;
+Z416->U_1.V_48.Y47.Y2 = Z417;
+break;
+case Zq0A4_51:;
+Z418 = Z416->U_1.V_49.Y48.Y2;
+Z416->U_1.V_49.Y48.Y2 = Z417;
+break;
+case Zq0A4_52:;
+Z418 = Z416->U_1.V_50.Y49.Y2;
+Z416->U_1.V_50.Y49.Y2 = Z417;
+break;
+case Zq0A4_53:;
+Z418 = Z416->U_1.V_51.Y50.Y3;
+Z416->U_1.V_51.Y50.Y3 = Z417;
+break;
+case Zq0A4_54:;
+Z418 = Z416->U_1.V_52.Y51.Y3;
+Z416->U_1.V_52.Y51.Y3 = Z417;
+break;
+case Zq0A4_55:;
+Z418 = Z416->U_1.V_53.Y52.Y3;
+Z416->U_1.V_53.Y52.Y3 = Z417;
+break;
+default:
+goto EXIT_3;
+break;
+}
+Z417 = Z416;
+Z416 = Z418;
+} EXIT_3:;
+switch (Z419->U_1.V_1.Y0) {
+case Zq0A4_9:;
+Z419->U_1.V_7.Y6.Y6 = Z416;
+break;
+case Zq0A4_12:;
+Z419->U_1.V_10.Y9.Y6 = Z416;
+break;
+case Zq0A4_15:;
+Z419->U_1.V_13.Y12.Y5 = Z416;
+break;
+case Zq0A4_18:;
+Z419->U_1.V_16.Y15.Y7 = Z416;
+break;
+case Zq0A4_21:;
+Z419->U_1.V_19.Y18.Y8 = Z416;
+break;
+case Zq0A4_27:;
+Z419->U_1.V_25.Y24.Y3 = Z416;
+break;
+case Zq0A4_30:;
+Z419->U_1.V_28.Y27.Y6 = Z416;
+break;
+case Zq0A4_36:;
+Z419->U_1.V_34.Y33.Y2 = Z416;
+break;
+case Zq0A4_45:;
+Z419->U_1.V_43.Y42.Y3 = Z416;
+break;
+case Zq0A4_46:;
+Z419->U_1.V_44.Y43.Y3 = Z416;
+break;
+case Zq0A4_47:;
+Z419->U_1.V_45.Y44.Y2 = Z416;
+break;
+case Zq0A4_48:;
+Z419->U_1.V_46.Y45.Y2 = Z416;
+break;
+case Zq0A4_49:;
+Z419->U_1.V_47.Y46.Y2 = Z416;
+break;
+case Zq0A4_50:;
+Z419->U_1.V_48.Y47.Y2 = Z416;
+break;
+case Zq0A4_51:;
+Z419->U_1.V_49.Y48.Y2 = Z416;
+break;
+case Zq0A4_52:;
+Z419->U_1.V_50.Y49.Y2 = Z416;
+break;
+case Zq0A4_53:;
+Z419->U_1.V_51.Y50.Y3 = Z416;
+break;
+case Zq0A4_54:;
+Z419->U_1.V_52.Y51.Y3 = Z416;
+break;
+case Zq0A4_55:;
+Z419->U_1.V_53.Y52.Y3 = Z416;
+break;
+default:
+break;
+}
+return Z417;
+}
+
+void Zq0A4_203
+# ifdef HAVE_ARGS
+(Zq0A4_58 Z153, Zq0A4_59 Z421)
+# else
+(Z153, Z421)
+Zq0A4_58 Z153;
+Zq0A4_59 Z421;
+# endif
+{
+Zq0A4_58 Z423;
+
+for (;;) {
+if (Z153 == Zq0A4_4) {
+return;
+}
+Z423 = Z153;
+switch (Z153->U_1.V_1.Y0) {
+case Zq0A4_9:;
+Z153 = Z153->U_1.V_7.Y6.Y6;
+break;
+case Zq0A4_12:;
+Z153 = Z153->U_1.V_10.Y9.Y6;
+break;
+case Zq0A4_15:;
+Z153 = Z153->U_1.V_13.Y12.Y5;
+break;
+case Zq0A4_18:;
+Z153 = Z153->U_1.V_16.Y15.Y7;
+break;
+case Zq0A4_21:;
+Z153 = Z153->U_1.V_19.Y18.Y8;
+break;
+case Zq0A4_27:;
+Z153 = Z153->U_1.V_25.Y24.Y3;
+break;
+case Zq0A4_30:;
+Z153 = Z153->U_1.V_28.Y27.Y6;
+break;
+case Zq0A4_36:;
+Z153 = Z153->U_1.V_34.Y33.Y2;
+break;
+case Zq0A4_45:;
+Z153 = Z153->U_1.V_43.Y42.Y3;
+break;
+case Zq0A4_46:;
+Z153 = Z153->U_1.V_44.Y43.Y3;
+break;
+case Zq0A4_47:;
+Z153 = Z153->U_1.V_45.Y44.Y2;
+break;
+case Zq0A4_48:;
+Z153 = Z153->U_1.V_46.Y45.Y2;
+break;
+case Zq0A4_49:;
+Z153 = Z153->U_1.V_47.Y46.Y2;
+break;
+case Zq0A4_50:;
+Z153 = Z153->U_1.V_48.Y47.Y2;
+break;
+case Zq0A4_51:;
+Z153 = Z153->U_1.V_49.Y48.Y2;
+break;
+case Zq0A4_52:;
+Z153 = Z153->U_1.V_50.Y49.Y2;
+break;
+case Zq0A4_53:;
+Z153 = Z153->U_1.V_51.Y50.Y3;
+break;
+case Zq0A4_54:;
+Z153 = Z153->U_1.V_52.Y51.Y3;
+break;
+case Zq0A4_55:;
+Z153 = Z153->U_1.V_53.Y52.Y3;
+break;
+default:
+return;
+break;
+}
+(*Z421)(Z423);
+} EXIT_4:;
+}
+
+static BOOLEAN Z427
+# ifdef HAVE_ARGS
+(CHAR Z428[], LONGCARD O_8, CHAR Z429[], LONGCARD O_7)
+# else
+(Z428, O_8, Z429, O_7)
+CHAR Z428[];
+LONGCARD O_8;
+CHAR Z429[];
+LONGCARD O_7;
+# endif
+{
+INTEGER Z138;
+
+if ((O_8 - 1) != (O_7 - 1)) {
+return FALSE;
+}
+{
+LONGINT B_5 = 0, B_6 = (INTEGER)(O_8 - 1);
+
+if (B_5 <= B_6)
+for (Z138 = B_5;; Z138 += 1) {
+if (Z428[Z138] != Z429[Z138]) {
+return FALSE;
+}
+if (Z138 >= B_6) break;
+}
+}
+return TRUE;
+}
+
+void Zq0A4_204
+# ifdef HAVE_ARGS
+(CHAR Z425[], LONGCARD O_6, CHAR Z426[], LONGCARD O_5)
+# else
+(Z425, O_6, Z426, O_5)
+CHAR Z425[];
+LONGCARD O_6;
+CHAR Z426[];
+LONGCARD O_5;
+# endif
+{
+Zp1PEAFD_2 Z362;
+
+Zp1PEAFD_13(Z426, O_5, &Z362);
+if (Z427(Z425, O_6, (STRING)"CheckReportNoTree", 17L)) {
+Zq0A4_138 = Zp1PEAFD_15(&Z362) != 0;
+} else if (Z427(Z425, O_6, (STRING)"CheckReportNodes", 16L)) {
+Zq0A4_139 = Zp1PEAFD_15(&Z362) != 0;
+} else if (Z427(Z425, O_6, (STRING)"DrawBoxHeight", 13L)) {
+Zq0A4_143 = Zp1PEAFD_15(&Z362);
+} else if (Z427(Z425, O_6, (STRING)"DrawBoxWidth", 12L)) {
+Zq0A4_142 = Zp1PEAFD_15(&Z362);
+} else if (Z427(Z425, O_6, (STRING)"DrawDepth", 9L)) {
+Zq0A4_140 = Zp1PEAFD_15(&Z362);
+} else if (Z427(Z425, O_6, (STRING)"DrawLength", 10L)) {
+Zq0A4_141 = Zp1PEAFD_15(&Z362);
+} else if (Z427(Z425, O_6, (STRING)"DrawFileName", 12L)) {
+Zp1PEAFD_3(&Zq0A4_144, &Z362);
+} else if (Z427(Z425, O_6, (STRING)"TreatTVAasChild", 15L)) {
+} else {
+ZblNKKO_78((LONGCARD)ZblNKKO_12, (LONGCARD)ZblNKKO_16, ZmtLFGGBG_1, (LONGCARD)ZblNKKO_29, ADR1 (Z425));
+}
+}
+
+void Zq0A4_205
+ ARGS ((void))
+{
+}
+
+void Zq0A4_206
+ ARGS ((void))
+{
+}
+
+static void Z446
+ ARGS ((void))
+{
+ZfM_34();
+rExit(1L);
+}
+
+void BEGIN_Tree ARGS ((void))
+{
+  static BOOLEAN has_been_called = FALSE;
+  if (has_been_called) return;
+  has_been_called = TRUE;
+BEGIN_Strings ();
+BEGIN_IO ();
+BEGIN_Idents ();
+BEGIN_IO ();
+BEGIN_Environs ();
+BEGIN_Patterns ();
+BEGIN_Position ();
+BEGIN_Sets ();
+BEGIN_StringM ();
+BEGIN_rSystem ();
+BEGIN_General ();
+BEGIN_rMemory ();
+BEGIN_DynArray ();
+BEGIN_IO ();
+BEGIN_Layout ();
+BEGIN_StringM ();
+BEGIN_Strings ();
+BEGIN_Idents ();
+BEGIN_Texts ();
+BEGIN_Sets ();
+BEGIN_Position ();
+BEGIN_Errors ();
+BEGIN_Idents ();
+BEGIN_Position ();
+BEGIN_IO ();
+BEGIN_StringM ();
+
+Zq0A4_132 = NIL;
+Zq0A4_133 = (ADDRESS)NIL;
+Zq0A4_134 = (ADDRESS)NIL;
+Zq0A4_131 = 0;
+Zq0A4_137 = Z446;
+Zq0A4_138 = TRUE;
+Zq0A4_139 = TRUE;
+Zq0A4_140 = 6;
+Zq0A4_141 = 256;
+Zq0A4_142 = 60;
+Zq0A4_143 = 20;
+Zp1PEAFD_4(&Zq0A4_144);
+Zq0A4_135.A[Zq0A4_5] = sizeof (Zq0A4_77);
+Zq0A4_135.A[Zq0A4_6] = sizeof (Zq0A4_78);
+Zq0A4_135.A[Zq0A4_7] = sizeof (Zq0A4_79);
+Zq0A4_135.A[Zq0A4_8] = sizeof (Zq0A4_80);
+Zq0A4_135.A[Zq0A4_9] = sizeof (Zq0A4_81);
+Zq0A4_135.A[Zq0A4_10] = sizeof (Zq0A4_82);
+Zq0A4_135.A[Zq0A4_11] = sizeof (Zq0A4_83);
+Zq0A4_135.A[Zq0A4_12] = sizeof (Zq0A4_84);
+Zq0A4_135.A[Zq0A4_13] = sizeof (Zq0A4_85);
+Zq0A4_135.A[Zq0A4_14] = sizeof (Zq0A4_86);
+Zq0A4_135.A[Zq0A4_15] = sizeof (Zq0A4_87);
+Zq0A4_135.A[Zq0A4_16] = sizeof (Zq0A4_88);
+Zq0A4_135.A[Zq0A4_17] = sizeof (Zq0A4_89);
+Zq0A4_135.A[Zq0A4_18] = sizeof (Zq0A4_90);
+Zq0A4_135.A[Zq0A4_19] = sizeof (Zq0A4_91);
+Zq0A4_135.A[Zq0A4_20] = sizeof (Zq0A4_92);
+Zq0A4_135.A[Zq0A4_21] = sizeof (Zq0A4_93);
+Zq0A4_135.A[Zq0A4_22] = sizeof (Zq0A4_94);
+Zq0A4_135.A[Zq0A4_23] = sizeof (Zq0A4_95);
+Zq0A4_135.A[Zq0A4_24] = sizeof (Zq0A4_96);
+Zq0A4_135.A[Zq0A4_25] = sizeof (Zq0A4_97);
+Zq0A4_135.A[Zq0A4_26] = sizeof (Zq0A4_98);
+Zq0A4_135.A[Zq0A4_27] = sizeof (Zq0A4_99);
+Zq0A4_135.A[Zq0A4_28] = sizeof (Zq0A4_100);
+Zq0A4_135.A[Zq0A4_29] = sizeof (Zq0A4_101);
+Zq0A4_135.A[Zq0A4_30] = sizeof (Zq0A4_102);
+Zq0A4_135.A[Zq0A4_31] = sizeof (Zq0A4_103);
+Zq0A4_135.A[Zq0A4_32] = sizeof (Zq0A4_104);
+Zq0A4_135.A[Zq0A4_33] = sizeof (Zq0A4_105);
+Zq0A4_135.A[Zq0A4_34] = sizeof (Zq0A4_106);
+Zq0A4_135.A[Zq0A4_35] = sizeof (Zq0A4_107);
+Zq0A4_135.A[Zq0A4_36] = sizeof (Zq0A4_108);
+Zq0A4_135.A[Zq0A4_37] = sizeof (Zq0A4_109);
+Zq0A4_135.A[Zq0A4_38] = sizeof (Zq0A4_110);
+Zq0A4_135.A[Zq0A4_39] = sizeof (Zq0A4_111);
+Zq0A4_135.A[Zq0A4_40] = sizeof (Zq0A4_112);
+Zq0A4_135.A[Zq0A4_41] = sizeof (Zq0A4_113);
+Zq0A4_135.A[Zq0A4_42] = sizeof (Zq0A4_114);
+Zq0A4_135.A[Zq0A4_43] = sizeof (Zq0A4_115);
+Zq0A4_135.A[Zq0A4_44] = sizeof (Zq0A4_116);
+Zq0A4_135.A[Zq0A4_45] = sizeof (Zq0A4_117);
+Zq0A4_135.A[Zq0A4_46] = sizeof (Zq0A4_118);
+Zq0A4_135.A[Zq0A4_47] = sizeof (Zq0A4_119);
+Zq0A4_135.A[Zq0A4_48] = sizeof (Zq0A4_120);
+Zq0A4_135.A[Zq0A4_49] = sizeof (Zq0A4_121);
+Zq0A4_135.A[Zq0A4_50] = sizeof (Zq0A4_122);
+Zq0A4_135.A[Zq0A4_51] = sizeof (Zq0A4_123);
+Zq0A4_135.A[Zq0A4_52] = sizeof (Zq0A4_124);
+Zq0A4_135.A[Zq0A4_53] = sizeof (Zq0A4_125);
+Zq0A4_135.A[Zq0A4_54] = sizeof (Zq0A4_126);
+Zq0A4_135.A[Zq0A4_55] = sizeof (Zq0A4_127);
+Zq0A4_135.A[Zq0A4_56] = sizeof (Zq0A4_128);
+Z137 = 0;
+for (Z138 = 1; Z138 <= 52; Z138 += 1) {
+Zq0A4_135.A[Z138] = (LONGINT)((BITSET)(Zq0A4_135.A[Z138] + (CARDINAL)ZdaDDAD7_1 - 1) & ZdaDDAD7_2);
+Z137 = ZdaDDAD7_4((LONGINT)Zq0A4_135.A[Z138], (LONGINT)Z137);
+}
+Zq0A4_136.A[Zq0A4_5] = Zq0A4_6;
+Zq0A4_136.A[Zq0A4_6] = Zq0A4_6;
+Zq0A4_136.A[Zq0A4_7] = Zq0A4_9;
+Zq0A4_136.A[Zq0A4_8] = Zq0A4_8;
+Zq0A4_136.A[Zq0A4_9] = Zq0A4_9;
+Zq0A4_136.A[Zq0A4_10] = Zq0A4_12;
+Zq0A4_136.A[Zq0A4_11] = Zq0A4_11;
+Zq0A4_136.A[Zq0A4_12] = Zq0A4_12;
+Zq0A4_136.A[Zq0A4_13] = Zq0A4_15;
+Zq0A4_136.A[Zq0A4_14] = Zq0A4_14;
+Zq0A4_136.A[Zq0A4_15] = Zq0A4_15;
+Zq0A4_136.A[Zq0A4_16] = Zq0A4_18;
+Zq0A4_136.A[Zq0A4_17] = Zq0A4_17;
+Zq0A4_136.A[Zq0A4_18] = Zq0A4_18;
+Zq0A4_136.A[Zq0A4_19] = Zq0A4_21;
+Zq0A4_136.A[Zq0A4_20] = Zq0A4_20;
+Zq0A4_136.A[Zq0A4_21] = Zq0A4_21;
+Zq0A4_136.A[Zq0A4_22] = Zq0A4_24;
+Zq0A4_136.A[Zq0A4_23] = Zq0A4_23;
+Zq0A4_136.A[Zq0A4_24] = Zq0A4_24;
+Zq0A4_136.A[Zq0A4_25] = Zq0A4_27;
+Zq0A4_136.A[Zq0A4_26] = Zq0A4_26;
+Zq0A4_136.A[Zq0A4_27] = Zq0A4_27;
+Zq0A4_136.A[Zq0A4_28] = Zq0A4_30;
+Zq0A4_136.A[Zq0A4_29] = Zq0A4_29;
+Zq0A4_136.A[Zq0A4_30] = Zq0A4_30;
+Zq0A4_136.A[Zq0A4_31] = Zq0A4_33;
+Zq0A4_136.A[Zq0A4_32] = Zq0A4_32;
+Zq0A4_136.A[Zq0A4_33] = Zq0A4_33;
+Zq0A4_136.A[Zq0A4_34] = Zq0A4_36;
+Zq0A4_136.A[Zq0A4_35] = Zq0A4_35;
+Zq0A4_136.A[Zq0A4_36] = Zq0A4_36;
+Zq0A4_136.A[Zq0A4_37] = Zq0A4_39;
+Zq0A4_136.A[Zq0A4_38] = Zq0A4_38;
+Zq0A4_136.A[Zq0A4_39] = Zq0A4_39;
+Zq0A4_136.A[Zq0A4_40] = Zq0A4_43;
+Zq0A4_136.A[Zq0A4_41] = Zq0A4_41;
+Zq0A4_136.A[Zq0A4_42] = Zq0A4_42;
+Zq0A4_136.A[Zq0A4_43] = Zq0A4_43;
+Zq0A4_136.A[Zq0A4_44] = Zq0A4_56;
+Zq0A4_136.A[Zq0A4_45] = Zq0A4_45;
+Zq0A4_136.A[Zq0A4_46] = Zq0A4_46;
+Zq0A4_136.A[Zq0A4_47] = Zq0A4_47;
+Zq0A4_136.A[Zq0A4_48] = Zq0A4_48;
+Zq0A4_136.A[Zq0A4_49] = Zq0A4_49;
+Zq0A4_136.A[Zq0A4_50] = Zq0A4_50;
+Zq0A4_136.A[Zq0A4_51] = Zq0A4_51;
+Zq0A4_136.A[Zq0A4_52] = Zq0A4_52;
+Zq0A4_136.A[Zq0A4_53] = Zq0A4_53;
+Zq0A4_136.A[Zq0A4_54] = Zq0A4_54;
+Zq0A4_136.A[Zq0A4_55] = Zq0A4_55;
+Zq0A4_136.A[Zq0A4_56] = Zq0A4_56;
+Z350 = 0;
+Z347 = Z346;
+ZarQdhNDD_0((ADDRESS *)&Z348, &Z347, (LONGINT)sizeof (Zq0A4_58));
+Zq0A4_205();
+}

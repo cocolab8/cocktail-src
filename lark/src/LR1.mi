@@ -1,0 +1,1755 @@
+(* $Id: LR1.mi,v 1.17 2008/08/25 08:53:40 grosch rel $ *)
+
+(*
+ * $Log: LR1.mi,v $
+ * Revision 1.17  2008/08/25 08:53:40  grosch
+ * fixed some calls of MakeArray and ExtendArray for 64 bit platforms
+ *
+ * Revision 1.16  2005/07/19 13:44:31  grosch
+ * fixed bug in elimination of LR(0) reductions (OptimizeLR0)
+ *
+ * Revision 1.15  2005/05/23 13:05:44  grosch
+ * improved handling of options for conflict explanation
+ *
+ * Revision 1.14  2001/10/11 20:30:25  grosch
+ * fixed bug in procedure PrintState at options -y and -6
+ *
+ * Revision 1.13  2001/01/28 23:32:17  grosch
+ * added type casts to function arguments in order to satisfy MS VC++
+ *
+ * Revision 1.12  2001/01/11 22:06:55  grosch
+ * fixed bug in procedure CompLR1 (Item2)
+ *
+ * Revision 1.11  1999/10/01 14:56:19  grosch
+ * fixed bug in CompContinuation
+ *
+ * Revision 1.10  1999/06/03 07:57:38  grosch
+ * added checks for: too many states
+ *
+ * Revision 1.9  1998/04/21 12:56:58  grosch
+ * truncation of file and module names to 8.3 format
+ * several improvements
+ *
+ * Revision 1.8  1995/11/07  09:21:52  grosch
+ * removed read reduce reduce conflicts
+ * added handling of LALR(2) grammars
+ *
+ * Revision 1.7  1994/12/09  14:15:42  grosch
+ * added alternate algorithm for table compression
+ *
+ * Revision 1.6  1994/11/13  12:43:39  grosch
+ * fixed bug in lookahead computation by introducing digraph algorithm
+ * fixed bug in procedure Contribute
+ *
+ * Revision 1.5  1994/10/31  23:12:08  grosch
+ * report detailed counts of conflict repairs
+ *
+ * Revision 1.4  1994/08/30  12:06:49  grosch
+ * cosmetic changes
+ *
+ * Revision 1.3  1994/07/14  12:23:16  grosch
+ * redesign of table generation
+ *
+ * Revision 1.2  1994/03/23  15:08:46  grosch
+ * allow several start symbols
+ * accept Yacc input as well as Lark input
+ * output several table elements on a line
+ * fix bug in memory management in CompressNTable
+ *
+ * Revision 1.1  1994/03/17  22:19:08  grosch
+ * removed unused objects
+ * fixed bug in RecomputeLA
+ *
+ * Revision 1.0  1994/02/01  14:05:46  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Jan. 1994 *)
+
+IMPLEMENTATION MODULE LR1;
+
+FROM SYSTEM	IMPORT TSIZE, ADR, ADDRESS;
+FROM General	IMPORT Min, Max;
+FROM rMemory	IMPORT Alloc, Free, MemoryUsed;
+FROM DynArray	IMPORT MakeArray, ResizeArray, ExtendArray, ReleaseArray;
+FROM IO		IMPORT tFile, StdOutput, StdError, WriteN, WriteS, WriteI, WriteNl,
+			WriteFlush;
+FROM Strings	IMPORT tString, Concatenate, Append, SubString, Length;
+FROM Idents	IMPORT WriteIdent, GetString;
+FROM Relation	IMPORT tRelation, MakeRelation, Project2, IsRelated, WriteRelation,
+			ReleaseRelation;
+FROM Position	IMPORT NoPosition;
+FROM Errors	IMPORT MessageI, Message, NoText, Ident, Short, Long,
+			Fatal, Error, Warning, Information;
+
+FROM Conflict	IMPORT ConditionCount, ConditionPtr, RepairCount,
+   cReadReduce			,
+   cReduceReduce		,
+   cExplRepReadReduce		,
+   cExplRepReduceReduce		,
+   cImplRepReadReduce		,
+   cImplRepReduceReduce		,
+   cDynaRepReadReduce		,
+   cDynaRepReduceReduce		,
+   cLRkRepReadReduce		,
+   cLRkRepReduceReduce		;
+
+FROM Compress	IMPORT TDefaultSize, TBaseSize, TCombSize, TTableMax, TTableSize,
+			NDefaultSize, NBaseSize, NCombSize, NTableMax, NTableSize,
+			TEntryCount, NEntryCount, tEntry, tComb, tTableElmt,
+			TDefault, NDefault, TDefaultSavings, NDefaultSavings,
+			DefaultSetPtr, DefaultLookPtr;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, AssignEmpty	,
+   IsElement	, Include	, Extract	, Union		,
+   Select	, Difference	, Complement	, ForallDo	,
+   IsSubset	, Minimum	, Maximum	, Assign	,
+   IsEmpty	, Exclude	, Intersection	, WriteSet	,
+   IsEqual	, Card		, Size		, ResizeSet	;
+
+FROM Tree	IMPORT
+   tTree	, Terminal	, Rule		, LS		, mStop		,
+   FirstNonterm	, LastNonterm	, LastTerm	, Epsilon	,
+   ToSymbolPtr	, ToRulePtr	, tpSet		, Options	,
+   Left		, Right		, None		, NoAssoc	,
+   IsType	, Check		, TrialParse	, NoTree	,
+   WarningCount	, ErrorCount	, SourceFile	;
+
+FROM Semantic	IMPORT TermCount, NontermCount, RuleCount, WriteSymSet, PathCount,
+			RootCount, StartCount;
+
+IMPORT Strings, Errors, Relation, Tree;
+
+CONST Infinite		= MAX (SHORTCARD);
+
+VAR
+   LookaheadCount	,
+   PredCount		: CARDINAL;
+   gPredSize		: LONGINT;
+   LaneTrace		: tRelation;
+   SymbolsBeforeDot, BusyNT, Set, Busy	: tSet;
+   StateStackPtr	: POINTER TO ARRAY [0..1000000] OF tStateRange;
+   ItemStackPtr		: POINTER TO ARRAY [0..1000000] OF CARDINAL;
+   StackSize		: LONGINT;
+   StackTop		: CARDINAL;
+
+(* compare the state State with the state StateCount wrt. Rule and Dot *)
+
+PROCEDURE CompareLR0 (State: tStateRange): BOOLEAN;
+   VAR Item, StateCountKernel	: CARDINAL;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 IF KernelSize # StatePtr^ [StateCount].KernelSize THEN RETURN FALSE; END;
+	 StateCountKernel := StatePtr^ [StateCount].Kernel;
+	 FOR Item := 0 TO KernelSize DO
+	    WITH ItemPtr^ [StateCountKernel + Item] DO
+	       IF (ItemPtr^ [Kernel + Item].Rule # Rule) OR
+		  (ItemPtr^ [Kernel + Item].Dot # Dot) THEN RETURN FALSE; END;
+	    END;
+	 END;
+      END;
+      RETURN TRUE;
+   END CompareLR0;
+
+(* look for a state in the collision chain State that is equal to the state StateCount
+   wrt. Rule and Dot *)
+
+PROCEDURE LookupLR0 (State: tStateRange): tStateRange;
+   VAR Item, StateCountKernel	: CARDINAL;
+   BEGIN
+      StateCountKernel := StatePtr^ [StateCount].Kernel;
+      WHILE State # 0 DO
+	 WITH StatePtr^ [State] DO
+	    IF KernelSize = StatePtr^ [StateCount].KernelSize THEN
+	       Item := 0;
+	       LOOP
+		  WITH ItemPtr^ [StateCountKernel + Item] DO
+		     IF (ItemPtr^ [Kernel + Item].Rule # Rule) OR
+			(ItemPtr^ [Kernel + Item].Dot # Dot) THEN EXIT; END;
+		  END;
+	          IF Item = KernelSize THEN RETURN State; END;
+		  INC (Item);
+	       END;
+	    END;
+	    State := Next;
+	 END;
+      END;
+      RETURN StateCount;
+   END LookupLR0;
+
+(* look for a state in the collision chain State that is equal to the state StateCount
+   wrt. Rule, Dot, and Lookahead. Compute the lookahead sets if necessary *)
+
+PROCEDURE LookupLR1 (State: tStateRange): tStateRange;
+   VAR Item	: CARDINAL;
+   BEGIN
+      WHILE State # 0 DO
+	 WITH StatePtr^ [State] DO
+	    IF (Class = StatePtr^ [StateCount].Class) AND CompareLR0 (State) THEN
+	       Item := 0;
+	       IF State > LastLR0State THEN
+		  LOOP
+		     IF NOT IsEqual (KernelItemPtr^ [KernelInfo + Item].Lookahead^,
+			KernelItemPtr^ [StatePtr^ [StateCount].KernelInfo + Item].Lookahead^) THEN
+			EXIT;
+		     END;
+		     IF Item = KernelSize THEN RETURN State; END;
+		     INC (Item);
+		  END;
+	       ELSE
+		  LOOP					(* determine lookaheads *)
+		     WITH KernelItemPtr^ [KernelInfo + Item] DO
+			IF Lookahead = NIL THEN		(* for kernel items	*)
+			   Lookahead := AllocLookahead ();
+			   CompLookaheadKernel (State, Kernel + Item, Lookahead^);
+			END;
+			IF NOT IsEqual (Lookahead^,
+			   KernelItemPtr^ [StatePtr^ [StateCount].KernelInfo + Item].Lookahead^) THEN
+			   EXIT;
+			END;
+		     END;
+		     IF Item = KernelSize THEN RETURN State; END;
+		     INC (Item);
+		  END;
+	       END;
+	    END;
+	    State := Next;
+	 END;
+      END;
+      RETURN StateCount;
+   END LookupLR1;
+
+(* compute the LR(0) states (automaton) and the GOTO table (TablePtr) *)
+
+PROCEDURE InitialStates;
+   VAR rule, Item, i	: CARDINAL;
+   BEGIN
+      ItemSize	:= RuleCount * 24;
+      StateSize	:= ItemSize DIV 10;
+      KernelItemSize := ItemSize DIV 3;
+      HashSize	:= LastNonterm + 1;
+      StackSize := 64;
+      StackTop	:= 0;
+
+      MakeArray (StatePtr	, StateSize	, TSIZE (tState		));
+      MakeArray (ItemPtr	, ItemSize	, TSIZE (tItem		));
+      MakeArray (KernelItemPtr	, KernelItemSize, TSIZE (tKernelItem	));
+      MakeArray (HashPtr	, HashSize	, TSIZE (LONGINT	));
+      MakeArray (StateStackPtr	, StackSize	, TSIZE (tStateRange	));
+      MakeArray (ItemStackPtr	, StackSize	, TSIZE (CARDINAL	));
+
+      FOR i := 0 TO LastNonterm DO HashPtr^ [i] := 0; END;
+
+      MakeSet (WorkingSet	, StateSize	);
+      MakeSet (SymbolsBeforeDot	, LastNonterm	);
+      MakeSet (BusyNT		, LastNonterm	);
+      MakeSet (Set		, Epsilon	);
+
+      WITH StatePtr^ [0] DO				(* dummy state	*)
+	 Kernel		:= 0;
+	 KernelInfo	:= 0;
+	 KernelSize	:= 0;
+	 ClosureSize	:= 0;
+	 Class		:= 0;
+	 ReadIndex	:= 0;
+	 Continuation	:= 0;
+	 MinSym		:= 0;
+	 MaxSym		:= 0;
+	 Next		:= 0;
+	 TablePtr	:= NIL;
+      END;
+
+      StateCount	:= 0;
+      ItemCount		:= 0;
+      KernelItemCount	:= 0;
+      MakeRelation (LaneTrace, LastNonterm, RootCount);
+
+      FOR rule := 1 TO RootCount DO
+	 INC (ItemCount);				(* inital item *)
+	 WITH ItemPtr^ [ItemCount] DO
+	    Rule	:= rule;
+	    Dot		:= 0;
+	 END;
+
+	 INC (KernelItemCount);				(* inital kernel item *)
+	 WITH KernelItemPtr^ [KernelItemCount] DO
+	    IF rule <= StartCount THEN
+	       Lookahead := NIL;
+	       N	 := 0;
+	    ELSE
+	       Lookahead := AllocLookahead ();
+	       MakeSet (Lookahead^, Epsilon);
+	       Complement (Lookahead^);
+	       Exclude (Lookahead^, Epsilon);
+	       N	 := Infinite;
+	    END;
+	    PredCount	:= 0;
+	    gPredSize	:= 4;
+	    MakeArray (PredPtr, gPredSize, TSIZE (tStateRange));
+	    PredSize	:= gPredSize;
+	 END;
+
+	 INC (StateCount);				(* initial state *)
+	 Include (WorkingSet, StateCount);
+	 WITH StatePtr^ [StateCount] DO
+	    Kernel	:= ItemCount;
+	    KernelInfo	:= KernelItemCount;
+	    TablePtr	:= NIL;
+	    KernelSize	:= 0;				(* 0 means 1 item *)
+	    Next	:= 0;
+	    Continuation:= 0;
+	    Closure (StateCount);
+
+	    FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+	       WITH ItemPtr^ [Item] DO
+		  WITH ToRulePtr^ [Rule]^.Rule DO
+		     IF Length > 0 THEN
+			Relation.Include (LaneTrace, ElmtsPtr^ [1], StateCount);
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+
+      LastLR0State	:= StateCount;
+      LastLR1State	:= StateCount;
+      ToItemListSize	:= LastNonterm + 1;
+      MakeArray (ToItemListPtr, ToItemListSize, TSIZE (tToItemList));
+      ItemListSize	:= NontermCount;
+      MakeArray (ItemListPtr, ItemListSize, TSIZE (tItemList));
+   END InitialStates;
+
+PROCEDURE CompLR0;
+   VAR
+      OldItemCount, State2	: LONGINT;
+      x, StateMinSym	: SHORTCARD;
+      State	: tStateRange;
+      Item	: CARDINAL;
+   BEGIN
+      WHILE NOT IsEmpty (WorkingSet) DO
+	 State := Extract (WorkingSet);
+(* WriteS (StdOutput, "EXTRACT "); PrintState (StdOutput, State); *)
+	 StateMinSym := StatePtr^ [State].MinSym;
+	 BeforeDot (State);
+	 WHILE NOT IsEmpty (SymbolsBeforeDot) DO	(* EXPANSION *)
+	    x := Extract (SymbolsBeforeDot);
+	    OldItemCount := ItemCount;
+	    Expand (x);
+	    IF StateCount >= MAX (tStateRange) THEN	(* ??? *)
+	       MessageI ("too many states", Fatal, NoPosition, Long, ADR (StateCount));
+	    END;
+	    INC (StateCount);				(* create core of new state *)
+	    IF StateCount = StateSize THEN
+	       ExtendArray (StatePtr, StateSize, TSIZE (tState));
+	       CheckMemory (StatePtr, StateCount);
+(* MessageI ("extend State", Warning, NoPosition, Long, ADR (StateSize)); *)
+	       ResizeSet (WorkingSet, StateSize);
+	    END;
+	    WITH StatePtr^ [StateCount] DO
+	       Kernel		:= OldItemCount + 1;
+	       KernelSize	:= ItemCount - OldItemCount - 1;
+(* WriteS (StdOutput, "CREATE "); PrintState (StdOutput, StateCount); *)
+
+	       State2 := LookupLR0 (HashPtr^ [x]);	(* does it exist already ? *)
+	       StatePtr^ [State].TablePtr^ [x - StateMinSym] := State2;
+	       INC (TableCount);
+
+	       IF State2 = StateCount THEN		(* if it does not exist *)
+		  Include (WorkingSet, StateCount);
+		  KernelInfo	:= KernelItemCount + 1;
+		  TablePtr	:= NIL;
+		  Next		:= HashPtr^ [x];
+		  HashPtr^ [x]	:= StateCount;
+		  Continuation	:= 0;
+		  Closure (StateCount);
+
+		  INC (KernelItemCount, KernelSize + 1);	(* complete kernel items *)
+		  IF KernelItemCount >= KernelItemSize THEN
+		     ExtendArray (KernelItemPtr, KernelItemSize, TSIZE (tKernelItem));
+		     CheckMemory (KernelItemPtr, StateCount);
+(* MessageI ("extend KernelItem", Warning, NoPosition, Long, ADR (KernelItemSize)); *)
+		  END;
+		  FOR Item := Kernel TO Kernel + KernelSize DO
+		     WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+		     (* for LALR(1) lookaheads only, the following condition
+			reduces memory consumption for the PRED relation:
+			WITH ItemPtr^ [Item] DO
+			   WITH ToRulePtr^ [Rule]^.Rule DO
+			      IF (Dot < Length) AND (ElmtsPtr^ [Dot + 1] > Epsilon) OR
+				 (Dot = Length) AND ((Class = ReadReduce) OR (Class = Reduce)) THEN *)
+			Lookahead	:= NIL;
+			PredCount	:= 0;
+			gPredSize	:= 4;
+			MakeArray (PredPtr, gPredSize, TSIZE (tStateRange));
+			PredSize	:= gPredSize;
+			N		:= 0;
+		     END;
+		  END;
+(* WriteS (StdOutput, "CLOSURE "); PrintState (StdOutput, StateCount); *)
+	       ELSE				(* if it does exist then remove it *)
+(* WriteS (StdOutput, "REMOVE "); PrintState (StdOutput, StateCount); *)
+		  ItemCount := OldItemCount;
+		  DEC (StateCount);
+	       END;
+	    END;
+	 END;
+      END;
+      LastLR0State := StateCount;
+      LastLR1State := StateCount;
+   END CompLR0;
+
+(* Reference:
+
+   J. Roehrich:
+   Methods for the Automatic Construction of Error Correcting Parsers,
+   Acta Informatica 13 (1980), 115-139.
+*)
+
+(* determine symbols before dot *)
+
+PROCEDURE BeforeDot (State: tStateRange);
+   VAR
+      size	: LONGINT;
+      Item	: CARDINAL;
+      x		: SHORTCARD;
+      Current, Previous	: SHORTINT;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 ItemListCount := 0;
+	 size := KernelSize + ClosureSize + 1;
+	 WHILE ItemListSize < size DO
+	    ExtendArray (ItemListPtr, ItemListSize, TSIZE (tItemList));
+	    CheckMemory (ItemListPtr, State);
+(* MessageI ("extend ItemList", Warning, NoPosition, Long, ADR (ItemListSize)); *)
+	 END;
+	 AssignEmpty (SymbolsBeforeDot);
+	 FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+	    WITH ItemPtr^ [Item] DO
+	       WITH ToRulePtr^ [Rule]^.Rule DO
+		  IF Dot < Length THEN
+		     x := ElmtsPtr^ [Dot + 1];
+		     IF x > 0 THEN		(* NOT EOF token *)
+			WITH ItemListPtr^ [ItemListCount] DO
+			   WITH ToItemListPtr^ [x] DO
+			      lItem := Item;
+			      IF IsElement (x, SymbolsBeforeDot) THEN
+						(* non first item *)
+				 IF Order < LastOrder THEN   (* out of order *)
+				    Previous := First;
+				    Current  := First;
+				    LOOP	(* bubble sort *)
+				       WITH ItemListPtr^ [Current] DO
+					  IF ItemPtr^ [lItem].Order > Order THEN
+					     EXIT;
+					  END;
+					  Previous := Current;
+					  Current  := Next;
+				       END;
+				    END;
+				    IF Current = First THEN (* insert as first item *)
+				       Next := First;
+				       First := ItemListCount;
+				    ELSE	(* insert before Current item *)
+				       Next := Current;
+				       ItemListPtr^ [Previous].Next := ItemListCount;
+				    END;
+				 ELSE		(* item is in order *)
+				    ItemListPtr^ [Last].Next := ItemListCount;
+				    Last := ItemListCount;
+				    Next := -1;
+				    LastOrder := Order;
+				 END;
+			      ELSE		(* first item *)
+				 Include (SymbolsBeforeDot, x);
+				 First := ItemListCount;
+				 Last  := ItemListCount;
+				 Next  := -1;
+				 LastOrder := Order;
+			      END;
+			      INC (ItemListCount);
+			   END;
+			END;
+		     ELSE			(* EOF token *)
+			StopList := mStop (StopList, State, Index);
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END BeforeDot;
+
+(* expand the current state by grammar symbol x and create the kernel of a new state *)
+
+PROCEDURE Expand (x: CARDINAL);
+   VAR Item	: SHORTINT;
+   BEGIN
+      Item := ToItemListPtr^ [x].First;
+      WHILE Item >= 0 DO
+	 WITH ItemListPtr^ [Item] DO
+	    WITH ItemPtr^ [lItem] DO
+	       WITH ToRulePtr^ [Rule]^.Rule DO
+		  IF (Dot < Length) AND (ElmtsPtr^ [Dot + 1] = x) THEN
+		     INC (ItemCount);			(* create items *)
+		     IF ItemCount = ItemSize THEN
+			ExtendArray (ItemPtr, ItemSize, TSIZE (tItem));
+			CheckMemory (ItemPtr, 0);
+(* MessageI ("extend Item", Warning, NoPosition, Long, ADR (ItemSize)); *)
+		     END;
+		     WITH ItemPtr^ [ItemCount] DO
+			Rule	:= ItemPtr^ [lItem].Rule;
+			Dot	:= ItemPtr^ [lItem].Dot + 1;
+		     END;
+		  END;
+	       END;
+	    END;
+	    Item := Next;
+	 END;
+      END;
+   END Expand;
+
+(* compute the closure items of the state State *)
+
+PROCEDURE Closure (State: tStateRange);
+   VAR
+      Item, i	: CARDINAL;
+      Size, x, MinX, MaxX, n	: SHORTCARD;
+      VReadCount, VReduceCount	: SHORTCARD;
+      TableSize	: LONGINT;
+
+   PROCEDURE Closure2 (x: SHORTCARD);
+      VAR r		: tTree;
+      BEGIN
+	 Include (BusyNT, x);
+	 r := ToSymbolPtr^ [x]^.Nonterminal.Rules;
+	 WHILE IsType (r, Rule) DO
+	    INC (ItemCount);
+	    IF ItemCount = ItemSize THEN
+	       ExtendArray (ItemPtr, ItemSize, TSIZE (tItem));
+	       CheckMemory (ItemPtr, State);
+(* MessageI ("extend Item", Warning, NoPosition, Long, ADR (ItemSize)); *)
+	    END;
+	    WITH ItemPtr^ [ItemCount] DO
+	       WITH r^.Rule DO
+		  Rule	:= Index;
+		  Dot	:= 0;
+		  Order	:= n;
+		  IF Dot < Length THEN			(* classify *)
+		     x := ElmtsPtr^ [Dot + 1];
+		     INC (VReadCount);
+		     MinX := Min (MinX, x);
+		     MaxX := Max (MaxX, x);
+		     IF (x > Epsilon) AND NOT IsElement (x, BusyNT) THEN
+			Closure2 (x);
+		     END;
+		  ELSE
+		     INC (VReduceCount);
+		  END;
+		  INC (Size);
+		  r := Next;
+	       END;
+	    END;
+	 END;
+      END Closure2;
+
+   BEGIN
+      Size		:= 0;
+      MinX		:= LastNonterm;
+      MaxX		:= 0;
+      VReadCount	:= 0;
+      VReduceCount	:= 0;
+
+      WITH StatePtr^ [State] DO
+	 AssignEmpty (BusyNT);
+	 n := 0;
+	 FOR Item := Kernel TO Kernel + KernelSize DO
+	    WITH ItemPtr^ [Item] DO
+	       WITH ToRulePtr^ [Rule]^.Rule DO
+		  INC (n);
+		  Order := n;
+		  IF Dot < Length THEN
+		     x := ElmtsPtr^ [Dot + 1];
+		     IF (x > Epsilon) AND NOT IsElement (x, BusyNT) THEN
+			Closure2 (x);
+		     END;
+		     INC (VReadCount);			(* classify *)
+		     MinX := Min (MinX, x);
+		     MaxX := Max (MaxX, x);
+		  ELSE
+		     INC (VReduceCount);
+		  END;
+	       END;
+	    END;
+	 END;
+	 ClosureSize := Size;
+
+	 (* determine the class of the state in preparation of LR(0) reductions *)
+
+	 IF VReadCount = 0 THEN
+	    Class	:= Reduce;
+	    IF (KernelSize = 0) AND NOT IsElement (ORD ('r'), Options) THEN
+	       MinSym	:= LastTerm;
+	       MaxSym	:= 0;
+	    ELSE
+	       MinSym	:= 0;				(* ? *)
+	       MaxSym	:= LastTerm;			(* ? *)
+	    END;
+	 ELSIF VReduceCount = 0 THEN
+	    Class	:= Read;
+	    MinSym	:= MinX;
+	    MaxSym	:= MaxX;
+	 ELSE
+	    Class	:= ReadReduce;
+	    MinSym	:= 0;				(* ? *)
+	    MaxSym	:= Max (MaxX, LastTerm);	(* ? *)
+	 END;
+	 IF MaxSym >= MinSym THEN
+	    TableSize := MaxSym - MinSym + 1;
+	    MakeArray (TablePtr, TableSize, TSIZE (tStateRange));
+	    CheckMemory (TablePtr, State);
+	    FOR i := 0 TO MaxSym - MinSym DO TablePtr^ [i] := 0; END;
+	    INC (gTableSize, TableSize);
+	 END;
+      END;
+   END Closure;
+
+(* compute the PRED relation, see literature *)
+
+PROCEDURE ResetPred;
+   VAR Item	: LONGINT;
+   BEGIN
+      FOR Item := 1 TO KernelItemCount DO KernelItemPtr^ [Item].PredCount := 0; END;
+   END ResetPred;
+
+PROCEDURE CompPred;
+   VAR
+      State, State2, Info	: LONGINT;
+      Item, Item2, i		: CARDINAL;
+   BEGIN
+      FOR State := 1 TO StateCount DO			(* for all states *)
+	 WITH StatePtr^ [State] DO			(* for all closure items *)
+	    IF Class # Invalid THEN
+	       FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+		  WITH ItemPtr^ [Item] DO
+		     IF Dot = 0 THEN
+			WITH ToRulePtr^ [Rule]^.Rule DO
+			   State2 := State;
+			   FOR i := 1 TO Length DO		(* for all elements of rule *)
+			      WITH StatePtr^ [State2] DO	(* determine next state *)
+				 State2 := TablePtr^ [ElmtsPtr^ [i] - MinSym];
+			      END;
+			      IF State2 > 0 THEN		(* no transition on EOF *)
+				 WITH StatePtr^ [State2] DO
+				 (* for LALR(1) lookaheads only, the following condition
+				    reduces memory consumption for the PRED relation:
+				    IF (i < Length) AND (ElmtsPtr^ [i + 1] > Epsilon) OR
+				       (i = Length) AND ((Class = ReadReduce) OR (Class = Reduce)) THEN *)
+				    Item2 := Kernel;		(* search for corresponding item *)
+				    Info  := KernelInfo;
+				    LOOP
+				       WITH ItemPtr^ [Item2] DO
+					  IF (ItemPtr^ [Item].Rule = Rule) AND (Dot = i) THEN
+					     WITH KernelItemPtr^ [Info] DO
+						INC (PredCount); (* add State to PRED *)
+						IF PredCount > PredSize THEN
+						   gPredSize := PredSize;
+						   ExtendArray (PredPtr, gPredSize, TSIZE (tStateRange));
+						   CheckMemory (PredPtr, State);
+						   PredSize := gPredSize;
+						END;
+						PredPtr^ [PredCount] := State;
+						EXIT;
+					     END;
+					  END;
+				       END;
+				       INC (Item2);
+				       INC (Info);
+				    END;
+				    INC (PredCount);
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      FOR Info := 1 TO KernelItemCount DO
+	 WITH KernelItemPtr^ [Info] DO
+	    IF PredPtr # NIL THEN
+	       gPredSize := PredSize;
+	       ResizeArray (PredPtr, gPredSize, PredCount, TSIZE (tStateRange));
+	       PredSize := gPredSize;
+	    END;
+	 END;
+      END;
+   END CompPred;
+
+(* Reference:
+
+   J. C. H. Park, K. M. Choe, C. H. Chang:
+   A New Analysis of LALR Formalism,
+   TOPLAS 7, 1 (Jan. 1985), 159-175.
+
+   F. DeRemer, T. Pennello:
+   Efficient Computation of LALR(1) Look-Ahead Sets
+   TOPLAS 4, 4 (Oct. 1982), 615-649.
+*)
+
+(* compute the lookahead sets for the LALR(1) automaton *)
+
+(* compute lookahead set LASet for kernel item Item of state State *)
+
+PROCEDURE CompLookaheadKernel (State: (* tStateRange *) CARDINAL; Item: CARDINAL; VAR LASet: tSet);
+   VAR
+      Pred		: tStateRange;
+      State2, size	: LONGINT;
+      Item2, KernelItem	: CARDINAL;
+      A, B, Depth, N2	: SHORTCARD;
+   BEGIN
+      INC (StackTop);					(* Digraph *)
+      IF StackTop >= CARDINAL (StackSize) THEN
+	 size := StackSize;
+	 ExtendArray (StateStackPtr, size, TSIZE (tStateRange));
+	 CheckMemory (StateStackPtr, size);
+(* MessageI ("extend StateStack", Warning, NoPosition, Long, ADR (size)); *)
+	 ExtendArray (ItemStackPtr, StackSize, TSIZE (CARDINAL));
+	 CheckMemory (ItemStackPtr, StackSize);
+(* MessageI ("extend ItemStack", Warning, NoPosition, Long, ADR (StackSize)); *)
+      END;
+      ItemStackPtr ^ [StackTop] := Item;
+      StateStackPtr^ [StackTop] := State;
+      Depth := StackTop;
+      INC (LookaheadCount);
+      MakeSet (LASet, Epsilon);
+      IF Size (LASet) = 0 THEN
+	 MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (State));
+      END;
+      WITH StatePtr^ [State] DO
+	 WITH ItemPtr^ [Item] DO
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+	       A := LHS^.Nonterminal.Index - FirstNonterm;
+	       WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+		  N := Depth;
+		  FOR Pred := 1 TO PredCount DO
+		     State2 := PredPtr^ [Pred];
+		     WITH StatePtr^ [State2] DO
+			FOR Item2 := Kernel TO Kernel + KernelSize DO
+			   WITH ItemPtr^ [Item2] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 IF Dot < Length THEN
+				    B := ElmtsPtr^ [Dot + 1];
+				    IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+				       WITH ToSymbolPtr^ [B]^.Nonterminal DO
+					  IF IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+					     Union (LASet, PathPtr^ [A - MinPath]^);
+					     Exclude (LASet, Epsilon);
+					     AssignEmpty (Set);
+					     SeqFirst (Rule, SHORTCARD (Dot + 2), Set);
+					     IF IsElement (Epsilon, Set) THEN
+						Exclude (Set, Epsilon);
+						Union (LASet, Set);
+						WITH KernelItemPtr^ [Item2 - Kernel + KernelInfo] DO
+						   IF N = 0 THEN
+						      (* ASSERT Lookahead = NIL *)
+						      Lookahead := AllocLookahead ();
+						      CompLookaheadKernel (State2, Item2, Lookahead^);
+						   END;
+						   N2 := N;
+						   Union (LASet, Lookahead^);
+						END;
+						N := Min (N, N2);
+					     ELSE
+						Union (LASet, Set);
+					     END;
+					  ELSE
+					     Union (LASet, PathPtr^ [A - MinPath]^);
+					  END;
+				       END;
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+		  IF N = Depth THEN
+		     LOOP
+			Item2  := ItemStackPtr ^ [StackTop];
+			State2 := StateStackPtr^ [StackTop];
+			DEC (StackTop);
+			WITH StatePtr^ [State2] DO
+			   KernelItem := Item2 - Kernel + KernelInfo;
+			   KernelItemPtr^ [KernelItem].N := Infinite;
+			END;
+			IF Item2 = Item THEN EXIT; END;
+			Assign (KernelItemPtr^ [KernelItem].Lookahead^, Lookahead^);
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END CompLookaheadKernel;
+
+(* compute lookahead set LASet for closure (non-kernel) item Item of state State *)
+
+PROCEDURE CompLookaheadClosure (State: tStateRange; Item: CARDINAL; VAR LASet: tSet);
+   VAR
+      Item2	: CARDINAL;
+      A, B	: SHORTCARD;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 WITH ItemPtr^ [Item] DO
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+	       A := LHS^.Nonterminal.Index - FirstNonterm;
+	       FOR Item2 := Kernel TO Kernel + KernelSize DO
+		  WITH ItemPtr^ [Item2] DO
+		     WITH ToRulePtr^ [Rule]^.Rule DO
+			IF Dot < Length THEN
+			   B := ElmtsPtr^ [Dot + 1];
+			   IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+			      WITH ToSymbolPtr^ [B]^.Nonterminal DO
+				 IF IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+				    Union (LASet, PathPtr^ [A - MinPath]^);
+				    Exclude (LASet, Epsilon);
+				    AssignEmpty (Set);
+				    SeqFirst (Rule, SHORTCARD (Dot + 2), Set);
+				    IF IsElement (Epsilon, Set) THEN
+				       Exclude (Set, Epsilon);
+				       Union (LASet, Set);
+				       WITH KernelItemPtr^ [Item2 - Kernel + KernelInfo] DO
+					  IF Lookahead = NIL THEN
+					     Lookahead := AllocLookahead ();
+					     CompLookaheadKernel (State, Item2, Lookahead^);
+					  END;
+					  Union (LASet, Lookahead^);
+				       END;
+				    ELSE
+				       Union (LASet, Set);
+				    END;
+				 ELSE
+				    Union (LASet, PathPtr^ [A - MinPath]^);
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END CompLookaheadClosure;
+
+PROCEDURE GetLookahead (State: tStateRange; Item: CARDINAL; VAR LASet: tSet);
+   BEGIN
+      WITH ItemPtr^ [Item] DO
+	 IF Dot = 0 THEN				(* closure	*)
+	    AssignEmpty (LASet);
+	    CompLookaheadClosure (State, Item, LASet);
+	 ELSE						(* kernel	*)
+	    WITH StatePtr^ [State] DO
+	       WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+		  IF Lookahead = NIL THEN
+		     Lookahead := AllocLookahead ();
+		     CompLookaheadKernel (State, Item, Lookahead^);
+		  END;
+		  Assign (LASet, Lookahead^);
+	       END;
+	    END;
+	 END;
+      END;
+   END GetLookahead;
+
+(* compute the FIRST set of a sequence of symbols of the rule Rule starting at position Dot *)
+
+PROCEDURE SeqFirst (Rule, Dot: SHORTCARD; VAR Set: tSet);
+   VAR e, x	: SHORTCARD;
+   BEGIN
+      WITH ToRulePtr^ [Rule]^.Rule DO
+	 FOR e := Dot TO Length DO
+	    x := ElmtsPtr^ [e];
+	    IF x < Epsilon THEN
+	       Include (Set, x); RETURN;
+	    ELSE
+	       Union (Set, ToSymbolPtr^ [x]^.Nonterminal.First);
+	       IF NOT IsElement (Epsilon, Set) THEN RETURN; END;
+	       Exclude (Set, Epsilon);
+	    END;
+	 END;
+	 Include (Set, Epsilon);
+      END;
+   END SeqFirst;
+
+(* References:
+
+   D. Pager: The Lane-Tracing Algorithm for Constructing LR(k) Parsers
+   and Ways of Enhancing its Efficiency, Inf. Sci. 12, 1 (1977), 19-42.
+
+   D. Pager: A Practical General Method for Constructing LR(k) Parsers,
+   Acta Inf. 7, 3 (1977), 249-268.
+*)
+
+(* determine states with reduce reduce conflicts as well as
+   states and transitions contributing lookahead sets *)
+
+VAR Conflicts	: tSet;
+
+PROCEDURE ReduceReduce;
+   VAR
+      State	: LONGINT;
+      Item	: CARDINAL;
+      Reduces, AllReduces	: tSet;
+   BEGIN
+      ReleaseRelation (LaneTrace);
+      MakeSet (Busy		, ItemCount);
+      MakeSet (Reduces		, Epsilon);
+      MakeSet (AllReduces	, Epsilon);
+      MakeSet (Conflicts	, Epsilon);
+      MakeRelation (LaneTrace, LastNonterm, StateCount);
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF (Class = ReadReduce) OR (Class = Reduce) THEN
+	       WITH ItemPtr^ [Kernel] DO
+		  IF (KernelSize = 0) AND (Dot = ToRulePtr^ [Rule]^.Rule.Length) THEN
+		  ELSE
+		     AssignEmpty (Conflicts);	(* determine lookaheads for reductions *)
+		     AssignEmpty (AllReduces);	(* and check for reduce-reduce conflicts *)
+		     FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+			WITH ItemPtr^ [Item] DO
+			   WITH ToRulePtr^ [Rule]^.Rule DO
+			      IF Dot = Length THEN
+				 GetLookahead (State, Item, Reduces);
+				 Assign (Set, AllReduces);
+				 Intersection (Set, Reduces);
+				 Union (Conflicts, Set);
+				 Union (AllReduces, Reduces);
+			      END;
+			   END;
+			END;
+		     END;
+		     IF NOT IsEmpty (Conflicts) THEN
+			FOR Item := Kernel TO Kernel + KernelSize DO
+			   WITH ItemPtr^ [Item] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 IF Dot = Length THEN
+				    GetLookahead (State, Item, Reduces);
+				    Intersection (Reduces, Conflicts);
+				    IF NOT IsEmpty (Reduces) THEN
+				       AssignEmpty (Busy);
+				       Contribute (State, Item);
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      IF IsElement (ORD ('L'), Options) THEN
+	 WriteS (StdOutput, "LaneTrace ");
+	 WriteRelation (StdOutput, LaneTrace); WriteNl (StdOutput);
+      END;
+      ReleaseSet (Busy		);
+      ReleaseSet (Reduces	);
+      ReleaseSet (AllReduces	);
+      ReleaseSet (Conflicts	);
+   END ReduceReduce;
+
+(* determine all states that contribute symbols to the lookahead of the item Item *)
+
+PROCEDURE Contribute (State: tStateRange; Item: CARDINAL);
+   VAR
+      Pred	: tStateRange;
+      State2	: LONGINT;
+      Item2, i	: CARDINAL;
+      A, B	: SHORTCARD;
+      LASet	: tSet;
+   BEGIN
+      IF IsElement (Item, Busy) THEN RETURN; END;
+      Include (Busy, Item);
+      MakeSet (LASet, Epsilon);
+      WITH StatePtr^ [State] DO
+	 WITH ItemPtr^ [Item] DO
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+	       A := LHS^.Nonterminal.Index - FirstNonterm;
+	       WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+		  FOR Pred := 1 TO PredCount DO
+		     State2 := PredPtr^ [Pred];
+		     WITH StatePtr^ [State2] DO
+			FOR Item2 := Kernel TO Kernel + KernelSize DO
+			   WITH ItemPtr^ [Item2] DO
+			      WITH ToRulePtr^ [Rule]^.Rule DO
+				 IF Dot < Length THEN
+				    B := ElmtsPtr^ [Dot + 1];
+				    IF (B > Epsilon) AND IsRelated (B - FirstNonterm, A, LS) THEN
+				       AssignEmpty (LASet);
+				       WITH ToSymbolPtr^ [B]^.Nonterminal DO
+					  IF IsElement (Epsilon, PathPtr^ [A - MinPath]^) THEN
+					     Union (LASet, PathPtr^ [A - MinPath]^);
+					     Exclude (LASet, Epsilon);
+					     AssignEmpty (Set);
+					     SeqFirst (Rule, SHORTCARD (Dot + 2), Set);
+					     IF IsElement (Epsilon, Set) THEN
+						Exclude (Set, Epsilon);
+						Union (LASet, Set);
+						Contribute (State2, Item2);
+					     ELSE
+						Union (LASet, Set);
+					     END;
+					  ELSE
+					     Union (LASet, PathPtr^ [A - MinPath]^);
+					  END;
+				       END;
+				       Intersection (LASet, Conflicts);
+				       IF NOT IsEmpty (LASet) THEN
+					  Include (WorkingSet, State2);
+				       END;
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+			   (* trace the item and record all transitions as lane trace *)
+			IF IsElement (State2, WorkingSet) THEN
+			   FOR i := 1 TO Dot DO		(* for some elements of rule *)
+			      Relation.Include (LaneTrace, ElmtsPtr^ [i], State2);
+			      WITH StatePtr^ [State2] DO	(* determine next state *)
+				 State2 := TablePtr^ [ElmtsPtr^ [i] - MinSym];
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      ReleaseSet (LASet);
+   END Contribute;
+
+(* compute an LR(1) automaton or
+   recompute the LR(0) automaton into an LR(1) automaton wrt. reduce reduce conflicts *)
+
+PROCEDURE CompLR1;
+   VAR
+      OldItemCount, State2	: LONGINT;
+      State		: tStateRange;
+      Item, Item2	: CARDINAL;
+      x, StateMinSym	: SHORTCARD;
+      IsRecomputed	: tSet;
+      vw		: BOOLEAN;
+   BEGIN
+      vw := IsElement (ORD ('|'), Options) OR NOT IsElement (ORD ('1'), Options);
+      MakeSet (IsRecomputed, LastLR0State);
+      WHILE NOT IsEmpty (WorkingSet) DO
+	 State := Extract (WorkingSet);
+(* WriteS (StdOutput, "EXTRACT "); PrintState (StdOutput, State); *)
+	 WITH StatePtr^ [State] DO
+
+	    IF State <= LastLR0State THEN   (* compute lookahead sets for kernel items *)
+	       Include (IsRecomputed, State);
+	       FOR Item := Kernel TO Kernel + KernelSize DO
+		  WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+		     IF Lookahead = NIL THEN
+			Lookahead := AllocLookahead ();
+			CompLookaheadKernel (State, Item, Lookahead^);
+		     END;
+		  END;
+	       END;
+	    END;
+	    StateMinSym := MinSym;
+	 END;
+
+	 BeforeDot (State);
+	 WHILE NOT IsEmpty (SymbolsBeforeDot) DO	(* EXPANSION *)
+	    x := Extract (SymbolsBeforeDot);
+	    IF (State > LastLR0State) OR IsRelated (x, State, LaneTrace) THEN
+	       OldItemCount := ItemCount;
+	       Expand (x);
+	       IF StateCount >= MAX (tStateRange) THEN	(* ??? *)
+		  MessageI ("too many states", Fatal, NoPosition, Long, ADR (StateCount));
+	       END;
+	       INC (StateCount);			(* create core of new state *)
+	       IF StateCount = StateSize THEN
+		  ExtendArray (StatePtr, StateSize, TSIZE (tState));
+		  CheckMemory (StatePtr, StateCount);
+(* MessageI ("extend State", Warning, NoPosition, Long, ADR (StateSize)); *)
+		  ResizeSet (WorkingSet, StateSize);
+	       END;
+	       WITH StatePtr^ [StateCount] DO
+		  Kernel	:= OldItemCount + 1;
+		  KernelSize	:= ItemCount - OldItemCount - 1;
+		  KernelInfo	:= KernelItemCount + 1;
+		  TablePtr	:= NIL;
+		  Continuation	:= 0;
+		  Closure (StateCount);
+
+		  INC (KernelItemCount, KernelSize + 1);	(* complete kernel items *)
+		  IF KernelItemCount >= KernelItemSize THEN
+		     ExtendArray (KernelItemPtr, KernelItemSize, TSIZE (tKernelItem));
+		     CheckMemory (KernelItemPtr, StateCount);
+(* MessageI ("extend KernelItem", Warning, NoPosition, Long, ADR (KernelItemSize)); *)
+		  END;
+
+							(* compute lookahead sets *)
+		  FOR Item := Kernel TO Kernel + KernelSize DO
+		     Item2 := StatePtr^ [State].Kernel;
+		     WITH ItemPtr^ [Item] DO
+			LOOP
+			   IF (ItemPtr^ [Item2].Rule = Rule) AND (ItemPtr^ [Item2].Dot = Dot - 1) THEN EXIT; END;
+			   INC (Item2);
+			END;
+		     END;
+		     WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+			IF vw THEN
+			   PredCount	:= 0;
+			   gPredSize	:= 4;
+			   MakeArray (PredPtr, gPredSize, TSIZE (tStateRange));
+			   CheckMemory (PredPtr, StateCount);
+			   PredSize	:= gPredSize;
+			ELSE
+			   PredPtr	:= NIL;
+			END;
+			Lookahead	:= AllocLookahead ();	(* ??? *)
+			MakeSet (Lookahead^, Epsilon);
+			IF Size (Lookahead^) = 0 THEN
+			   MessageI ("out of memory for state", Fatal, NoPosition, Long, ADR (StateCount));
+			END;
+			INC (LookaheadCount);
+			GetLookahead (State, Item2, Lookahead^);
+		     END;
+		  END;
+(* WriteS (StdOutput, "CREATE "); PrintState (StdOutput, StateCount); *)
+
+		  State2 := LookupLR1 (HashPtr^ [x]);	(* does state exist already ? *)
+		  WITH StatePtr^ [State] DO
+		     IF TablePtr^ [x - StateMinSym] = 0 THEN INC (TableCount); END;
+		     TablePtr^ [x - StateMinSym] := State2;
+		  END;
+(* WriteS (StdOutput, "TABLE "); PrintState (StdOutput, State); *)
+
+		  IF State2 = StateCount THEN		(* if it does not exist *)
+		     Include (WorkingSet, State2);
+		     Next		:= HashPtr^ [x];
+		     HashPtr^ [x]	:= StateCount;
+		  ELSE				(* if it does exist then remove it *)
+		     IF (CARDINAL (State2) <= LastLR0State) AND
+			NOT IsElement (State2, IsRecomputed) THEN
+			Include (WorkingSet, State2);
+		     END;
+(* WriteS (StdOutput, "REMOVE "); PrintState (StdOutput, StateCount); *)
+							     (* reclaim memory *)
+		     IF TablePtr # NIL THEN ReleaseTable (StateCount); END;
+		     FOR Item := Kernel TO Kernel + KernelSize DO
+			ReleaseLookahead (StateCount, Item);
+		     END;
+		     ItemCount := OldItemCount;
+		     DEC (KernelItemCount, KernelSize + 1);
+		     DEC (StateCount);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      LastLR1State := StateCount;
+      ReleaseSet (IsRecomputed);
+      ReleaseRelation (LaneTrace);
+      ResizeArray (StatePtr, StateSize, StateCount + 1, TSIZE (tState));
+      ResizeArray (ItemPtr, ItemSize, ItemCount + 1, TSIZE (tItem));
+      ResizeArray (KernelItemPtr, KernelItemSize, KernelItemCount + 1, TSIZE (tKernelItem));
+      ReleaseArray (HashPtr, HashSize, TSIZE (LONGINT));
+      ReleaseSet (WorkingSet		);
+      ReleaseSet (SymbolsBeforeDot	);
+      ReleaseSet (BusyNT		);
+   END CompLR1;
+
+(* determine all reachable states *)
+
+PROCEDURE CompReachable1;
+   VAR
+      WorkingSet, StateSet	: tSet;
+      State, State2		: LONGINT;
+      Item, i			: CARDINAL;
+   BEGIN
+      MakeSet (WorkingSet, StateCount);
+      MakeSet (StateSet	 , StateCount);
+      FOR i := 1 TO RootCount DO Include (WorkingSet, i); END;
+      WHILE NOT IsEmpty (WorkingSet) DO
+         State := Extract (WorkingSet);
+	 WITH StatePtr^ [State] DO
+	    Include (StateSet, State);
+	    IF TablePtr # NIL THEN
+	       FOR i := 0 TO MaxSym - MinSym DO
+		  State2 := TablePtr^ [i];
+		  IF (State2 # 0) AND (State2 <= StateCount) AND NOT IsElement (State2, StateSet) THEN
+		     Include (WorkingSet, State2);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      Complement (StateSet);
+      Exclude (StateSet, 0);
+      WHILE NOT IsEmpty (StateSet) DO
+	 State := Extract (StateSet);
+	 WITH StatePtr^ [State] DO
+	    Class := Invalid;
+							(* reclaim memory *)
+	    IF TablePtr # NIL THEN ReleaseTable (State); END;
+	    FOR Item := Kernel TO Kernel + KernelSize DO
+	       ReleaseLookahead (State, Item);
+	    END;
+	 END;
+      END;
+      ReleaseSet (WorkingSet	);
+      ReleaseSet (StateSet	);
+   END CompReachable1;
+
+(* Check whether a state has a unique reduce action and return the rule *)
+
+PROCEDURE GetUniqueReduction (State: tStateRange): CARDINAL;
+   VAR
+      i, Compare, TableElmt	: CARDINAL;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 IF KernelSize = 0 THEN RETURN ItemPtr^ [Kernel].Rule; END;
+	 Compare := 0;
+	 FOR i := 0 TO MaxSym - MinSym DO
+	    TableElmt := TablePtr^ [i];
+	    IF TableElmt # 0 THEN
+	       IF (TableElmt <= RuleBase) OR (TableElmt > RuleBase + RuleCount) THEN
+		  RETURN 0;
+	       ELSIF Compare = 0 THEN
+		  Compare := TableElmt;
+	       ELSIF TableElmt # Compare THEN
+		  RETURN 0;
+	       END;
+	    END;
+	 END;
+	 RETURN Compare - RuleBase;
+      END;
+   END GetUniqueReduction;
+
+PROCEDURE OptimizeLR0;
+   VAR
+      State, State2	: LONGINT;
+      Item, x, r	: CARDINAL;
+   BEGIN
+      MakeSet (ReadReduceSet, RuleCount);
+   IF IsElement (ORD ('r'), Options) THEN RETURN; END;
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       FOR Item := Kernel TO Kernel + KernelSize + ClosureSize DO
+		  WITH ItemPtr^ [Item] DO
+		     WITH ToRulePtr^ [Rule]^.Rule DO
+			IF Dot = Length - 1 THEN
+			   x := ElmtsPtr^ [Dot + 1];
+			   IF 0 < x THEN
+			      State2 := TablePtr^ [x - MinSym];
+			      IF State2 <= StateCount THEN
+				 r := GetUniqueReduction (State2);
+				 IF r > 0 THEN
+				    IF x < Epsilon THEN
+				       TablePtr^ [x - MinSym] := CARDINAL (StateCount) + r;
+				       Include (ReadReduceSet, r);
+				    ELSE
+				       TablePtr^ [x - MinSym] := RuleBase + r;
+				    END;
+				 END;
+			      END;
+			   END;
+			END;
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END OptimizeLR0;
+
+(* determine all reachable states *)
+
+PROCEDURE CompReachable2;
+   VAR
+      WorkingSet, StateSet, Set	: tSet;
+      State, State2, TableSize	: LONGINT;
+      i, j, x			: CARDINAL;
+   BEGIN
+      MakeSet (WorkingSet, StateCount	);
+      MakeSet (StateSet	 , StateCount	);
+      MakeSet (Set	 , Epsilon	);
+      FOR i := 1 TO RootCount DO Include (WorkingSet, i); END;
+      FOR i := 1 TO CARDINAL (ConditionCount) DO
+         State := ConditionPtr^ [i].Implicit;
+	 IF State <= StateCount THEN
+	    Include (WorkingSet, State);
+	    WITH StatePtr^ [State] DO
+	       IF TablePtr = NIL THEN
+		  GetLookahead (State, Kernel, Set);
+		  MinSym := Minimum (Set);
+		  MaxSym := Maximum (Set);
+		  TableSize := MaxSym - MinSym + 1;
+		  MakeArray (TablePtr, TableSize, TSIZE (tStateRange));
+		  CheckMemory (TablePtr, State);
+		  FOR j := 0 TO MaxSym - MinSym DO TablePtr^ [j] := 0; END;
+		  INC (gTableSize, TableSize);
+		  WHILE NOT IsEmpty (Set) DO
+		     x := Extract (Set);
+		     TablePtr^ [x - MinSym] := RuleBase + ItemPtr^ [Kernel].Rule;
+		     INC (TableCount);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      ReleaseSet (Set);
+      WHILE NOT IsEmpty (WorkingSet) DO
+         State := Extract (WorkingSet);
+	 WITH StatePtr^ [State] DO
+	    Include (StateSet, State);
+	    IF TablePtr # NIL THEN
+	       FOR i := 0 TO MaxSym - MinSym DO
+		  State2 := TablePtr^ [i];
+		  IF (State2 # 0) AND (State2 <= StateCount) AND NOT IsElement (State2, StateSet) THEN
+		     Include (WorkingSet, State2);
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+      FOR State := 1 TO StateCount DO
+	 WITH StatePtr^ [State] DO
+	    IF IsElement (State, StateSet) THEN
+	       CASE Class OF
+	       | Reduce		: INC (ReduceCount	);
+	       | Read		: INC (ReadCount	);
+	       | ReadReduce	: INC (ReadReduceCount	);
+	       END;
+	    ELSE
+	       Class := Invalid	; INC (InvalidCount	);
+							(* reclaim memory *)
+	    (* IF TablePtr # NIL THEN ReleaseTable (State); END;
+	       FOR Item := Kernel TO Kernel + KernelSize DO
+		  ReleaseLookahead (State, Item);
+	       END; *)
+	    END;
+	 END;
+      END;
+      ReleaseSet (WorkingSet	);
+      ReleaseSet (StateSet	);
+   END CompReachable2;
+
+PROCEDURE ReleaseTable (State: tStateRange);
+   VAR TableSize	: LONGINT;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 TableSize := MaxSym - MinSym + 1;
+	 ReleaseArray (TablePtr, TableSize, TSIZE (tStateRange));
+	 DEC (gTableSize, TableSize);
+	 TablePtr := NIL;
+      END;
+   END ReleaseTable;
+
+PROCEDURE ReleaseLookahead (State: tStateRange; Item: CARDINAL);
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+	    IF Lookahead # NIL THEN
+	       ReleaseSet (Lookahead^);
+	       Free (TSIZE (tSet), Lookahead);
+	       DEC (LookaheadCount);
+	       Lookahead := NIL;
+	       N := 0;
+	    END;
+	 END;
+      END;
+   END ReleaseLookahead;
+
+PROCEDURE CompGrammarClass;
+   VAR ErrorClass	: CARDINAL;
+BEGIN
+   IF ErrorCount > 0 THEN
+      ErrorClass := Error;
+   ELSIF WarningCount > 0 THEN
+      ErrorClass := Warning;
+   ELSE
+      ErrorClass := Information;
+   END;
+   IF HasConflict THEN
+      IF IsElement (ORD ('0'), Options) THEN
+	 Message ("grammar is not LALR(1)", ErrorClass, NoPosition);
+      ELSE
+	 Message ("grammar is not LR(1)", ErrorClass, NoPosition);
+      END;
+   ELSIF LookaheadCount = 0 THEN
+	 Message ("grammar is LR(0)", ErrorClass, NoPosition);
+   ELSIF LastLR0State = CARDINAL (StateCount) THEN
+      IF Repair = ExplicitRepair THEN
+	 Message ("grammar is LALR(1) after explicit repair", ErrorClass, NoPosition);
+      ELSE
+	 Message ("grammar is LALR(1)", ErrorClass, NoPosition);
+      END;
+   ELSIF (LastLR0State < LastLR1State) AND (LastLR1State = CARDINAL (StateCount)) THEN
+      IF Repair = ExplicitRepair THEN
+	 Message ("grammar is LR(1) after explicit repair", ErrorClass, NoPosition);
+      ELSE
+	 Message ("grammar is LR(1)", ErrorClass, NoPosition);
+      END;
+   ELSIF LastLR1State < CARDINAL (StateCount) THEN
+      IF Repair = ExplicitRepair THEN
+	 Message ("grammar is LR(1) after explicit repair", ErrorClass, NoPosition);
+      ELSE
+	 Message ("grammar is LR(1)", ErrorClass, NoPosition);
+      END;
+   ELSE
+      Message ("grammar is not LR(1)", ErrorClass, NoPosition);
+   END;
+END CompGrammarClass;
+
+PROCEDURE PrintRepairCount;
+BEGIN
+   IF ReadReduceConflict + ReduceReduceConflict > 0 THEN
+      WriteNl (StdError);
+      WriteS  (StdError, " conflict repair   explicit implicit  LALR(2)  dynamic unsolved    total");
+      WriteNl (StdError);
+      WriteS  (StdError, "------------------------------------------------------------------------");
+      WriteNl (StdError);
+
+      IF ReadReduceConflict > 0 THEN
+	 WriteS  (StdError, " shift-reduce     ");
+	 WriteI  (StdError, RepairCount [cExplRepReadReduce	], 9);
+	 WriteI  (StdError, RepairCount [cImplRepReadReduce	], 9);
+	 WriteI  (StdError, RepairCount [cLRkRepReadReduce	], 9);
+	 WriteI  (StdError, RepairCount [cDynaRepReadReduce	], 9);
+	 WriteI  (StdError, RepairCount [cReadReduce		], 9);
+	 WriteI  (StdError, ReadReduceConflict			 , 9);
+	 WriteNl (StdError);
+      END;
+      IF ReduceReduceConflict > 0 THEN
+	 WriteS  (StdError, "reduce-reduce     ");
+	 WriteI  (StdError, RepairCount [cExplRepReduceReduce	], 9);
+	 WriteI  (StdError, RepairCount [cImplRepReduceReduce	], 9);
+	 WriteI  (StdError, RepairCount [cLRkRepReduceReduce	], 9);
+	 WriteI  (StdError, RepairCount [cDynaRepReduceReduce	], 9);
+	 WriteI  (StdError, RepairCount [cReduceReduce		], 9);
+	 WriteI  (StdError, ReduceReduceConflict		 , 9);
+	 WriteNl (StdError);
+      END;
+      WriteS  (StdError, "------------------------------------------------------------------------");
+      WriteNl (StdError);
+      WriteS  (StdError, " total            ");
+      WriteI  (StdError, RepairCount [cExplRepReadReduce	] +
+			 RepairCount [cExplRepReduceReduce	] , 9);
+      WriteI  (StdError, RepairCount [cImplRepReadReduce	] +
+			 RepairCount [cImplRepReduceReduce	] , 9);
+      WriteI  (StdError, RepairCount [cLRkRepReadReduce		] +
+			 RepairCount [cLRkRepReduceReduce	] , 9);
+      WriteI  (StdError, RepairCount [cDynaRepReadReduce	] +
+			 RepairCount [cDynaRepReduceReduce	] , 9);
+      WriteI  (StdError, RepairCount [cReadReduce		] +
+			 RepairCount [cReduceReduce		] , 9);
+      WriteI  (StdError, ReadReduceConflict + ReduceReduceConflict, 9);
+      WriteNl (StdError);
+   END;
+END PrintRepairCount;
+
+PROCEDURE PrintStates;
+   VAR State	: LONGINT;
+   BEGIN
+      WriteS (StdOutput, "Automaton (States and Situations)");
+      WriteNl (StdOutput); WriteNl (StdOutput);
+      FOR State := 1 TO StateCount DO
+	 IF (StatePtr^ [State].Class # Invalid) OR IsElement (ORD ('A'), Options) THEN
+	    PrintState (StdOutput, State); WriteNl (StdOutput);
+	 END;
+      END;
+      WriteFlush (StdOutput);
+   END PrintStates;
+
+PROCEDURE PrintState (File: tFile; State: tStateRange);
+   VAR State2, Item, i, j, TableElmt	: CARDINAL;
+   BEGIN
+      WITH StatePtr^ [State] DO
+	 WriteI (File, ReadIndex, 0);
+	 WriteS (File, ", intern: "); WriteI (File, State, 0);
+	 IF IsElement (ORD ('A'), Options) THEN
+	    IF Class # Invalid THEN
+	       IF TDefault # NIL THEN
+		  WriteS (File, ", TDefault: ");
+		  IF NOT IsElement (ORD ('6'), Options) THEN
+		     WriteI (File, TDefault^ [ReadIndex], 0);
+		  ELSIF TDefault^ [ReadIndex] > RuleBase THEN
+		     WriteS (File, " r ");
+		     WriteI (File, TDefault^ [ReadIndex] - RuleBase, 0);
+		  ELSE
+		     WriteS (File, " e");
+		  END;
+	       END;
+	       IF NDefault # NIL THEN
+		  WriteS (File, ", NDefault: "); WriteI (File, NDefault^ [ReadIndex], 0);
+	       END;
+	    (* WriteI (File, Kernel, 5);
+	       WriteI (File, KernelInfo, 5);
+	       WriteI (File, KernelSize, 5);
+	       WriteI (File, ClosureSize, 5); *)
+	       WriteS (File, ", Cont: "); WriteIdent (File, ToSymbolPtr^ [Continuation]^.Terminal.Name);
+	    END;
+	    CASE Class OF
+	    | Invalid	: WriteS (File, ", Invalid"	);
+	    | Reduce	: WriteS (File, ", Reduce"	);
+	    | Read	: WriteS (File, ", Read"	);
+	    | ReadReduce: WriteS (File, ", ReadReduce"	);
+	    ELSE
+	    END;
+	 END;
+	 IF TablePtr # NIL THEN
+	    j := 0;
+	    WriteS (File, ", Actions:"); WriteNl (File); WriteS (File, "    ");
+	    FOR i := MinSym TO MaxSym DO
+	       State2 := State;
+	       LOOP
+		  WITH StatePtr^ [State2] DO
+		     IF (i < MinSym) OR (MaxSym < i) THEN TableElmt := 0; EXIT; END;
+		     TableElmt := TablePtr^ [i - MinSym];
+		     IF TableElmt # 0 THEN EXIT; END;
+		     IF i < Epsilon THEN
+			IF TDefault = NIL THEN EXIT; END;
+			IF NOT IsElement (ORD ('6'), Options) THEN
+			   State2 := TDefault^ [ReadIndex];
+			ELSIF (TDefault^ [ReadIndex] # 0) AND
+			   IsElement (i, DefaultSetPtr^ [DefaultLookPtr^ [ReadIndex]]) THEN
+			   TableElmt := TDefault^ [ReadIndex]; EXIT;
+			ELSE
+			   TableElmt := 0; EXIT;
+			END;
+		     ELSE
+			IF NDefault = NIL THEN EXIT; END;
+			State2 := NDefault^ [ReadIndex];
+		     END;
+		     IF State2 = 0 THEN EXIT; END;
+		  END;
+	       END;
+	       IF TableElmt # 0 THEN
+		  IF i < Epsilon THEN
+		     WriteIdent (File, ToSymbolPtr^ [i]^.Terminal.Name);
+		  ELSE
+		     WriteIdent (File, ToSymbolPtr^ [i]^.Nonterminal.Name);
+		  END;
+		  IF TableElmt <= CARDINAL (StateCount) THEN
+		     WriteS (File, " s ");
+		     IF StatePtr^ [TableElmt].ReadIndex = 0 THEN
+			WriteI (File, TableElmt, 0);
+		     ELSE
+			WriteI (File, StatePtr^ [TableElmt].ReadIndex, 0);
+		     END;
+		  ELSIF TableElmt <= RuleBase THEN
+		     WriteS (File, " sr ");
+		     WriteI (File, TableElmt - CARDINAL (StateCount), 0);
+		  ELSIF TableElmt <= RuleBase + RuleCount THEN
+		     WriteS (File, " r ");
+		     WriteI (File, TableElmt - RuleBase, 0);
+		  ELSE
+		     WriteS (File, " d ");
+		     WriteI (File, TableElmt - RuleBase - RuleCount, 0);
+		  END;
+		  WriteS (File, ", ");
+		  IF j = 5 THEN j := 0; WriteNl (File); WriteS (File, "    "); END;
+		  INC (j);
+	       END;
+	    END;
+	 END;
+	 WriteNl (File);
+	 FOR Item := 0 TO KernelSize + ClosureSize DO
+	    PrintItem (File, Kernel + Item, KernelInfo + Item);
+	 END;
+      END;
+   END PrintState;
+
+PROCEDURE PrintItem (File: tFile; Item, Info: CARDINAL);
+   VAR i	: CARDINAL; x: tTree;
+   BEGIN
+      WITH ItemPtr^ [Item] DO
+	 WITH ToRulePtr^ [Rule]^.Rule DO
+	    WriteI (File, Item, 4);
+	    WriteI (File, Order, 3);
+	 (* WriteI (File, Rule, 5);
+	    WriteI (File, Dot, 5);
+	    WriteS (File, " ="); *)
+	    WriteS (File, " ");
+	    WriteIdent (File, LHS^.Nonterminal.Name);
+	    WriteS (File, ": ");
+	    IF Dot = 0 THEN WriteS (File, "."); ELSE WriteS (File, " "); END;
+	    FOR i := 1 TO Length DO
+	       x := ToSymbolPtr^ [ElmtsPtr^ [i]];
+	       IF x^.Kind = Terminal THEN
+		  WriteIdent (File, x^.Terminal.Name);
+	       ELSE
+		  WriteIdent (File, x^.Nonterminal.Name);
+	       END;
+	       IF i = Dot THEN WriteS (File, "."); ELSE WriteS (File, " "); END;
+	    END;
+	    WITH KernelItemPtr^ [Info] DO
+	       IF Dot > 0 THEN
+		  IF IsElement (ORD ('A'), Options) THEN
+		     PrintPred (File, KernelItemPtr^ [Info]);
+		  END;
+		  IF Lookahead # NIL THEN
+		     WriteS (File, " "); WriteSymSet (File, Lookahead^);
+		  END;
+	       END;
+	    END;
+	    WriteNl (File);
+	 END;
+      END;
+   END PrintItem;
+
+PROCEDURE PrintPred (File: tFile; KernelItem: tKernelItem);
+   VAR i, j	: tStateRange;
+   BEGIN
+      WITH KernelItem DO
+	 IF PredPtr # NIL THEN
+	    j := 0;
+	    WriteS (File, " {");
+	    FOR i := PredCount TO 1 BY -1 DO
+	       WriteI (File, PredPtr^ [i], 0);
+	       WriteS (File, ", ");
+	       INC (j);
+	       IF j = 15 THEN j := 0; WriteNl (File); WriteS (File, "	"); END;
+	    END;
+	    WriteS (File, "}");
+	 END;
+      END;
+   END PrintPred;
+
+PROCEDURE ResetLookahead;
+   VAR State, Item	: CARDINAL;
+   BEGIN
+      FOR State := 1 TO LastLR1State DO
+	 WITH StatePtr^ [State] DO
+	    IF Class # Invalid THEN
+	       FOR Item := Kernel TO Kernel + KernelSize DO
+		  WITH ItemPtr^ [Item] DO
+		     IF Rule > RootCount THEN ReleaseLookahead (State, Item); END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END ResetLookahead;
+
+PROCEDURE PrintLine (Text: ARRAY OF CHAR; Value: INTEGER);
+   BEGIN
+      WriteS (StdOutput, "          ");
+      WriteS (StdOutput, Text); WriteI (StdOutput, Value, 8); WriteNl (StdOutput);
+   END PrintLine;
+
+PROCEDURE PrintStatistics;
+   BEGIN
+      WriteNl (StdOutput);
+      WriteS  (StdOutput, 'Parser statistics for grammar "');
+      IF SourceFile [0] # 0C
+      THEN WriteS (StdOutput, SourceFile);
+      ELSE WriteS (StdOutput, "standard input");
+      END;
+      WriteS  (StdOutput, '"');
+      WriteNl (StdOutput); WriteNl (StdOutput);
+      PrintLine ("Terminals          ", TermCount	);
+      PrintLine ("Nonterminals       ", NontermCount	);
+      PrintLine ("Symbols            ", LastNonterm	);
+      PrintLine ("Rules              ", RuleCount	);
+      PrintLine ("LR(0)      States  ", LastLR0State	);
+      PrintLine ("LR(1)      States  ", LastLR1State - LastLR0State);
+   (* PrintLine ("LR(k)      States  ", StateCount - LONGINT (LastLR1State)); *)
+      PrintLine ("Invalid    States  ", InvalidCount	);
+      PrintLine ("Total      States  ", StateCount	);
+      PrintLine ("Items              ", ItemCount	);
+   IF IsElement (ORD ('T'), Options) THEN
+      PrintLine ("Kernel     Items   ", KernelItemCount	);
+      PrintLine ("Table      Elmts   ", TableCount	);
+      PrintLine ("Pred       Elmts   ", PredCount	);
+      PrintLine ("Path       Elmts   ", Relation.Card (LS));
+      PrintLine ("Invalid    States  ", InvalidCount	);
+      PrintLine ("Reduce     States  ", ReduceCount	);
+      PrintLine ("Read       States  ", ReadCount	);
+      PrintLine ("ReadReduce States  ", ReadReduceCount	);
+      PrintLine ("Dynamic    States  ", ConditionCount	);
+      PrintLine ("Lookahead  Sets    ", LookaheadCount	);
+      PrintLine ("shift reduce       ", ReadReduceConflict	);
+      PrintLine ("reduce reduce      ", ReduceReduceConflict	);
+      PrintLine ("State      Space   ", StateSize	* TSIZE (tState	));
+      PrintLine ("Item       Space   ", ItemSize	* TSIZE (tItem	));
+      PrintLine ("Kernel     Space   ", KernelItemSize	* TSIZE (tKernelItem	));
+      PrintLine ("Lookahead  Space   ", LookaheadCount	* (TSIZE (tSet) + (Epsilon + 32) DIV 32 * TSIZE (BITSET)));
+      PrintLine ("Table      Space   ", gTableSize	* TSIZE (tStateRange	));
+      PrintLine ("Pred       Space   ", PredCount	* TSIZE (tStateRange	));
+      PrintLine ("Path       Space   ", CARDINAL (PathCount) + CARDINAL
+      (Relation.Card (LS)) * (TSIZE (tSet) + (Epsilon + 32) DIV 32 * TSIZE (BITSET)));
+      PrintLine ("TEntrys            ", TEntryCount	);
+      PrintLine ("TTable     Max     ", TTableSize	);
+      PrintLine ("TComb      Size    ", TCombSize	);
+      PrintLine ("TBase      Size    ", TBaseSize	);
+      PrintLine ("TDefault   Size    ", TDefaultSize	);
+      PrintLine ("TDefault   Savings ", TDefaultSavings	);
+      PrintLine ("NEntrys            ", NEntryCount	);
+      PrintLine ("NTable     Max     ", NTableSize	);
+      PrintLine ("NComb      Size    ", NCombSize	);
+      PrintLine ("NBase      Size    ", NBaseSize	);
+      PrintLine ("NDefault   Size    ", NDefaultSize	);
+      PrintLine ("NDefault   Savings ", NDefaultSavings	);
+      PrintLine ("TEntry     Space   ", TEntryCount	* TSIZE (tEntry		));
+      PrintLine ("TComb      Space   ", TCombSize	* TSIZE (tComb		));
+      PrintLine ("TBase      Space   ", TBaseSize	* TSIZE (tTableElmt	));
+      PrintLine ("TDefault   Space   ", TDefaultSize	* TSIZE (tTableElmt	));
+      PrintLine ("NEntry     Space   ", NEntryCount	* TSIZE (tEntry		));
+      PrintLine ("NComb      Space   ", NCombSize	* TSIZE (tComb		));
+      PrintLine ("NBase      Space   ", NBaseSize	* TSIZE (tTableElmt	));
+      PrintLine ("NDefault   Space   ", NDefaultSize	* TSIZE (tTableElmt	));
+      PrintLine ("Tree       Space   ", Tree.HeapUsed	);
+   END;
+      PrintLine ("Memory             ", MemoryUsed	);
+      WriteFlush (StdOutput);
+   END PrintStatistics;
+
+PROCEDURE AllocLookahead (): ADDRESS;
+   VAR Ptr	: ADDRESS;
+   BEGIN
+      Ptr := Alloc (TSIZE (tSet));
+      IF Ptr = NIL THEN
+	 Message ("out of memory", Fatal, NoPosition);
+      END;
+      RETURN Ptr;
+   END AllocLookahead;
+
+PROCEDURE CheckMemory (Ptr: ADDRESS; State: tStateRange);
+   BEGIN
+      IF Ptr = NIL THEN
+	 MessageI ("out of memory for state", Fatal, NoPosition, Short, ADR (State));
+      END;
+   END CheckMemory;
+
+BEGIN
+   gTableSize		:= 0;
+   TableCount		:= 0;
+   PredCount		:= 0;
+   InvalidCount		:= 0;
+   ReduceCount		:= 0;
+   ReadCount		:= 0;
+   ReadReduceCount	:= 0;
+   LookaheadCount	:= 0;
+   ReadReduceConflict	:= 0;
+   ReduceReduceConflict	:= 0;
+   Repair		:= 0;
+   StopList		:= NoTree;
+   HasConflict		:= FALSE;
+END LR1.

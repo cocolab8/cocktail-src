@@ -1,0 +1,105 @@
+ SPACE
+ !
+ "
+ # {x, z, u } -> # = process grammar for parser and scanner // NOT YET
+ $ {w, o, +X} -> $ = WriteHex, etc.
+ % used for evaluation version
+ &
+ '
+ (
+ )
+ * indicates -c++
+ + generate C++ source code
+ +D generate graphic browser procedure DrawTREE enclosed in #ifdef DRAWTREE
+ +E generate tree equality test   procedure IsEqualTREE
+ +G browse internal data structure with graphical browser
+ +H print advanced help
+ +I suppress informations
+ +J start dialog system
+ +P generate empty bodies for procedures not selected
+ +T generate TSL description (Micro Focus)
+ , generate procedure yyMark
+ - generate Ada source code
+ . run order
+ / follow as early as possible strategy instead of as late as possible
+ 0 optimize attribute storage
+ 1 print inserted copy rules
+ 2 print inherited attribute computation rules
+ 3 print attribute storage assignment
+ 4 generate tree/graph description in file TREE.TS
+ 5 generate source code to check for cyclic dependencies
+ 6 generate # line directives
+ 7 touch output files only if necessary
+ 8 report storage consumption
+ 9 generate source code to measure stack size
+ : generate lines not longer than 80 characters
+ ; generate 'TreeStore'
+ < generate 'SUBUNIT'
+ = generate tree equality test   procedure IsEqualTREE
+ >
+ ?
+ @ print messages (do not store)
+ A generate all, same as -DI (default)
+ B allow missing attribute computations in extended node types
+ C print dependencies introduced for total order
+ D generate header file or definition module
+ E print attribute instances sorted by evaluation order
+ F generate general    destroyer procedure ReleaseTREEModule (FREE)
+ G print attribute instances sorted by declaration order
+ H print help information for evaluator  module
+ I generate implementation part or module
+ J generate Java source code
+ K generate an evaluator based on a stack automaton (default: recursive procedures)
+ L generate a (lazy) evaluator for WAG (default: OAG)
+ M print summary of all node types (rules) from source
+ N print dependency relations DNC
+ O print dependency relations OAG
+ P print dependency relations DP
+ Q browse internal data structure with text browser
+ R generate list iterator        procedure ForallTREE
+ R generate list reverser        procedure ReverseTREE
+ S print dependency relations SNC
+ T generate evaluator with trace output (all actions, T = XZ)
+ U trace only node types specified in file TraceTab
+ V print visit sequences
+ W suppress warnings
+ X trace attribute evaluation actions with    values
+ Y trace attribute evaluation actions without values
+ Z trace visit actions
+ [
+ \
+ ]
+ ^
+ _ generate array/procedure NodeName
+ `
+ a generate all except -ceh (default)
+ b generate bottom up traversal  procedure TraverseTREEBU
+ c generate C   source code (default: Modula-2)
+ d generate header file or definition module
+ e generate graphic browser      procedure DrawTREE
+ f generate node/graph destroyer procedure ReleaseTREE (free)
+ g generate binary graph reader  procedure GetTREE
+ h print help information for tree/graph module
+ i generate implementation part or module
+ j allow undefined node types; define implicitly as terminals
+ k generate graph type checker   procedure CheckTREE
+ l <dir> specify the directory dir where cg finds its tables
+ m generate node constructors    procedures m<node> (make)
+ n generate node constructors    procedures n<node> (node)
+ o generate text   node  writer  procedure WriteTREENode (output)
+ p generate binary graph writer  procedure PutTREE
+ q generate text   graph browser procedure QueryTREE
+ r generate text   graph reader  procedure ReadTREE
+ s generate import statements
+ t generate top down  traversal  procedure TraverseTREETD
+ u generate parser  specification for yacc
+ v omit actions in the generated parser specifications
+ w generate text   graph writer  procedure WriteTREE
+ x generate scanner specification
+ y generate graph copy           procedure CopyTREE
+ z generate parser  specification for lark
+ {
+ |
+ }
+ ~
+ DEL

@@ -1,0 +1,1060 @@
+/* $Id: cg.cg,v 1.18 2008/09/25 14:39:08 grosch Exp $ */
+
+/*
+ * $Log: cg.cg,v $
+ * Revision 1.18  2008/09/25 14:39:08  grosch
+ * removed variable SourceFile2
+ *
+ * Revision 1.17  2002/10/04 12:45:02  grosch
+ * changed prefix for superclass from c to yy
+ *
+ * Revision 1.16  2002/09/25 15:01:02  grosch
+ * added class property HasReverse
+ * moved declarations of variables EmptyBodies and iBaseClass to this module
+ *
+ * Revision 1.15  2002/08/07 12:25:45  grosch
+ * added explicit initialization of attributes
+ * improved handling of files cg.cg and puma.cg
+ *
+ * Revision 1.14  2002/07/30 09:50:23  grosch
+ * added support for automatic prefixing of node types for C and C++
+ *
+ * Revision 1.13  2001/12/17 11:28:48  grosch
+ * added count to output of number of cyclic attributes
+ *
+ * Revision 1.12  2001/08/28 21:13:41  grosch
+ * added option and call for DrawTree
+ *
+ * Revision 1.11  2001/08/08 14:55:30  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 1.10  2001/08/01 14:51:22  grosch
+ * delivery of Trevor Nash for generation of Java for ag
+ *
+ * Revision 1.9  2001/01/28 22:09:58  grosch
+ * added type cast to ADR (Action) for AIX
+ *
+ * Revision 1.8  2001/01/05 19:17:25  grosch
+ * checked in update for generation of Java from Trevor Nash
+ *
+ * Revision 1.7  2000/09/06 15:24:47  grosch
+ * added generation of Java
+ *
+ * Revision 1.6  1998/06/08 19:39:03  grosch
+ * improved support for several attribute evaluators
+ *
+ * Revision 1.5  1998/04/21 13:43:22  grosch
+ * truncation of file and module names to 8.3 format
+ * added node type PrecClause
+ * added many language extensions for puma
+ * some other improvements
+ *
+ * Revision 1.4  1994/09/13  12:41:52  grosch
+ * added generation of Ada code
+ *
+ * Revision 1.3  1994/07/13  10:55:43  grosch
+ * added handling of lark extensions: START, cost, repr, predicates, unconditional actions
+ *
+ * Revision 1.2  1993/10/27  17:46:38  grosch
+ * added printing of property Ignore
+ *
+ * Revision 1.1  1993/08/20  17:49:35  grosch
+ * removed unused variables
+ *
+ * Revision 1.0  1993/08/18  13:24:11  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, 21.3.1989 */
+
+MODULE AstIn
+
+PROPERTY INPUT
+
+RULE
+
+Classes		= <
+  NoClass	= .
+  Class		= [Name: tIdent] [Properties: tClassProperties]
+		  Attributes Extensions: Classes Next: Classes REV .
+>.
+Attributes	= <
+  NoAttribute	= .
+  AttrOrAction	= Next: Attributes REV <
+    AttrOrChild	= [Name: tIdent] [Type: tIdent] [CppType: tIdent]
+		  [Properties: tAttrProperties] [Init: tStringRef] <
+      Child	= .
+      Attribute	= .
+    >.
+      ActionPart= .
+      UCActionPart= .
+      TrialParse= .
+      CondParse = .
+      PrecClause= .
+  >.
+>.
+
+END AstIn
+
+MODULE Ast
+
+RULE
+
+Class		= BaseClass: Classes .
+Child		= Class    : Classes .
+Attribute	= NodeType : Classes .
+
+END Ast
+
+MODULE Tree2
+
+TREE GLOBAL {
+# define puttStringRef(a)	PutString (a);
+# define gettStringRef(a)	GetString (a);
+
+PROCEDURE PutString (yyr: StringM.tStringRef);
+   BEGIN
+      StringM.WriteString (yyf, yyr);
+      IO.WriteNl (yyf);
+   END PutString;
+
+PROCEDURE GetString (VAR yyr: StringM.tStringRef);
+   VAR yys: Strings.tString;
+   BEGIN
+      Strings.ReadL (yyf, yys);
+      IF Strings.Length (yys) = 0 THEN
+         yyr := StringM.NoString;
+      ELSE
+	 yyr := StringM.PutString (yys);
+      END;
+   END GetString;
+}
+
+END Tree2
+
+MODULE Common
+
+TREE IMPORT	{
+
+FROM SYSTEM	IMPORT ADDRESS;
+FROM IO		IMPORT tFile;
+FROM Strings	IMPORT tString;
+FROM StringM	IMPORT tStringRef;
+FROM Idents	IMPORT tIdent;
+FROM Texts	IMPORT tText;
+FROM Sets	IMPORT tSet;
+FROM Relation	IMPORT tRelation;
+FROM Position	IMPORT tPosition;
+
+VAR ErrorCount	: CARDINAL;
+
+CONST
+
+   (* properties of attributes and attribute instances		*)
+
+   Virtual	= 0;
+   Computed	= 1;
+   Reverse	= 2;	(* list attribute to be used for reversion *)
+   Write	= 3;	(* Usage:				*)
+   Read		= 4;	(*					*)
+   Inherited	= 5;	(* Kind:				*)
+   Synthesized	= 6;
+   Input	= 7;	(* Mode:				*)
+   Output	= 8;
+   Tree		= 9;	(* Store:				*)
+   Parameter	= 10;
+   Stack	= 11;
+   Variable	= 12;	(*	global variable			*)
+   Demand	= 13;
+   Funct	= 14;
+   String	= 15;	(* named by string, otherwise ident	*)
+   Ignore	= 16;
+   Thread	= 17;	(* specified thread			*)
+   Test		= 18;	(* generated for check			*)
+   Left		= 19;	(* lhs/rhs of rule (for instances)	*)
+   Right	= 20;	(*					*)
+   CopyDef	= 21;	(* defined by copy rule			*)
+   CopyUse	= 22;	(* used by copy rule			*)
+   NonBaseComp	= 23;	(* non inherited computation		*)
+   MultInhComp	= 24;	(* multiple inherited computation	*)
+   First	= 25;	(* first attribute of group		*)
+   Dummy	= 26;	(* dummy attribute for complete evaluation *)
+   Def		= 27;	(* marks definition of attribute	*)
+   Use		= 28;	(* marks last use of attribute		*)
+   ChildUse	= 29;	(* marks last use of rhs attribute	*)
+   ParentUse	= 30;	(* marks last use of lhs attribute	*)
+   Generated	= 31;	(* action part has been generated	*)
+
+   (* properties of classes					*)
+
+   Top		= 0;	(* declaration level:			*)
+   Intermediate	= 1;	(*					*)
+   Low		= 2;	(*	(has no extensions)		*)
+   Referenced	= 3;	(* explicitly used			*)
+   Reachable	= 4;	(* reachable maybe via extensions	*)
+   Nonterminal	= 5;
+   Terminal	= 6;
+   Explicit	= 7;	(* class explicitly declared		*)
+   Implicit	= 8;	(* class implicitly declared		*)
+   Trace	= 9;	(*					*)
+   HasSelector	= 10;	(* selector explicitly specified	*)
+   HasChildren	= 11;	(*					*)
+   HasAttributes= 12;	(*					*)
+   HasActions	= 13;	(*					*)
+   Mark		= 14;
+(* String	= 15;	   named by string, otherwise ident	*)
+(* Ignore	= 16;						*)
+   Abstract	= 17;
+   HasOutput	= 18;	(* has output attributes or tests	*)
+   HasReverse	= 19;	(* directly has a child with property REV *)
+}
+
+EXPORT	{
+
+TYPE
+   INTEGER0		= SHORTCARD;
+   tAttrProperties	= BITSET;
+   tClassProperties	= BITSET;
+   ProcOfT		= PROCEDURE (tTree);
+
+VAR
+   Options	: tSet;
+   f		: tFile;
+   fPosition	: tPosition;	(* file and current line of f *)
+   CurrentPos	: tPosition;	(* position after interpretation of #line in f *)
+   SourceFile	: ARRAY [0..255] OF CHAR;
+   NoCodeAttr	,
+   NoCodeClass	: BITSET;
+   Prefix	: tIdent;
+   EmptyBodies	: BOOLEAN;
+
+PROCEDURE InitIdentifyClass	(t: tTree);
+PROCEDURE InitIdentifyClass2	(t: tTree);
+PROCEDURE IdentifyClass		(t: tTree; Ident: tIdent): tTree;
+PROCEDURE IdentifyAttribute	(t: tTree; Ident: tIdent): tTree;
+PROCEDURE ForallClasses		(t: tTree; Proc: ProcOfT);
+PROCEDURE ForallAttributes	(t: tTree; Proc: ProcOfT);
+PROCEDURE Error		(ErrorCode: INTEGER; Pos: tPosition);
+PROCEDURE Warning	(ErrorCode: INTEGER; Pos: tPosition);
+PROCEDURE Information	(ErrorCode: INTEGER; Pos: tPosition);
+PROCEDURE ErrorI	(ErrorCode: INTEGER; Pos: tPosition; iClass: INTEGER; iPtr: ADDRESS);
+PROCEDURE WarningI	(ErrorCode: INTEGER; Pos: tPosition; iClass: INTEGER; iPtr: ADDRESS);
+PROCEDURE InformationI	(ErrorCode: INTEGER; Pos: tPosition; iClass: INTEGER; iPtr: ADDRESS);
+PROCEDURE WI		(i: tIdent);		(* write identifier  *)
+PROCEDURE WP		(i: tIdent);		(* write with prefix *)
+PROCEDURE WE		(i: tIdent);		(* write with escape *)
+PROCEDURE WN		(n: INTEGER);		(* write number      *)
+PROCEDURE IsDotted	(i: tIdent): BOOLEAN;
+PROCEDURE GetFileName	(i: tIdent; VAR fn: tString);
+PROCEDURE GetPackage	(i: tIdent; VAR pkg: tIdent; VAR class: tIdent);
+}
+
+GLOBAL	{
+
+FROM SYSTEM	IMPORT ADR, ADDRESS, TSIZE;
+FROM DynArray	IMPORT MakeArray;
+FROM IO		IMPORT tFile, StdOutput, ReadI, WriteS, WriteI, WriteC, WriteNl;
+FROM Strings	IMPORT tString, ArrayToString, Concatenate, Length, Char, SubString;
+FROM StringM	IMPORT tStringRef, WriteString;
+FROM Idents	IMPORT tIdent, NoIdent, GetString, WriteIdent, MakeIdent, MaxIdent;
+FROM Texts	IMPORT tText, MakeText;
+FROM Sets	IMPORT tSet, Include, IsElement, MakeSet;
+FROM Relation	IMPORT tRelation, IsRelated, MakeRelation;
+FROM Position	IMPORT tPosition;
+
+IMPORT Relation;
+
+# define beginINTEGER0(a)	a := 0;
+# define readINTEGER0(a)	a := IO.ReadI (yyf);
+# define writeINTEGER0(a)	IO.WriteI (yyf, a, 0);
+# define beginBOOLEAN(a)	a := FALSE;
+# define beginBITSET(a)		a := {};
+# define begintIdent(a)		a := NoIdent;
+
+VAR IdentToClassPtr	: POINTER TO ARRAY [0..1000000] OF tTree;
+VAR IdentToClassSize	: LONGINT;
+VAR sIdentToClassSize	: tIdent;
+
+PROCEDURE InitIdentifyClass (t: tTree);
+   VAR i: INTEGER;
+   BEGIN
+      IdentToClassSize := MaxIdent () + 1;
+      sIdentToClassSize := IdentToClassSize;
+      MakeArray (IdentToClassPtr, IdentToClassSize, TSIZE (tTree));
+      FOR i := 0 TO IdentToClassSize - 1 DO
+	 IdentToClassPtr^ [i] := NoTree;
+      END;
+      ForallClasses (t, InitIdentifyClass2);
+   END InitIdentifyClass;
+
+PROCEDURE InitIdentifyClass2 (t: tTree);
+   BEGIN
+      IdentToClassPtr^ [t^.Class.Name] := t;
+   END InitIdentifyClass2;
+
+PROCEDURE IdentifyClass (t: tTree; Ident: tIdent): tTree;
+   BEGIN
+      IF Ident < sIdentToClassSize THEN RETURN IdentToClassPtr^ [Ident]; END;
+      RETURN NoTree;
+   END IdentifyClass;
+
+PROCEDURE IdentifyAttribute (t: tTree; Ident: tIdent): tTree;
+   VAR attribute	: tTree;
+   BEGIN
+      LOOP
+	 CASE t^.Kind OF
+	 | Class:
+	       attribute := IdentifyAttribute (t^.Class.BaseClass, Ident);
+	       IF attribute # NoTree THEN RETURN attribute; END;
+	       t := t^.Class.Attributes;
+	 | Child:
+	       IF t^.Child.Name = Ident THEN RETURN t; END;
+	       t := t^.Child.Next;
+	 | Attribute:
+	       IF t^.Attribute.Name = Ident THEN RETURN t; END;
+	       t := t^.Attribute.Next;
+
+	 | ActionPart	: t := t^.ActionPart.Next;
+	 | UCActionPart	: t := t^.UCActionPart.Next;
+	 | TrialParse	: t := t^.TrialParse.Next;
+	 | CondParse	: t := t^.CondParse.Next;
+	 | PrecClause	: t := t^.PrecClause.Next;
+	 ELSE
+	       RETURN NoTree;
+	 END;
+      END;
+   END IdentifyAttribute;
+
+PROCEDURE ForallClasses (t: tTree; Proc: ProcOfT);
+   BEGIN
+      WHILE t^.Kind = Class DO
+	 Proc (t);
+	 ForallClasses (t^.Class.Extensions, Proc);
+	 t := t^.Class.Next;
+      END;
+   END ForallClasses;
+
+PROCEDURE ForallAttributes (t: tTree; Proc: ProcOfT);
+   BEGIN
+      LOOP
+	 CASE t^.Kind OF
+	 | Class:
+	       ForallAttributes (t^.Class.BaseClass, Proc);
+	       t := t^.Class.Attributes;
+
+	 | Child	: Proc (t); t := t^.Child.Next;
+	 | Attribute	: Proc (t); t := t^.Attribute.Next;
+	 | ActionPart	: Proc (t); t := t^.ActionPart.Next;
+	 | UCActionPart	: Proc (t); t := t^.UCActionPart.Next;
+	 | TrialParse	: Proc (t); t := t^.TrialParse.Next;
+	 | CondParse	: Proc (t); t := t^.CondParse.Next;
+	 | PrecClause	: Proc (t); t := t^.PrecClause.Next;
+	 ELSE
+	       RETURN;
+	 END;
+      END;
+   END ForallAttributes;
+
+PROCEDURE Error (ErrorCode: INTEGER; Pos: tPosition);
+   BEGIN
+      Errors.ErrorMessage (ErrorCode, Errors.Error, Pos);
+      INC (ErrorCount);
+   END Error;
+
+PROCEDURE Warning (ErrorCode: INTEGER; Pos: tPosition);
+   BEGIN
+      Errors.ErrorMessage (ErrorCode, Errors.Warning, Pos);
+   END Warning;
+
+PROCEDURE Information (ErrorCode: INTEGER; Pos: tPosition);
+   BEGIN
+      Errors.ErrorMessage (ErrorCode, Errors.Information, Pos);
+   END Information;
+
+PROCEDURE ErrorI (ErrorCode: INTEGER; Pos: tPosition; iClass: INTEGER; iPtr: ADDRESS);
+   BEGIN
+      Errors.ErrorMessageI (ErrorCode, Errors.Error, Pos, iClass, iPtr);
+      INC (ErrorCount);
+   END ErrorI;
+
+PROCEDURE WarningI (ErrorCode: INTEGER; Pos: tPosition; iClass: INTEGER; iPtr: ADDRESS);
+   BEGIN
+      Errors.ErrorMessageI (ErrorCode, Errors.Warning, Pos, iClass, iPtr);
+   END WarningI;
+
+PROCEDURE InformationI (ErrorCode: INTEGER; Pos: tPosition; iClass: INTEGER; iPtr: ADDRESS);
+   BEGIN
+      Errors.ErrorMessageI (ErrorCode, Errors.Information, Pos, iClass, iPtr);
+   END InformationI;
+
+PROCEDURE WI (i: tIdent); BEGIN WriteIdent (f, i); END WI;
+
+PROCEDURE WP (i: tIdent); BEGIN WriteIdent (f, Prefix); WriteIdent (f, i); END WP;
+
+PROCEDURE WE (i: tIdent);
+   VAR s: tString; Ch: CHAR; j: SHORTCARD;
+   BEGIN
+      GetString (i, s);
+      FOR j := 1 TO Length (s) DO
+         Ch := Char (s, j);
+         IF (Ch = '{') OR (Ch = '}') OR (Ch = '\') THEN WriteC (f, '\'); END;
+         WriteC (f, Ch);
+      END;
+   END WE;
+
+PROCEDURE WN (n: INTEGER); BEGIN WriteI (f, n, 0); END WN;
+
+PROCEDURE LastNameIndex (s: tString): CARDINAL;
+   (* return the index at which the last name of a dotted name begins *)
+   VAR Dot: CARDINAL;
+   BEGIN
+      Dot := Length (s);
+      WHILE (Dot > 1) AND (Char (s, Dot-1) # '.') DO DEC (Dot); END;
+      RETURN Dot;
+   END LastNameIndex;
+
+PROCEDURE IsDotted (i: tIdent): BOOLEAN;
+   VAR s: tString;
+   BEGIN
+      GetString (i, s);
+      RETURN LastNameIndex (s) # 1;
+   END IsDotted;
+
+PROCEDURE GetFileName (i: tIdent; VAR fn: tString);
+   VAR start: CARDINAL;
+       s: tString;
+   BEGIN
+      GetString (i, s);
+      start := LastNameIndex (s);
+      SubString (s, start, Length (s), fn);
+   END GetFileName;
+
+PROCEDURE GetPackage	(i: tIdent; VAR pkg: tIdent; VAR class: tIdent);
+   VAR start: CARDINAL;
+       s: tString;
+       p: tString;
+       c: tString;
+   BEGIN
+      GetString (i, s);
+      start := LastNameIndex (s);
+      IF start = 1 THEN
+         pkg := NoIdent;
+         class := i;
+      ELSE
+         SubString (s, start, Length (s), c);
+         SubString (s, 1, start-2, p);
+         pkg := MakeIdent (p);
+         class := MakeIdent (c);
+      END;
+   END GetPackage;
+}
+
+BEGIN	{
+   ErrorCount := 0;
+   MakeSet (Options, 127);
+   NoCodeAttr  := {Test, Dummy, Virtual, Parameter};
+   NoCodeClass := {Ignore, Abstract};
+   Prefix := NoIdent;
+}
+
+PROPERTY INPUT
+
+RULE
+
+Codes		= [Export: tText] [Import: tText] [Global: tText]
+		  [Local: tText] [Begin: tText] [Close: tText]
+		  [ExportLine: tPosition] [ImportLine: tPosition] [GlobalLine: tPosition]
+		  [LocalLine: tPosition] [BeginLine: tPosition] [CloseLine: tPosition] .
+Designators	= <
+   NoDesignator	= .
+   cDesignator	= Next: Designators REV <
+      Designator= [Selector: tIdent] [Attribute: tIdent] [Pos: tPosition] .
+      Ident	= [Attribute: tIdent] [Pos: tPosition] .
+      Remote	= Designators [Type: tIdent] [Attribute: tIdent] [Pos: tPosition] .
+      Any	= [Code: tStringRef] .
+      Anys	= Layouts .
+   >.
+>.
+Layouts		= <
+   NoLayout	= .
+   LayoutAny	= [Code: tStringRef]
+	          Next: Layouts REV .
+>.
+Names		= <
+   NoName	= .
+   Name		= [Name: tIdent] [Pos: tPosition]
+		  Next: Names REV .
+>.
+
+END Common
+
+MODULE Cg
+
+TREE IMPORT	{
+
+CONST			(* grammar classes	*)
+
+   cLNC		= 0;	(* locally non circular *)
+   cWAG		= 1;	(* well defined *)
+   cSNC		= 2;	(* ANC, ANCAG *)
+   cDNC		= 3;
+   cLordered	= 4;
+   cOAG		= 5;
+   cSweep	= 6;
+   cALT		= 7;	(* APAG *)
+   cLAG		= 8;
+   cRAG		= 9;
+   cSAG		= 10;
+
+TYPE
+   tBitInfo	= RECORD ToBit, ToAttr: SHORTCARD; END;
+   tBitIndex	= POINTER TO ARRAY [1 .. 1000000] OF tBitInfo;
+   tInstancePtr	= POINTER TO tInstances;
+   tSetOfRelPtr	= POINTER TO tSetOfRel;
+   tSetOfRel	= RECORD Relation: tRelation; Next: tSetOfRelPtr; END;
+   INTEGER9999	= SHORTCARD;
+
+VAR
+   ClassCount	: INTEGER;
+   GrammarClass	: BITSET;
+   MaxVisit	: SHORTCARD;
+   SubUnit	,
+   ViewName	,
+   iScan	,
+   iPosition	,
+   itPosition	,
+   itStringRef	,
+   itIdent	,
+   itSet	,
+   iInteger	,
+   iMain	,
+   iTreeNode	,
+   iPackage	,
+   iEvalPackage	,
+   iEvalClass	,
+   iModule	,
+   itTree	,
+   iBaseClass	,
+   iNoTree	: tIdent;
+   CgLib	,
+   ModuleName	: tString;
+   TypeNames	,
+   CppTypeNames	,
+   TreeTypeNames,
+   MaxSet	: tSet;
+}
+
+EXPORT	{
+TYPE
+   tInstance	= RECORD
+		     Selector	: tTree;
+		     Attribute	: tTree;
+		     Action	: tTree;
+		     Properties	: tAttrProperties;
+		     Order	: SHORTINT;
+		     CopyArg	: SHORTCARD;
+		  END;
+   tInstances	= ARRAY [1 .. 100000] OF tInstance;
+
+VAR
+   nNoAction	,
+   nNoAttribute	,
+   nNoClass	,
+   nNoDecl	,
+   nNoDesignator,
+   nNoLayout	,
+   nNoModule	,
+   nNoName	,
+   nNoPrec	,
+   nNoProp	: tTree;
+
+PROCEDURE BeginTree2;
+PROCEDURE IdentifyModule	(t: tTree; Ident: tIdent): tTree;
+PROCEDURE WriteName		(i: tInstance);
+PROCEDURE WriteInstance		(i: tInstance);
+PROCEDURE WriteDependencies	(t: tTree; r: tRelation; s: tSet);
+PROCEDURE WriteCyclics		(t: tTree; s: tSet);
+PROCEDURE WriteAttrProperties	(f: tFile; Properties: tAttrProperties);
+PROCEDURE WriteClassProperties	(f: tFile; Properties: tClassProperties);
+PROCEDURE WriteClass		(t: tTree);
+}
+
+GLOBAL	{
+
+VAR
+   DummySet	: tSet;
+   DummyRelation: tRelation;
+
+# define begintPosition(a)	a.Line := 0; a.Column := 0;
+# define readtPosition(a)	a.Line := ReadI (yyf); a.Column := ReadI (yyf);
+# define beginINTEGER9999(a)	a := 9999;
+# define readINTEGER9999(a)	a := IO.ReadI (yyf);
+# define writeINTEGER9999(a)	WriteI (yyf, a, 0);
+# define begintText(a)		MakeText (a);
+# define begintSet(a)		a := DummySet;
+# define begintRelation(a)	a := DummyRelation;
+(* IF NOT Test *)
+# define writetAttrProperties(a)	WriteAttrProperties(yyf, a);
+# define writetClassProperties(a)	WriteClassProperties(yyf, a);
+(* *)
+(* IF Test
+   # define readtText(a)		yyReadHex (a);
+   # define writetText(a)		yyWriteHex (a);
+   # define puttText(a)		yyPut (a);
+   # define gettText(a)		yyGet (a);
+   # define writetSet(a)		yyWriteHex (a);
+   # define readtSet(a)		yyReadHex (a);
+   # define puttSet(a)		yyPut (a);
+   # define gettSet(a)		yyGet (a);
+   # define readtRelation(a)	yyReadHex (a);
+   # define writetRelation(a)	yyWriteHex (a);
+   # define puttRelation(a)	yyPut (a);
+   # define gettRelation(a)	yyGet (a);
+*)
+
+PROCEDURE BeginTree2;
+   VAR Word	: tString;
+   BEGIN
+      WITH TreeRoot^.Ag DO
+	 IF ParserName = NoIdent THEN
+	    IF IsElement (ORD ('-'), Options) THEN
+	       ArrayToString ("parser"	, Word);
+	    ELSE
+	       ArrayToString ("Parser"	, Word);
+	    END;
+	    ParserName	:= MakeIdent (Word);
+	 END;
+	 IF TreeName = NoIdent THEN
+	    IF IsElement (ORD ('-'), Options) THEN
+	       ArrayToString ("tree"	, Word);
+	    ELSE
+	       ArrayToString ("Tree"	, Word);
+	    END;
+	    TreeName	:= MakeIdent (Word);
+	 END;
+	 IF EvalName = NoIdent THEN
+	    IF IsElement (ORD ('-'), Options) THEN
+	       ArrayToString ("eval"	, Word);
+	    ELSE
+	       ArrayToString ("Eval"	, Word);
+	    END;
+	    EvalName	:= MakeIdent (Word);
+	 END;
+	 GetPackage (TreeName, iPackage, iMain);
+	 IF ViewName = NoIdent THEN ViewName := iMain; END;
+	 GetString (iMain, ModuleName);
+	 GetPackage (EvalName, iEvalPackage, iEvalClass);
+         iTreeNode := iMain;
+      END;
+      ArrayToString ("t" , Word); Concatenate (Word, ModuleName); itTree  := MakeIdent (Word);
+      ArrayToString ("yy", Word); Concatenate (Word, ModuleName); iBaseClass := MakeIdent (Word);
+      ArrayToString ("No", Word); Concatenate (Word, ModuleName); iNoTree := MakeIdent (Word);
+      ArrayToString ("Scan"		, Word); iScan		:= MakeIdent (Word);
+      ArrayToString ("Position"		, Word); iPosition	:= MakeIdent (Word);
+      ArrayToString ("tPosition"	, Word); itPosition	:= MakeIdent (Word);
+      ArrayToString ("tStringRef"	, Word); itStringRef	:= MakeIdent (Word);
+      ArrayToString ("tIdent"		, Word); itIdent	:= MakeIdent (Word);
+      ArrayToString ("tSet"		, Word); itSet		:= MakeIdent (Word);
+
+      IF SubUnit = NoIdent THEN
+	 iModule := iMain;
+      ELSE
+	 iModule := SubUnit;
+      (* Include (Options, ORD ('<')); *)
+      END;
+   END BeginTree2;
+
+PROCEDURE IdentifyModule (t: tTree; Ident: tIdent): tTree;
+   BEGIN
+      IF t^.Kind = Module THEN
+	 IF t^.Module.Name = Ident THEN RETURN t; END;
+	 RETURN IdentifyModule (t^.Module.Next, Ident);
+      ELSE
+	 RETURN NoTree;
+      END;
+   END IdentifyModule;
+
+PROCEDURE WriteInstance (i: tInstance);
+   BEGIN
+      WITH i DO
+         WriteS  (StdOutput, " ");
+	 WriteName (i);
+	 WriteS  (StdOutput, "	");
+	 WriteI  (StdOutput, Attribute^.Child.Partition, 0);
+	 WriteS  (StdOutput, " ");
+	 WriteAttrProperties (StdOutput, Properties + Attribute^.Child.Properties);
+	 WriteNl (StdOutput);
+      END;
+   END WriteInstance;
+
+PROCEDURE WriteName (i: tInstance);
+   BEGIN
+      WITH i DO
+	 IF (Selector # NoTree) AND (Right IN Properties) THEN
+	    WriteIdent (StdOutput, Selector^.Child.Name);
+	    WriteS     (StdOutput, ":");
+	 END;
+
+	 IF Attribute # NoTree THEN
+	    WriteIdent (StdOutput, Attribute^.Child.Name);
+	 END;
+      END;
+   END WriteName;
+
+PROCEDURE WriteAttrProperties (f: tFile; Properties: tAttrProperties);
+   BEGIN
+      IF Virtual	IN Properties THEN WriteS (f, "Virtual "	); END;
+      IF Computed	IN Properties THEN WriteS (f, "Computed "	); END;
+      IF Reverse	IN Properties THEN WriteS (f, "Reverse "	); END;
+      IF Write		IN Properties THEN WriteS (f, "Write "	); END;
+      IF Read		IN Properties THEN WriteS (f, "Read "	); END;
+      IF Inherited	IN Properties THEN WriteS (f, "Inherited "	); END;
+      IF Synthesized	IN Properties THEN WriteS (f, "Synthesized "	); END;
+      IF Input		IN Properties THEN WriteS (f, "Input "	); END;
+      IF Output		IN Properties THEN WriteS (f, "Output "	); END;
+      IF Tree		IN Properties THEN WriteS (f, "Tree "	); END;
+      IF Parameter	IN Properties THEN WriteS (f, "Parameter "	); END;
+      IF Stack		IN Properties THEN WriteS (f, "Stack "	); END;
+      IF Variable	IN Properties THEN WriteS (f, "Variable "	); END;
+      IF Demand		IN Properties THEN WriteS (f, "Demand "	); END;
+      IF Funct		IN Properties THEN WriteS (f, "Function "	); END;
+      IF String		IN Properties THEN WriteS (f, "String "	); END;
+      IF Ignore		IN Properties THEN WriteS (f, "Ignore "	); END;
+      IF Thread		IN Properties THEN WriteS (f, "Thread "	); END;
+      IF Test		IN Properties THEN WriteS (f, "Test "	); END;
+      IF Left		IN Properties THEN WriteS (f, "Left "	); END;
+      IF Right		IN Properties THEN WriteS (f, "Right "	); END;
+      IF CopyDef	IN Properties THEN WriteS (f, "CopyDef "	); END;
+      IF CopyUse	IN Properties THEN WriteS (f, "CopyUse "	); END;
+      IF NonBaseComp	IN Properties THEN WriteS (f, "NonBaseComp "	); END;
+      IF MultInhComp	IN Properties THEN WriteS (f, "MultInhComp "	); END;
+      IF First		IN Properties THEN WriteS (f, "First "	); END;
+      IF Dummy		IN Properties THEN WriteS (f, "Dummy "	); END;
+      IF Def		IN Properties THEN WriteS (f, "Def "	); END;
+      IF Use		IN Properties THEN WriteS (f, "Use "	); END;
+      IF ChildUse	IN Properties THEN WriteS (f, "ChildUse "	); END;
+      IF ParentUse	IN Properties THEN WriteS (f, "ParentUse "	); END;
+      IF Generated	IN Properties THEN WriteS (f, "Generated "	); END;
+   END WriteAttrProperties;
+
+PROCEDURE WriteClassProperties (f: tFile; Properties: tClassProperties);
+   BEGIN
+      IF Top		IN Properties THEN WriteS (f, "Top "	); END;
+      IF Intermediate	IN Properties THEN WriteS (f, "Intermediate "	); END;
+      IF Low		IN Properties THEN WriteS (f, "Low "	); END;
+      IF Referenced	IN Properties THEN WriteS (f, "Referenced "	); END;
+      IF Reachable	IN Properties THEN WriteS (f, "Reachable "	); END;
+      IF Nonterminal	IN Properties THEN WriteS (f, "Nonterminal "	); END;
+      IF Terminal	IN Properties THEN WriteS (f, "Terminal "	); END;
+      IF Explicit	IN Properties THEN WriteS (f, "Explicit "	); END;
+      IF Implicit	IN Properties THEN WriteS (f, "Implicit "	); END;
+      IF Trace		IN Properties THEN WriteS (f, "Trace "	); END;
+      IF HasSelector	IN Properties THEN WriteS (f, "HasSelector "	); END;
+      IF HasChildren	IN Properties THEN WriteS (f, "HasChildren "	); END;
+      IF HasAttributes	IN Properties THEN WriteS (f, "HasAttributes "	); END;
+      IF HasActions	IN Properties THEN WriteS (f, "HasActions "	); END;
+      IF Mark		IN Properties THEN WriteS (f, "Mark "	); END;
+      IF String		IN Properties THEN WriteS (f, "String "	); END;
+      IF Ignore		IN Properties THEN WriteS (f, "Ignore "	); END;
+      IF Abstract	IN Properties THEN WriteS (f, "Abstract "	); END;
+      IF HasOutput	IN Properties THEN WriteS (f, "HasOutput "	); END;
+   END WriteClassProperties;
+
+PROCEDURE WriteDependencies (t: tTree; r: tRelation; s: tSet);
+   VAR i, j, k, count	: SHORTCARD;
+   BEGIN
+      IF (t = NoTree) OR (r.Size1 # t^.Class.InstCount) THEN RETURN; END;
+      WriteIdent (StdOutput, t^.Class.Name);
+      WriteS (StdOutput, "	");
+      WriteClassProperties (StdOutput, t^.Class.Properties);
+      WriteNl (StdOutput);
+      WriteNl (StdOutput);
+      FOR i := 1 TO t^.Class.InstCount DO
+         IF IsElement (i, s) AND NOT (Dummy IN t^.Class.Instance^ [i].Properties) THEN
+            WriteName (t^.Class.Instance^ [i]);
+            WriteS    (StdOutput, "	:");
+	    count := 0;
+	    k := 0;
+            FOR j := 1 TO t^.Class.InstCount DO
+	       IF IsElement (j, s) AND IsRelated (i, j, r) THEN
+		  IF count = 5 THEN
+		     WriteNl (StdOutput);
+		     WriteS  (StdOutput, "	");
+		     count := 0;
+		  END;
+		  WriteS    (StdOutput, " ");
+		  WriteName (t^.Class.Instance^ [j]);
+		  INC (count);
+		  INC (k);
+	       END;
+            END;
+	    WriteS (StdOutput, " (");
+	    WriteI (StdOutput, k, 0);
+	    WriteS (StdOutput, ")");
+            WriteNl (StdOutput);
+         END;
+      END;
+      WriteNl (StdOutput);
+   END WriteDependencies;
+
+PROCEDURE WriteCyclics		(t: tTree; s: tSet);
+   VAR i, count	: SHORTCARD;
+   BEGIN
+      count := 0;
+      FOR i := 1 TO t^.Class.InstCount DO
+	 IF IsElement (i, s) THEN
+	    IF count = 5 THEN
+	       WriteNl (StdOutput);
+	       count := 0;
+	    END;
+	    WriteName (t^.Class.Instance^ [i]);
+	    WriteS    (StdOutput, " ");
+	    INC (count);
+         END;
+      END;
+      WriteC (StdOutput, '(');
+      WriteI (StdOutput, count, 0);
+      WriteC (StdOutput, ')');
+      WriteNl (StdOutput);
+   END WriteCyclics;
+
+PROCEDURE WriteClass (t: tTree);
+   VAR i	: SHORTCARD;
+   BEGIN
+      CASE t^.Kind OF
+      | Class	: WITH t^.Class DO
+	    WriteIdent	(StdOutput, Name);
+	    WriteS	(StdOutput, " =");
+	    WriteNl	(StdOutput);
+	    ForallAttributes (t, WriteClass);
+	    WriteNl	(StdOutput);
+	    FOR i := 1 TO InstCount DO
+	       WITH Instance^ [i] DO
+		  IF Action # tTree (ADR (Action)) THEN
+		     IF Test IN Properties THEN
+			WriteName (Instance^ [i]);
+			WriteS	(StdOutput, ":");
+		     END;
+		     WriteS	(StdOutput, "	{");
+		     WriteClass	(Action);
+		     WriteS	(StdOutput, "}");
+		     WriteNl	(StdOutput);
+		  END;
+	       END;
+	    END;
+	    WriteS	(StdOutput, ".");
+	    WriteNl	(StdOutput);
+	 END;
+      | Child	: WITH t^.Child DO
+	    WriteS	(StdOutput, "	");
+	    WriteIdent	(StdOutput, Name);
+	    WriteS	(StdOutput, ": ");
+	    WriteIdent	(StdOutput, Type);
+	    WriteNl	(StdOutput);
+	 END;
+      | Attribute	: WITH t^.Attribute DO
+	    WriteS	(StdOutput, "	[");
+	    WriteIdent	(StdOutput, Name);
+	    WriteS	(StdOutput, ": ");
+	    WriteIdent	(StdOutput, Type);
+	    WriteS	(StdOutput, "]");
+	    WriteNl	(StdOutput);
+	 END;
+      | Assign	: WITH t^.Assign DO
+	    WriteClass	(Results);
+	    WriteS	(StdOutput, ":=");
+	    WriteClass	(Arguments);
+	    WriteS	(StdOutput, ";");
+	 END;
+      | Copy	: WITH t^.Copy DO
+	    WriteClass	(Results);
+	    WriteS	(StdOutput, " := ");
+	    WriteClass	(Arguments);
+	    WriteS	(StdOutput, ";");
+	 END;
+      | TargetCode	: WITH t^.TargetCode DO
+	    IF Results^.Kind # NoDesignator THEN
+	       WriteClass (Results);
+	       WriteS	  (StdOutput, ":= {");
+	       WriteClass (Code);
+	       WriteS	  (StdOutput, "};");
+	    END;
+	 END;
+      | Order	: WITH t^.Order DO
+	    WriteClass	(Results);
+	    WriteS	(StdOutput, " AFTER ");
+	    WriteClass	(Arguments);
+	    WriteS	(StdOutput, ";");
+	 END;
+      | Check	: WITH t^.Check DO
+	    IF Condition # NoTree THEN
+	       WriteS	  (StdOutput, "CHECK ");
+	       WriteClass (Condition);
+	    END;
+	    IF Statement # NoTree THEN
+	       WriteS	  (StdOutput, " => { ");
+	       WriteClass (Statement);
+	       WriteS	  (StdOutput, "}");
+	    END;
+	    WriteClass	(Actions);
+	    WriteS	(StdOutput, ";");
+	 END;
+      | Designator	: WITH t^.Designator DO
+	    WriteIdent	(StdOutput, Selector);
+	    WriteS	(StdOutput, ":");
+	    WriteIdent	(StdOutput, Attribute);
+	    WriteClass	(Next);
+	 END;
+      | Ident	: WITH t^.Ident DO
+	    WriteIdent	(StdOutput, Attribute);
+	    WriteClass	(Next);
+	 END;
+      | Remote	: WITH t^.Remote DO
+	    WriteS	(StdOutput, "REMOTE ");
+	    WriteClass	(Designators);
+	    WriteS	(StdOutput, "=>");
+	    WriteIdent	(StdOutput, Type);
+	    WriteS	(StdOutput, ":");
+	    WriteIdent	(StdOutput, Attribute);
+	    WriteClass	(Next);
+	 END;
+      | Any	: WITH t^.Any DO
+	    WriteString	(StdOutput, Code);
+	    WriteClass	(Next);
+	 END;
+      | Anys	: WITH t^.Anys DO
+	    WriteClass	(Layouts);
+	    WriteClass	(Next);
+	 END;
+      | LayoutAny	: WITH t^.LayoutAny DO
+	    WriteString	(StdOutput, Code);
+	    WriteClass	(Next);
+	 END;
+      ELSE
+      END;
+   END WriteClass;
+}
+
+BEGIN	{
+   MakeSet	(DummySet, 0);
+   MakeRelation	(DummyRelation, 0, 0);
+
+   nNoAction	:= mNoAction	();
+   nNoAttribute	:= mNoAttribute	();
+   nNoClass	:= mNoClass	();
+   nNoDecl	:= mNoDecl	();
+   nNoDesignator:= mNoDesignator();
+   nNoLayout	:= mNoLayout	();
+   nNoModule	:= mNoModule	();
+   nNoName	:= mNoName	();
+   nNoPrec	:= mNoPrec	();
+   nNoProp	:= mNoProp	();
+}
+
+PROPERTY INPUT
+
+RULE
+
+Ag		= [Name: tIdent]
+		  [ScannerName	: tIdent]
+		  [ParserName	: tIdent] ParserCodes: Codes
+		  [TreeName	: tIdent] TreeCodes  : Codes
+		  [EvalName	: tIdent] EvalCodes  : Codes
+		  Precs Starts: Names Props Decls Classes Modules .
+Precs		= <
+   NoPrec	= .
+   Prec		= Names Next: Precs REV <
+      LeftAssoc	= .
+      RightAssoc= .
+      NonAssoc	= .
+   >.
+>.
+Class		= [Pos: tPosition] [Selector: tIdent] [Repr: tIdent]
+		  [Code: SHORTCARD] [Cost: SHORTCARD] Names .
+Child		= [Pos: tPosition] .
+Attribute	= [Pos: tPosition] .
+ActionPart	= [Pos: tPosition] Actions .
+UCActionPart	= [Pos: tPosition] Actions .
+TrialParse	= [Ident: tIdent] [Pos: tPosition] [Not: BOOLEAN] .
+CondParse	= Actions: Designators [Pos: tPosition] [Not: BOOLEAN] .
+PrecClause	= [Prec: tIdent] [Pos: tPosition] .
+
+Actions		= <
+   NoAction	= .
+   Action	= Next: Actions REV [Pos: tPosition] [BPos: tPosition] <
+      Assign	= Results: Designators Arguments: Designators .
+      Copy	= Results: Designators Arguments: Designators .
+      TargetCode= Results: Designators Code: Designators .
+      Order	= Results: Designators Arguments: Designators .
+      Check	= Condition: Designators Statement: Designators Actions .
+   >.
+>.
+Modules		= <
+   NoModule	= .
+   Module	= [Name: tIdent]
+		  [ScannerName	: tIdent]
+		  [ParserName	: tIdent] ParserCodes: Codes
+		  [TreeName	: tIdent] TreeCodes  : Codes
+		  [EvalName	: tIdent] EvalCodes  : Codes
+		  Props Decls Classes Next: Modules REV .
+>.
+Props		= <
+   NoProp	= .
+   Prop		= [Properties: BITSET] Names Next: Props REV .
+   Select	= Names Next: Props REV .
+>.
+Decls		= <
+   NoDecl	= .
+   Decl		= Names Attributes [Properties: tClassProperties]
+		  Next: Decls REV .
+>.
+
+END Cg
+
+MODULE Ag
+
+TREE EXPORT	{
+PROCEDURE HasItem (t: tTree; Item: SHORTCARD): BOOLEAN;
+}
+
+GLOBAL	{
+PROCEDURE HasItem (t: tTree; Item: SHORTCARD): BOOLEAN;
+   BEGIN
+      CASE t^.Kind OF
+      | Class:
+	 RETURN HasItem (t^.Class.BaseClass, Item) OR HasItem (t^.Class.Attributes, Item);
+      | NoClass, NoAttribute:
+	 RETURN FALSE;
+      ELSE
+	 RETURN (t^.AttrOrAction.Item = Item) OR HasItem (t^.AttrOrAction.Next, Item);
+      END;
+   END HasItem;
+
+}
+
+RULE
+
+Ag		= [Properties: BITSET] .
+
+Class		= [AttrCount: SHORTCARD] [InstCount: SHORTCARD] [Instance: tInstancePtr]
+		  [DP: tRelation] [SNC: tRelation] [DNC: tRelation] [OAG: tRelation]
+		  [Part: tRelation] [Index: SHORTCARD] [Visits: SHORTCARD] [Users: tSet]
+		  [Generated: INTEGER0] [BitCount: SHORTCARD] [BitIndex: tBitIndex]
+		  [D: tSetOfRelPtr] .
+Child		= [AttrIndex: SHORTCARD] [Partition: INTEGER9999] [Usage: BITSET]
+		  [InstOffset: SHORTCARD] [ParsIndex: SHORTCARD] [BitOffset: SHORTCARD] .
+Attribute	= [AttrIndex: SHORTCARD] [Partition: INTEGER9999] [Usage: BITSET] .
+ActionPart	= [Name: SHORTCARD] [ParsIndex: SHORTCARD] [Properties: BITSET] .
+UCActionPart	= [Name: SHORTCARD] [ParsIndex: SHORTCARD] [Properties: BITSET] .
+TrialParse	= [ParsIndex: SHORTCARD] [Properties: BITSET] .
+CondParse	= [ParsIndex: SHORTCARD] [Properties: BITSET] .
+PrecClause	= [ParsIndex: SHORTCARD] [Properties: BITSET] .
+
+AttrOrAction	= [Item: SHORTCARD] .
+
+Check		= Results: Designators .
+
+Module		= [Properties: BITSET] .
+
+END Ag

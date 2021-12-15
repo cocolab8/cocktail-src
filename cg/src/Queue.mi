@@ -1,0 +1,67 @@
+(* Ich, Doktor Josef Grosch, Informatiker, 11.8.1989 *)
+
+IMPLEMENTATION MODULE Queue;
+
+FROM SYSTEM	IMPORT TSIZE;
+FROM DynArray	IMPORT MakeArray, ReleaseArray;
+FROM Sets	IMPORT tSet, MakeSet, ReleaseSet, Include, Exclude;
+
+IMPORT Sets;
+
+VAR
+   QueueSizeL	: LONGINT;
+   QueuePtr	: POINTER TO ARRAY [0 .. 10000] OF SHORTCARD;
+   QueueSize	,
+   QueueCount	,
+   QueueIn	,
+   QueueOut	: SHORTCARD;
+   QueueSet	: tSet;
+
+PROCEDURE MakeQueue (Size: SHORTCARD);
+   BEGIN
+      QueueSizeL	:= Size;
+      MakeArray (QueuePtr, QueueSizeL, TSIZE (SHORTCARD));
+      QueueSize		:= Size;
+      QueueCount	:= 0;
+      QueueIn		:= 0;
+      QueueOut		:= 0;
+      MakeSet   (QueueSet, QueueSize);
+   END MakeQueue;
+
+PROCEDURE ReleaseQueue;
+   BEGIN
+      ReleaseArray (QueuePtr, QueueSizeL, TSIZE (SHORTCARD));
+      ReleaseSet   (QueueSet);
+   END ReleaseQueue;
+
+PROCEDURE IsEmpty (): BOOLEAN;
+   BEGIN
+      RETURN QueueCount = 0;
+   END IsEmpty;
+
+PROCEDURE Enqueue (Elmt: SHORTCARD);
+   BEGIN
+      IF NOT Sets.IsElement (Elmt, QueueSet) THEN
+	 QueuePtr^[QueueIn] := Elmt;
+	 QueueIn := (QueueIn + 1) MOD QueueSize;
+	 INC (QueueCount);
+	 Include (QueueSet, Elmt);
+      END;
+   END Enqueue;
+
+PROCEDURE Dequeue (): SHORTCARD;
+   VAR Result	: SHORTCARD;
+   BEGIN
+      Result := QueuePtr^ [QueueOut];
+      QueueOut := (QueueOut + 1) MOD QueueSize;
+      DEC (QueueCount);
+      Exclude (QueueSet, Result);
+      RETURN Result;
+   END Dequeue;
+
+PROCEDURE IsElement (Elmt: SHORTCARD): BOOLEAN;
+   BEGIN
+      RETURN Sets.IsElement (Elmt, QueueSet);
+   END IsElement;
+
+END Queue.

@@ -1,0 +1,211 @@
+(*
+ *	ell2 - a redesign of ell
+ *
+ *	$RCSfile: ArgCheck.MI,v $
+ *	
+ *	purpose:	check arguments
+ *
+ *	$Author: grosch $
+ *	$Date: 2008/09/25 14:46:18 $
+ *)
+
+IMPLEMENTATION MODULE ArgCheck;
+
+FROM Errors	IMPORT	Error, Warning, Repair, Note, Information,
+			Array, String, Character, MessageI, GetCount,
+			CloseErrors;
+FROM Position	IMPORT	NoPosition;
+FROM IO		IMPORT	tFile, ReadOpen, ReadClose, CloseIO;
+FROM Scanner	IMPORT	BeginFile, Attribute;
+FROM StdIO	IMPORT	WriteS, WriteNl;
+FROM Strings	IMPORT	tString, ArrayToString, AssignEmpty, Append, Length,
+			Concatenate;
+FROM Idents	IMPORT	MakeIdent;
+FROM rSystem	IMPORT	GetArgCount, GetArgument, rExit, DirectorySeparator,
+			tArrayChar, GetEnvVar;
+FROM SYSTEM	IMPORT	ADR;
+
+.. %	WriteS ("%");
+.. $	WriteNl;
+.. s	WriteS (%);
+.. (	(* ARG_ )*
+.. )	*( _ARG *)
+
+PROCEDURE CheckArgs;
+  VAR
+    ArgNo, i	: CARDINAL;
+    Argument	: ARRAY [0..255] OF CHAR;
+    String	: tString;
+    SourceFile	: tFile;
+    Default, Help, SourceFileIsOpen: BOOLEAN;
+    pos		: INTEGER;
+    ch		: CHAR;
+    EnvVarPtr	: tArrayChar;
+.(
+    TestHelp	: BOOLEAN;
+.)
+
+  BEGIN
+    Help := FALSE;
+    Default := TRUE;
+.(
+    TestHelp := FALSE;
+.)
+    SourceFileIsOpen := FALSE;
+    FOR ArgNo := 1 TO GetArgCount () - 1 DO
+      GetArgument (ArgNo, Argument);
+      IF Argument [0] = '-' THEN
+	Default := FALSE;
+	pos := 1;
+	REPEAT
+	  ch := Argument [pos];
+	  CASE (ch) OF
+	  | 'c': LANGUAGE := C;
+	  | 'd': DEF := TRUE;
+	  | 'g': LINE := TRUE;
+	  | 'i': IMP := TRUE;
+	  | 'j': ImplicitDecl := TRUE;
+
+	  | 'f': TokenConstants := TRUE;
+		 IF Argument [pos + 1] # 0C THEN
+		   i := 0;
+		   REPEAT
+		     INC (pos);
+		     ch := Argument [pos];
+		     TokenPrefix [i] := ch;
+		     INC (i);
+		   UNTIL ch = 0C;
+		 END;
+
+	  | 'l': AssignEmpty (EllLib);
+		 INC (pos);
+		 LOOP
+		   ch := Argument [pos]; INC (pos);
+		   IF ORD (ch) <= ORD (' ') THEN EXIT; END;
+		   Append (EllLib, ch);
+		 END;
+		 Append (EllLib, DirectorySeparator ());
+
+	  | 'h': Help := TRUE;
+	  | 'm': LANGUAGE := MODULA2;
+	  | 'p': PAR := TRUE;
+.(
+	  | '?': TestHelp := TRUE; Help := TRUE;
+	  | 'A': TREE := TRUE;
+	  | 'C': CODES := TRUE;
+	  | 'T': TABLE := TRUE;
+	  | 'Q': QUERY := TRUE;
+.)
+	  | 0C : 
+	  ELSE
+	    MessageI ("unknown option", Error, NoPosition, Character,
+	      ADR (Argument [pos]));
+	  END;
+	  INC (pos);
+	UNTIL ch = 0C;
+      ELSE
+	IF SourceFileIsOpen THEN
+	  MessageI ("too many arguments", Error, NoPosition, Array,
+	    ADR (Argument));
+	ELSE
+	  SourceFile := ReadOpen (Argument);
+	  IF SourceFile < 0 THEN
+	    MessageI ("cannot open file", Error, NoPosition, Array,
+	      ADR (Argument));
+	  ELSE
+	    ReadClose (SourceFile);
+	    BeginFile (Argument);
+	    ArrayToString (Argument, String);
+	    Attribute.Position.File := MakeIdent (String);
+	    GetArgument (ArgNo, SourceFileName);
+	    SourceFileIsOpen := TRUE;
+          END;
+	END;
+      END;
+    END;
+
+    IF Length (EllLib) = 0 THEN
+      EnvVarPtr := GetEnvVar ("CT_DIR");
+      IF EnvVarPtr # NIL THEN
+	i := 0;
+	LOOP
+	  Argument [i] := EnvVarPtr^ [i];
+	  IF (Argument [i] = 0C) OR (i = 255) THEN EXIT; END;
+	  INC (i);
+	END;
+	ArrayToString	(Argument, EllLib);
+	Append		(EllLib, DirectorySeparator ());
+	ArrayToString	("lib", String);
+	Concatenate	(EllLib, String);
+	Append		(EllLib, DirectorySeparator ());
+	ArrayToString	("ell", String);
+	Concatenate	(EllLib, String);
+	Append		(EllLib, DirectorySeparator ());
+      END;
+    END;
+
+    IF Default THEN
+      DEF := TRUE;
+      IMP := TRUE;
+    END;
+    IF Help THEN
+.
+.     usage: ell [-options] [file]
+.     
+.    \ c  generate C code
+.    \ m  generate Modula-2 code (default)
+.    \ d  generate header file or definition module
+.    \ i  generate implementation part or module
+.    \ p  generate main program to be used as test driver
+.    \ g  generate # line directives
+.    \ j  treat undeclared symbols as terminal symbols
+.    \ f[<prefix>] generate constant declarations for tokens in header file
+.    \      using prefix (default: t_)
+.    \ h  print help information
+.    \ l<dir> specify the directory dir where ell finds its data files
+(*
+.    \ W  suppress warnings
+.    \ R  suppress repair messages
+.    \ N  suppress notes
+.    \ I  suppress informations
+.    \ M  mixed error listing
+.    \ D  report errors directly
+*)
+.(
+      IF TestHelp THEN
+.
+.    \ A  print abstract syntax tree
+.    \ C  print codes
+.    \ Q  query abstract syntax tree
+.    \ T  print table
+      END;
+.)
+      CloseIO;
+      rExit (0);
+    END;
+    IF GetCount (Error) > 0 THEN
+      CloseErrors;
+      CloseIO;
+      rExit (1);
+    END;
+  END CheckArgs;
+
+BEGIN
+  DEF := FALSE;
+  PAR := FALSE;
+  IMP := FALSE;
+  LINE := FALSE;
+  ImplicitDecl := FALSE;
+  TokenConstants := FALSE;
+  TokenPrefix [0] := 't';
+  TokenPrefix [1] := '_';
+  TokenPrefix [2] := 0C;
+.(
+  TREE  := FALSE;
+  CODES := FALSE;
+  TABLE := FALSE;
+  QUERY := FALSE;
+.)
+  LANGUAGE := MODULA2;
+  AssignEmpty (EllLib);
+END ArgCheck.

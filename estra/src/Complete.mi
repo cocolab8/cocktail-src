@@ -1,0 +1,159 @@
+(* $Id: Complete.mi,v 2.3 1998/05/27 15:23:55 grosch rel $ *)
+
+IMPLEMENTATION MODULE Complete;
+
+FROM	Errors		IMPORT	ErrorMessageI, eError, eWarning;
+FROM	Position	IMPORT	tPosition;
+FROM	Environs	IMPORT	tFunction, GetPatterns, GetCondPatterns;
+FROM	Idents		IMPORT	tIdent;
+FROM	Patterns	IMPORT	tPattern, tRelation, ePattern,
+				MakePattern, NormPattern, Relation,
+				ResetExtendPos, ExtendPos, Extend,
+				ReleasePattern;
+FROM	Queues		IMPORT	tQueue, MakeQueue, ReleaseQueue,
+				Append, Assign, IsEmpty,
+				TakeHead, AssignEmpty, Length,
+				GetElement;
+FROM	SYSTEM		IMPORT	ADR;
+
+(* COMPL_   
+FROM	Idents		IMPORT	WriteIdent;
+FROM	IO		IMPORT	StdOutput;
+FROM	StdIO		IMPORT	WriteS, WriteNl;
+FROM	Patterns	IMPORT	WritePattern;
+   _COMPL *)
+
+CONST
+  eNoPattern	= 61;
+  eNoPatAtAll	= 62;
+
+PROCEDURE FunctionComplete (function: tFunction; ident: tIdent; pos: tPosition);
+  VAR
+    syn: tQueue;	(* synthesized patterns *)
+    rest: tQueue;	(* synthesized patterns *)
+    match: tQueue;
+
+    real: tQueue;	(* real patterns *)
+
+    pat: tPattern;
+    i: INTEGER;
+
+  BEGIN
+    (* COMPL_   
+WriteS ('FunctionComplete: '); WriteIdent (StdOutput, ident); WriteNl;
+       _COMPL *)
+    MakeQueue (rest);
+    MakeQueue (match);
+
+    MakeQueue (syn);
+    Append (syn, NormPattern (MakePattern (ident)));
+
+    MakeQueue (real);
+    GetPatterns (function, real);
+
+    (* COMPL_   
+    WriteS ('first pass'); WriteNl;
+       _COMPL *)
+    Filter (real, syn, rest, match);
+
+    WHILE NOT IsEmpty (match) DO
+      pat := TakeHead (match);
+      ReleasePattern (pat);
+    END;
+
+    GetCondPatterns (function, real);
+
+    (* COMPL_   
+    WriteS ('second pass'); WriteNl;
+       _COMPL *)
+    Filter (real, syn, rest, match);
+
+    WHILE NOT IsEmpty (match) DO
+      pat := TakeHead (match);
+      ErrorMessageI (eNoPattern, eWarning, pos, ePattern, ADR (pat));
+      ReleasePattern (pat);
+    END;
+
+    WHILE NOT IsEmpty (rest) DO
+      pat := TakeHead (rest);
+      ErrorMessageI (eNoPatAtAll, eError, pos, ePattern, ADR (pat));
+      ReleasePattern (pat);
+    END;
+
+    ReleaseQueue (rest);
+    ReleaseQueue (syn);
+    ReleaseQueue (real);
+
+  END FunctionComplete;
+
+
+  PROCEDURE Filter (VAR real, syn, rest, match: tQueue);
+  
+  VAR
+    pos: tPattern;
+    synpat: tPattern;
+    realpat: tPattern;
+    relation: tRelation;
+
+    (* COMPL_   
+    i: INTEGER;
+       _COMPL *)
+
+  BEGIN
+    WHILE NOT IsEmpty (real) & NOT IsEmpty (syn) DO
+      realpat := TakeHead (real);
+      AssignEmpty (rest);
+      WHILE NOT IsEmpty (syn) DO
+	(* COMPL_   
+	WriteNl;
+	WriteS ('syn:  '); WriteNl;
+	FOR i := Length (syn) TO 1 BY -1 DO
+	  WritePattern (StdOutput, GetElement (syn, i)); WriteNl;
+	END;
+	WriteS ('real: '); WriteNl; WritePattern (StdOutput, realpat); WriteNl;
+	   _COMPL *)
+	synpat := TakeHead (syn);
+	ResetExtendPos;
+	relation := Relation (synpat, realpat);
+
+	(* COMPL_   
+	CASE relation OF
+	| cEqual:	WriteS ('equal        - match ');
+	| cSubsumes:	WriteS ('subsumes     - match');
+	| cIndependent:	WriteS ('independent  - overlap');
+			IF ExtendPos () = NIL THEN
+			  WriteS ('  but no extention');
+			END;
+	| cSupersumes:	WriteS ('supersumes   - overlap');
+        | cInconsistent:WriteS ('inconsistent - no match');
+	END;
+	WriteNl;
+	   _COMPL *)
+
+	CASE relation OF
+	| cEqual, cSubsumes:
+				(* synthesized pattern is matched *)
+	    Append (match, synpat);
+
+	| cIndependent, cSupersumes:
+				(* synthesized pattern must be extended *)
+	    pos := ExtendPos ();
+	    IF pos # NIL THEN
+	      Extend (synpat, pos, syn);
+	    END;
+	    ReleasePattern (synpat);
+
+	| cInconsistent:
+				(* synthesized pattern is remaining preliminary *)
+	    Append (rest, synpat);
+
+	END;
+      END;
+      Assign (syn, rest);
+    END;
+    Assign (rest, syn);
+  END Filter;
+
+BEGIN
+  IsComplete := TRUE;
+END Complete.

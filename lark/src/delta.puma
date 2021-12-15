@@ -1,0 +1,617 @@
+/* $Id: delta.puma,v 1.3 2008/09/13 15:41:00 grosch Exp $ */
+
+/*
+ * $Log: delta.puma,v $
+ * Revision 1.3  2008/09/13 15:41:00  grosch
+ * fixed notation for comment leader
+ *
+ * Revision 1.2  1999/11/16 16:01:47  grosch
+ * fixed bug in Print2
+ *
+ * Revision 1.1  1998/04/21 13:02:49  grosch
+ * truncation of file and module names to 8.3 format
+ *
+ * Revision 1.0  1995/11/07  09:33:18  grosch
+ * Initial revision
+ *
+ */
+
+/* Ich, Doktor Josef Grosch, Informatiker, Aug. 1995 */
+
+TRAFO Delta PUBLIC WriteDelta
+
+EXPORT {
+FROM IO		IMPORT tFile;
+FROM Sets	IMPORT tSet;
+
+VAR ConflictFile, DeltaFile	: tFile;
+
+PROCEDURE ReadDelta;
+PROCEDURE IsNewConflict (State: CARDINAL; ConflictDesc: BITSET; ConflictSet: tSet): BOOLEAN;
+PROCEDURE MissingConflicts;
+PROCEDURE WriteConflict (State: CARDINAL; ConflictDesc: BITSET; ConflictSet: tSet);
+}
+
+GLOBAL {
+
+FROM SYSTEM	IMPORT TSIZE;
+FROM IO		IMPORT WriteN, WriteS, WriteI, WriteC, WriteNl,
+			ReadC, ReadI, ReadN, ReadNl, EndOfFile;
+FROM DynArray	IMPORT MakeArray, ExtendArray;
+FROM Strings	IMPORT tString, ReadL;
+FROM Idents	IMPORT WriteIdent, tIdent, MakeIdent;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, IsElement	,
+   Include	, Complement	, Card		, Minimum	,
+   Maximum	, Exclude	, Intersection	, WriteSet	,
+   ReadSet	, Assign	, IsEmpty	;
+
+FROM Tree	IMPORT
+   tTree	, NoTree	, TreeRoot	, Identify	,
+   Reachable	, Epsilon	, ForallTree	, Options	,
+   LastNonterm	, ToSymbolPtr	, ToRulePtr	, ReUsed	;
+
+FROM Semantic	IMPORT
+   TermCount	, NontermCount	, RuleCount	, WriteSymSet	;
+
+FROM LR1	IMPORT
+   GetLookahead	, ItemPtr	, KernelItemPtr	, StatePtr	,
+   AllocLookahead;
+
+TYPE
+   tSymbol		= RECORD
+			     Name	: tIdent;
+			     Index	: SHORTINT;
+			  END;
+
+   tRHS			= POINTER TO ARRAY [0..10000] OF SHORTCARD;
+
+   tRule		= RECORD
+			     Index	: SHORTCARD;
+			     Length	: SHORTCARD;
+			     LHS	: SHORTCARD;
+			     ElmtsPtr	: tRHS;
+			  END;
+
+   tItem		= RECORD
+			     Rule	: SHORTCARD;
+			     Dot	: SHORTCARD;
+			     Lookahead	: POINTER TO tSet;
+			  END;
+
+   tState		= RECORD
+			     ConflictSet: tSet;
+			     Intern	: SHORTCARD;
+			     Extern	: SHORTCARD;
+			     Size	: SHORTCARD;
+			     ReUsed	: BOOLEAN;
+			     ConflictDesc: BITSET;
+			     OldItemPtr	: POINTER TO ARRAY [0..10000] OF tItem;
+			  END;
+
+VAR
+   AddTermCount		, SubTermCount		,
+   AddNontermCount	, SubNontermCount	,
+   AddRuleCount		, SubRuleCount		,
+   AddConfCount		, SubConfCount		,
+   OldTermCount		,
+   OldNontermCount	,
+   OldLastNonterm	,
+   OldRuleCount		: CARDINAL;
+
+   OldSymbolSize	: LONGINT;
+   OldSymbolPtr		: POINTER TO ARRAY [0..100000] OF tSymbol;
+
+   OldRuleSize		: LONGINT;
+   OldRulePtr		: POINTER TO ARRAY [0..100000] OF tRule;
+
+   OldStateCount	: LONGINT;
+   OldStateSize		: LONGINT;
+   OldStatePtr		: POINTER TO ARRAY [0..100000] OF tState;
+
+   ReUsedRules, Set	: tSet;
+
+PROCEDURE LookupRule (Rule: tTree; length: SHORTCARD; elmtsPtr: tRHS): SHORTCARD;
+VAR i	: SHORTCARD;
+BEGIN
+   WHILE Rule^.Kind # Tree.NoRule DO
+      WITH Rule^.Rule DO
+	 IF (Length = length) AND NOT IsElement (Index, ReUsedRules) THEN
+	    i := 1;
+	    LOOP
+	       IF i > length THEN RETURN Index; END;
+	       IF ElmtsPtr^ [i] # SHORTCARD (OldSymbolPtr^ [elmtsPtr^ [i]].Index) THEN EXIT; END;
+	       INC (i);
+	    END;
+	 END;
+	 Rule := Next;
+      END;
+   END;
+   RETURN 0;
+END LookupRule;
+
+PROCEDURE Skip;
+VAR ch	: CHAR;
+BEGIN
+   REPEAT ch := ReadC (ConflictFile); UNTIL (ch = ' ') OR (ch = 12C);
+END Skip;
+
+PROCEDURE ReadDelta;
+VAR
+   Index, i, j, card	: CARDINAL;
+   String		: tString;
+   object		: tTree;
+   ch			: CHAR;
+   size			: LONGINT;
+   index		: SHORTINT;
+BEGIN
+   Skip;
+   OldTermCount		:= ReadI (ConflictFile);
+   OldNontermCount	:= ReadI (ConflictFile);
+   OldLastNonterm	:= ReadI (ConflictFile);
+   OldRuleCount		:= ReadI (ConflictFile);
+   ReadNl (ConflictFile);
+   OldSymbolSize	:= OldLastNonterm + 1;
+   MakeArray (OldSymbolPtr, OldSymbolSize, TSIZE (tSymbol));
+   OldRuleSize		:= OldRuleCount + 1;
+   MakeArray (OldRulePtr, OldRuleSize, TSIZE (tRule));
+
+   SubTermCount := 0;
+   ReadNl (ConflictFile);
+   FOR i := 1 TO OldTermCount DO
+      Index := ReadI (ConflictFile);
+      ch := ReadC (ConflictFile);
+      ReadL (ConflictFile, String);
+      WITH OldSymbolPtr^ [Index] DO
+	 Name := MakeIdent (String);
+	 object := Identify (Name);
+	 IF (object = NoTree) OR (object^.Kind # Tree.Terminal) THEN
+	    Index := -1;
+	    INC (SubTermCount);
+	    WriteS (DeltaFile, "- Terminal ");
+	    WriteIdent (DeltaFile, Name);
+	    WriteNl (DeltaFile);
+	 ELSE
+	    Index := object^.Terminal.Index;
+	    INCL (object^.Terminal.Properties, ReUsed);
+	 END;
+      END;
+   END;
+   IF SubTermCount > 0 THEN WriteNl (DeltaFile); END;
+
+   AddTermCount := 0;
+   object := TreeRoot^.Grammar.Terminals;
+   WHILE object^.Kind = Tree.Terminal DO
+      WITH object^.Terminal DO
+	 IF NOT (ReUsed IN Properties) AND (Reachable IN Properties) THEN
+	    INC (AddTermCount);
+	    WriteS (DeltaFile, "+ Terminal ");
+	    WriteIdent (DeltaFile, Name);
+	    WriteNl (DeltaFile);
+	 END;
+	 object := Next;
+      END;
+   END;
+   IF AddTermCount > 0 THEN WriteNl (DeltaFile); END;
+
+   SubNontermCount := 0;
+   ReadNl (ConflictFile);
+   FOR i := 1 TO OldNontermCount DO
+      Index := ReadI (ConflictFile);
+      ch := ReadC (ConflictFile);
+      ReadL (ConflictFile, String);
+      WITH OldSymbolPtr^ [Index] DO
+	 Name := MakeIdent (String);
+	 object := Identify (Name);
+	 IF (object = NoTree) OR (object^.Kind # Tree.Nonterminal) THEN
+	    Index := -1;
+	    INC (SubNontermCount);
+	    WriteS (DeltaFile, "- Nonterm  ");
+	    WriteIdent (DeltaFile, Name);
+	    WriteNl (DeltaFile);
+	 ELSE
+	    Index := object^.Nonterminal.Index;
+	    INCL (object^.Nonterminal.Properties, ReUsed);
+	 END;
+      END;
+   END;
+   IF SubNontermCount > 0 THEN WriteNl (DeltaFile); END;
+
+   AddNontermCount := 0;
+   object := TreeRoot^.Grammar.Nonterminals;
+   WHILE object^.Kind = Tree.Nonterminal DO
+      WITH object^.Nonterminal DO
+	 IF NOT (ReUsed IN Properties) AND (Reachable IN Properties) THEN
+	    INC (AddNontermCount);
+	    WriteS (DeltaFile, "+ Nonterm  ");
+	    WriteIdent (DeltaFile, Name);
+	    WriteNl (DeltaFile);
+	 END;
+	 object := Next;
+      END;
+   END;
+   IF AddNontermCount > 0 THEN WriteNl (DeltaFile); END;
+
+   SubRuleCount := 0;
+   MakeSet (ReUsedRules, RuleCount);
+   ReadNl (ConflictFile);
+   FOR i := 1 TO OldRuleCount DO
+      Index := ReadI (ConflictFile);
+      WITH OldRulePtr^ [Index] DO
+	 Length	:= ReadI (ConflictFile);
+	 LHS	:= ReadI (ConflictFile);
+	 size	:= Length + 1;
+	 MakeArray (ElmtsPtr, size, TSIZE (SHORTCARD));
+	 FOR j := 1 TO Length DO
+	    ElmtsPtr^ [j] := ReadI (ConflictFile);
+	 END;
+	 ReadNl (ConflictFile);
+	 index := OldSymbolPtr^ [LHS].Index;
+	 IF index > 0 THEN
+	    Index := LookupRule (ToSymbolPtr^ [index]^.Nonterminal.Rules, Length, ElmtsPtr);
+	    Include (ReUsedRules, Index);
+	 ELSE
+	    Index := 0;
+	 END;
+	 IF Index = 0 THEN
+	    INC (SubRuleCount);
+	    WriteS (DeltaFile, "- Rule     ");
+	    WriteIdent (DeltaFile, OldSymbolPtr^ [LHS].Name);
+	    WriteS (DeltaFile, ": ");
+	    FOR j := 1 TO Length DO
+	       WriteIdent (DeltaFile, OldSymbolPtr^ [ElmtsPtr^ [j]].Name);
+	       WriteC (DeltaFile, ' ');
+	    END;
+	    WriteNl (DeltaFile);
+	 END;
+      END;
+   END;
+   IF SubRuleCount > 0 THEN WriteNl (DeltaFile); END;
+
+   AddRuleCount := 0;
+   Complement (ReUsedRules);
+   Exclude (ReUsedRules, 0);
+   IF NOT IsEmpty (ReUsedRules) THEN
+      FOR i := Minimum (ReUsedRules) TO Maximum (ReUsedRules) DO
+	 IF IsElement (i, ReUsedRules) THEN
+	    WITH ToRulePtr^ [i]^.Rule DO
+	       INC (AddRuleCount);
+	       WriteS (DeltaFile, "+ Rule     ");
+	       WriteIdent (DeltaFile, LHS^.Nonterminal.Name);
+	       WriteS (DeltaFile, ": ");
+	       FOR j := 1 TO Length DO
+		  object := ToSymbolPtr^ [ElmtsPtr^ [j]];
+		  IF object^.Kind = Tree.Terminal THEN
+		     WriteIdent (DeltaFile, object^.Terminal.Name);
+		  ELSE
+		     WriteIdent (DeltaFile, object^.Nonterminal.Name);
+		  END;
+		  WriteC (DeltaFile, ' ');
+	       END;
+	       WriteNl (DeltaFile);
+	    END;
+	 END;
+      END;
+   END;
+   ReleaseSet (ReUsedRules);
+   IF AddRuleCount > 0 THEN WriteNl (DeltaFile); END;
+
+   AddConfCount := 0;
+   MakeArray (OldStatePtr, OldStateSize, TSIZE (tState));
+   WHILE NOT EndOfFile (ConflictFile) DO
+      Skip;
+      INC (OldStateCount);
+      IF OldStateCount = OldStateSize THEN
+	 ExtendArray (OldStatePtr, OldStateSize, TSIZE (tState));
+      END;
+      WITH OldStatePtr^ [OldStateCount] DO
+	 Intern	:= ReadI (ConflictFile);
+	 Extern	:= ReadI (ConflictFile);
+	 Size	:= ReadI (ConflictFile);
+	 ReUsed	:= FALSE;
+	 MakeSet (ConflictSet, OldTermCount);
+	 ReadSet (ConflictFile, ConflictSet);
+	 ConflictDesc := BITSET (ReadN (ConflictFile, 16));
+	 ReadNl (ConflictFile);
+	 size := Size + 1;
+	 MakeArray (OldItemPtr, size, TSIZE (tItem));
+	 FOR i := 0 TO Size DO
+	    WITH OldItemPtr^ [i] DO
+	       Rule	:= ReadI (ConflictFile);
+	       Dot	:= ReadI (ConflictFile);
+	       card	:= ReadI (ConflictFile);
+	       IF card = 0 THEN
+		  Lookahead := NIL;
+	       ELSE
+		  Lookahead := AllocLookahead ();
+		  MakeSet (Lookahead^, OldTermCount);
+		  ReadSet (ConflictFile, Lookahead^);
+	       END;
+	       ReadNl (ConflictFile);
+	    END;
+	 END;
+      END;
+   END;
+END ReadDelta;
+
+PROCEDURE Equal (Old, New: tSet): BOOLEAN;
+BEGIN
+   RETURN (Card (Old) = Card (New)) AND Subset (Old, New);
+END Equal;
+
+PROCEDURE Subset (Old, New: tSet): BOOLEAN;
+VAR
+   i		: CARDINAL;
+BEGIN
+   FOR i := Minimum (Old) TO Maximum (Old) DO
+      IF IsElement (i, Old) AND ((OldSymbolPtr^ [i].Index < 0) OR
+	 NOT IsElement (OldSymbolPtr^ [i].Index, New)) THEN
+	 RETURN FALSE;
+      END;
+   END;
+   RETURN TRUE;
+END Subset;
+
+PROCEDURE IsNewConflict (State: CARDINAL; conflictDesc: BITSET; conflictSet: tSet): BOOLEAN;
+VAR
+   i			: INTEGER;
+   j, x			: CARDINAL;
+   OldSize, NewSize	: INTEGER;
+   OldItem, NewItem	: INTEGER;
+BEGIN
+   IF OldStateCount = 0 THEN RETURN TRUE; END;
+   WITH StatePtr^ [State] DO
+
+      FOR i := 1 TO OldStateCount DO		(* look for exact match *)
+	 WITH OldStatePtr^ [i] DO
+	    IF (KernelSize + ClosureSize = Size) AND (ConflictDesc = conflictDesc) THEN
+	       j := 0;
+	       LOOP
+		  IF j > Size THEN ReUsed := TRUE; RETURN FALSE;
+		  END;
+		  IF (ItemPtr^ [Kernel + j].Dot # OldItemPtr^ [j].Dot) OR
+		     (ItemPtr^ [Kernel + j].Rule # OldRulePtr^ [OldItemPtr^ [j].Rule].Index) THEN
+		     EXIT;
+		  END;
+		  INC (j);
+	       END;
+	    END;
+	 END;
+      END;
+
+      FOR i := 1 TO OldStateCount DO		(* look for partial match *)
+	 WITH OldStatePtr^ [i] DO
+	    IF NOT ReUsed AND (ConflictDesc = conflictDesc) AND
+	       Equal (ConflictSet, conflictSet) THEN
+	       NewSize := Kernel + KernelSize + ClosureSize;
+	       OldSize := Size;
+	       NewItem := Kernel - 1;
+	       OldItem := -1;
+	       LOOP
+		  LOOP
+		     INC (NewItem);
+		     IF NewItem > NewSize THEN EXIT; END;
+		     WITH ItemPtr^ [NewItem] DO
+			WITH ToRulePtr^ [Rule]^.Rule DO
+			   IF Dot = Length THEN
+			      GetLookahead (State, NewItem, Set);
+			      Intersection (Set, conflictSet);
+			      IF NOT IsEmpty (Set) THEN EXIT; END;
+			   ELSE
+			      x := ElmtsPtr^ [Dot + 1];
+			      IF (x < Epsilon) AND IsElement (x, conflictSet) THEN EXIT; END;
+			   END;
+			END;
+		     END;
+		  END;
+
+		  LOOP
+		     INC (OldItem);
+		     IF OldItem > OldSize THEN EXIT; END;
+		     WITH OldItemPtr^ [OldItem] DO
+			IF Lookahead # NIL THEN EXIT; END;
+			WITH OldRulePtr^ [Rule] DO
+			   x := ElmtsPtr^ [Dot + 1];
+			   IF (x < OldTermCount) AND IsElement (x, ConflictSet) THEN EXIT; END;
+			END;
+		     END;
+		  END;
+
+		  IF (NewItem > NewSize) AND (OldItem > OldSize) THEN
+		     ReUsed := TRUE; RETURN FALSE;
+		  END;
+
+		  IF (NewItem > NewSize) OR (OldItem > OldSize) THEN EXIT; END;
+
+		  IF (ItemPtr^ [NewItem].Dot # OldItemPtr^ [OldItem].Dot) OR
+		     (ItemPtr^ [NewItem].Rule # OldRulePtr^ [OldItemPtr^ [OldItem].Rule].Index) THEN
+		     EXIT;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+
+      INC (AddConfCount);
+      WriteS (DeltaFile, "+ Conflict State ");
+      WriteI (DeltaFile, ReadIndex, 0);
+      WriteS (DeltaFile, " (");
+      WriteI (DeltaFile, State, 0);
+      WriteS (DeltaFile, ") on lookahead ");
+      WriteSymSet (DeltaFile, conflictSet);
+      WriteNl (DeltaFile);
+      RETURN TRUE;
+   END;
+END IsNewConflict;
+
+PROCEDURE MissingConflicts;
+VAR
+   i		: INTEGER;
+   j, k		: CARDINAL;
+BEGIN
+   IF AddConfCount > 0 THEN WriteNl (DeltaFile); END;
+
+   SubConfCount := 0;
+   FOR i := 1 TO OldStateCount DO
+      WITH OldStatePtr^ [i] DO
+	 IF NOT ReUsed THEN
+	    INC (SubConfCount);
+	    WriteS (DeltaFile, "- Conflict State ");
+	    WriteI (DeltaFile, Extern, 0);
+	    WriteS (DeltaFile, " (");
+	    WriteI (DeltaFile, Intern, 0);
+	    WriteS (DeltaFile, ") on lookahead {");
+	    k := 0;
+	    FOR j := Minimum (ConflictSet) TO Maximum (ConflictSet) DO
+	       IF IsElement (j, ConflictSet) THEN
+		  WriteIdent (DeltaFile, OldSymbolPtr^ [j].Name);
+		  WriteC (DeltaFile, ' ');
+		  INC (k);
+		  IF k = 10 THEN k := 0; WriteNl (DeltaFile); WriteC (DeltaFile, '	'); END;
+	       END;
+	    END;
+	    WriteC (DeltaFile, '}');
+	    WriteNl (DeltaFile);
+	 END;
+      END;
+   END;
+   IF SubConfCount > 0 THEN WriteNl (DeltaFile); END;
+
+   IF AddTermCount + SubTermCount + AddNontermCount + SubNontermCount +
+      AddRuleCount + SubRuleCount + AddConfCount + SubConfCount = 0 THEN
+      WriteS (DeltaFile, "no differences"); WriteNl (DeltaFile);
+   ELSE
+      WriteS (DeltaFile, "Summary"); WriteNl (DeltaFile);
+      WriteS (DeltaFile, "-------"); WriteNl (DeltaFile); WriteNl (DeltaFile);
+      PrintCount ("- Terminals    ", SubTermCount	);
+      PrintCount ("+ Terminals    ", AddTermCount	);
+      PrintCount ("- Nonterminals ", SubNontermCount	);
+      PrintCount ("+ Nonterminals ", AddNontermCount	);
+      PrintCount ("- Rules        ", SubRuleCount	);
+      PrintCount ("+ Rules        ", AddRuleCount	);
+      PrintCount ("- Conflicts    ", SubConfCount	);
+      PrintCount ("+ Conflicts    ", AddConfCount	);
+   END;
+END MissingConflicts;
+
+PROCEDURE PrintCount (Text: ARRAY OF CHAR; Count: CARDINAL);
+BEGIN
+   IF Count > 0 THEN
+      WriteS (DeltaFile, Text); WriteI (DeltaFile, Count, 4); WriteNl (DeltaFile);
+   END;
+END PrintCount;
+
+PROCEDURE WriteConflict (State: CARDINAL; ConflictDesc: BITSET; ConflictSet: tSet);
+VAR Item	: CARDINAL;
+
+BEGIN
+   WITH StatePtr^ [State] DO
+      WriteS (ConflictFile, "STATE ");
+      WriteI (ConflictFile, State, 0); WriteC (ConflictFile, ' ');
+      WriteI (ConflictFile, ReadIndex, 0); WriteC (ConflictFile, ' ');
+      WriteI (ConflictFile, KernelSize + ClosureSize, 0); WriteC (ConflictFile, ' ');
+      WriteSet (ConflictFile, ConflictSet); WriteC (ConflictFile, ' ');
+      WriteN (ConflictFile, LONGCARD (ConflictDesc), 4, 16);
+      WriteNl (ConflictFile);
+
+      FOR Item := Kernel TO Kernel + KernelSize DO
+	 WITH ItemPtr^ [Item] DO			(* kernel *)
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+	       WITH KernelItemPtr^ [Item - Kernel + KernelInfo] DO
+		  WriteI (ConflictFile, Rule, 0); WriteC (ConflictFile, ' ');
+		  WriteI (ConflictFile, Dot, 0); WriteC (ConflictFile, ' ');
+		  IF (Lookahead # NIL) AND (Dot = Length) THEN
+		     Assign (Set, Lookahead^);
+		     Intersection (Set, ConflictSet);
+		     IF NOT IsEmpty (Set) THEN
+			WriteI (ConflictFile, Card (Set), 0);
+			WriteC (ConflictFile, ' ');
+			WriteSet (ConflictFile, Set);
+		     ELSE
+			WriteC (ConflictFile, '0');
+		     END;
+		  ELSE
+		     WriteC (ConflictFile, '0');
+		  END;
+		  WriteNl (ConflictFile);
+	       END;
+	    END;
+	 END;
+      END;
+
+      FOR Item := Kernel + KernelSize + 1 TO Kernel + KernelSize + ClosureSize DO
+	 WITH ItemPtr^ [Item] DO			(* closure *)
+	    WITH ToRulePtr^ [Rule]^.Rule DO
+	       WriteI (ConflictFile, Rule, 0); WriteC (ConflictFile, ' ');
+	       WriteI (ConflictFile, Dot, 0); WriteC (ConflictFile, ' ');
+	       IF Dot = Length THEN
+		  GetLookahead (State, Item, Set);
+		  Intersection (Set, ConflictSet);
+		  IF NOT IsEmpty (Set) THEN
+		     WriteI (ConflictFile, Card (Set), 0);
+		     WriteC (ConflictFile, ' ');
+		     WriteSet (ConflictFile, Set);
+		  ELSE
+		     WriteC (ConflictFile, '0');
+		  END;
+	       ELSE
+		  WriteC (ConflictFile, '0');
+	       END;
+	       WriteNl (ConflictFile);
+	    END;
+	 END;
+      END;
+   END;
+END WriteConflict;
+}
+
+BEGIN {
+   OldStateCount	:= 0;
+   OldStateSize		:= 200;
+}
+
+PROCEDURE WriteDelta (Grammar)
+
+Grammar (..) :-
+   MakeSet (Set, Epsilon);
+   yyf := ConflictFile;
+   "GRAMMAR ";
+   WriteI (ConflictFile, TermCount	, 0); " ";
+   WriteI (ConflictFile, NontermCount	, 0); " ";
+   WriteI (ConflictFile, LastNonterm	, 0); " ";
+   WriteI (ConflictFile, RuleCount	, 0); NL;
+   "TERMINAL";		NL; ForallTree (Terminals, Print);
+   "NONTERMINAL";	NL; ForallTree (Nonterminals, Print);
+   "RULE";		NL; ForallTree (Nonterminals, Print2);
+   .
+
+PROCEDURE Print ([Terminals, Nonterminals])
+
+Terminal (..) :-
+   CONDITION Reachable IN Properties;
+   WriteI (ConflictFile, Index, 0); " "; WriteIdent (ConflictFile, Name); NL;
+   .
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   WriteI (ConflictFile, Index, 0); " "; WriteIdent (ConflictFile, Name); NL;
+   .
+
+PROCEDURE Print2 ([Nonterminals, Rules, Elements]) LOCAL { VAR i: SHORTCARD; }
+
+Nonterminal (..) :-
+   CONDITION Reachable IN Properties;
+   ForallTree (Rules, Print2);
+   .
+Rule (..) :-
+   WriteI (ConflictFile, Index, 0); " ";
+   WriteI (ConflictFile, Length, 0); " ";
+   WriteI (ConflictFile, LHS^.Nonterminal.Index, 0); " ";
+{  FOR i := 1 TO Length DO
+      WriteI (ConflictFile, ElmtsPtr^[i], 0); WriteC (ConflictFile, ' ');
+   END; };
+   NL;
+   .
+Ident (..) :-
+   WriteIdent (ConflictFile, Name); " ";
+   .

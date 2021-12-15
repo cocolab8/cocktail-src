@@ -1,0 +1,80 @@
+(* $Id: DefTable.mi,v 1.1 1997/05/27 15:44:37 grosch rel $ *)
+
+(*
+ * $Log: DefTable.mi,v $
+ * Revision 1.1  1997/05/27 15:44:37  grosch
+ * cosmetic changes
+ *
+ * Revision 1.0  1993/08/17 16:20:22  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Dec. 1990 *)
+
+IMPLEMENTATION MODULE DefTable;
+
+FROM SYSTEM	IMPORT TSIZE	;
+FROM DynArray	IMPORT MakeArray, ExtendArray	;
+FROM Idents	IMPORT tIdent	;
+
+CONST
+   InitialDefTableSize	= 16;
+
+TYPE
+   DefType	= RECORD
+		     Symbol 	: tIdent	;
+		     Kind 	: tKind		;
+		  END;
+
+   DefTable	= ARRAY [0 .. 100000] OF DefType;
+
+VAR
+   DefTablePtr	: POINTER TO DefTable;
+   DefTableSize	: LONGINT;
+
+PROCEDURE MakeIdentDef	( pSymbol	: tIdent	);
+   BEGIN
+      INC (DefCount);
+      IF DefCount = DefTableSize THEN
+	 ExtendArray (DefTablePtr, DefTableSize, TSIZE (DefType));
+      END;
+      WITH DefTablePtr^[DefCount] DO
+	 Symbol		:= pSymbol	;
+	 Kind		:= Ident	;
+      END;
+   END MakeIdentDef;
+
+PROCEDURE MakeStartDef	( pSymbol	: tIdent	);
+   BEGIN
+      INC (DefCount);
+      IF DefCount = DefTableSize THEN
+	 ExtendArray (DefTablePtr, DefTableSize, TSIZE (DefType));
+      END;
+      WITH DefTablePtr^[DefCount] DO
+	 Symbol		:= pSymbol	;
+	 Kind		:= Start	;
+      END;
+   END MakeStartDef;
+
+PROCEDURE GetDef	( pSymbol	: tIdent	): DefRange;
+   VAR Def	: DefRange;
+   BEGIN
+      FOR Def := 1 TO DefCount DO
+	 IF DefTablePtr^[Def].Symbol = pSymbol THEN
+	    RETURN Def;
+	 END;
+      END;
+      RETURN NoDef;
+   END GetDef;
+
+PROCEDURE GetKind	( pDef		: DefRange	): tKind;
+   BEGIN
+      RETURN DefTablePtr^[pDef].Kind;
+   END GetKind;
+
+BEGIN
+   DefTableSize	:= InitialDefTableSize;
+   MakeArray (DefTablePtr, DefTableSize, TSIZE (DefType));
+   DefCount	:= 0;
+END DefTable.

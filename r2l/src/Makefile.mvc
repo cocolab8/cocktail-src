@@ -1,0 +1,26 @@
+SOURCES	= Scanner.md Scanner.mi Parser.md Parser.mi
+
+sources: $(SOURCES)
+
+Scanner.mi Scanner.md:	r2l.rex
+	rex -di r2l.rex
+
+Parser.mi Parser.md:	r2l.lrk
+	@echo expect 4 conflict messages
+	lark -di0v r2l.lrk
+
+m2c:
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="$(M2FLAGS) -d../../reuse/src -o../m2c" -c -f ../m2c/Makefile
+
+m :
+	nmake sources -c -f Makefile.mvc
+	nmake sources M2FLAGS="-c -d../../reuse/src -o../m" -c -f ../m/Makefile
+
+clean:
+	del *.obj
+	del *.dbg
+	del r2l.exe
+
+CLEAN:	clean
+	del $(SOURCES)

@@ -1,0 +1,55 @@
+(* $Id: SysError.mi,v 1.7 1997/05/27 14:58:14 grosch rel $ *)
+
+(*
+ * $Log: SysError.mi,v $
+ * Revision 1.7  1997/05/27 14:58:14  grosch
+ * cosmetic changes
+ *
+ * Revision 1.6  1993/08/18 15:09:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 1.5  1992/08/07  15:06:04  grosch
+ * adaption to the new interface of the module Errors
+ * 
+ * Revision 1.4  1992/01/30  13:26:58  grosch
+ * redesign of interface to operating system
+ * 
+ * Revision 1.3  1991/03/08  18:45:38  grosch
+ * changed interface of Errors
+ * changed interface for source position
+ * 
+ * Revision 1.2  90/06/12  18:33:49  grosch
+ * layout improvements
+ * 
+ * Revision 1.1  89/01/31	16:00:42  vielsack
+ * Initial revision
+ * 
+ *)
+
+IMPLEMENTATION MODULE SysError;
+
+FROM	Errors		IMPORT	ErrorMessage, ErrorMessageI, SysOffset;
+FROM	Position	IMPORT	NoPosition;
+FROM	SYSTEM		IMPORT	ADDRESS;
+FROM	rSystem		IMPORT	rErrNo;
+
+PROCEDURE StatIsBad (N: INTEGER): BOOLEAN;
+  BEGIN
+    RETURN N < 0;
+  END StatIsBad;
+
+PROCEDURE SysErrorMessageI (N: INTEGER; ErrCl, InfCl: CARDINAL; Info: ADDRESS);
+  BEGIN
+    IF StatIsBad (N) THEN
+      ErrorMessageI (rErrNo () + SysOffset, ErrCl, NoPosition, InfCl, Info);
+    END;
+  END SysErrorMessageI;
+
+PROCEDURE SysErrorMessage (N: INTEGER; ErrCl: CARDINAL);
+  BEGIN
+    IF StatIsBad (N) THEN
+      ErrorMessage (rErrNo () + SysOffset, ErrCl, NoPosition);
+    END;
+  END SysErrorMessage;
+
+END SysError.

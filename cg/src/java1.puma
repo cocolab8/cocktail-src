@@ -1,0 +1,1119 @@
+/* Ich, Doktor Josef Grosch, Informatiker, 22.3.1989 */
+
+TRAFO TreeJav1
+TREE Tree
+PUBLIC TreeImplJava
+
+EXPORT {
+FROM Idents	IMPORT tIdent;
+CONST BSS	= 32;	(* BITSET size *)
+}
+
+GLOBAL {
+
+FROM General	IMPORT Max;
+FROM IO		IMPORT WriteS, WriteNl, StdOutput;
+FROM StringM	IMPORT NoString, WriteString;
+FROM Idents	IMPORT tIdent, NoIdent;
+FROM Texts	IMPORT WriteText, IsEmpty;
+FROM Sets	IMPORT IsElement, Include;
+FROM Semantic	IMPORT CodeClass, MaxChildCount;
+FROM TreeJav2	IMPORT TreeIO, GetIterator, Iterator, WriteLine, Search;
+
+FROM Tree	IMPORT
+   NoTree	, tTree		, Input		, Reverse	,
+   Class	, Child		, Attribute	, Abstract	,
+   HasChildren	, HasAttributes	, NoCodeAttr	, NoCodeClass	,
+   Options	, TreeRoot	, ClassCount	, iNoTree	,
+   itTree	, iMain		, iTreeNode	,
+   iPackage	, iModule	,
+   f		, WI	, WN	, ForallClasses	, ForallAttributes,
+   Ignore	, Test		, Dummy		, TreeTypeNames	;
+
+IMPORT Strings;
+
+VAR
+   ConstCount	,
+   ListCount	: INTEGER;
+   iRange	,
+   iClassName	: tIdent;
+   Node		: tTree;
+   gBitCount	: SHORTCARD;
+   i, MaxBit	: SHORTCARD;
+   IsFirst	,
+   Success	: BOOLEAN;
+   UserImport	: BOOLEAN;
+   UserBegin	: BOOLEAN;
+   UserClose	: BOOLEAN;
+}
+
+PROCEDURE ConstDecls (t: Tree)
+
+Class (..) :-
+	CONDITION NOT (Abstract IN Properties);
+	INC (ConstCount);
+	CONDITION NOT (Ignore IN Properties);
+	!   public static final int k! WI (Name); ! = ! WN (ConstCount); !;!
+	.
+
+PROCEDURE TypeDeclNode (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	!!
+	!   public static class ! WI (Name); ! extends ! 
+	IF BaseClass^.Kind = Tree.NoClass THEN
+	   WI (iTreeNode);
+	ELSE
+	   WI (BaseClass^.Class.Name);
+	END;
+	! {!
+	ForallAttributes (Attributes, TypeDeclNode);
+	/* Constructors are always generated.
+	** This prevents construction of uninitialized objects.
+	*/
+	ProcedureBodyn (t);
+	IF IsElement (ORD ('m'), Options) THEN
+	   ProcedureBodym (t);
+	END;
+	!?! WI (Name); !.constructors!
+	!?! WI (Name); !.methods!
+	!   }!
+	/* End of class declaration. */
+	.
+Child (..) :-
+	!      public ! WI (Type); ! ! WI (Name); !;!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	!      public ! WI (Type); ! ! WI (Name); !;!
+	.
+
+
+PROCEDURE ProcedureHeadingm (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	ListCount := 0;
+	!!
+	!      public ! WI (Name); ! (!
+	ForallAttributes (t, ProcedureHeadingm); !)!
+	!      {!
+	.
+Child (..) ;
+Attribute (..) :-
+	CONDITION (Input IN Properties) AND (Init = NoString);
+	IF ListCount > 0 THEN !, !
+	END;
+	!         ! WI (Type); ! ! WI (Name);
+	INC (ListCount);
+	.
+
+PROCEDURE InitNodeName (t: Tree)
+
+Class (..) :-
+	CONDITION NOT (Abstract IN Properties);
+	IF NOT (Ignore IN Properties) THEN
+	   @      "@ WI (Name); @",@
+	ELSE
+	   @      "",@
+	END;
+	.
+
+PROCEDURE MakeTreeCase (t: Tree)
+
+Class (..) :-
+	CONDITION NOT (Abstract IN Properties);
+	!         case k!WI (Name); !: return new ! WI (Name); ! ();!
+	.
+
+PROCEDURE TreeImplJava (t: Tree)
+
+Ag (..) :- {
+	IF iPackage # NoIdent THEN
+	   !package ! WI (iPackage); !;!
+	   !!
+	END;
+	UserImport := FALSE;
+	IF NOT IsEmpty (TreeCodes^.Codes.Import) THEN
+	   WriteLine (TreeCodes^.Codes.ImportLine);
+	   WriteText (f, TreeCodes^.Codes.Import);
+	   UserImport := TRUE;
+	END;
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   IF NOT IsEmpty (Node^.Module.TreeCodes^.Codes.Import) THEN
+	      WriteLine (Node^.Module.TreeCodes^.Codes.ImportLine);
+	      WriteText (f, Node^.Module.TreeCodes^.Codes.Import);
+	      UserImport := TRUE;
+	   END;
+	   Node := Node^.Module.Next;
+	END;
+	IF NOT UserImport THEN
+	   !import de.cocolab.reuse.Position;!
+	   !import de.cocolab.reuse.IdentTable;!
+	   !import de.cocolab.reuse.Ident;!
+	   !import de.cocolab.reuse.Global;!
+	   !import de.cocolab.reuse.CocktailReader;!
+	   !import de.cocolab.reuse.CocktailWriter;!
+	   !import de.cocolab.reuse.DynArrayObject;!
+	   !import de.cocolab.reuse.CocktailError;!
+	END;
+	!!
+	WriteLine (TreeCodes^.Codes.GlobalLine);
+	WriteText (f, TreeCodes^.Codes.Global);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.TreeCodes^.Codes.GlobalLine);
+	   WriteText (f, Node^.Module.TreeCodes^.Codes.Global);
+	   Node := Node^.Module.Next;
+	END;
+	WriteLine (TreeCodes^.Codes.LocalLine);
+	WriteText (f, TreeCodes^.Codes.Local);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.TreeCodes^.Codes.LocalLine);
+	   WriteText (f, Node^.Module.TreeCodes^.Codes.Local);
+	   Node := Node^.Module.Next;
+	END;
+	@#include "yy@ WI (iModule); @.h"@
+	!# ifndef Idents_PREFIX!
+	!# define Idents_PREFIX Global.idents.!
+	!# endif!
+	!# ifndef ! WI (iModule); !_NodeHead!
+	!# define ! WI (iModule); !_NodeHead!
+	!# endif!
+	!!
+	!public abstract class ! WI (iModule); ! implements java.io.Serializable {!
+	!!
+	!   public ! WI (iModule); ! () {!
+	!      beginNodeHead (this)!
+	!   }!
+	!!
+	!   public static final ! WI (iTreeNode); ! ! WI (iNoTree); ! = null;!
+	!?! WI (iTreeNode); !.fields!
+	!!
+	!   public static interface ProcTree {!
+	!      public void proc (! WI (iTreeNode); ! yyt);!
+	!   }!
+	!!
+	WriteLine (TreeCodes^.Codes.ExportLine);
+	WriteText (f, TreeCodes^.Codes.Export);
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   WriteLine (Node^.Module.TreeCodes^.Codes.ExportLine);
+	   WriteText (f, Node^.Module.TreeCodes^.Codes.Export);
+	   Node := Node^.Module.Next;
+	END;
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   public int yyMark;!
+	!   ! WI (iModule); !_NodeHead!
+	!=! WI (iTreeNode); !.fields!
+	!?! WI (iTreeNode); !.methods!
+	!!
+	!   public abstract int yyKind ();!
+	ForallClasses (Classes, yyKind);
+         IF IsElement (ORD ('L'), Options) THEN
+	    !// this code may well be broken until Ag is done - Trevor Nash!
+	    !  public int yyOffset; ! WI (iTreeNode); ! yyParent;!
+	    MaxBit := 0;
+	    ForallClasses (Classes, CompMaxBit);
+	    !  public int yyIsComp0!
+            IF IsElement (ORD ('5'), Options) THEN
+	       !, yyIsDone0! 
+            END;
+            FOR i := 1 TO (MaxBit - 1) DIV BSS DO
+	       !, yyIsComp! WN (i);
+               IF IsElement (ORD ('5'), Options) THEN
+	          !, yyIsDone! WN (i);
+               END;
+            END;
+            !;!
+	 END;
+      IF IsElement (ORD ('R'), Options) THEN
+	!!
+	!   public ! WI (iTreeNode); ! reverse () {!
+	!      ! WI (iTreeNode); ! yyOld, yyNew, yyNext;!
+	!      yyOld = yyNew = this;!
+	(* we deal sensibly with null terminated lists, too.  This is why
+	 * the default yySwapNext returns 'this' rather than 'null' when a
+	 * node type has no 'Reverse' child.
+	 * If a node points at itself, then this terminates the list: if you
+	 * have 1-2-3-3-3... you get 2-1-3-2-1-3-...
+	 *)
+	@      while (yyOld != null) {@
+	!         yyNext = yyOld.yySwapNext (yyNew);!
+	@         if (yyNext == yyOld) break;@
+	!         yyNew = yyOld;!
+	!         yyOld = yyNext;!
+	@      }@
+	!      yyNext = this.yySwapNext (yyOld);!
+	!      return yyNew;!
+	!   }!
+	!+! WI (iTreeNode); !.methods!
+	!!
+	!   ! WI (iTreeNode); ! yySwapNext (! WI (iTreeNode); ! yyt) {!
+	!      return this;!
+	!   }!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, GenReverse);
+      END;
+	!!
+      IF IsElement (ORD ('_'), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   public static final String [] NodeNames = {!
+	@      "@ WI (iNoTree); @",@
+	ForallClasses (Classes, InitNodeName);
+	!   };!
+	!=! WI (iTreeNode); !.fields!
+      END;
+	!   public static boolean isType (! WI (iTreeNode); ! yyt, int kind) {!
+
+	@      return yyt != null && yyt.isType (kind);@
+	!   }!
+	!!
+	!   public boolean isType (int kind) {!
+	!      return kind <= yyKind () && yyKind () <= TypeRange [kind];!
+	!   }!
+	!+! WI (iTreeNode); !.fields!
+	!!
+	ConstCount := 0; ForallClasses (Classes, ConstDecls);
+	!=! WI (iTreeNode); !.fields!
+      IF IsElement (ORD ('L'), Options) THEN
+	MaxBit := 0;
+	ForallClasses (Classes, CompMaxBit);
+      IF IsElement (ORD ('5'), Options) THEN
+	!, int yyIsDone0! 
+      END;
+	FOR i := 1 TO (MaxBit - 1) DIV BSS DO
+	   !, int yyIsComp! WN (i);
+      IF IsElement (ORD ('5'), Options) THEN
+	   !, int yyIsDone! WN (i);
+      END;
+	END;
+	!;!
+      END;
+	ForallClasses (Classes, TypeDeclNode);
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   public static final int TypeRange [] = { 0,!
+	ForallClasses (Classes, InitTypeRange);
+	!   };!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   public static !WI (iTreeNode); ! make (int yyKind) {!
+	!      switch (yyKind) {!
+	ForallClasses (Classes, MakeTreeCase);
+	!         default:!
+	!            throw new de.cocolab.reuse.CocktailError (!
+	@            "@ WI (iMain); @.make called with parameter value of " + yyKind);@
+	!      }!
+	!   }!
+	!!
+	TreeIO (t);
+      IF IsElement (ORD ('t'), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static ProcTree yyProc;!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   public static void traverseTD (! WI (iTreeNode); ! yyt, ProcTree yyyProc) {!
+	!      yyMark (yyt);!
+	!      yyProc = yyyProc;!
+	!      yyTraverseTD (yyt);!
+	!   }!
+	!!
+	!   public static void yyTraverseTD (! WI (iTreeNode); ! yyt) {!
+	@      while (yyt != null@ 
+	@ && yyt.yyMark != 0) {@
+	!         yyt.yyMark = 0;!
+	!         yyProc.proc (yyt);!
+	!!
+	!         yyt.yyTraverseTD ();!
+	!+! WI (iTreeNode); !.methods!
+	!!
+	!   public void traverseTD (ProcTree yyyProc) {!
+	!      ! WI (iModule); !.traverseTD (this, yyyProc);!
+	!   }!
+	!!
+	!   void yyTraverseTD () {}!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, TraverseTD);
+	!         yyt = yyt.yyGetIterator ();!
+	!      }!
+	!      return;!
+	!   }!
+	!!
+      END;
+      IF IsElement (ORD ('b'), Options) THEN
+	!# ifndef yyInitStackSize!
+	!# define yyInitStackSize 100!
+	!# endif!
+	!!
+	!   public static void traverseBU (! WI (iTreeNode); ! yyt, ProcTree yyProc) {!
+	!      final int yyIsStacked = 32768;!
+	!      ! WI (iTreeNode); ! yys; int yyi;!
+	!      ! WI (iTreeNode); ! [] yyStack = new ! WI (iTreeNode); ! [yyInitStackSize];!
+	!      int yyStackPtr = 1;!
+	!      yyMark (yyt);!
+	!      yyStack [1] = yyt;!
+	@      if (yyt != null) yyt.yyMark += yyIsStacked;@
+	!      while (yyStackPtr > 0) {!
+	!         yyt = yyStack [yyStackPtr];!
+	!         if (yyt == null || yyt.yyMark == 0) {!
+	!            yyStackPtr --;!
+	!         } else if (yyt.yyMark > yyIsStacked) {!
+	!            yyi = yyStackPtr + 1;!
+	!            yyt.yyMark = yyIsStacked;!
+	!            if (yyStackPtr + ! WN (MaxChildCount); ! > yyStack.length) {!
+	!               yyStack = (! WI (iTreeNode); ! []) DynArrayObject.extend (yyStack);!
+	!            }!
+	!            switch (yyt.yyKind ()) {!
+	ForallClasses  (Classes, TraverseBU);
+	!               default: break;!
+	!            }!
+	!            while (yyi <= yyStackPtr) {!
+	!               yys = yyStack [yyi];!
+	@               if (yys != null) {@
+	!                  if (yys.yyMark >= yyIsStacked) yyStack [yyi] = null;!
+	!                  else yys.yyMark += yyIsStacked;!
+	!               }!
+	!               yyi ++;!
+	!            }!
+	!         } else {!
+	!            yyt.yyMark = 0; yyStackPtr --; yyProc.proc (yyt);!
+	!         }!
+	!      }!
+	!   }!
+	!+! WI (iTreeNode); !.methods!
+	!!
+	!   public void traverseBU (ProcTree yyyProc) {!
+	!      ! WI (iModule); !.traverseBU (this, yyyProc);!
+	!   }!
+	!=! WI (iTreeNode); !.methods!
+      END;
+      IF IsElement (ORD ('R'), Options) THEN
+	!   public static void forall (! WI (iTreeNode); ! yyt, ProcTree yyProc) {!
+	!      ! WI (iTreeNode); ! yyyt = yyt;!
+	@      while (yyyt != null) {@
+	!         yyProc.proc (yyyt);!
+	!         yyyt = yyyt.yyGetNext ();!
+	!      }!
+	!   }!
+	!+! WI (iTreeNode); !.methods!
+	!!
+	!   public ! WI (iTreeNode); ! yyGetNext () {!
+	!      return null;!
+	!   }!
+	!!
+	!   public void forall (ProcTree yyProc) {!
+	!      ! WI (iModule); !.forall (this, yyProc);!
+	!   }!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, Forall);
+      END;
+      IF IsElement (ORD ('y'), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+        !   private static final int yyInitOldToNewStoreSize = 32;!
+	!!
+	!   private static ! WI (iTreeNode); ! [] yyOld = new ! WI (iTreeNode); ! [yyInitOldToNewStoreSize];!
+	!   private static ! WI (iTreeNode); ! [] yyNew = new ! WI (iTreeNode); ! [yyInitOldToNewStoreSize];!
+	!!
+	!   private static int yyOldToNewCount;!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   private static void yyStoreOldToNew (! WI (iTreeNode); ! yyyOld, ! WI (iTreeNode); ! yyyNew) {!
+	!      yyOldToNewCount ++;!
+	!      if (yyOldToNewCount == yyOld.length) {!
+	!         yyOld = (! WI (iTreeNode); ! []) de.cocolab.reuse.DynArrayObject.extend (yyOld);!
+	!         yyNew = (! WI (iTreeNode); ! []) de.cocolab.reuse.DynArrayObject.extend (yyNew);!
+	!      }!
+	!      yyOld [yyOldToNewCount] = yyyOld;!
+	!      yyNew [yyOldToNewCount] = yyyNew;!
+	!   }!
+	!!
+	!   final ! WI (iTreeNode); ! yyMapOldToNew () {!
+	!      for (int yyi = 1; yyi <= yyOldToNewCount; yyi ++)!
+	!         if (yyOld [yyi] == this) return yyNew [yyi];!
+	!      return null;!
+	!   }!
+	!!
+	!   public static ! WI (iTreeNode); ! copy (! WI (iTreeNode); ! yyt) {!
+	!      yyMark (yyt);!
+	!      yyOldToNewCount = 0;!
+	!      return yyCopyAll (yyt);!
+	!   }!
+	!!
+	!   public java.lang.Object clone () {!
+	!      yyMark (this);!
+	!      yyOldToNewCount = 0;!
+	!      return yyCopyAll (this);!
+	!   }!
+	!!
+	!   static !WI (iTreeNode); ! yyCopyAll (! WI (iTreeNode); ! yyt) {!
+	!      ! WI (iTreeNode); ! first, current, next;!
+	!      if (yyt == null) return null;!
+	!      first = yyt.yyCopy ();!
+	!      current = first;!
+	@      while (yyt != null@ 
+	@ && yyt.yyMark != 0) {@
+	!         if (yyt.yyMark > 1) yyStoreOldToNew (yyt, current);!
+	!         yyt.yyMark = 0;!
+	!         yyt = yyt.yyGetIterator ();!
+	!         if (yyt == null) return first;!
+	!         next = yyt.yyCopy ();!
+	!         current.yySetIterator (next);!
+	!         current = next;!
+	!      }!
+	!      return first;!
+	!   }!
+	!!
+	!+! WI (iTreeNode); !.methods!
+	!   abstract ! WI (iTreeNode); ! yyCopy ();!
+	!!
+	!=! WI (iTreeNode); !.methods!
+	(* this produces the code for yyCopy for each node type, not
+	   inline code.
+	*)
+	ForallClasses (Classes, Copy);
+      END;
+      IF IsElement (ORD ('y'), Options) OR
+	 IsElement (ORD ('='), Options) OR
+	 IsElement (ORD ('r'), Options) OR
+	 IsElement (ORD ('w'), Options) OR
+	 IsElement (ORD (','), Options) THEN
+	!+! WI (iTreeNode); !.methods!
+	!   ! WI (iTreeNode); ! yyGetIterator () {!
+	!      return null;!
+	!   }!
+	!!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, GenGetIterator);
+      END;
+      IF IsElement (ORD ('y'), Options) OR
+	 IsElement (ORD ('r'), Options) THEN
+	!+! WI (iTreeNode); !.methods!
+	!   boolean yyHasIterator () { return false; }!
+	!!
+	!   void yySetIterator (! WI (iTreeNode); ! yyt) {!
+	!   }!
+	!!
+	!=! WI (iTreeNode); !.methods!
+	ForallClasses (Classes, GenSetIterator);
+      END;
+      IF IsElement (ORD ('k'), Options) OR
+	 IsElement (ORD ('='), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static boolean yyResult;!
+	!=! WI (iTreeNode); !.fields!
+      END;
+      IF IsElement (ORD ('k'), Options) THEN
+	!!
+	!   public static boolean check (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	!      if (yyt == null) { return false; }!
+	!      return yyt.check ();!
+	!   }!
+	!+! WI (iTreeNode); !.methods!
+	!!
+	!   final public boolean check () throws java.io.IOException {!
+	!      yyMark (this);!
+	!      yyResult = true;!
+	!      yyCheckTree (this);!
+	!      return yyResult;!
+	!   }!
+	!=! WI (iTreeNode); !.methods!
+	!!
+	!   static void yyCheckTree (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	@      while (yyt != null @ 
+				@&& yyt.yyMark != 0) {@
+	!         yyt.yyMark = 0;!
+	!         yyt = yyt.yyCheck ();!
+	!      }!
+	!   }!
+	!!
+	!   final void yyCheckChild2 (! WI (iTreeNode);
+	     ! yyChild, String yySelector) throws java.io.IOException {!
+	!      final CocktailWriter yyerr = new CocktailWriter (System.err, true);!
+	@      if (yyChild == null) {@
+	!         yyResult = false;!
+	@         yyerr.write ("@ WI (iMain); @.check: parent = ");@ 
+	!         writeNode (yyerr, this);!
+	@         yyerr.writeNl (); yyerr.write ("selector: "); yyerr.write (yySelector);@
+	@         yyerr.write (", child = "); writeNode (yyerr, yyChild); yyerr.writeNl ();@
+	!      }!
+	!   }!
+	!!
+	!   final void yyCheckChild (! WI (iTreeNode); ! yyChild, String yySelector) throws java.io.IOException {!
+	!      yyCheckChild2 (yyChild, yySelector);!
+	!      yyCheckTree (yyChild);!
+	!   }!
+	!!
+	!   ! WI (iTreeNode); ! yyCheck () throws java.io.IOException {!
+	!      return null;!
+	!   }!
+	ForallClasses (Classes, CheckAttributes);
+      END;
+      IF IsElement (ORD ('^'), Options) THEN
+	Search (t);
+      END;
+      IF IsElement (ORD ('q'), Options) THEN
+	!+! WI (iTreeNode); !.fields!
+	!!
+	!   private static int yyState;!
+	!   private static StringBuffer yyString = new StringBuffer (32);!
+	!   private static int yyLength;!
+	!=! WI (iTreeNode); !.fields!
+	!!
+	!   private static boolean yyyIsEqual (String yya) {!
+	!      int yyi;!
+	!      if (yyLength >= 0 && yyString.charAt (yyLength) == ' ') {!
+	@         if (yyLength != yya.length ()) return false;@
+	!         for (yyi = 0; yyi < yyLength; yyi ++)!
+	@            if (yyString.charAt (yyi) != yya.charAt (yyi)) return false;@
+	!      } else {!
+	!         if (yyLength >= yya.length ()) return false;!
+	!         for (yyi = 0; yyi <= yyLength; yyi ++)!
+	@            if (yyString.charAt (yyi) != yya.charAt (yyi)) return false;@
+	!      }!
+	!      return true;!
+	!   }!
+	!!
+	!   private static boolean yyyIsEqualGoto () {!
+	!      int yyi = 0;!
+	!      while (yyi <= yyLength && yyString.charAt (yyi) == ' ') yyi ++;!
+	!      if (yyi <= yyLength && yyString.charAt (yyi) == 'g') yyi ++; else return false;!
+	!      if (yyi <= yyLength && yyString.charAt (yyi) == 'o') yyi ++; else return false;!
+	!      if (yyi <= yyLength && yyString.charAt (yyi) == 't') yyi ++; else return false;!
+	!      if (yyi <= yyLength && yyString.charAt (yyi) == 'o') yyi ++; else return false;!
+	!      if (yyi <= yyLength && yyString.charAt (yyi) == ' ') yyi ++; else return false;!
+	!      while (yyi <= yyLength && yyString.charAt (yyi) == ' ') yyi ++;!
+	!      yyLine = 0;!
+	!      while (yyi <= yyLength && '0' <= yyString.charAt (yyi) && yyString.charAt (yyi) <= '9')!
+	!         { yyLine = yyLine * 10 + yyString.charAt (yyi) - '0'; yyi ++; }!
+	!      return true;!
+	!   }!
+	!!
+	!   private static void yyQuery (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	!      final CocktailWriter out = new CocktailWriter (System.out, true);!
+	!      final int yyyWrite = 1;!
+	!      final int yyyRead = 2;!
+	!      final int yyyQuit = 3;!
+	!      yyState = yyyWrite;!
+	!      char yyCh;!
+	!      for (;;) {!
+	!         switch (yyState) {!
+	!            case yyyQuit : return;!
+	!            case yyyWrite: writeNode (out, yyt); yyState = yyyRead; break;!
+	!            case yyyRead :!
+	@               out.write ("? "); out.flush (); yyString.setLength (0);@
+	@               while ((yyCh = (char) System.in.read ()) != @ !'\n')!
+	@                  if (yyCh != @ !'\r') yyString.append (yyCh);!
+	!               yyLength = yyString.length () - 1;!
+	@               if      (yyyIsEqual ("parent")) { yyState = yyyWrite; return; }@
+	@               else if (yyyIsEqual ("quit"))   { yyState = yyyQuit; return; }@
+	!               else if (yyyIsEqualGoto ()) {!
+	!                  yyTheNode = yyTheTree;!
+	!                  yyCurLine = Integer.MAX_VALUE;!
+	!                  ! WI (iMain); !.traverseTD (yyTheTree, yySearch2);!
+	!                  yyQuery (yyTheNode);!
+	@               } else if (yyt != null) {@
+	!                  switch (yyt.yyKind ()) {!
+	                      ForallClasses (Classes, QueryAttributes);
+	!                  default: break;!
+	!               }!
+	!            }!
+	!         }!
+	!      }!
+	!   }!
+	!!
+	!   public static void query (! WI (iTreeNode); ! yyt) throws java.io.IOException {!
+	!      yyTheTree = yyt; yyQuery (yyt);!
+	!   }!
+	!!
+	!   public void query () throws java.io.IOException {!
+	!      query (this);!
+	!   }!
+      END;
+      IF IsElement (ORD ('='), Options) THEN
+	!   public static boolean isEqual (! WI (iTreeNode); ! yyt1, ! WI (iTreeNode); ! yyt2) {!
+	!      yyResult = true;!
+	!      yyIsEqual! WI (iMain); ! (yyt1, yyt2);!
+	!      return yyResult;!
+	!   }!
+	!!
+	!+! WI (iTreeNode); !.methods!
+	!   public boolean equals (Object other) {!
+	!      ! WI (iTreeNode); ! yyt2;!
+	@      if (! (other instanceof @ WI (iTreeNode); @)) return false;@
+	!      yyt2 = (! WI (iTreeNode); !) other;!
+	!      return ! WI (iModule); !.isEqual (this, yyt2);!
+	!   }!
+	!!
+	!=! WI (iTreeNode); !.methods!
+	!!
+	!   static void yyIsEqual! WI (iMain); ! (! WI (iTreeNode); ! yyt1, ! WI (iTreeNode); ! yyt2) {!
+	@      while (yyt1 != yyt2 && yyResult) {@
+	@         if (yyt1 == null || yyt2 == null || yyt1.yyKind () != yyt2.yyKind ())@
+	!            { yyResult = false; return; }!
+	!         yyt1.yyEqual (yyt2);!
+	ForallClasses (Classes, IsEqualAttributes);
+	!         yyt1 = yyt1.yyGetIterator ();!
+	!         yyt2 = yyt2.yyGetIterator ();!
+	!      }!
+	!   }!
+	!!
+	!+! WI (iTreeNode); !.methods!
+	!   void yyEqual (! WI (iTreeNode); ! yyOther) { yyResult &= equalNodeHead (this, yyOther); }!
+	!=! WI (iTreeNode); !.methods!
+      END;
+      IF IsElement (ORD ('L'), Options) THEN
+	MaxBit := 0;
+	ForallClasses (Classes, CompMaxBit);
+	! public static void init! WI (iMain); !(! WI (iTreeNode); ! yyt) {!
+	!  for (;;) {!
+	FOR i := 0 TO (MaxBit - 1) DIV BSS DO
+	   !   yyt.yyIsComp! WN (i); ! = 0;!
+      IF IsElement (ORD ('5'), Options) THEN
+	   !   yyt.yyIsDone! WN (i); ! = 0;!
+      END;
+	END;
+	!   switch (yyt.yyKind ()) {!
+	ForallClasses (Classes, InitAttributes);
+	!   default: return;!
+	!   }!
+	!  }!
+	! }!
+	!!
+      END;
+	!!
+	UserBegin := FALSE;
+	IF NOT IsEmpty (TreeCodes^.Codes.Begin) THEN
+	   UserBegin := TRUE;
+	END;
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   IF NOT IsEmpty (Node^.Module.TreeCodes^.Codes.Begin) THEN
+	      UserBegin := TRUE;
+	   END;
+	   Node := Node^.Module.Next;
+	END;
+	IF UserBegin THEN
+	   !   public static void begin () {!
+	   WriteLine (TreeCodes^.Codes.BeginLine);
+	   WriteText (f, TreeCodes^.Codes.Begin);
+	   Node := Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	      WriteLine (Node^.Module.TreeCodes^.Codes.BeginLine);
+	      WriteText (f, Node^.Module.TreeCodes^.Codes.Begin);
+	      Node := Node^.Module.Next;
+	   END;
+	   !   }!
+	   !!
+	END;
+	UserClose := FALSE;
+	IF NOT IsEmpty (TreeCodes^.Codes.Close) THEN
+	   UserClose := TRUE;
+	END;
+	Node := Modules;
+	WHILE Node^.Kind = Tree.Module DO
+	   IF NOT IsEmpty (Node^.Module.TreeCodes^.Codes.Close) THEN
+	      UserClose := TRUE;
+	   END;
+	   Node := Node^.Module.Next;
+	END;
+	IF UserClose THEN
+	   !   public static void close () {!
+	   WriteLine (TreeCodes^.Codes.CloseLine);
+	   WriteText (f, TreeCodes^.Codes.Close);
+	   Node := Modules;
+	   WHILE Node^.Kind = Tree.Module DO
+	      WriteLine (Node^.Module.TreeCodes^.Codes.CloseLine);
+	      WriteText (f, Node^.Module.TreeCodes^.Codes.Close);
+	      Node := Node^.Module.Next;
+	   END;
+	   !   }!
+	   !!
+	END;
+	IF UserBegin THEN
+           !   static {!
+	   !      begin ();!
+	   !   }!
+	END;
+	!}!
+}; .
+
+
+PROCEDURE ProcedureBodyn (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	!!
+	!      public ! WI (Name); ! () {!
+	iClassName := Name;
+	ForallAttributes (t, ProcedureBodyn);
+	!      }!
+	.
+Child (..) :-
+	!         this.! WI (Name); ! = null;!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	!         begin! WI (CppType); ! (this.! WI (Name); !)!
+	.
+
+PROCEDURE HasmArgs2 (t: Tree)
+
+Attribute (..) ;
+Child (..) :-
+	CONDITION (Input IN Properties) AND (Init = NoString);
+	Success := TRUE;
+.
+
+PREDICATE HasmArgs (t: Tree)
+
+Class (..) :-
+	Success := FALSE;
+	ForallAttributes (t, HasmArgs2);
+	CONDITION Success;
+.
+
+PROCEDURE ProcedureBodym (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND HasmArgs (t);
+	ProcedureHeadingm (t);
+	IF ({{HasChildren, HasAttributes}} * Properties) # {{}} THEN
+	   ForallAttributes (t, ProcedureBodym);
+	END;
+	!      }!
+	.
+Child (..) :-
+	IF Input IN Properties THEN
+	   !         this.! WI (Name); ! =! 
+	   IF Init = NoString THEN
+	      ! ! WI (Name); !;!
+	   ELSE
+	      WriteString (f, Init); !;!
+	   END
+	ELSE
+	   !         this.! WI (Name); ! = null;!
+	END;
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	IF Input IN Properties THEN
+	   !         this.! WI (Name); ! =! 
+	   IF Init = NoString THEN
+	      ! ! WI (Name); !;!
+	   ELSE
+	      WriteString (f, Init); !;!
+	   END
+	ELSE
+	   !         begin! WI (CppType); ! (this.! WI (Name); !)!
+	END;
+	.
+
+
+PROCEDURE TraverseTD (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	!+! WI (Name); !.methods!
+	!      void yyTraverseTD () {!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, TraverseTD);
+	!      }!
+	!=! WI (Name); !.methods!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!         ! WI (iModule); !.yyTraverseTD (! WI (Name); !);!
+	.
+
+
+PROCEDURE TraverseBU (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	!               case k! WI (Name); !:!
+	GetIterator (t);
+	iClassName := Name;
+	!                  yyStackPtr ++; yyStack [yyStackPtr] = ((! WI (iClassName); !) yyt).! WI (Iterator^.Child.Name); !;!
+	ForallAttributes (t, TraverseBU);
+	!                  break;!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!                  yyStackPtr ++; yyStack [yyStackPtr] = ((! WI (iClassName); !) yyt).! WI (Name); !;!
+	.
+
+PROCEDURE GenReverse (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	iClassName := Name;
+	ForallAttributes (t, GenReverse);
+	.
+Child (..) :-
+	CONDITION Reverse IN Properties;
+	!+! WI (iClassName); !.methods!
+	!      ! WI (iTreeNode); ! yySwapNext (! WI (iTreeNode); ! yyt) {!
+	!         ! WI (iTreeNode); ! yyNext = ! WI (Name); !;!
+	!         ! WI (Name); ! = (! WI (Type); !) yyt;!
+	!         return yyNext;!
+	!      }!
+	!=! WI (iClassName); !.methods!
+	.
+
+PROCEDURE Forall (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	iClassName := Name;
+	ForallAttributes (t, Forall);
+	.
+Child (..) :-
+	CONDITION Reverse IN Properties;
+	!+! WI (iClassName); !.methods!
+	!!
+	!      public ! WI (iTreeNode); ! yyGetNext () {!
+	!         return ! WI (Name); !;!
+	!      }!
+	!=! WI (iClassName); !.methods!
+	.
+
+PROCEDURE Copy (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	GetIterator (t);
+	iClassName := Name;
+	!+! WI (Name); !.methods!
+	!!
+	!      ! WI (iTreeNode); ! yyCopy () {!
+	!         ! WI (Name); ! copy;!
+	!         if (yyMark == 0) return this.yyMapOldToNew ();!
+	!         copy = new ! WI (Name); ! ();!
+	!         copyNodeHead (this, copy)!
+	ForallAttributes (t, Copy);
+	!         return copy;!
+	!      }!
+	!=! WI (Name); !.methods!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!         copy.! WI (Name); ! = (! WI (Type); !) ! WI (iModule); !.yyCopyAll (! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	!         copy! WI (CppType); ! (copy.! WI (Name); !, ! WI (Name); !)!
+	.
+
+PROCEDURE GenGetIterator (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	GetIterator (t);
+	iClassName := Name;
+	!+! WI (Name); !.methods!
+	IF Iterator # NoTree THEN
+	   !!
+	   !      ! WI (iTreeNode); ! yyGetIterator () {!
+	   !         return ! WI (Iterator^.Child.Name); !;!
+	   !      }!
+	END;
+	!=! WI (Name); !.methods!
+	.
+
+PROCEDURE GenSetIterator (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	GetIterator (t);
+	iClassName := Name;
+	!+! WI (Name); !.methods!
+	IF Iterator # NoTree THEN
+	   !!
+	   !      boolean yyHasIterator () { return true; }!
+	   !!
+	   !      void yySetIterator (! WI (iTreeNode); ! yyt) {!
+	   !         ! WI (Iterator^.Child.Name); ! = (! WI (Iterator^.Child.Type); !) yyt;!
+	   !      }!
+	END;
+	!=! WI (Name); !.methods!
+	.
+
+PROCEDURE CheckAttributes (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	GetIterator (t);
+	iClassName := Name;
+	!+! WI (Name); !.methods!
+	!      ! WI (iTreeNode); ! yyCheck () throws java.io.IOException {!
+	ForallAttributes (t, CheckAttributes);
+	!         this.yyCheckChild2 (! WI (Iterator^.Child.Name);
+	             @, "@ WI (Iterator^.Child.Name); @");@
+	!         return ! WI (Iterator^.Child.Name); !;!
+	!      }!
+	!=! WI (Name); !.methods!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!         this.yyCheckChild (! WI (Name); @, "@ WI (Name); @");@
+	.
+
+PROCEDURE yyKind (t: Tree)
+
+Class (..) :-
+	CONDITION NOT (Abstract IN Properties);
+	CONDITION NOT (Ignore IN Properties);
+	!+! WI (Name); !.methods!
+	!!
+	!      public int yyKind () { return k! WI (Name); !; }!
+	!=! WI (Name); !.methods!
+	.
+PROCEDURE InitTypeRange (t: Tree)
+
+Class (..) :-
+	CONDITION NOT (Abstract IN Properties);
+	IF NOT (Ignore IN Properties) THEN
+	   iRange := Name;
+	   ForallClasses (Extensions, InitTypeRange2);
+	   !      k! WI (iRange); !,!
+	ELSE
+	   !      0,!
+	END;
+	.
+
+
+PROCEDURE InitTypeRange2 (t: Tree)
+
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	iRange := Name;
+	.
+
+PROCEDURE QueryAttributes ([Classes, Attributes])
+
+t:
+Class (..) :-
+	CONDITION (NoCodeClass * Properties) = {{}};
+	CONDITION (HasChildren IN Properties) OR HasTreeValuedAttributes (t);
+	IsFirst := TRUE;
+	!                     case k! WI (Name); !:!
+	iClassName := Name;
+	ForallAttributes (t, QueryAttributes);
+	!                        break;!
+	.
+Child (..) :-
+	!                        ! 
+	IF IsFirst THEN IsFirst := FALSE; ELSE !else ! END;
+	@if (yyyIsEqual ("@ WI (Name); @")) @ 
+	!yyQuery (((! WI (iClassName); !) yyt).! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION IsElement (CppType, TreeTypeNames);
+	!                        ! 
+	IF IsFirst THEN IsFirst := FALSE; ELSE !else ! END;
+	@if (yyyIsEqual ("@ WI (Name); @")) @ 
+	!yyQuery (((! WI (iClassName); !) yyt).! WI (Name); !);!
+	.
+
+PROCEDURE IsEqualAttributes (t: Tree)
+
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND
+	   (({{HasChildren, HasAttributes}} * Properties) # {{}});
+	!+! WI (Name); !.methods!
+	!      void yyEqual (! WI (iTreeNode); ! yyOther) {!
+	!         ! WI (Name); ! yyt2 = (! WI (Name); !) yyOther;!
+	GetIterator (t);
+	iClassName := Name;
+	ForallAttributes (t, IsEqualAttributes);
+	!         yyResult &= equalNodeHead (a, yyt2);!
+	!      }!
+	!!
+	!=! WI (Name); !.methods!
+	.
+Child (..) :-
+	CONDITION t # Iterator;
+	!         ! WI (iModule); !.yyIsEqual! WI (iMain); ! (! WI (Name); !, yyt2.! WI (Name); !);!
+	.
+Attribute (..) :-
+	CONDITION (NoCodeAttr * Properties) = {{}};
+	!         yyResult &= (equal! WI (CppType); !(! WI (Name); !, yyt2.! WI (Name); !));!
+	.
+
+PROCEDURE InitAttributes (Tree)
+
+t:
+Class (..) :-
+	CONDITION ((NoCodeClass * Properties) = {{}}) AND (HasChildren IN Properties);
+	CONDITION HasInputChildren (t);
+	!   case ! WI (Name); !:!
+	GetIterator (t);
+	iClassName := Name;
+	gBitCount := BitCount;
+	ForallAttributes (t, InitAttributes);
+	IF NOT (Input IN Iterator^.Child.Properties) THEN
+	   !    return;!
+	ELSE
+	   !    yyt = ((! WI (iClassName); !) yyt).! WI (Iterator^.Child.Name); !;!
+	END;
+	.
+t:
+Child (..) :-
+	CONDITION Input IN Properties;
+	!    yyt.yyOffset = ! WN (gBitCount + BitOffset); !; yyt.yyParent = yyt;!
+	CONDITION t # Iterator;
+	!    init! WI (iMain); !(((! WI (iClassName); !) yyt).! WI (Name); !);!
+	.
+
+PROCEDURE CompMaxBit (t: Tree)
+
+Class (..) :-
+	i := 1;
+	ForallAttributes (t, CompMaxBit);
+	MaxBit := Max (i, MaxBit);
+	.
+Child (..) ;
+Attribute (..) :-
+	CONDITION {{Input, Test, Dummy}} * Properties = {{}};
+	INC (i);
+	.
+
+PREDICATE HasTreeValuedAttributes (t: Class)
+
+Class (..) :-
+	Success := FALSE;
+	ForallAttributes (t, HasTreeValuedAttributes2);
+	CONDITION Success;
+	.
+
+PROCEDURE HasTreeValuedAttributes2 (t: Attributes)
+
+Attribute (..) :-
+	CONDITION NodeType # NoTree;
+	Success := TRUE;
+	.
+
+PREDICATE HasInputChildren (t: Class)
+
+Class (..) :-
+	Success := FALSE;
+	ForallAttributes (t, HasInputChildren2);
+	CONDITION Success;
+	.
+
+PROCEDURE HasInputChildren2 (t: Attributes)
+
+Child (..) :-
+	CONDITION Input IN Properties;
+	Success := TRUE;
+	.

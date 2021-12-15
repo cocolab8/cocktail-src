@@ -1,0 +1,96 @@
+(* $Id: Table.mi,v 1.1 1989/04/14 12:21:55 vielsack rel $ *)
+
+IMPLEMENTATION MODULE Table;
+
+FROM IO		IMPORT	StdOutput;
+FROM StdIO	IMPORT	WriteNl, WriteC;
+FROM Strings	IMPORT	tString, AssignEmpty, Length, Char, Assign, WriteS;
+
+VAR 
+  empty: tString;
+  outside: BOOLEAN;
+  table: ARRAY CHAR OF tString;
+  c: CHAR;
+
+PROCEDURE Define	(letter: CHAR; VAR definition: tString);
+  BEGIN
+    Assign (table [letter], definition);
+  END Define;
+
+PROCEDURE Translate	(letter: CHAR; VAR text: tString);
+  VAR def: tString; l,i: INTEGER;
+  BEGIN
+    Assign (def, table [letter]);
+    i := 0;
+    l := Length (def);
+    LOOP
+      IF i = l THEN EXIT END;
+      INC (i);
+      c := Char (def, i);
+      IF c = '%' THEN
+	WriteText (text);
+      ELSIF c = '\' THEN
+	IF i < l THEN
+	  INC (i);
+	  c := Char (def, i);
+	  WriteC (c);
+	END;
+      ELSE
+	WriteC (c);
+      END;
+    END;
+  END Translate;
+
+PROCEDURE WriteText	(VAR text: tString);
+  VAR i,l: INTEGER; c: CHAR;
+  BEGIN
+    i := 0;
+    l := Length (text);
+    LOOP
+      IF i = l THEN EXIT END;
+      INC (i);
+      c := Char (text, i);
+      IF c = '\' THEN
+	IF i < l THEN
+	  INC (i);
+	  c := Char (text, i);
+	  WriteC (c);
+	END;
+      ELSE
+	WriteC (c);
+      END;
+    END;
+  END WriteText;
+
+PROCEDURE BeginLine	;
+  BEGIN
+    IF outside THEN
+      Translate ('^', empty);
+      outside := FALSE;
+    END;
+  END BeginLine;
+
+PROCEDURE CloseLine	;
+  BEGIN
+    Translate ('$', empty);
+    outside := TRUE;
+  END CloseLine;
+
+PROCEDURE WriteLine	(VAR text: tString);
+  BEGIN
+    WriteS (StdOutput, text);
+  END WriteLine;
+
+PROCEDURE NewLine	;
+  BEGIN
+    WriteNl;
+  END NewLine;
+
+
+BEGIN
+  outside := TRUE;
+  AssignEmpty (empty);
+  FOR c := MIN (CHAR) TO MAX (CHAR) DO
+    AssignEmpty (table [c]);
+  END;
+END Table.

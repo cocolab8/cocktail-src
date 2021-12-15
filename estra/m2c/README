@@ -1,0 +1,9 @@
+Estra - Generator for Syntax Tree Transformations
+=================================================
+
+The libraries MLIB=reuse and COMMON must have been compiled before the
+installation of estra.
+
+To generate estra use:
+
+   make install LIB=... BIN=... OPT=...

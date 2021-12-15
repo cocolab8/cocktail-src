@@ -1,0 +1,43 @@
+(*
+ *	M T C  -  Modula-2 to C Translator
+ *      ----------------------------------
+ *
+ *	Purpose: access to source files
+ *
+ *	$Author: grosch $
+ *	$Date: 1998/05/29 10:46:12 $
+ *	$Revision: 1.0 $
+ *
+ ***)
+
+IMPLEMENTATION MODULE Source;
+
+FROM SYSTEM	IMPORT ADDRESS;
+FROM rSystem	IMPORT tFile, OpenInput, rRead, rClose;
+FROM Idents	IMPORT MakeIdent;
+FROM Strings	IMPORT tString, ArrayToString;
+FROM Scanner	IMPORT Attribute;
+
+VAR String	: tString;
+
+PROCEDURE BeginSource (FileName: ARRAY OF CHAR): tFile;
+   BEGIN
+      ArrayToString (FileName, String);
+      Attribute.Position.File := MakeIdent (String);
+      RETURN OpenInput (FileName);
+   END BeginSource;
+
+PROCEDURE GetLine (File: tFile; Buffer: ADDRESS; Size: CARDINAL): INTEGER;
+   BEGIN
+      RETURN rRead (File, Buffer, Size);
+   END GetLine;
+
+PROCEDURE CloseSource (File: tFile);
+   BEGIN
+      rClose (File);
+   END CloseSource;
+
+BEGIN
+  ArrayToString ("StdInput", String);
+  Attribute.Position.File := MakeIdent (String);
+END Source.

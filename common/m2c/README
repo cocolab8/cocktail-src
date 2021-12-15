@@ -1,0 +1,8 @@
+Common - Module Library
+=======================
+
+The library MLIB=reuse must have been compiled before the compilation of common.
+
+To generate common use:
+
+   make OPT=...

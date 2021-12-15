@@ -1,0 +1,71 @@
+ % used for evaluation version
+ & used for GetLookahead
+ + generate C++       source code
+ , used for TrialParse
+ . used for yacc
+ | used for explain
+ 0 construct an LALR(1) parser (based on an LR(0) automaton)
+ 1 construct an   LR(1) parser (based on an LR(1) automaton)
+ 2 suppress reporting of multiply defined nonterminals
+ 3 generate Ada       source code
+ 4 use tables to decrement stack pointers (default: inline code)
+ 5 generate parser with graphical visualization
+ 6 use alternate algorithm for table compression
+ 7 touch output files only if necessary
+ 8 report storage consumption
+ 9
+ : generate lines not longer than 80 characters
+ ; used for ReParse
+ A print full automaton (invalid states, PRED, defaults, etc.)
+ B print full automaton before CheckConflicts1
+ C disable generation of comments and rules
+ D explain new conflicts, only - old conflicts are read from file with suffix .cft
+ E disable LR1(k) analysis
+ F disable LR(k)  analysis
+ G browse internal data structure with graphical browser
+ H
+ I
+ J report undefined tokens and multiply defined nonterminals as error (default: warning)
+ K
+ L print info about lane trace algorithm
+ M
+ N<name> specify parser name   for concrete syntax tree
+ O<nnn>  specify parser number for concrete syntax tree (default: 1)
+ P print full symbol info (PATH, LS, etc.)
+ Q or q browse internal data structure with text browser
+ R print step-time
+ S print messages (do not store)
+ T print full statistics
+ U explain explicitly  repaired conflicts
+ V explain implicitly  repaired conflicts
+ W explain LALR(2)     repaired conflicts
+ X explain dynamically repaired conflicts
+ Y print a list of terminals and their encoding
+ Z print a list of nonterminals and rules
+ a generate all = -dip (default)
+ b memorize previous trial parses and avoid repetition of same trial parses
+ c generate C         source code
+ d generate header file or definition module
+ e generate Eiffel 3  source code
+ f<pre> generate constant declarations for tokens with prefix pre (default: t_)
+ g generate # line directives
+ h print help information
+ i generate implementation part or module
+ j generate Java      source code
+ k<n> specify maximal value of k for LR(k) analysis (default: 1)
+ l<dir> specify the directory dir where lark finds its data files
+ m generate Modula-2  source code (default)
+ n reduce the number of case labels in switch, case, or inspect statements
+ n<mmm> generate switch or case statements with at most mmm case labels
+ o use fast and large nonterminal tables  (default: slow and small)
+ p generate main program to be used as test driver
+ q or Q browse internal data structure with text browser
+ r suppress elimination of LR(0) reductions
+ s suppress informations and warnings
+ t print statistics about the generated parser
+ u use fast and large    terminal tables  (default: slow and small)
+ v explain all LR conflicts in file with suffix .dbg
+ w explain implicitly and dynamically repaired conflicts, only
+ x print a list of terminals and their encoding
+ y print a readable version of the generated automaton (states and items)
+ z print a list of nonterminals and rules

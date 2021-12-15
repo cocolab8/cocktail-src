@@ -1,0 +1,1158 @@
+(* $Id: GenTabs.mi,v 4.12 2007/03/27 09:49:25 grosch rel $ *)
+
+(*
+ * $Log: GenTabs.mi,v $
+ * Revision 4.12  2007/03/27 09:49:25  grosch
+ * fixed overflow of variable NodeCount
+ * changed some INT types to CARD
+ *
+ * Revision 4.11  2006/08/01 14:13:08  grosch
+ * provide exclusive start states like flex
+ *
+ * Revision 4.10  2001/08/08 14:58:15  grosch
+ * added and revised support for #line directives
+ *
+ * Revision 4.9  2000/09/12 17:39:40  grosch
+ * added support for Unicode
+ *
+ * Revision 4.8  1999/11/16 17:52:34  grosch
+ * added generation of Java
+ *
+ * Revision 4.7  1999/05/04 15:00:17  grosch
+ * added reporting of \127 as triggering the default action
+ *
+ * Revision 4.6  1998/04/21 10:28:06  grosch
+ * truncation of file and module names to 8.3 format
+ * cosmetic changes
+ * report ranges of characters in warning message
+ *
+ * Revision 4.5  1997/01/17 21:29:43  grosch
+ * removed Errors module, use the one from reuse
+ *
+ * Revision 4.4  1996/04/25  09:44:09  grosch
+ * added option for printing of information about ambiguous rules
+ *
+ * Revision 4.3  1995/07/24  16:38:15  grosch
+ * detect and handle null strings
+ *
+ * Revision 4.2  1994/09/13  12:43:56  grosch
+ * added generation of Ada code
+ *
+ * Revision 4.1  1994/03/23  14:49:28  grosch
+ * added generation of C++
+ * read options from environment variable REX
+ * added touching of output files only if necessary
+ *
+ * Revision 4.0  1993/08/26  16:01:21  grosch
+ * replaced table files (Scanner.Tab, Parser.Tab, ...) by initialization code
+ *
+ * Revision 3.4  1993/08/18  15:10:38  grosch
+ * rename System and Memory to rSystem and rMemory
+ *
+ * Revision 3.3  1993/05/28  14:09:53  grosch
+ * added target language Eiffel
+ *
+ * Revision 3.2  1991/11/21  14:41:19  grosch
+ * fixed bug: interference of right context between constant and non-constant RE
+ * new version of RCS on SPARC
+ *
+ * Revision 3.1  91/04/26  18:19:08  grosch
+ * fixed bug in computing ControlSize
+ *
+ * Revision 3.0  91/04/04  18:06:59  grosch
+ * introduced partitioning of character set
+ *
+ * Revision 2.1  91/03/26  18:26:46  grosch
+ * improved generation time
+ * introduced options n and o to control table size and generation time
+ * increased limitation for table size from 64K to 256K
+ *
+ * Revision 2.0  91/03/08  18:17:46  grosch
+ * turned tables into initialized arrays (in C)
+ * reduced case size
+ * changed interface for source position
+ *
+ * Revision 1.9  91/02/13  11:34:34  grosch
+ * moved tables from file to initialization in C; reduced case size
+ *
+ * Revision 1.8  90/09/04  19:35:39  grosch
+ * fixed bug in AddConstantRE with StartSets
+ *
+ * Revision 1.7  90/06/11  11:27:29  grosch
+ * extended character range to 8 bits, ChRange -> CHAR
+ *
+ * Revision 1.6  90/05/17  11:20:32  grosch
+ * extend character range to 8 bits
+ *
+ * Revision 1.5  90/04/11  18:27:36  grosch
+ * added missing ) in message
+ *
+ * Revision 1.4  89/11/06  12:38:36  grosch
+ * renamed module Rex to GenTabs to avoid name clash with rex under VMS
+ *
+ * Revision 1.3  89/06/01  18:09:36  grosch
+ * fixed bug at optional right context
+ *
+ * Revision 1.2  89/02/23  15:55:34  grosch
+ * corrected confusion between RuleCount and PatternCount
+ * corrected debug procedure WritePattern
+ * improved handling of right context
+ * added completeness check for the automaton
+ *
+ * Revision 1.1  89/01/17  15:01:15  grosch
+ * correction and redesign of source position handling
+ *
+ * Revision 1.0  88/10/04  11:59:40  grosch
+ * Initial revision
+ *
+ *)
+
+(* Ich, Doktor Josef Grosch, Informatiker, Nov. 1987 *)
+
+IMPLEMENTATION MODULE GenTabs;
+
+FROM SYSTEM	IMPORT TSIZE, ADR;
+FROM General	IMPORT Min;
+FROM rMemory	IMPORT Alloc, Free, MemoryUsed;
+FROM DynArray	IMPORT MakeArray, ExtendArray, ReleaseArray;
+FROM Errors	IMPORT Message, MessageI, Information;
+FROM Strings	IMPORT tString, Char, Concatenate, Append;
+FROM StringM	IMPORT GetString, GetWString, Length;
+FROM Times	IMPORT WriteStepTime;
+
+FROM Sets	IMPORT
+   tSet		, MakeSet	, ReleaseSet	, Union		,
+   Intersection	, Include	, Exclude	, Minimum	,
+   Extract	, IsEqual	, IsElement	, IsEmpty	,
+   Assign	, AssignElmt	, AssignEmpty	, ForallDo	,
+   Maximum	, IsSubset	, WriteSet	, Card		;
+
+FROM Relation	IMPORT tRelation, MakeRelation, ReleaseRelation;
+FROM IO		IMPORT WriteS, WriteNl, WriteI, WriteC, StdOutput, StdError;
+FROM Layout	IMPORT WriteSpace;
+FROM DefTable	IMPORT GetKind, DefRange, DefCount, GetStartDef, tKind;
+
+FROM Tree	IMPORT
+   nAlternative	, nSequence	, nRepetition	, nOption	,
+   nChar	, nSet		, nString	,
+   tTree	, NoTree	;
+
+FROM Nfa	IMPORT
+   NStateRange	, TransitionRange, NStateCount	, TransitionCount,
+   PutNSemantics, GetNSemantics	, PutTransitions, GetTransitions,
+   MakeNState	, MakeTransition, IsLastTransition, NextTransition,
+   GetCh	, GetNextState	, NoTransition	, WriteNfa	,
+   AddTransition, CopyTransitions, UniteTransitions, BeginNfa, FinalizeNfa;
+
+FROM Dfa	IMPORT
+   DNoState	, DStateRange	, DStateCount	, MakeDState	,
+   GetTable	, PutTable	, GetDSemantics	, PutDSemantics	,
+   GetStartSet	, PutStartSet	, ComputeStartSets, WriteDfa	,
+   GetDefault	, PutDefault	, GetFirst	, GetLast	,
+   EobState	, EobDefaultState, FirstCh	,
+   EobCh	, CyclicStates	, AmbiguousStates, MaxAmbiguousState,
+   ComputeSuccGraph, ComputeCyclicStates, ComputeAmbiguousStates,
+   MinimizeDfa	, MinimizeSavings, SaveEobTransitions, ComputeDefaults,
+   DefaultSavings, GetEobTrans	;
+
+FROM Traces	IMPORT
+   InitTraces	, ResetTraces	, RecordTrace	, RecordedTrace	,
+   FinalizeTraces;
+
+FROM ScanTabs	IMPORT
+   NoRule	, TableSize	, TableEntries	, MakeTables	,
+   CompressTables, PutEiffelTables, QueryTables	, WriteTables	;
+
+FROM ScanGen	IMPORT Language, tLanguage;
+FROM Classes	IMPORT ClassCount, LastClass, ToClass, ClassMemPtr, ToChar,
+			Unused, tCharClass;
+FROM UniCode	IMPORT UCHAR, WriteChar;
+
+IMPORT Strings, WStrings, Idents, Errors, Relation, HugeSets;
+
+TYPE
+   SetOfNInfoPtr	= POINTER TO SetOfNInfo			;
+   SetOfNInfo		= RECORD
+			     Next	: SetOfNInfoPtr	;
+			     Set	: tSet		;
+			     DState	: DStateRange	;
+			  END;
+   MapDToSetOfN		= ARRAY [0 .. 100000] OF SetOfNInfoPtr	;
+   HashDToSetOfN	= ARRAY [0 .. 100000] OF SetOfNInfoPtr	;
+   Stack		= ARRAY [0 .. 100000] OF DStateRange	;
+
+VAR
+   MapDToSetOfNPtr	: POINTER TO MapDToSetOfN;
+   MapDToSetOfNSize	: LONGINT	;
+
+   HashDToSetOfNPtr	: POINTER TO HashDToSetOfN;
+   HashDToSetOfNSize	: LONGINT	;
+
+   StackPtr		: POINTER TO Stack;
+   StackSize		: LONGINT	;
+   StackTop		: DStateRange	;
+
+   StartSet		,
+   dSemantics		: tSet		;
+   SentinelSavings	: INTEGER	;
+
+   IsComputedNContext	: BOOLEAN	;
+   IsComputedDContext	: BOOLEAN	;
+   IsComputedFinals	: BOOLEAN	;
+
+PROCEDURE ComputeNfa;
+   VAR
+      t1, t2		: TransitionRange;
+      f1, f2		: tSet		;
+      o1, o2		: BOOLEAN	;
+      ruleList		: tTree		;
+      rule		: tTree		;
+      patternList	: tTree		;
+      pattern		: tTree		;
+      RuleNr		: SHORTCARD	;
+      NState		: NStateRange	;
+      length		: SHORTINT	;
+   BEGIN
+      BeginNfa;
+      FOR NState := 1 TO StartStateCount DO
+	 IF MakeNState (NoTransition) # NState THEN HALT; END;	(* ASSERT *)
+      END;
+
+      MakeSet (f1, LeafCount);
+      MakeSet (f2, LeafCount);
+      ruleList := Root;
+
+      WHILE ruleList # NoTree DO
+	 rule := ruleList^.vNode2.Son2;
+	 RuleNr := rule^.vNodeRule.RuleNr;
+	 RuleToCodePtr^[RuleNr].Text     := rule^.vNodeRule.TargetCode;
+	 RuleToCodePtr^[RuleNr].TextFile := rule^.vNodeRule.File;
+	 RuleToCodePtr^[RuleNr].TextLine := rule^.vNodeRule.Line;
+	 RuleToCodePtr^[RuleNr].CodeMode := rule^.vNodeRule.CodeMode;
+	 patternList := rule^.vNodeRule.Patterns;
+
+	 WHILE patternList # NoTree DO
+	    pattern := patternList^.vNode2.Son2;
+	    PatternNr := pattern^.vNodePattern.PatternNr;
+	    WITH PatternTablePtr^[PatternNr] DO
+	       Rule		:= RuleNr;
+	       ContextLng	:= NoContext;
+	       Position		:= pattern^.vNodePattern.Position;
+	    END;
+	    IF NOT pattern^.vNodePattern.IsConstantRE THEN
+	       AttributeEvaluator (pattern^.vNodePattern.RegExpr, t1, f1, o1);
+	       AttributeEvaluator (pattern^.vNodePattern.RightContext, t2, f2, o2);
+	       tt := t1;
+	       ForallDo (pattern^.vNodePattern.StartStates, ExtendTransitions);
+	       IF o2 THEN
+		  ForallDo (f1, EnterNSemantics);
+	       END;
+	       tt := t2;
+	       ForallDo (f1, ExtendTransitions);
+	       ForallDo (f2, EnterNSemantics);
+					     (* context *)
+	       length := ComputeLength (pattern^.vNodePattern.RightContext);
+	       IF length # VariableContext THEN
+		  PatternTablePtr^[PatternNr].ContextLng := length;
+	       ELSE
+		  length := ComputeLength (pattern^.vNodePattern.RegExpr);
+		  IF length # VariableContext THEN
+		     PatternTablePtr^[PatternNr].ContextLng := - length;
+		  ELSE
+		     PatternTablePtr^[PatternNr].ContextLng := VariableContext;
+		     MakeSet (PatternTablePtr^[PatternNr].NContext, LeafCount);
+		     Assign (PatternTablePtr^[PatternNr].NContext, f1);
+		  END;
+	       END;
+	    END;
+	    patternList := patternList^.vNode2.Son1;
+	 END;
+	 ruleList := ruleList^.vNode2.Son1;
+      END;
+
+      IsComputedNContext := TRUE;
+      ReleaseSet (f1);
+      ReleaseSet (f2);
+   END ComputeNfa;
+
+PROCEDURE ComputeLength (t: tTree): SHORTINT;
+   VAR l1, l2	: SHORTINT;
+   BEGIN
+      IF t = NoTree THEN RETURN NoContext; END;
+
+      CASE t^.vNode0.Rule OF
+      |  nAlternative	: l1 := ComputeLength (t^.vNode2.Son1);
+			  l2 := ComputeLength (t^.vNode2.Son2);
+			  IF l1 = l2 THEN
+			     RETURN l1;
+			  ELSE
+			     RETURN VariableContext;
+			  END;
+
+      |  nSequence	: l1 := ComputeLength (t^.vNode2.Son1);
+			  l2 := ComputeLength (t^.vNode2.Son2);
+			  IF (l1 # VariableContext) AND (l2 # VariableContext) THEN
+			     RETURN l1 + l2;
+			  ELSE
+			     RETURN VariableContext;
+			  END;
+
+      |  nRepetition	,
+         nOption	: RETURN VariableContext;
+
+      |  nChar		,
+         nSet		: RETURN 1;
+
+      |  nString	: RETURN Length (t^.vNodeString.String);
+      END;
+   END ComputeLength;
+
+PROCEDURE AttributeEvaluator (
+	  t		: tTree		;
+      VAR Transitions	: TransitionRange;
+      VAR FinalStates	: tSet		;
+      VAR IsOptional	: BOOLEAN	);
+   VAR
+      t1, t2		: TransitionRange;
+      f1, f2		: tSet;
+      o1, o2		: BOOLEAN;
+      NState		: NStateRange;
+      string		: WStrings.tString;
+      i			: INTEGER;
+   BEGIN
+      IF t = NoTree THEN
+	 Transitions := NoTransition;
+	 AssignEmpty (FinalStates);
+	 IsOptional := TRUE;
+	 RETURN;
+      END;
+
+      CASE t^.vNode0.Rule OF
+
+      |  nAlternative	: (* regExpr = Alternative (regExpr regExpr) *)
+	    MakeSet (f1, LeafCount);
+	    MakeSet (f2, LeafCount);
+	    AttributeEvaluator (t^.vNode2.Son1, t1, f1, o1);
+	    AttributeEvaluator (t^.vNode2.Son2, t2, f2, o2);
+	    Transitions := UniteTransitions (t1, t2);
+	    Assign (FinalStates, f1);
+	    Union (FinalStates, f2);
+	    IsOptional := o1 OR o2;
+	    ReleaseSet (f1);
+	    ReleaseSet (f2);
+
+      |  nSequence	: (* regExpr = Sequence (regExpr regExpr) *)
+	    MakeSet (f1, LeafCount);
+	    MakeSet (f2, LeafCount);
+	    AttributeEvaluator (t^.vNode2.Son1, t1, f1, o1);
+	    AttributeEvaluator (t^.vNode2.Son2, t2, f2, o2);
+	    tt := t2;
+	    ForallDo (f1, ExtendTransitions);
+	    IF o1 THEN
+	       Transitions := UniteTransitions (t1, t2);
+	    ELSE
+	       Transitions := t1;
+	    END;
+	    IF o2 THEN
+	       Assign (FinalStates, f1);
+	       Union (FinalStates, f2);
+	    ELSE
+	       Assign (FinalStates, f2);
+	    END;
+	    IsOptional := o1 AND o2;
+	    ReleaseSet (f1);
+	    ReleaseSet (f2);
+
+      |  nRepetition	: (* regExpr = Repetition (regExpr) *)
+	    MakeSet (f1, LeafCount);
+	    AttributeEvaluator (t^.vNode1.Son1, t1, f1, o1);
+	    tt := t1;
+	    ForallDo (f1, ExtendTransitions);
+	    Transitions := t1;
+	    Assign (FinalStates, f1);
+	    IsOptional := o1;
+	    ReleaseSet (f1);
+
+      |  nOption	: (* regExpr = Option (regExpr) *)
+	    MakeSet (f1, LeafCount);
+	    AttributeEvaluator (t^.vNode1.Son1, t1, f1, o1);
+	    Transitions := t1;
+	    Assign (FinalStates, f1);
+	    IsOptional := TRUE;
+	    ReleaseSet (f1);
+
+      |  nChar	: (* regExpr = Char *)
+	    NState := MakeNState (NoTransition);
+	    Transitions := MakeTransition (t^.vNodeCh.Ch, NState);
+	    AssignElmt (FinalStates, NState);
+	    IsOptional := FALSE;
+
+      |  nSet	: (* regExpr = Set *)
+	    MakeSet (f1, LastClass);
+	    Assign (f1, t^.vNodeSet.Set);
+	    NState := MakeNState (NoTransition);
+	    Transitions := NoTransition;
+	    WHILE NOT IsEmpty (f1) DO
+	       Transitions := AddTransition (MakeTransition (
+			      Extract (f1), NState), Transitions);
+	    END;
+	    AssignElmt (FinalStates, NState);
+	    IsOptional := FALSE;
+	    ReleaseSet (f1);
+
+      |  nString	: (* regExpr = String *)
+	    GetWString (t^.vNodeString.String, string);
+	    i := WStrings.Length (string);
+	    IF i > 0 THEN
+	       NState := MakeNState (NoTransition);
+	       Transitions := MakeTransition (WStrings.Char (string, i), NState);
+	       AssignElmt (FinalStates, NState);
+	       FOR i := INTEGER (WStrings.Length (string) - 1) TO 1 BY -1 DO
+		  NState := MakeNState (Transitions);
+		  Transitions := MakeTransition (WStrings.Char (string, i), NState);
+	       END;
+	       IsOptional := FALSE;
+	    ELSE
+	       Transitions := NoTransition;
+	       AssignEmpty (FinalStates);
+	       IsOptional := TRUE;
+	    END;
+      END;
+   END AttributeEvaluator;
+
+VAR tt		: TransitionRange;
+VAR PatternNr	: SHORTCARD;
+
+PROCEDURE ExtendTransitions (NState: CARDINAL);
+   BEGIN
+      PutTransitions (NState, UniteTransitions (
+      GetTransitions (NState), CopyTransitions (tt)));
+   END ExtendTransitions;
+
+PROCEDURE EnterNSemantics (NState: CARDINAL);
+   BEGIN
+      PutNSemantics (NState, PatternNr);
+   END EnterNSemantics;
+
+PROCEDURE MapSetOfNToD (t: tSet): DStateRange;
+   VAR
+      DState	: DStateRange;
+      Hash	: CARDINAL;
+      Current	: SetOfNInfoPtr;
+   BEGIN
+      Hash := Maximum (t) MOD CARDINAL (NStateCount);
+      Current := HashDToSetOfNPtr^[Hash];
+      WHILE Current # NIL DO			(* t IN S' ? *)
+	 IF IsEqual (Current^.Set, t) THEN
+	    RETURN Current^.DState;		(* yes *)
+	 END;
+	 Current := Current^.Next;
+      END;
+
+      DState := MakeDState ();			(* no: S' := S' UNION {t} *)
+      IF DState = LONGCARD (MapDToSetOfNSize) THEN
+	 ExtendArray (MapDToSetOfNPtr, MapDToSetOfNSize, TSIZE (SetOfNInfoPtr));
+      END;
+      MapDToSetOfNPtr^[DState] := Alloc (TSIZE (SetOfNInfo));
+      MakeSet (MapDToSetOfNPtr^[DState]^.Set, NStateCount);
+      Assign (MapDToSetOfNPtr^[DState]^.Set, t);
+      MapDToSetOfNPtr^[DState]^.DState := DState;
+      MapDToSetOfNPtr^[DState]^.Next := HashDToSetOfNPtr^[Hash];
+      HashDToSetOfNPtr^[Hash] := MapDToSetOfNPtr^[DState];
+
+      INC (StackTop);				(* push (y) *)
+      IF StackTop = LONGCARD (StackSize) THEN
+	 ExtendArray (StackPtr, StackSize, TSIZE (DStateRange));
+      END;
+      StackPtr^[StackTop] := DState;
+      RETURN DState;
+   END MapSetOfNToD;
+
+PROCEDURE ComputeDfa;
+   CONST InitialStackSize = 64;
+   VAR
+      DState	: DStateRange;
+      NState	: NStateRange;
+      x		: tSet;
+      y		: ARRAY tCharClass OF tSet;	(* optimize storage ??? *)
+      Transition: TransitionRange;
+      Ch	: tCharClass;
+      CharSet	: tSet;
+      Pattern	: SHORTCARD;
+      nStates	: tSet;
+   BEGIN
+      StackSize		:= InitialStackSize;	(* initialize *)
+      MakeArray (StackPtr, StackSize, TSIZE (DStateRange));
+      StackTop		:= 0;
+      MapDToSetOfNSize	:= LeafCount;
+      MakeArray (MapDToSetOfNPtr, MapDToSetOfNSize, TSIZE (SetOfNInfoPtr));
+      HashDToSetOfNSize	:= NStateCount;
+      MakeArray (HashDToSetOfNPtr, HashDToSetOfNSize, TSIZE (SetOfNInfoPtr));
+      FOR NState := 0 TO NStateCount - 1 DO
+         HashDToSetOfNPtr^[NState] := NIL;
+      END;
+      MakeSet (x, NStateCount);
+      FOR Ch := FirstCh TO LastClass DO
+	 MakeSet (y [Ch], NStateCount);
+      END;
+      MakeSet (CharSet, LastClass);
+      MakeSet (nStates, LeafCount);
+
+      FOR NState := 1 TO StartStateCount DO	(* FORALL start states *)
+	 AssignElmt (x, NState);		(* map+push (start state) *)
+	 DState := MapSetOfNToD (x);
+	 IF DState # NState THEN HALT; END;	(* ASSERT *)
+      END;
+
+      WHILE StackTop > 0 DO
+	 DState := StackPtr^[StackTop];		(* DState := pop () *)
+	 DEC (StackTop);
+	 Assign (x, MapDToSetOfNPtr^[DState]^.Set);
+	 AssignEmpty (CharSet);
+
+	 FOR NState := 1 TO NStateCount DO
+	    IF IsElement (NState, x) THEN
+	       Transition := GetTransitions (NState);
+	       WHILE NOT IsLastTransition (Transition) DO
+		  Ch := GetCh (Transition);
+		  Include (y [Ch], GetNextState (Transition));
+		  Include (CharSet, ORD (Ch));
+		  Transition := NextTransition (Transition);
+	       END;
+	    END;
+	 END;
+
+	 WHILE NOT IsEmpty (CharSet) DO
+	    Ch := Extract (CharSet);
+	    PutTable (DState, Ch, MapSetOfNToD (y [Ch]));
+	    AssignEmpty (y [Ch]);
+	 END;
+      END;
+
+      INC (NodeCount, DStateCount + 3);
+      FOR Pattern := 1 TO PatternCount - 2 DO	(* context *)
+	 IF PatternTablePtr^[Pattern].ContextLng = VariableContext THEN
+	    MakeSet (PatternTablePtr^[Pattern].DContext, NodeCount);
+	    FOR DState := 1 TO DStateCount DO
+	       Assign (nStates, PatternTablePtr^[Pattern].NContext);
+	       Intersection (nStates, MapDToSetOfNPtr^[DState]^.Set);
+	       IF NOT IsEmpty (nStates) THEN
+		  Include (PatternTablePtr^[Pattern].DContext, DState);
+	       END;
+	    END;
+	    ReleaseSet (PatternTablePtr^[Pattern].NContext);
+	 END;
+      END;
+      IsComputedNContext := FALSE;
+      IsComputedDContext := TRUE;
+
+      FOR DState := 1 TO DStateCount DO		(* semantics *)
+	 dState := DState;
+	 AssignEmpty (dSemantics);
+	 ForallDo (MapDToSetOfNPtr^[DState]^.Set, EnterDSemantics);
+	 Exclude (dSemantics, NoRule);
+	 PutDSemantics (DState, dSemantics);
+      END;
+
+      FOR DState := 1 TO DStateCount DO		(* clean up *)
+	 ReleaseSet (MapDToSetOfNPtr^[DState]^.Set);
+         Free (TSIZE (SetOfNInfo), MapDToSetOfNPtr^[DState]);
+      END;
+      ReleaseSet (x);
+      FOR Ch := FirstCh TO LastClass DO
+	 ReleaseSet (y [Ch]);
+      END;
+      ReleaseSet (CharSet);
+      ReleaseSet (nStates);
+      ReleaseArray (StackPtr, StackSize, TSIZE (DStateRange));
+      ReleaseArray (MapDToSetOfNPtr, MapDToSetOfNSize, TSIZE (SetOfNInfoPtr));
+      ReleaseArray (HashDToSetOfNPtr, HashDToSetOfNSize, TSIZE (SetOfNInfoPtr));
+      FinalizeNfa;
+   END ComputeDfa;
+
+VAR dState	: DStateRange;
+
+PROCEDURE EnterDSemantics (NState: CARDINAL);
+   BEGIN
+      Include (dSemantics, GetNSemantics (NState));
+   END EnterDSemantics;
+
+PROCEDURE SaveSentinels;
+   VAR
+      DState	,
+      Default	: DStateRange;
+      Success	: BOOLEAN;
+      Ch, lastCh: tCharClass;
+      Defaults	: tSet;
+   BEGIN
+
+      (* no end of buffer sentinel necessary for absolute final states:	*)
+      (* - state must have semantics (to be final state)		*)
+      (* - may not use a default state (except EobDefaultState)		*)
+      (* - may not be used as default state				*)
+      (* - no transitions may be defined (except on EobCh)		*)
+
+      SentinelSavings := 0;
+      MakeSet (Defaults, DStateCount);
+      FOR DState := 1 TO DStateCount DO
+	 Include (Defaults, GetDefault (DState));
+      END;
+
+      FOR DState := 1 TO DStateCount DO
+	 GetDSemantics (DState, dSemantics);
+	 Default := GetDefault (DState);
+	 IF NOT IsEmpty (dSemantics) AND	  (* final state ?	   *)
+	    ((Default = DNoState) OR		  (* don't use default ?   *)
+	     (Default = EobDefaultState)) AND
+	    NOT IsElement (DState, Defaults) THEN (* not used as default ? *)
+
+	    Success := TRUE;			  (* check transitions     *)
+	    Ch      := GetFirst (DState);
+	    lastCh  := GetLast  (DState);
+	    IF Ch <= lastCh THEN
+	       LOOP
+		  IF (Ch # ToClass (EobCh)) AND (GetTable (DState, Ch) # DNoState) THEN
+		     Success := FALSE;
+		     EXIT;
+		  END;
+		  IF Ch = lastCh THEN EXIT; END;
+		  INC (Ch);
+	       END;
+	    END;
+
+	    IF Success THEN			(* absolute final state ? *)
+	       PutTable (DState, ToClass (EobCh), DNoState);
+	       PutDefault (DState, DNoState);
+	       INC (SentinelSavings);
+	    END;
+	 END;
+      END;
+      ReleaseSet (Defaults);
+   END SaveSentinels;
+
+PROCEDURE AddConstantREs;
+   VAR
+      ruleList		: tTree		;
+      rule		: tTree		;
+      patternList	: tTree		;
+      pattern		: tTree		;
+      string1, string2	: WStrings.tString;
+      StartState	: DStateRange	;
+      PatternNr		: SHORTCARD	;
+      l			: INTEGER	;
+   BEGIN
+      InitTraces;
+      MakeSet (StartSet, StartStateCount);
+      ruleList := Root;
+      WHILE ruleList # NoTree DO
+	 rule := ruleList^.vNode2.Son2;
+	 patternList := rule^.vNodeRule.Patterns;
+
+	 WHILE patternList # NoTree DO
+	    pattern := patternList^.vNode2.Son2;
+	    IF pattern^.vNodePattern.IsConstantRE THEN
+	       PatternNr := pattern^.vNodePattern.PatternNr;
+	       PatternTablePtr^[PatternNr].ContextLng :=
+		  ComputeLength (pattern^.vNodePattern.RightContext);
+	       ComputeConstantRE (pattern^.vNodePattern.RegExpr, string1);
+	       ComputeConstantRE (pattern^.vNodePattern.RightContext, string2);
+	       WStrings.Concatenate (string1, string2);
+	       l := WStrings.Length (string1);
+	       IF l > 0 THEN
+		  ResetTraces (l);
+		  FOR StartState := 1 TO StartStateCount DO
+		     IF IsElement (StartState, pattern^.vNodePattern.StartStates) THEN
+			AddConstantRE (StartState, string1, PatternNr,
+			   pattern^.vNodePattern.StartStates);
+		     END;
+		  END;
+	       END;
+	    END;
+	    patternList := patternList^.vNode2.Son1;
+	 END;
+	 ruleList := ruleList^.vNode2.Son1;
+      END;
+      ReleaseSet (StartSet);
+      FinalizeTraces;
+   END AddConstantREs;
+
+PROCEDURE ComputeConstantRE (t: tTree; VAR String: WStrings.tString);
+   VAR string2	: WStrings.tString;
+   BEGIN
+      IF t = NoTree THEN
+	 WStrings.AssignEmpty (String);
+      ELSE
+	 CASE t^.vNode0.Rule OF
+	 |  nSequence	: ComputeConstantRE (t^.vNode2.Son1, String);
+			  ComputeConstantRE (t^.vNode2.Son2, string2);
+			  WStrings.Concatenate (String, string2);
+	 |  nChar	: WStrings.AssignEmpty (String);
+			  WStrings.Append (String, t^.vNodeCh.Ch);
+	 |  nString	: GetWString (t^.vNodeString.String, String);
+	 END;
+      END;
+   END ComputeConstantRE;
+
+PROCEDURE AddConstantRE (StartState: DStateRange; String: WStrings.tString;
+			PatternNr: SHORTCARD; StartStates: tSet);
+   VAR
+      Ch		: tCharClass	;
+      State		,
+      Successor		,
+      NewState		,
+      PrevState		: DStateRange	;
+      ChIndex		: SHORTCARD	;
+      StringLength	: SHORTCARD	;
+      EndOfInput	: BOOLEAN	;
+
+   PROCEDURE GetCh (): WStrings.WCHAR;
+      BEGIN
+	 IF ChIndex = StringLength THEN
+	    EndOfInput := TRUE;
+	    RETURN FirstCh;
+	 ELSE
+	    INC (ChIndex);
+	    RETURN WStrings.Char (String, ChIndex);
+	 END;
+      END GetCh;
+
+   BEGIN
+      StringLength	:= WStrings.Length (String);
+      ChIndex		:= 0;
+      EndOfInput	:= FALSE;
+      State		:= StartState;
+      Ch		:= GetCh ();
+      PrevState		:= State;
+
+      LOOP					(* trace and do nothing *)
+	 IF EndOfInput THEN EXIT; END;
+	 Successor := GetTable (State, Ch);
+	 IF Successor = DNoState THEN EXIT; END;
+	 IF (Successor <= MaxAmbiguousState) AND
+	    IsElement (Successor, AmbiguousStates) THEN EXIT; END;
+	 GetStartSet (Successor, StartSet);
+	 IF NOT IsSubset (StartSet, StartStates) THEN EXIT; END;
+
+	 State := Successor;
+	 NewState := RecordedTrace (ChIndex, State);
+	 IF NewState # DNoState THEN
+	    PutTable (PrevState, Ch, NewState);
+	 ELSE
+	    RecordTrace (ChIndex, State, State);
+	    NewState := State;
+	 END;
+	 GetStartSet (NewState, StartSet);
+	 Include (StartSet, StartState);
+	 PutStartSet (NewState, StartSet);
+	 PrevState := NewState;
+	 Ch := GetCh ();
+      END;
+
+   (* INV EndOfInput OR
+	  Table [State, Ch] = DNoState OR
+	  Table [State, Ch] IN AmbiguousStates *)
+
+      LOOP					(* trace and duplicate the path *)
+	 IF EndOfInput THEN EXIT END;
+	 Successor := GetTable (State, Ch);
+	 IF Successor # DNoState THEN
+	    State := Successor;
+	    NewState := RecordedTrace (ChIndex, State);
+	    IF NewState = DNoState THEN
+	       NewState := MakeDState ();
+	       GetDSemantics (State, dSemantics);
+	       PutDSemantics (NewState, dSemantics);
+	       PutDefault (NewState, State);
+	       RecordTrace (ChIndex, State, NewState);
+	    END;
+	    PutTable (PrevState, Ch, NewState);
+	    GetStartSet (NewState, StartSet);
+	    Include (StartSet, StartState);
+	    PutStartSet (NewState, StartSet);
+	    PrevState := NewState;
+	    Ch := GetCh ();
+	 ELSE
+	    IF GetDefault (State) = DNoState THEN EXIT END;
+	    State := GetDefault (State);
+	 END;
+      END;
+
+   (* INV EndOfInput OR Table [State, Ch] = DNoState *)
+
+      LOOP					(* extend the path *)
+	 IF EndOfInput THEN EXIT END;
+	 NewState := RecordedTrace (ChIndex, DNoState);
+	 IF NewState = DNoState THEN
+	    NewState := MakeDState ();
+	    PutDefault (NewState, EobDefaultState);
+	    RecordTrace (ChIndex, DNoState, NewState);
+	 END;
+	 PutTable (PrevState, Ch, NewState);
+	 GetStartSet (NewState, StartSet);
+	 Include (StartSet, StartState);
+	 PutStartSet (NewState, StartSet);
+	 PrevState := NewState;
+	 Ch := GetCh ();
+      END;
+
+   (* INV EndOfInput *)
+
+      GetDSemantics (PrevState, dSemantics);	(* process final state *)
+      Include (dSemantics, PatternNr);
+      PutDSemantics (PrevState, dSemantics);
+   END AddConstantRE;
+
+PROCEDURE UpdateContext;
+   VAR
+      Pattern	: SHORTCARD	;
+      State1	: DStateRange	;
+      State2	: DStateRange	;
+      Max	: DStateRange	;
+   BEGIN
+      IF DStateCount > NodeCount THEN
+	 WriteS (StdError, "internal Error: StateCount > NodeCount"); WriteNl (StdError);
+      END;
+
+      FOR Pattern := 0 TO PatternCount - 2 DO
+	 IF PatternTablePtr^[Pattern].ContextLng = VariableContext THEN
+	    Max := Maximum (PatternTablePtr^[Pattern].DContext);
+	    FOR State1 := 1 TO Max DO
+	       IF IsElement (State1, PatternTablePtr^[Pattern].DContext) THEN
+		  FOR State2 := 1 TO DStateCount DO
+		     IF State1 = GetDefault (State2) THEN
+		        Include (PatternTablePtr^[Pattern].DContext, State2);
+		     END;
+		  END;
+	       END;
+	    END;
+	 END;
+      END;
+   END UpdateContext;
+
+PROCEDURE InvertMapping;
+   VAR
+      Pattern	: SHORTCARD	;
+      State	: DStateRange	;
+   BEGIN
+      FOR Pattern := 0 TO PatternCount DO
+	 MakeSet (PatternTablePtr^[Pattern].Finals, DStateCount);
+      END;
+
+      FOR State := 1 TO DStateCount DO
+	 GetDSemantics (State, dSemantics);
+	 IF IsEmpty (dSemantics) THEN
+	    Include (PatternTablePtr^[0].Finals, State);
+	 ELSE
+	    Pattern := Minimum (dSemantics);
+	    Include (PatternTablePtr^[Pattern].Finals, State);
+	 END;
+      END;
+      IsComputedFinals := TRUE;
+   END InvertMapping;
+
+PROCEDURE CheckTables;		(* check automaton for completeness *)
+   VAR
+      Definition: DefRange	;
+      Ident	: Idents.tIdent	;
+      StartState: LONGCARD	;
+   BEGIN
+      FOR Definition := 1 TO DefCount DO	(* FORALL StartStates *)
+	 IF GetKind (Definition) = Start THEN
+	    GetStartDef (Definition, Ident, StartState);
+	    CheckStartState (StartState, Ident, FALSE);
+	    IF LeftJustUsed THEN
+	       CheckStartState (StartState + 1, Ident, TRUE);
+	    END;
+	 END;
+      END;
+   END CheckTables;
+
+PROCEDURE WriteCh (Delim: CHAR; Ch: UCHAR);
+   BEGIN
+      WriteC (StdError, Delim);
+      IF Ch > ORD (MAX (CHAR)) THEN
+	 WriteChar (StdError, Ch);
+      ELSIF (ORD ('!') <= Ch) AND (Ch <= ORD ('~')) THEN
+	 WriteC (StdError, "'");
+	 WriteC (StdError, CHR (Ch));
+	 WriteC (StdError, "'");
+      ELSE
+	 WriteC (StdError, '\');
+	 WriteI (StdError, ORD (Ch), 0);
+      END;
+   END WriteCh;
+
+PROCEDURE CheckStartState (StartState: SHORTCARD; Ident: Idents.tIdent; LeftJust: BOOLEAN);
+   VAR
+      BeginOfRange, PrevCh, Ch	: UCHAR;
+      DState	: DStateRange	;
+      Undefined	: HugeSets.tSet	;
+      Semantics	: tSet		;
+      String	: tString	;
+      Count	: INTEGER	;
+      Lwb, Upb	: LONGCARD	;
+   BEGIN
+      HugeSets.MakeSet (Undefined);
+      MakeSet (Semantics, PatternCount);
+      HugeSets.Union (Undefined, Unused);
+
+      FOR Ch := FirstCh TO LastClass DO
+	 IF Ch # ToClass (EobCh) THEN
+	    DState := GetTable (StartState, Ch);
+	 ELSE
+	    DState := GetEobTrans (StartState);
+	 END;
+	 IF DState = DNoState THEN
+	    IF INTEGER (Ch) <= ClassCount THEN
+	       HugeSets.Union (Undefined, ClassMemPtr^[Ch]);
+	    ELSE
+	       HugeSets.Include (Undefined, ToChar (Ch));
+	    END;
+	 ELSE
+	    GetDSemantics (DState, Semantics);
+	    IF IsEmpty (Semantics) THEN
+	       IF INTEGER (Ch) <= ClassCount THEN
+		  HugeSets.Union (Undefined, ClassMemPtr^[Ch]);
+	       ELSE
+		  HugeSets.Include (Undefined, ToChar (Ch));
+	       END;
+	    END;
+	 END;
+      END;
+
+      IF NOT HugeSets.IsEmpty (Undefined) THEN
+	 WriteS (StdError, "Warning: in start state ");
+	 Idents.GetString (Ident, String);
+	 Strings.WriteS (StdError, String);
+	 WriteS (StdError, " the default action may be triggered by");
+	 IF LeftJust THEN WriteS (StdError, " (left justified)"); END;
+	 WriteS (StdError, ":");
+	 WriteNl (StdError);
+
+	 HugeSets.Extract (Undefined, Lwb, Upb);
+	 BeginOfRange := Lwb;
+	 PrevCh := Upb;
+	 Count := 0;
+	 WHILE NOT HugeSets.IsEmpty (Undefined) DO
+	    HugeSets.Extract (Undefined, Lwb, Upb);
+	    IF Lwb = PrevCh + 1 THEN
+	       PrevCh := Upb;
+	    ELSE
+	       IF BeginOfRange = PrevCh THEN
+		  WriteCh (' ', PrevCh);
+		  INC (Count);
+	       ELSE
+		  WriteCh (' ', BeginOfRange);
+		  WriteCh ('-', PrevCh);
+		  INC (Count, 2);
+	       END;
+	       IF Count >= 10 THEN WriteNl (StdError); Count := 0; END;
+	       BeginOfRange := Lwb;
+	       PrevCh := Upb;
+	    END;
+	 END;
+	 IF BeginOfRange = PrevCh THEN
+	    WriteCh (' ', PrevCh);
+	 ELSE
+	    WriteCh (' ', BeginOfRange);
+	    WriteCh ('-', PrevCh);
+	 END;
+	 WriteNl (StdError);
+      END;
+
+      ReleaseSet (Semantics);
+      HugeSets.ReleaseSet (Undefined);
+   END CheckStartState;
+
+VAR Ambiguities	: tRelation;
+
+PROCEDURE ReportAmbiguity (Pattern1, Pattern2: INTEGER);
+   BEGIN
+      IF PatternTablePtr^[Pattern2].Position.Line = 0 THEN
+	 Message ("pattern is ambiguous wrt. to a predefined rule",
+	    Information, PatternTablePtr^[Pattern1].Position);
+      ELSE
+	 MessageI ("pattern is ambiguous wrt. to pattern at",
+	    Information, PatternTablePtr^[Pattern1].Position,
+	    Errors.Position, ADR (PatternTablePtr^[Pattern2].Position));
+      END;
+   END ReportAmbiguity;
+
+PROCEDURE CheckAmbiguous;		(* check automaton for ambiguities *)
+   VAR
+      State	: DStateRange	;
+      Pattern	: SHORTCARD	;
+   BEGIN
+      MakeRelation (Ambiguities, PatternCount, PatternCount);
+      FOR State := 1 TO DStateCount DO
+	 GetDSemantics (State, dSemantics);
+	 IF Card (dSemantics) > 1 THEN
+	    Pattern := Extract (dSemantics);
+	    WHILE NOT IsEmpty (dSemantics) DO
+	       Relation.Include (Ambiguities, Pattern, Extract (dSemantics));
+	    END;
+	 END;
+      END;
+      Relation.ForallDo (Ambiguities, ReportAmbiguity);
+      ReleaseRelation (Ambiguities);
+   END CheckAmbiguous;
+
+PROCEDURE WritePattern;
+   VAR Pattern	: SHORTCARD;
+   BEGIN
+      FOR Pattern := 0 TO PatternCount - 2 DO
+	 IF PatternTablePtr^[Pattern].ContextLng # NoContext THEN
+	    WriteS (StdOutput, "Pattern, ContextLng");
+	    WriteI (StdOutput, Pattern, 5);
+	    WriteI (StdOutput, PatternTablePtr^[Pattern].ContextLng, 5);
+	    IF PatternTablePtr^[Pattern].ContextLng = VariableContext THEN
+	       IF IsComputedNContext THEN
+		  WriteS (StdOutput, " NContext ");
+		  WriteSet (StdOutput, PatternTablePtr^[Pattern].NContext);
+	       END;
+	       IF IsComputedDContext THEN
+		  WriteS (StdOutput, " DContext ");
+		  WriteSet (StdOutput, PatternTablePtr^[Pattern].DContext);
+	       END;
+	    END;
+	    IF IsComputedFinals THEN
+	       WriteS (StdOutput, " Finals ");
+	       WriteSet (StdOutput, PatternTablePtr^[Pattern].Finals);
+	    END;
+	    WriteNl (StdOutput);
+	 END;
+      END;
+   END WritePattern;
+
+PROCEDURE WriteStatistics;
+   BEGIN
+      WriteNl (StdOutput);
+      WriteS (StdOutput, "Start States    ");
+      WriteI (StdOutput, StartStateCount, 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Incl Start State");
+      WriteI (StdOutput, InclStartStateCount, 6); WriteNl (StdOutput);
+      WriteS (StdOutput, "Definitions     ");
+      WriteI (StdOutput, DefCount       , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Rules           ");
+      WriteI (StdOutput, RuleCount      , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Patterns        ");
+      WriteI (StdOutput, PatternCount   , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Classes         ");
+      WriteI (StdOutput, ClassCount	, 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "LastClass       ");
+      WriteI (StdOutput, LastClass	, 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Transitions     ");
+      WriteI (StdOutput, TransitionCount, 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Leafs           ");
+      WriteI (StdOutput, LeafCount      , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "NFA States      ");
+      WriteI (StdOutput, NStateCount    , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Minimize Savings");
+      WriteI (StdOutput, MinimizeSavings, 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Ambiguous States");
+      WriteI (StdOutput, MaxAmbiguousState, 6); WriteNl (StdOutput);
+      WriteS (StdOutput, "Nodes           ");
+      WriteI (StdOutput, NodeCount      , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "DFA States      ");
+      WriteI (StdOutput, DStateCount    , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Sentinel Savings");
+      WriteI (StdOutput, SentinelSavings, 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Default Savings ");
+      WriteI (StdOutput, DefaultSavings , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Table Entries   ");
+      WriteI (StdOutput, TableEntries   , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Table Size      ");
+      WriteI (StdOutput, TableSize      , 6);   WriteNl (StdOutput);
+      WriteS (StdOutput, "Memory used   ");
+      WriteI (StdOutput, MemoryUsed     , 8);   WriteNl (StdOutput);
+   END WriteStatistics;
+
+PROCEDURE GenerateTables (DebugLevel: SHORTCARD; ReduceCaseSize, Warnings: BOOLEAN; Optimize: SHORTCARD);
+VAR i: SHORTCARD;
+BEGIN
+			IF DebugLevel >= 2 THEN WriteStepTime ("Start		"); END;
+   IsComputedNContext	:= FALSE;
+   IsComputedDContext	:= FALSE;
+   IsComputedFinals	:= FALSE;
+   INC (RuleCount); INC (PatternCount); EobAction	:= PatternCount;
+   INC (RuleCount); INC (PatternCount); DefaultAction	:= PatternCount;
+   RuleToCodeSize	:= RuleCount + 1;
+   MakeArray		(RuleToCodePtr, RuleToCodeSize, TSIZE (CodeInfo));
+   PatternTableSize	:= PatternCount + 1;
+   MakeArray		(PatternTablePtr, PatternTableSize, TSIZE (PatternInfo));
+   PatternTablePtr^[0].ContextLng := NoContext;
+
+   MakeSet		(dSemantics, PatternCount);
+   ComputeNfa;		IF DebugLevel >= 15 THEN WriteNfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeNfa	"); END;
+   ComputeDfa;		IF DebugLevel >= 14 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeDfa	"); END;
+   MinimizeDfa;		IF DebugLevel >= 13 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("MinimizeDfa	"); END;
+
+   EobDefaultState	:= MakeDState ();	(* has to be ambiguous *)
+   ComputeSuccGraph;
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeSuccGraph"); END;
+   ComputeAmbiguousStates;
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeAmbiguous"); END;
+   ComputeCyclicStates;	IF DebugLevel >= 12 THEN
+			   WriteSet (StdOutput, AmbiguousStates	);
+			   WriteNl  (StdOutput);
+			   WriteSet (StdOutput, CyclicStates	);
+			   WriteNl  (StdOutput);
+			END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeCyclicSta"); END;
+
+   ComputeStartSets;	IF DebugLevel >= 11 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeStartSets"); END;
+
+   EobState		:= MakeDState ();
+   AssignElmt		(dSemantics, EobAction);
+   PutDSemantics	(EobState, dSemantics);
+   AssignElmt		(dSemantics, DefaultAction);	(* default state *)
+   PutDSemantics	(MakeDState (), dSemantics);
+
+   AddConstantREs;	IF DebugLevel >= 10 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("AddConstantREs	"); END;
+   UpdateContext;	IF DebugLevel >= 9 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("UpdateContext	"); END;
+   SaveEobTransitions;	IF DebugLevel >= 8 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("SaveEobTransitio"); END;
+   SaveSentinels;	IF DebugLevel >= 7 THEN WriteDfa; WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("SaveSentinels	"); END;
+IF Optimize > 0 THEN
+   i := 1;
+   WHILE i <= MaxAmbiguousState DO
+      ComputeDefaults	(i, Min (MaxAmbiguousState, i + Optimize - 1));
+			IF DebugLevel >= 2 THEN WriteStepTime ("ComputeDefaults	"); END;
+      INC (i, Optimize);
+   END;
+END;
+			IF DebugLevel >= 6 THEN WriteDfa; WritePattern; END;
+   InvertMapping;	IF DebugLevel >= 5 THEN WritePattern; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("InvertMapping	"); END;
+   MakeTables (ReduceCaseSize);
+			IF DebugLevel >= 2 THEN WriteStepTime ("MakeTables	"); END;
+   CompressTables (Optimize);
+			IF DebugLevel >= 4 THEN WriteTables; END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("CompressTables	"); END;
+CASE Language OF
+| Modula:
+| C	:
+| Cpp	:
+| Eiffel: PutEiffelTables (ReduceCaseSize);
+| Ada	:
+| Java	:
+END;
+			IF DebugLevel >= 2 THEN WriteStepTime ("PutTables	"); END;
+			IF DebugLevel >= 3 THEN QueryTables; END;
+IF Warnings THEN
+   CheckTables;		IF DebugLevel >= 2 THEN WriteStepTime ("CheckTables	"); END;
+END;
+IF Ambiguous THEN
+   CheckAmbiguous;	IF DebugLevel >= 2 THEN WriteStepTime ("CheckAmbiguous	"); END;
+END;
+			IF DebugLevel >= 1 THEN WriteStatistics; END;
+END GenerateTables;
+
+END GenTabs.

@@ -1,0 +1,3365 @@
+.lf 1 /tmp/.doc
+.\" use: groff -pte -me | lpr
+.\" or : pic | tbl | eqn | ditroff -me
+.\"
+.\"	"@(#)bibmac.me	2.2	9/9/83";
+.de IP
+.ip \\$1 \\$2
+..
+.de LP
+.lp
+..
+.\"	@(#)bmac.std	2.2	9/9/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [? " \&
+.ds ?] ?
+.ds [: " \&
+.ds :] :
+.ds [; " \&
+.ds ;] ;
+.ds [! " \&
+.ds !] !
+.ds [" " \&
+.ds "] \&"
+.ds [' " \&
+.ds '] '
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds a] " \&
+.ds b] , \&
+.ds c] , \&
+.ds n] "\& and \&
+.ds m] "\& and \&
+.ds p] .
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A\\c
+.if !"\\*([T"" , \\*([T\\c
+.if !"\\*([V"" , Vol. \\*([V\\c
+.if !"\\*([O"" , \\*([O\\c
+.if !"\\*([D"" , \\*([D\\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T""  \\*([T,
+\\fI\\*([J \\*([V\\fP\c
+.if !"\\*([N"" ,\\*([N
+.if !"\\*([D"" (\\*([D)\c
+.if !"\\*([P"" , \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP\c
+.if !"\\*([V"" , vol. \\*([V
+.if !~\\*([E~~ \{\
+.       ie , \\n([E-1  \\*([E (editors)\c
+.       el , \\*([E (editor)\c\}
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+.if !~\\*([E~~ \{\
+.       ie \\n([E-1 \\*([E, editors.
+.       el \\*([E, editor.\}
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.\"	@(#)bmac.std	2.2	8/24/83;
+.\" standard format troff commands
+.\" citation formatting strings
+.ds [[ [
+.ds ]] ]
+.ds ], ,\|
+.ds ]- -
+.ds [. " \&
+.ds .] .
+.ds [, " \&
+.ds ,] ,
+.ds [< " \&
+.ds >]
+.\" reference formmating strings
+.ds c] , \&
+.ds n] "" and \&
+.ds m] "" and \&
+.ds a] " \&
+.\" reference formmating macros
+.de s[   \" start reference
+.nh
+.IP [\\*([F] 5m
+..
+.de e[   \" end reference
+.[-
+..
+.de []   \" start to display collected references
+.SH
+References
+.LP
+..
+.de ][   \" choose format
+.ie !"\\*([J"" \{\
+.    ie !"\\*([V"" .nr t[ 1    \" journal
+.    el            .nr t[ 5    \" conference paper
+.\}
+.el .ie !"\\*([B"" .nr t[ 3    \" article in book
+.el .ie !"\\*([R"" .nr t[ 4    \" technical report
+.el .ie !"\\*([I"" .nr t[ 2    \" book
+.el                .nr t[ 0    \" other
+.\\n(t[[
+..
+.de 0[   \" other
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+.if !"\\*([O"" \\*([O\c
+.if !"\\*([D"" , \\*([D\c
+\&.
+.e[
+..
+.de 1[ \" journal article
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J \\*([V\\fP,
+.if !"\\*([N"" \\*([N
+.if !"\\*([D"" (\\*([D),
+.if !"\\*([P"" \\*([P\c
+.if !"\\*([I"" , \\*([I\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 2[ \" book
+.s[
+.ie !"\\*([A"" \\*([A,
+.el .if !"\\*([E"" \{\
+.       ie \\n([E-1 \\*([E, eds.,
+.       el \\*([E, ed.,\}
+.if !"\\*([T"" \\fI\\*([T\\fP,
+.rm a[
+.if !"\\*([I"" .ds a[ \\*([I
+.if !"\\*([C"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([C\}
+.if !"\\*([D"" \{\
+.       if !"\\*(a["" .as a[ , \\&
+.       as a[ \\*([D\}
+\\*(a[.
+.if !"\\*([G"" Gov. ordering no. \\*([G.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 3[ \" article in book
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+in \\fI\\*([B\\fP,
+.if !"\\*([V"" vol. \\*([V,
+.if !"\\*([E"" \\*([E (ed.),
+.if !"\\*([I"" \\*([I,
+.if !"\\*([C"" \\*([C,
+.if !"\\*([D"" \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" \\*([O.
+.e[
+..
+.de 4[ \" report
+.s[
+.if !"\\*([A"" \\*([A,
+\\*([T,
+\\*([R\c
+.if !"\\*([G"" \& (\\*([G)\c
+.if !"\\*([I"" , \\*([I\c
+.if !"\\*([C"" , \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de 5[ \" conference paper
+.s[
+.if !"\\*([A"" \\*([A,
+.if !"\\*([T"" \\*([T,
+\\fI\\*([J\\fP,
+.if !"\\*([C"" \\*([C\c
+.if !"\\*([D"" , \\*([D\c
+.if !"\\*([P"" , \\*([P\c
+\\&.
+.if !"\\*([O"" , \\*([O.
+.e[
+..
+.de [-   \" clean up after yourself
+.rm [A [B [C [D
+.rm [E [F [G
+.rm [I [J [K
+.rm [N [O [P
+.rm [R [T
+.rm [V [W
+..
+.lf 1 ./head
+.if t \{ \
+.ie rletter .pl 11i	\" page length letter
+.el .pl 29.7c	\" page length DIN A4
+.po 2.5c	\" page offset (left margin)
+.ll 17.0c	\" line length
+.lt 17.0c	\" title length
+.nr LL 17.0c
+.nr )l 29.7c
+.nr pp 12
+.nr sp 12
+.nr tp 12	\" title point size
+.nr fp 10	\" foot note point size
+.nr bi 4n	\" block indentation
+.hc ~		\" hyphenation character
+.
+.		\" Umlauts and sharp s
+.ie "\n(.g"1" \
+\{\
+.nr $r \n(.v*100+\n(.sp-1u/\n(.sp
+.nr $r 112	\" factor for vertical spacing, orig. value = 120
+.ds A \(:A
+.ds O \(:O
+.ds U \(:U
+.ds a \(:a
+.ds o \(:o
+.ds u \(:u
+.ds s \(ss
+.\}
+.el \
+\{\
+.nr $r 9	\" factor for vertical spacing
+.ds A \(A:
+.ds O \(O:
+.ds U \(U:
+.ds a \(a:
+.ds o \(o:
+.ds u \(u:
+.ds s \(ss
+.\}
+.nr $R \n($r
+.sz 12		\" font size
+.		\"  UMLAUT  \*:u, etc.
+.ds : \v'-0.6m'\h'(1u-(\\n(.fu%2u))*0.13m+0.06m'\z.\h'0.2m'\z.\h'-((1u-(\\n(.fu%2u))*0.13m+0.26m)'\v'0.6m'
+.\}
+.
+.if n \{ \
+.po 0		\" page offset (left margin)
+.ll 78		\" line length
+.lt 78		\" title length
+.nr $r 4	\" factor for vertical spacing
+.nr $R \n($r
+.hc ~		\" hyphenation character
+.		\" Umlaute und scharfes s
+.
+.\" .pl 1050
+.ds A Ä
+.ds O Ö
+.ds U Ü
+.ds a ä
+.ds o ö
+.ds u ü
+.ds s ß
+.
+.ds A Ae
+.ds O Oe
+.ds U Ue
+.ds a ae
+.ds o oe
+.ds u ue
+.ds s ss
+.
+.\}
+.
+.de _
+\&\\$1\l'|0\(ul' \\$2
+..
+.ds d \h'0.12c'	\" space with width of a dot
+.
+.de FT		\" font for programs
+.ft C
+.sz -2
+..
+.
+.de FR
+.ft R
+.sz +2
+..
+.de tt
+.@E
+.ft C
+.\" .sz -2
+.if \\n(.$ \&\\$1\f\\*(_F\\$2
+..
+.
+.de []		\" start to display collected references
+.uh References
+.lp
+..
+.
+.de $0		\" collect table of contents
+.(x
+.ta 2c
+.ie '\\$2''	\\$1
+.el \\$2.	\\$1
+.)x
+..
+.
+.de np
+.nr $p +1
+.ip \\n($p.
+..
+.nr y4 1900+\n(yr
+.
+.de SH
+.sp 0.5
+.in -3
+.b \\$1
+.sp 0.5
+.in +3
+..
+.
+.de PP
+.sp 0.5
+..
+.
+.de IP
+.ip \\$1 \\$2
+..
+.
+.de I
+.i \\$1
+..
+.
+.de TH
+..
+.
+.de UL
+\&\\$1\l'|0\(ul'\\$2
+..
+.
+.de PS
+.sp 0.5
+..
+.
+.de PE
+.sp 0.5
+..
+.
+.de T0
+.b " "
+.sp 1c
+.ta 9c
+.ft R
+.sz 12
+\l'17.0c'
+.nf
+..
+.
+.de T1
+\l'17.0c'
+.ie rletter .sp 11.0c
+.el .sp 12.5c
+\l'17.0c'
+.ft H
+.nf
+ 
+	DR. JOSEF GROSCH
+ 
+	COCOLAB - DATENVERARBEITUNG
+ 
+	GERMANY
+ 
+.r
+\l'17.0c'
+..
+.
+.de T2
+.bp
+.oh ''\\$1'%'
+.eh ''\\$1'%'
+.ce 99
+.b " "
+.sz 20
+.ie rletter .sp 0
+.el .sp 2
+.b "Cocktail"
+.sp 2
+Toolbox for Compiler Construction
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+.sz 16
+.b "\\$2"
+.sp 2
+\\$3
+.sp 2
+.sz 14
+\\$4
+.sp 2
+.sz 12
+\l'15c'
+.sp 2
+Document No. \\$5
+.sp 2
+Copyright \(co \\$6 Dr. Josef Grosch
+.sp 2
+Dr. Josef Grosch
+CoCoLab - Datenverarbeitung
+Breslauer Str. 64c
+76139 Karlsruhe
+Germany
+.sp 0.5
+.hc
+Phone: +49-721-91537544
+Fax: +49-721-91537543
+Email: grosch@cocolab.com
+.ce 0
+.fi
+..
+.lf 294 /tmp/.doc
+.EQ
+gsize 12
+gfont R
+.EN
+.T0
+
+
+	Ag - An Attribute
+	Evaluator Generator
+
+	J. Grosch
+
+
+.T1
+.T2 Ag "Ag - An Attribute Evaluator Generator" "Josef Grosch" "Sept. 24, 2002" 16 2002
+.hc @
+.bp 1
+.sh 1 Introduction
+.pp
+.i Ag
+is a generator for attribute evaluators\*([<\*([[Gro90\*(],Groa\*(]]\*(>].
+It processes ordered attribute grammars (OAGs)\*([<\*([[Kas80\*(]]\*(>],
+well-defined attribute grammars (WAGs)
+as well as higher order attribute grammars (HAGs)
+\*([[VSK89\*(],Vog93\*(]].
+It is oriented towards abstract syntax trees.
+Therefore, the tree structure is fully known.
+The terminals and nonterminals may have arbitrary many attributes
+which can have any target language type.
+This includes tree-valued attributes.
+.i ag
+allows attributes local to rules and offers an extension mechanism which provides single
+inheritance as well as multiple inheritance for attributes and for attribute computations.
+It also allows the elimination of chain rules.
+The attribute computations are expressed in the target language and should be written
+in a functional style.
+It is possible to call external functions of separately compiled modules.
+Non-functional statements and side-effects are possible but require careful consideration.
+The syntax of the specification language is designed to support compact, modular,
+and readable documents.
+An attribute grammar can consist of several modules
+where the context-free grammar is specified only once.
+There are shorthand notations for copy rules and threaded attributes which allow the user to
+omit many trivial attribute computations.
+The generated evaluators are very efficient because they are directly coded using
+recursive procedures.
+Attribute storage for OAGs is optimized by implementing attributes as local variables
+and procedure parameters whenever their lifetime is contained within one visit.
+.sh 1 Features
+.pp
+The following list tries to give a complete overview of the features of
+.i ag .
+.ip -
+processes ordered attribute grammars (OAGs)
+.ip -
+processes well-defined attribute grammars (WAGs)
+.ip -
+processes higher order attribute grammars (HAGs)
+.ip -
+allows tree-valued attributes
+.ip -
+allows to use subtrees as attribute values
+.ip -
+allows to create parts of the tree during evaluation time
+.ip -
+allows read access to non-local attributes
+.ip -
+operates on abstract syntax
+.ip -
+cooperates with the generator for abstract syntax trees \fIast\fP
+.ip -
+the tree structure is fully known
+.ip -
+terminals and nonterminals may have attributes
+.ip -
+allows attributes of any type
+.ip -
+differentiates input and output attributes
+.ip -
+allows to eliminate chain rules
+.ip -
+allows attributes local to rules
+.ip -
+offers single and multiple inheritance
+.ip -
+attributes are denoted by unique selector names instead of nonterminals with
+subscripts
+.ip -
+is largely independent of the target language
+.ip -
+attribute computations are expressed in the target language
+.ip -
+attribute computations are written in a functional style
+.ip -
+attribute computations can call external functions
+.ip -
+non-functional statements and side-effects are possible
+.ip -
+allows to write compact, modular, and readable specifications
+.ip -
+attribute grammars can consist of several modules
+.ip -
+the context-free grammar is specified only once
+.ip -
+checks an attribute grammar for completeness of the attribute computations
+.ip -
+checks for unused attributes
+.ip -
+checks an attribute grammar for the classes WAG, SNC, DNC, OAG, LAG, and SAG
+.ip -
+generates efficient evaluators
+.ip -
+the evaluators are directly coded using recursive procedures
+.ip -
+the implementation of the trees is efficient
+.ip -
+optimizes attribute storage (for OAG evaluators)
+.ip -
+attributes may be implemented as local variables in procedures and passed as parameters
+.ip -
+.mc \(bv
+generates evaluators in C, C++, Java, and Modula-2
+.mc
+.sh 1 Specification
+.pp
+The input of
+.i ag
+is an attribute grammar. The notation used is an extension of a
+specification for
+.i ast
+\*([[Grob\*(]]. The
+.i ast
+formalism is used to describe the context-free grammar or the tree structure
+and to declare the attributes and their types. The extension describes the
+attribute computations. Such an extended specification is processed by both
+tools
+.i ast
+and
+.i ag .
+The first one generates a tree module and the second one an evaluator module.
+Additionally, the specification can be used to derive a scanner and parser which evaluate an
+S-attribution during parsing. This feature is described in a separate document
+\*([[Groc\*(]]. The complete syntax of
+.i ag
+specifications is described in Appendix 1 using
+.i ast 's
+notation.
+.sh 2 "Context-Free Grammar"
+.pp
+The context-free grammar on which an attribute grammar is based is described
+by an
+.i ast
+specification. The primary item of such a specification is a
+.i "node type"
+which corresponds to a nonterminal or a terminal as well as to grammar
+rules. The names of the node types correspond to the names of grammar rules.
+The grammar symbols on the right-hand side of rules are referred to as
+.i children
+in
+.i ast 's
+terminology.
+.sh 2 "Attribute Declarations"
+.pp
+For every node type an arbitrary number of attributes of arbitrary types can
+be declared again using
+.i ast 's
+notation. The extension mechanism (single inheritance) as well as multiple inheritance
+are also available when using
+.i ag .
+The attribute properties
+.i input ,
+.i output ,
+.i synthesized ,
+.i inherited ,
+.i threaded ,
+.i ignore ,
+and
+.i virtual
+are meaningful for
+.i ag
+(see next section). The properties
+.i synthesized
+and
+.i inherited
+are often optional because they are determined automatically.
+The concept of views also works in combination with
+.i ag .
+The global property
+.i ignore
+is effective for attribute computations (see section 3.4), too. This allows for the
+activation of different sets of attribute computations.
+.sh 2 Properties
+.pp
+The description of children and attributes can be refined by the association of so-called
+properties. These properties are expressed by the keywords listed in Table 1.
+.(b L
+.ce
+Table 1: Properties for Children and Attributes
+.sp 0.5
+.TS
+box center;
+l l.
+long form	short form
+_
+.FT
+INPUT	IN
+OUTPUT	OUT
+SYNTHESIZED	SYN
+INHERITED	INH
+THREAD
+IGNORE
+VIRTUAL
+.TE
+.)b
+.pp
+The properties have the following meanings:
+.i Input
+attributes (or children) receive a value at node-creation time, whereas non-input
+attributes may receive their values at later times.
+.i Output
+attributes are supposed to hold a value at the end of a node's existence,
+whereas non-output attributes may become undefined or unnecessary earlier.
+.i Synthesized
+and
+.i inherited
+describe the kinds of attributes occurring in attribute grammars.
+.pp
+The property
+.i thread
+supports so-called threaded attributes:
+An attribute declaration [a THREAD] is equivalent to the declaration of a pair of attributes
+with the suffixes In and Out: [aIn INH] [aOut SYN]. In attribute computations,
+these attributes have to be accessed with their full name including the suffixes.
+Additionally, special default rules are applied to threaded attributes in order
+to yield the desired behaviour (see section 3.5.).
+.pp
+The property
+.i ignore
+instructs
+.i ag
+to disregard or omit an attribute or a child. It is useful in connection with the concept of
+views\*([<\*([[Grob\*(]]\*(>] (see section 4.).
+Attributes with the property
+.i virtual
+may depend on regular attributes or vice versa. However, virtual
+attributes neither take storage nor are the computations specified for them executed.
+Attributes with this property may be used to influence the evaluation order.
+.pp
+Properties are specified either locally or globally. Local properties are valid for one
+individual child or attribute. They are listed after the type of this item. Example:
+.(b
+.FT
+Expr = [Value SYN] [Env: tEnv INH] .
+.)b
+Global properties are valid for all children and attributes
+defined in one or several modules. They are valid in addition to the local properties that
+might be specified. In order to describe global properties, a module may contain several
+property clauses which are written in the following form:
+.(b
+.FT
+PROPERTY properties [ FOR module_names ]
+.)b
+The listed properties become valid for the given modules. If the FOR part is missing, the
+properties become valid for the module that contains the clause.
+.(b
+Example:
+.sp 0.5
+.FT
+PROPERTY OUTPUT
+PROPERTY SYN OUT FOR Eval2
+.)b
+.sh 2 "Attribute Computations"
+.pp
+For every node type, attribute computations (ACs) or actions may be specified. ACs can be
+placed everywhere within the list of attribute and child declarations and are enclosed in
+braces '{' '}'. ACs are written in the desired target language, using expressions,
+statements, or calls of external functions of separately compiled abstract
+data types. However, ACs have to be functional in order to allow
+.i ag
+the derivation of the dependencies among the attributes and the determination of an
+appropriate evaluation order. Side effects are possible as long as the user knows what
+he/she is doing. The ACs are copied unchecked to the generated evaluator module.
+Therefore, syntax errors are detected by the compiler.
+.pp
+The ACs may contain
+.i "attribute denotations" .
+At a tree node, the attributes of this node and the attributes of the
+children are accessible. Attributes of a node or of the left-hand side of a
+rule are denoted just by their name.
+Attributes of a child or of the right-hand side of a rule are denoted by
+the child's selector name, a colon, and the attribute name.
+If an evaluator for WAGs is generated then it is possible to have read-access to non-local
+attributes:
+.(b
+.FT
+LhsAttribute = Ident
+RhsAttribute = Ident : Ident
+RemAttribute = REMOTE Expression => Node_type : Ident
+.)b
+In a "remote" access the expression has to evaluate to a pointer to a tree node whose type
+is a subtype of 'Node_type'. The 'Ident' describes the desired attribute of this tree node.
+.(b
+Example:
+.sp 0.5
+.FT
+.mc \(bv
+Expr            = [Type] <
+.mc
+   Binary       = Lop: Expr Rop: Expr [Operator] .
+> .
+
+Type                            /*  left-hand side (node ) attribute */
+Lop:Type                        /* right-hand side (child) attribute */
+REMOTE addr => Expr:Type        /* remote attribute access           */
+.)b
+A name conflict occurs if the same identifier denotes an attribute as well
+as an other item. In this case the escape character '\\' should precede the
+non-attribute item as otherwise
+.i ag
+would treat it as attribute.
+In general, the escape character '\\' can be used within ACs to pass characters or tokens
+unchanged to the generated program module which otherwise
+.i ag
+would interpret erroneously.
+.pp
+The special value SELF is a pointer referring to the current tree node. It is of interest
+when higher order attribute grammars (HAGs) are used.
+.pp
+The following kinds of ACs are available (meta characters are '[', ']', and '|'):
+.(b L
+.FT
+Assignment = Attribute := Expression ;
+Copy       = Attribute :- Attribute ;
+AssignCode = Attributes := { Statement_sequence } ;
+Check      = Conditions ;
+Conditions = Condition | Condition [ AND_THEN ] Conditions
+Condition  = [ CHECK Expression ] [ => Statement | => { Statement_sequence } ]
+After      = Attributes AFTER  Attributes ;
+Before     = Attributes BEFORE Attributes ;
+.)b
+The simplest form is the assignment of an arbitrary expression to an attribute.
+A copy rule behaves exactly like an assignment, with the restriction that only an attribute
+may be assigned instead of an arbitrary expression. The use of copy rules allows
+better optimizations in the generated attribute evaluator.
+.(b
+Example:
+.sp 0.5
+.FT
+a   := 1;                       /* constant       */
+a   :- c:b;                     /* copy rule      */
+c:b :- a;                       /* copy rule      */
+a   := c:a + 1;                 /* infix operator */
+a   := f (c:b, c:a, 2);         /* function call  */
+a   := f (c:b, g (c:a))) * 3;   /* nested calls   */
+.)b
+.pp
+The
+.i AssignCode
+statement allows the computation of attributes using other statements than assignments.
+In this case the attribute dependencies can not be derived from the statements, automatically.
+The result attributes being computed have to be specified explicitly on the left-hand side of
+the symbol ':='. The right-hand side is a block containing arbitrary statements. This feature
+allows the description of conditional expressions and to compute several attributes at one
+.mc \(bv
+time. Note, that for the target languages C, C++, and Java the symbol ':=' is used
+.mc
+in assignments and before the block of the
+.i AssignCode
+statement. However, the block itself contains pure target language code and therefore the
+symbol '=' is the correct assignment operator there.
+.(b
+.mc \(bv
+Example in C, C++, or Java:
+.mc
+.sp 0.5
+.FT
+   a := { a = 1; };
+   a := { sum (b, c, a); };
+a, b := { p (a, b, c, d); };
+a, b := { p (a, c); q (b, d); };
+   a := { if (c:d) a = c:a; else a = c:b; };      /* or */
+   a := c:d ? c:a : c:b;
+.)b
+.(b
+Example in Modula-2:
+.sp 0.5
+.FT
+   a := { a := 1; };
+   a := { sum (b, c, a); };
+a, b := { p (a, b, c, d); };
+a, b := { p (a, c); q (b, d); };
+   a := { IF c:d THEN a := c:a; ELSE a := c:b; END; };
+.)b
+.pp
+The next form of ACs allows to check attribute values for certain conditions.
+It consists of a semicolon terminated list of checks where every check
+is composed out of an expression part and a statement part.
+If an expression evaluates to
+.i true
+then the next check in the list is considered. Otherwise, the statement part of this
+check is executed and the rest of the list is ignored.
+.(b
+Example:
+.sp 0.5
+.FT
+CHECK a   # 0 => WriteString ("a is zero");
+CHECK c:b > 0 => { Error ("some error text"); INC (ErrorCount); };
+.sp 0.5
+CHECK Object       != NULL => Error ("identifier not declared") AND_THEN
+CHECK Object->Kind == kVar => Error ("variable required");
+.)b
+.pp
+A missing expression part is equivalent to:
+.(b
+.FT
+CHECK FALSE
+.)b
+This allows the execution of arbitrary statements during attribute evaluation.
+A missing statement part is equivalent to an empty statement.
+.pp
+In some cases it is desirable to add artificial dependencies between attributes.
+This feature can be used to turn AGs which are not OAG into OAG
+ones or to explicitly specify attribute evaluation order:
+The attributes on the left-hand side of AFTER are evaluated after the ones
+on the right-hand side or in other words they artificially depend on them.
+BEFORE works the other way round.
+Alternatively, the pseudo function DEP (x, y) can be used to describe artificial
+dependencies between attributes. It returns the value of its first argument x. This result
+depends on both arguments x and y.
+.(b
+Example:
+.sp 0.5
+.FT
+a AFTER c:b;
+a, c:a BEFORE c:b, d;
+a:b := DEP (c, d:e);
+.)b
+If the second argument of DEP is an attribute with the property VIRTUAL then
+some compilers give an error message. The reason is that no code is generated
+for virtual attributes. Therefore the compilers see DEP (x, ) and complain
+about a missing argument. The following workarounds are available if v is a
+virtual attribute:
+.(b
+.FT
+a := DEP (c, v 0);
+a := DEP (c, v+0);
+a := c v;
+a := v + c;
+.)b
+In all cases the attribute a depends on the attributes c and v and the
+generated computation is
+.br
+\&"a := c;"
+.sh 2 "Default Computations"
+.pp
+If ACs are missing and they are not inherited via the extension mechanism (see next section),
+.i ag
+tries to insert copy rules as default ACs in the following ways:
+.ip -
+If an AC is missing for an right-hand side attribute
+.i c:a
+which is known to be inherited and not threaded,
+and if the left-hand side has an attribute with the same name
+.i a :
+c:a :- a;
+.ip -
+If an AC is missing for an left-hand side attribute
+.i a
+which is known to be synthesized and not threaded, and if there is a child
+.i c
+with an attribute named
+.i a :
+a :- c:a;
+If there are several children with attributes named
+.i a
+then the right-most child is selected.
+.ip -
+If an AC is missing for a threaded attribute
+.i a
+then the attribute is threaded through all children from
+left to right as shown in the example below. Or more precisely:
+.ip -
+If an AC is missing for a threaded attribute
+.i a
+and there is no child having a threaded attribute with the same name
+.i a :
+aOut :- aIn;
+.ip -
+If an AC is missing for a threaded attribute
+.i a
+of a child
+.i c
+and there is no other child having a threaded attribute named
+.i a
+to the left of it and there is a threaded attribute named
+.i a
+on the left-hand side: c:aIn :- aIn;
+.ip -
+If an AC is missing for a threaded attribute
+.i a
+of a child
+.i c
+and there is a child
+.i b
+having a threaded attribute named
+.i a
+to the left of it: c:aIn :- b:aOut;
+.ip -
+If an AC is missing for a threaded attribute
+.i a
+of the left-hand side and there is a child
+.i c
+having a threaded attribute named
+.i a :
+aOut :- c:aOut;
+If there are several children with threaded attributes named
+.i a
+then the right-most child is selected.
+.lp
+.(b
+Example: automatically inserted default ACs
+.sp 0.5
+.FT
+L       = [a INH] L1: L L2: L . /* L1:a :- a; L2:a :- a;               */
+.sp 0.5
+L       = [a SYN] L1: L L2: L . /* a :- L2:a;                          */
+.sp 0.5
+L       = [a THREAD] <          /* aOut :- aIn;                        */
+   L0   = .                     /* aOut :- aIn;                        */
+   L1   = L1: L L2: L .         /* L1:aIn :- aIn; L2:aIn :- L1:aOut;   */
+> .                             /* aOut :- L2:aOut;                    */
+.)b
+.sh 2 Extensions
+.pp
+The extension mechanism of
+.i ast
+fits together with the one of
+.i ag .
+First, like with
+.i ast ,
+derived node types possess the attributes of their base type. Second, a
+derived type inherits the ACs of its base type. It may overwrite these
+by giving own ACs.
+.i ag
+tries to inherit ACs from a base type before the rules for default computations (see
+section 3.5) are applied.
+.(b
+Example:
+.sp 0.5
+.FT
+.mc \(bv
+Expr            = [Type]                        { Type := NoType; } <
+.mc
+   Binary       = Lop: Expr Rop: Expr [Operator] .
+   Unary        = Expr [Operator]               { Type := Integer; } .
+> .
+.)b
+The node type Binary inherits the computation of the attribute Type from the
+node type Expr whereas the node type Unary overwrites it.
+.sh 2 "Target Code"
+.pp
+For both, the generated tree and evaluator modules, several sections containing
+.i "target code"
+may be specified.
+Target code is code written in the target language which is copied unchecked
+and unchanged to certain places in the generated modules.
+It has to be enclosed in braces '{' '}'. Balanced braces
+within the target code are allowed. Unbalanced braces have to be escaped by a
+preceding '\\' character. In general the escape character '\\' escapes
+everything within target code.
+Therefore, especially the escape character itself has to be escaped.
+The keywords TREE and EVAL each introduce a set of sections with the meaning
+given below.
+.pp
+These two keywords may optionally be followed by an identifier
+that specifies the name of the generated module (compilation unit):
+.(b
+.FT
+TREE [ Name ] ... EVAL [ Name ] ...
+.)b
+If several modules contain a name, the first one is chosen.
+If none of the modules contains a name, the default names
+.i Tree
+and
+.i Eval
+are used.
+.lp
+The meaning of the target code sections is as follows:
+.ip IMPORT: 3c
+.mc \(bv
+Declarations of other compilation units used.
+.mc
+.ip EXPORT: 3c
+.mc \(bv
+Declarations to be made visible to users of the generated module.
+.mc
+.ip GLOBAL: 3c
+.mc \(bv
+Declarations which should be visible only to the implementation part of the
+generated module.
+.mc
+.ip LOCAL: 3c
+Declarations to be included in the procedures of the attribute evaluator.
+.ip BEGIN: 3c
+Statements to initialize the declared data structures.
+.ip CLOSE: 3c
+Statements to finalize the declared data structures.
+.mc \(bv
+.lp
+The details depend on the target language and are given in the following sections.
+.sh 3 Modula-2
+.lp
+The target code sections are placed as follows:
+.br
+.mc
+.ip IMPORT: 3c
+.mc \(bv
+Included in the definition module at a place where IMPORT statements are legal.
+.br
+.mc
+.ip EXPORT: 3c
+.mc \(bv
+Included in the definition module at a place where declarations are legal.
+.\" after the declaration of the tree type
+.\" .i tTREE
+.\" in the tree module. Behaves like IMPORT in the evaluator module.
+.br
+.mc
+.ip GLOBAL: 3c
+.mc \(bv
+Included in the implementation module at global level.
+.br
+.mc
+.ip LOCAL: 3c
+.mc \(bv
+.\" Like GLOBAL for the Tree module.
+Included in the procedures of the attribute evaluator.
+.br
+.mc
+.ip BEGIN: 3c
+.mc \(bv
+Included in a procedure Begin<module>.
+.br
+.mc
+.ip CLOSE: 3c
+.mc \(bv
+Included in a procedure Close<module>.
+.sh 3 C/C++
+.lp
+The target code sections are placed as follows:
+.br
+.mc
+.ip IMPORT: 3c
+.mc \(bv
+Included in the generated header file.
+.\" before the definition of the tree type
+.\" .i tTREE .
+.br
+.mc
+.ip EXPORT: 3c
+.mc \(bv
+Included in the generated header file.
+.\" after the declaration of the tree type
+.\" .i tTREE .
+.\" Behaves like IMPORT in the evaluator module.
+.br
+.mc
+.ip GLOBAL: 3c
+.mc \(bv
+Included in the implementation module at global level.
+.br
+.mc
+.ip LOCAL: 3c
+.mc \(bv
+Declarations to be included in the procedures of the attribute evaluator.
+.\" Behaves like GLOBAL in the tree module.
+.br
+.mc
+.ip BEGIN: 3c
+.mc \(bv
+Inserted in a function Begin<module>.
+In simple C++ this function is called by the constructor.
+.br
+.mc
+.ip CLOSE: 3c
+.mc \(bv
+Inserted in a function Close<module>.
+In simple C++ this function is called by the constructor.
+.sh 3 Java
+.lp
+The target code sections are placed as follows:
+.br
+.mc
+.ip IMPORT: 3c
+.mc \(bv
+Included before the generated class where import statement are legal.
+.br
+.mc
+.ip EXPORT: 3c
+.mc \(bv
+Included in the body of the generated class.
+.br
+.mc
+.ip GLOBAL: 3c
+.mc \(bv
+Included in the generated file before the class declaration.
+This is normally only used for defining macros.
+.br
+.mc
+.ip LOCAL: 3c
+.mc \(bv
+Behaves like GLOBAL.
+.br
+.mc
+.ip BEGIN: 3c
+.mc \(bv
+Inserted in a method
+.i begin
+which is called when the class is loaded.
+.br
+.mc
+.ip CLOSE: 3c
+.mc \(bv
+Inserted in a method
+.i close.
+.mc
+.sh 2 Modules
+.pp
+The context-free grammar with attribute declarations and attribute
+computations may be followed by an arbitrary number of modules. The modules
+allow the combination of parts of the specification that logically belong together.
+A module consists of additional target code sections and specifications of
+node types with attribute declarations and attribute computations. The
+information given in the modules is merged in the
+following way: The target code sections are concatenated. If a node type has
+already been declared, its attribute declarations and attribute computations
+are added to the existing ones. If it has not been declared, it gets declared
+thus introducing a new node type. See Appendix 2 for an elaborated example.
+Additionally, the DECLARE section allows the
+definition of attributes for several node types at one time.
+.(b
+Example:
+.sp 0.5
+.FT
+DECLARE
+.mc \(bv
+   Decls Stats Expr = [Level] [Env: tEnv] .
+               Expr = [Type: tType] .
+.mc
+.)b
+.sh 1 "Several Attribute Evaluators"
+.pp
+In some cases it might be desirable to use two or even more attribute evaluators that operate
+on one tree structure. These evaluators run one after the other and every one computes a
+disjoint subset of the attributes. There are three problems to solve:
+.pp
+First, a preceding evaluator may compute attributes which are used by a
+succeeding evaluator. These attributes should have the property
+.i output
+in the first case and the property
+.i input
+in the latter case. Therefore, we need means to switch the properties of attributes.
+.pp
+Second, the check for the completeness of an attribute grammar should be restricted to the
+attributes processed by the current evaluator. Otherwise, those attributes that are to be
+computed by preceding evaluators are reported as not computed.
+.pp
+Third, the tool
+.i ag
+generates code that checks the consistency between the compilation units
+generated for the tree module and the evaluator modules. Care has to be taken
+in order to fulfill this consistency condition. The consistency check compares
+a checksum computed from the names of all node types and their attributes.
+The consistency check can be passed only if the tree module and the evaluator
+modules are generated from the same set of node types and attributes.
+.pp
+The solution is to generate all evaluators from one common attribute grammar and to use the
+concept of views. Each generation step uses a distinguished view that selects those parts of
+the complete information that are of interest and it adds properties such as
+.i input
+and
+.i output .
+.pp
+Suppose for example, we want to run two attribute evaluators in sequence.
+In general, the complete specification might have the following parts:
+.(b
+.TS
+center;
+l l l.
+module	contents
+_
+G	context-free grammar +	for Eval 1 + Eval 2
+	input attributes
+I1	intermediate attributes	of Eval 1
+O1	output attributes =	of Eval 1
+	input attributes	of Eval 2
+I2	intermediate attributes	of Eval 2
+O2	output attributes	of Eval 2
+C1	attribute computations	of Eval 1
+C2	attribute computations	of Eval 2
+.TE
+.)b
+We distribute the parts on separate modules.
+The final program consists of three compilation units:
+.(b
+.ta 2c
+Tree	tree module
+Eval1	first evaluator
+Eval2	second evaluator
+.)b
+The three compilation units can be generated with the following UNIX commands:
+.(b
+.FT
+echo SELECT G I1 O1 I2 O2                              | cat - spec | ast -di
+echo SELECT G I1 O1 I2 O2 C1 PROPERTY OUTPUT FOR O1    \\
+                             PROPERTY INPUT  FOR I2 O2 | cat - spec | ag  -DI
+echo SELECT G I1 O1 I2 O2 C2 PROPERTY INPUT  FOR I1 O1 | cat - spec | ag  -DI
+.)b
+The select clauses chose distinct subsets of all information that represent
+complete attribute grammars. We have to select all modules with declarations
+of node types and attributes in order to fulfill the consistency condition
+between the generated compilation units. We are free to select one or more
+modules with attribute computations such as for example C1 and C2.
+The property clauses add the global properties
+.i input
+and
+.i output
+to some of the modules. For the module O1 properties are added in order to
+switch this module from
+.i input
+to
+.i output ,
+for the modules I1, I2, and O2 the property
+.i input
+is added in order to restrict the check for the completeness of the attribute
+grammar to the attributes declared in modules without this property.
+.pp
+We assume the following information to be present in the modules:
+.(b
+.TS
+center;
+l l l.
+module	information	file names
+_
+.FT
+G	TREE Tree	Tree.h + Tree.c
+C1	EVAL Eval1	Eval1.h + Eval1.c
+C2	EVAL Eval2	Eval2.h + Eval2.c
+O2	PROPERTY OUTPUT
+.TE
+.)b
+The above information defines the names of the compilation units and the static
+global properties. The names after the first TREE and EVAL keywords in selected
+modules are taken to derive the file names of the compilation units (see above).
+.pp
+Note, if several attribute evaluators are used then currently the option for the optimization
+of attribute storage does not work. Therefore, all attributes have to be stored in the tree.
+The reason is that the tree module has to be generated by a separate run of
+.i ast
+in order to yield a tree module with all attributes. However, this independent run of
+.i ast
+does not know about the optimizer results of the two
+.i ag
+runs.
+.sh 1 Output
+.pp
+The tool
+.i ag
+can generate four different attribute evaluators which differ in run time performance and
+memory requirements. Table 2 compares the properties of the different evaluators.
+.(b L
+.ce
+Table 2: Properties of Attribute Evaluators
+.sp 0.5
+.TS
+box center;
+l 2 c 2 l 2 l 2 l 2 l 2 l 2 c 2 l.
+#	options	class	algorithm	size	speed	stack	optimization	memory
+_
+1	I	OAG	recursion	low	high	high	no	high
+2	I0	OAG	recursion	medium	high	medium	yes	medium
+3	IK	OAG	stack    	medium	medium	very low	no	high
+4	IL	WAG	recursion	high	low	very high	no	very high
+.TE
+.)b
+.lp
+The column
+.i options
+contains the option characters that instruct
+.i ag
+.mc \(bv
+to generate a specific evaluator.
+At the current release if the target language is Java only type 1 is supported.
+The column
+.mc
+.i class
+describes the grammar class that can be handled: The evaluators 1 to 3 can process ordered
+attribute grammars (OAG) - evaluator 4 can process well-defined attribute grammars (WAG).
+The column
+.i algorithm
+gives the algorithm or the implementation technique that is used for attribute evaluation:
+.i recursion
+stands for recursive procedures and
+.i stack
+stands for table-driven stack automaton. The columns
+.i size ,
+.i speed ,
+and
+.i stack
+contain a relative comparison of the attribute evaluator's sizes, run time speeds,
+and stack requirements. The words
+.i low ,
+.i medium ,
+and
+.i high
+just define a relation where
+.i low
+is smaller than
+.i medium
+and
+.i medium
+is smaller than
+.i high .
+Nothing is said about the quantity of the differences. The differences vary widely
+depending on the application at hand and they can lie between 10% and 100% or more.
+The column
+.i optimization
+tells whether the tree module can be generated with optimization of attribute storage.
+This and the special demands of the WAG evaluator influence the memory requirements
+of the attributed tree which are given in the column
+.i memory .
+.mc \(bv
+.lp
+The details of each target language are given below.
+The strings EVAL
+and TREE are replaced by the specified module names which default to
+.i Eval
+and
+.i Tree .
+.sh 2 Modula-2
+.pp
+The output of
+.i ag
+is an evaluator module consisting of a definition part and an implementation
+part. The module exports 3 procedures:
+.i EVAL
+is the generated evaluator procedure,
+.i BeginEVAL
+and
+.i CloseEVAL
+are the procedures containing the BEGIN and CLOSE target code sections.
+.br
+.mc
+.(b
+.mc \(bv
+Definition part in Modula-2:
+.sp 0.5
+.FT
+DEFINITION MODULE EVAL;
+.sp 0.5
+IMPORT TREE;
+.sp 0.5
+PROCEDURE EVAL (t: TREE.tTREE);
+PROCEDURE BeginEVAL;
+PROCEDURE CloseEVAL;
+.sp 0.5
+END EVAL.
+.br
+.mc
+.)b
+.mc \(bv
+.sh 2 C
+.pp
+The output of
+.i ag
+is an evaluator module consisting of a header file (definition part) and a .c
+file (implementation part). The module exports 3 procedures:
+.i EVAL
+is the generated evaluator procedure,
+.i BeginEVAL
+and
+.i CloseEVAL
+are the procedures containing the BEGIN and CLOSE target code sections.
+.br
+.mc
+.(b
+.mc \(bv
+Definition part in C (header file):
+.sp 0.5
+.FT
+extern void EVAL      (tTREE);
+extern void BeginEVAL (void);
+extern void CloseEVAL (void);
+.br
+.mc
+.)b
+.mc \(bv
+.sh 2 "Simple C++"
+.mc
+.pp
+The attribute evaluators generated by
+.i ag
+provide one class that has the attribute evaluator and the routines for
+.mc \(bv
+initialization and finalization as member functions.
+.br
+.mc
+.(b
+.mc \(bv
+Definition part in simple C++ (header file):
+.sp 0.5
+.FT
+class EVAL {
+public:
+  void Evaluate  (tTREE);
+  void BeginEVAL (void);
+  void CloseEVAL (void);
+       Eval      (void);
+       ~Eval     (void);
+};
+.br
+.mc
+.)b
+.mc \(bv
+If the attribute evaluator
+.mc
+is implemented as a stack automaton (option -K) then the class also has private
+data members such as for example the stack. In any case multiple instances of
+.mc \(bv
+attribute evaluators can be created. If the tree module is generated in
+simple C++ then the evaluator module has to be generated in simple C++ as
+well. This is requested with the option -+ or -c+. The reason is that in some
+.mc
+cases it is necessary for the attribute evaluator to call methods of the tree
+object. As there might be several tree objects it is necessary to describe
+which one to refer to. This is handled by generating code like this:
+.(b
+.FT
+TREE_PREFIX TREE_IsType (yyt, k<node_type>)
+.)b
+In order to make this code work two declarations have to be included in the
+GLOBAL section such as for example:
+.(b
+.FT
+# define TREE_PREFIX t->
+.sp 0.5
+extern TREE * t;
+.)b
+.mc \(bv
+.sh 2 "Proper C++"
+.pp
+The output of
+.i ag
+is an evaluator module consisting of a header file (definition part) and a .cxx
+file (implementation part). The module exports 3 functions:
+.i EVAL
+is the generated evaluator function,
+.i BeginEVAL
+and
+.i CloseEVAL
+are the functions containing the BEGIN and CLOSE target code sections.
+.br
+.mc
+.(b
+.mc \(bv
+Definition part in proper C++ (header file):
+.sp 0.5
+.FT
+extern void EVAL      (TREE::tTREE);
+extern void BeginEVAL ();
+extern void CloseEVAL ();
+.br
+.mc
+.)b
+.mc \(bv
+If the tree module is generated in proper C++ then the evaluator module has
+to be generated in proper C++ as well. This is requested with the option -c++.
+.sh 2 Java
+.pp
+The output of
+.i ag
+is an evaluator class (module) EVAL.
+There is no separate definition and implementation part,
+so the options D and I are synonymous.
+The class exports 3 static methods:
+.i eval
+is the generated evaluator procedure,
+.i begin
+and
+.i close
+are the procedures containing the BEGIN and CLOSE target code sections.
+The last two are only generated if they are not empty.
+.pp
+To simplify coding of attribute computations the Tree class is imported and
+the node type constants are repeated.
+.br
+.mc
+.(b
+.mc \(bv
+Method signatures in Java:
+.sp 0.5
+.FT
+import TREE.*;
+class EVAL {
+  private static final int kNODE = n; // Constants for node types
+  ...
+  public static void eval (TREE yyt);
+  public static void begin (); // If BEGIN target code sections are present
+  public static void close (); // If CLOSE target code sections are present
+}
+.br
+.mc
+.)b
+.mc \(bv
+.mc
+.sh 1 "Higher Order Attribute Grammars"
+.pp
+.i ag
+is able to process
+.i "higher order attribute grammars"
+\*([[VSK89\*(],Vog93\*(]] which are a reinvention of
+.i "generative attribute grammars"
+\*([[Den84\*(]]. These grammars are characterized by the following features:
+.ip -
+Subtrees can be used as operands in expressions. They can appear on the
+right-hand side of attribute computations or as parameters of function calls.
+.ip -
+Non-input children or attributes of type tTREE may receive a value of type
+tTREE during attribute evaluation. This value can be an existing subtree or
+a dynamically created new tree.
+.ip -
+The attributes in dynamically created subtrees are evaluated like all other
+attributes. Attributes of this subtrees may depend on attributes of the
+already existing tree parts or vice versa.
+.pp
+The following example taken from\*([<\*([[VSK89\*(]]\*(>] computes faculty
+numbers. Together with the given main program it works as follows:
+the main program constructs an initial tree out of two nodes of types R and
+P1. Then the generated evaluator is called. It dynamically extends the tree
+by computing values for the non-input child F of the nodes P1 thus creating
+a tree of height n. All nodes have two attributes called n and r. The
+attribute n is inherited and holds the values to be multiplied. The
+attributes r is synthesized and computes the result. The node R serves as interface:
+the value of its n attribute is read in, the value of its r attribute
+receives the final result which is printed when attribute evaluation is
+finished. Note, that the node P2 inherits its computation for the attribute
+r from its base type F. The main program shows how an attribute evaluator
+can be called several times in one run of a program.
+.mc \(bv
+.sh 2 "Example in C"
+.lp
+Attribute Grammar:
+.mc
+.(b
+.sp 0.5
+.FT
+RULE
+.sp 0.5
+.mc \(bv
+R       = F IN [n IN] [r OUT] { F:n := n; r := F:r; } .
+.mc
+.sp 0.5
+.mc \(bv
+F       =      [n]    [r]     { r   := 1; } <
+.mc
+.sp 0.5
+.mc \(bv
+   P1   = F                   { F   := n <= 1 ? mP2 () : mP1 ();
+.mc
+                                F:n := n - 1;
+                                r   := F:r * n; } .
+   P2   = .
+>.
+.)b
+.mc \(bv
+Main program:
+.mc
+.(b
+.sp 0.5
+.FT
+# include "Tree.h"
+# include "Eval.h"
+.sp 0.5
+int main (void)
+{
+   tTree t; int i;
+.sp 0.5
+   do {
+      scanf ("%d", & i);
+      t = mR (mP1 (), i);
+      Eval (t);
+      printf ("%d\\n", t->R.r);
+   } while (t->R.n != 0);
+   return 0;
+}
+.)b
+.mc \(bv
+.bp
+.sh 2 "Example in Simple C++"
+.lp
+Attribute Grammar:
+.mc
+.(b
+.sp 0.5
+.FT
+TREE GLOBAL { Tree t; }
+.sp 0.5
+EVAL GLOBAL { extern Tree t; }
+.sp 0.5
+PROPERTY RULE
+.sp 0.5
+R       = F IN [n IN] [r OUT] { F:n := n; r := F:r; } .
+.sp 0.5
+F       =      [n]    [r]     { r   := 1; } <
+.sp 0.5
+   P1   = F                   { F   := n <= 1 ? t.mP2 () : t.mP1 ();
+                                F:n := n - 1;
+                                r   := F:r * n; } .
+.sp 0.5
+   P2   = .
+>.
+.)b
+.mc \(bv
+Main program:
+.mc
+.(b
+.sp 0.5
+.FT
+# include "Tree.h"
+# include "Eval.h"
+.sp 0.5
+extern Tree t;
+.sp 0.5
+.mc \(bv
+int main ()
+.mc
+{
+   Eval EvalObj;
+   tTree p;
+   int i;
+.sp 0.5
+   do {
+.mc \(bv
+      scanf ("%d", & i);
+.mc
+      p = t.mR (t.mP1 (), i);
+      EvalObj.Evaluate (p);
+.mc \(bv
+      printf ("%d\\n", p->R.r);
+.mc
+   } while (p->R.n != 0);
+   return 0;
+}
+.)b
+.mc \(bv
+.bp
+.sh 2 "Example in Proper C++"
+.lp
+Attribute Grammar:
+.br
+.mc
+.(b
+.mc \(bv
+.sp 0.5
+.FT
+PROPERTY RULE
+.sp 0.5
+R       = F IN [n IN] [r OUT] { F:n := n; r := F:r; } .
+.sp 0.5
+F       =      [n]    [r]     { r   := 1; } <
+.sp 0.5
+   P1   = F                   { F   := n <= 1 ? new P2 () : new P1 ();
+                                F:n := n - 1;
+                                r   := F:r * n; } .
+.sp 0.5
+   P2   = .
+> .
+.br
+.mc
+.)b
+.mc \(bv
+Main program:
+.br
+.mc
+.(b
+.mc \(bv
+.sp 0.5
+.FT
+# include "Tree.h"
+# include "Eval.h"
+.sp 0.5
+using namespace Tree;
+.sp 0.5
+int main ()
+{
+   tpR t;
+   int i;
+.sp 0.5
+   do {
+      scanf ("%d", & i);
+      t = new R (new P1 (), i);
+      Eval (t);
+      printf ("%d\n", t->r);
+   } while (t->n != 0);
+   return 0;
+}
+.br
+.mc
+.)b
+.mc \(bv
+.bp
+.sh 2 "Example in Java"
+.lp
+Attribute Grammar:
+.br
+.mc
+.(b
+.mc \(bv
+.sp 0.5
+.FT
+PROPERTY RULE
+.sp 0.5
+R       = F IN [n IN] [r OUT] { F:n := n; r := F:r; } .
+.sp 0.5
+F       =      [n]    [r]     { r   := 1; } <
+.sp 0.5
+   P1   = F                   { F   := n <= 1 ? (\\F) new P2 () : new P1 ();
+                                F:n := n - 1;
+                                r   := F:r * n; } .
+.sp 0.5
+   P2   = .
+>.
+.br
+.mc
+.)b
+.mc \(bv
+Main program:
+.br
+.mc
+.(b
+.mc \(bv
+.sp 0.5
+.FT
+import de.cocolab.reuse.CocktailWriter;
+import de.cocolab.reuse.CocktailReader;
+import Tree.*;
+.sp 0.5
+class Main {
+.sp 0.5
+    public static void main (String [] argv) throws java.io.IOException {
+.sp 0.5
+        R t;
+        CocktailReader in = new CocktailReader (System.in);
+        CocktailWriter out = new CocktailWriter (System.out);
+.sp 0.5
+        do {
+            int i = in.readI ();
+            t = new R (new P1 (), i);
+            Eval.eval (t);
+            out.write (""+t.r+"\\n");
+            out.flush ();
+        } while (t.n != 0);
+    }
+}
+.br
+.mc
+.)b
+.mc \(bv
+.bp
+.sh 2 "Example in Modula-2"
+.lp
+Attribute Grammar:
+.mc
+.(b
+.sp 0.5
+.FT
+RULE
+.sp 0.5
+.mc \(bv
+R       = F IN [n IN] [r OUT] { F:n := n; r := F:r; } .
+.mc
+.sp 0.5
+.mc \(bv
+F       =      [n]    [r]     { r   := 1; } <
+.mc
+.sp 0.5
+.mc \(bv
+   P1   = F                   { F   := {IF n <= 1
+.mc
+                                        THEN F := Tree.mP2 ();
+                                        ELSE F := Tree.mP1 ();
+                                        END;};
+                                F:n := n - 1;
+                                r   := F:r * n; } .
+   P2   = .
+>.
+.)b
+.mc \(bv
+Main program:
+.mc
+.(b
+.sp 0.5
+.FT
+MODULE Main;
+.sp 0.5
+FROM StdIO      IMPORT ReadI, WriteI, WriteNl, CloseIO;
+FROM Tree       IMPORT tTree, mR, mP1;
+FROM Eval       IMPORT Eval;
+.sp 0.5
+VAR t   : tTree;
+.sp 0.5
+BEGIN
+   REPEAT
+      t := mR (mP1 (), ReadI ());
+      Eval (t);
+      WriteI (t^.R.r, 0); WriteNl;
+   UNTIL t^.R.n = 0;
+   CloseIO;
+END Main.
+.)b
+.sh 1 Example
+.pp
+Appendix 2 contains an attribute grammar that specifies the
+semantic analysis for the example language
+.i MiniLAX
+\*([[GrK88\*(]]. A complete specification of the MiniLAX compiler
+and a more detailed description of the attribute grammar can be found
+in\*([<\*([[Grod\*(]]\*(>] and\*([<\*([[WGS89\*(]]\*(>].
+The attribute grammar is based on the abstract syntax of the language.
+It is divided into modules where each module describes the computation
+of one attribute. The first page
+of the specification describes the abstract syntax and the intrinsic
+attributes whose values are supplied by the scanner and parser. The
+attributes for semantic analysis are introduced in the individual modules.
+A separate module named
+.i Conditions
+contains all context checks for MiniLAX.
+The reporting of error messages is completely
+expressed in the target language. The source position is treated like any
+other attribute. This allows the combination of error messages with precise source
+positions.
+.sh 1 "When Things Go Wrong"
+.pp
+This section gives advice and points out debugging facilities when problems with the
+attribute grammar or the generated evaluator occur. The information in this section is
+organized according to the time the problem can arise.
+.sh 2 "During Specification"
+.pp
+An unalterable precondition for the use of
+.i ag
+is that the user has a basic understanding of attribute grammars. This knowledge should be
+available either through some kind of education or from appropriate text-books. Some hints
+for writing attribute grammars may help to make the generated evaluator work.
+.ip -
+Attribute computations should obey the functional stye, that means all arguments a
+computation depends upon have to be mentioned and no side-effects on global variables should
+occur. In other words, global variables should neither be read nor written during an
+attribute computation. Only the above rule allows the generator to determine a correct order
+for the evaluation of all attributes.
+.ip -
+If the user decides to compute attributes using global variables, special care has to be
+taken. The correct execution order should be validated for example by inspecting the visit
+sequences. If there are mistakes in the execution order, then BEFORE and AFTER clauses
+can be used to influence this order.
+.ip -
+Attributes with the property VIRTUAL may be used to influence the evaluation order, too.
+Virtual attributes may depend on regular attributes or vice versa. However, virtual
+attributes neither take storage nor are the computations specified for them executed.
+No code is generated for virtual attributes.
+.(b
+Example:
+.sp 0.5
+.FT
+DECLARE x = [a] [b] [v VIRTUAL] .
+.sp 0.5
+RULE x = { a := b v; } .
+.)b
+There are three attributes called a, b, and v. The attribute v has the property
+VIRTUAL. The attributes a depends on the attributes b and v. The generated
+computation is 'a := b;' because the virtual attribute v is omitted.
+.sh 2 "During Generation"
+.pp
+.ip -
+Sometimes the extension or inheritance mechanism does not behave as expected. The inherited
+attribute computations are printed with the option 2 and should be checked if necessary.
+.ip -
+Sometimes the mechanism for default computations does not behave as expected. The copy rules
+inserted by default can be printed with the option 1 and should be checked if necessary.
+.ip -
+A serious problem occurs if cycles in the attribute dependencies are detected. This fact is
+reported as error together with the concerned node type and the attribute instances involved.
+The direct attribute dependencies specified in the attribute grammar and the closure
+operations applied by the tool result in a partial order between attribute instances. In
+order to arrive at a total order necessary to construct visit sequences the OAG algorithm
+adds additional dependencies between attributes. Sometimes these added dependencies introduce
+a cycle. Often this
+dependencies come in pairs. The explicit reversion of one dependency in a pair using an AFTER
+or BEFORE clause can solve this problem. This is possible when the attribute grammar is
+l-ordered or partitioned, but the tool did a bad guess in trying to produce a
+total order. However, if the attribute grammar is not l-ordered but DNC or SNC for example,
+a larger reformulation of the attribute grammar may be necessary.
+.sp 0.5
+The following school example illustrates this phenomenon:
+.(b
+.FT
+Z       = <
+   s    = X Y { X:b := Y:d; Y:c := 1; Y:e := X:a; } .
+   t    = X Y { X:b := Y:f; Y:c := X:a; Y:e := 2; } .
+> .
+.mc \(bv
+X       = [a] [b] { a := 3; } .
+Y       = [c] [d] [e] [f] { d := c; f := e; } .
+.mc
+.)b
+It produces the following error messages:
+.(b
+.FT
+.mc \(bv
+  2,  4: Error        cycle in OAG: s
+.mc
+.sp 0.5
+Cyclic Attributes and Artificially Introduced Dependencies
+.sp 0.5
+s       Reachable Nonterminal Explicit HasChildren HasActions 
+.sp 0.5
+X:a     : X:b (1)
+X:b     : (0)
+Y:d     : Y:e (1)
+Y:e     : (0)
+.)b
+.(b
+.FT
+.mc \(bv
+  3,  4: Error        cycle in OAG: t
+.mc
+.sp 0.5
+Cyclic Attributes and Artificially Introduced Dependencies
+.sp 0.5
+t       Reachable Nonterminal Explicit HasChildren HasActions 
+.sp 0.5
+X:a     : X:b (1)
+X:b     : (0)
+Y:c     : (0)
+Y:f     : Y:c (1)
+.sp 0.5
+  1,  1: Information  grammar is DNC
+.)b
+At both node types, s and t, there is cycle in the internal relation called OAG.
+The name of the node type and its properties are printed. It is followed by a list of the
+attribute instances on the cycle. For every attribute, the dependencies
+artificially introduced
+by the OAG algorithm are printed after the character ':'. The number in parentheses counts
+the artificial dependencies. In this example, there are always pairs of artificial
+dependencies. If we reverse the dependencies of X:a upon X:b by specifying that X:a should be
+computed before X:b, the conflict is solved. This can be done with one BEFORE clause as
+follows:
+.(b
+.FT
+Z       = <
+   s    = X Y { X:b := Y:d; Y:c := 1; Y:e := X:a; } .
+   t    = X Y { X:b := Y:f; Y:c := X:a; Y:e := 2; } .
+> .
+.mc \(bv
+X       = [a] [b] { a := 3; a BEFORE b; } .
+Y       = [c] [d] [e] [f] { d := c; f := e; } .
+.mc
+.)b
+.ip -
+Sometimes the attribute dependencies occurring in cycles are not obvious. The
+.i "dialog system"
+of
+.i ag
+allows the interactive inquiry of detailed information about the attribute grammar and the
+problem. With options like V or P the visit sequences or the direct attribute dependencies
+for all node types can be printed. The output may be quite voluminous for realistic
+applications. The dialog system allows to obtain this information only for those node types
+which are of interest. The dialog system is started when
+.i ag
+.mc \(bv
+is rerun with the same input and with the additional option +J. The dialog system displays a
+.mc
+menu and asks for commands which consist mostly of one letter. All commands are terminated by
+the RETURN key. Important commands are:
+.ip "t <node type> or <node type>"
+Selects a certain node type as current node type.
+.ip m
+Prints a summary of all input belonging to the current node type. This includes all
+attribute declarations and all attribute computations including inherited ones and
+copy rules added automatically as default computations.
+In modular attribute grammars this information can be spread over several modules.
+Only this command provides a complete view of all information collected for a node type.
+.ip v
+Prints the visit sequence of a node type. For example the node type
+.i Index
+of the MiniLAX example in Appendix 2 has the following visit sequence:
+.(l L
+.FT
+Index   Reachable Nonterminal Explicit HasChildren HasAttributes HasActions 
+.sp 0.5
+visit   parent 1. time to compute
+        Env
+compute Expr:Env
+visit   Expr 1. time to compute
+        Expr:Type
+check   condition 19
+compute Adr:Env
+visit   Adr 1. time to compute
+        Adr:Type
+compute type
+compute IsLegal
+check   condition 18
+compute Type
+visit   parent 2. time to compute
+        Level
+        CodeSizeIn
+        Co
+compute Adr:Co
+compute Expr:Level
+compute Expr:Co
+compute Adr:Level
+compute Adr:CodeSizeIn
+visit   Adr 2. time to compute
+        Adr:CodeSizeOut
+compute Expr:CodeSizeIn
+visit   Expr 2. time to compute
+        Expr:CodeSizeOut
+compute CodeSizeOut
+visit   parent
+.)l
+The first line gives the name of the node type and its properties. In this case, Index is an
+explicitly declared nonterminal which can be reached from the start symbol. It is a rule
+having children, attributes, and attribute computations (actions).
+The first two lines of the visit sequence might erroneously be interpreted as
+to do nothing and to return to the parent node, immediately.
+However, the correct interpretation is, that the Index node is visited the first time from the
+parent node and the inherited attribute
+.i Env
+has been computed in the context of the parent node. Therefore, the first operation carried
+out at an Index node is the computation of the attribute
+.i Expr:Env .
+The rest of the visit sequence should be self explanatory.
+.ip f
+Finds and prints a path of dependencies between two attribute instances. These attribute
+instances can be selected with the commands a and b. The printed path can be considered as
+one path in the many possible trees. The path is printed as a sequence of lines. Every line
+contains the name of a node type and two attribute instances. It represents a direct
+dependency. The nodes of two neighbouring lines can be neighbours in the tree. The
+concatenation of the direct dependencies represents the desired (usually non-direct)
+dependency information.
+.(b
+Example: Suppose for MiniLAX (Appendix 2) we want know how in the rule \fIProc\fP
+the attribute \fPCodeSizeOut\fP depends upon the attribute \fPEnv\fP. The following is a slightly
+beautified listing showing how to answer this question.
+.)b
+.(b
+.FT
+.mc \(bv
+ag +J minilax.ag
+.mc
+.sp 0.5
+\&... the dialog system displays its menu here ...
+.sp 0.5
+? t Proc
+? a CodeSizeOut
+? b Stats:Env
+? ?
+node type: Proc, a: CodeSizeOut = 8, b: Stats:Env = 43
+.)b
+.(b
+.FT
+? f
+Proc    CodeSizeOut      Stats:Env
+.sp 0.5
+Proc    CodeSizeOut      Next:CodeSizeOut
+Decls   CodeSizeOut      CodeSizeIn
+Proc    Next:CodeSizeIn  Decls:CodeSizeOut
+NoDecl  CodeSizeOut      CodeSizeIn
+Proc    Decls:CodeSizeIn Stats:CodeSizeOut
+Stat    CodeSizeOut      Next:CodeSizeOut
+Assign  CodeSizeOut      Next:CodeSizeOut
+Call    CodeSizeOut      Next:CodeSizeOut
+Stats   CodeSizeOut      CodeSizeIn
+Call    Next:CodeSizeIn  Actuals:CodeSizeOut
+Actual  CodeSizeOut      Next:CodeSizeOut
+Actuals CodeSizeOut      CodeSizeIn
+Actual  Next:CodeSizeIn  Expr:Co
+Actual  Expr:Co          Formals
+Call    Actuals:Formals  Object
+Call    Object           Env
+Assign  Next:Env         Env
+Stat    Next:Env         Env
+? x
+.)b
+.ip "C and c"
+In case of problems with cycles because of attribute dependencies introduced artificially,
+those dependencies can be reported.
+The command C displays all dependencies of a node type added artificially. The
+command c restricts this information to the attribute instances on the cycle.
+The following dialog illustrates the analysis of the school example from above:
+.(l
+.FT
+.mc \(bv
+ag +J dnc2
+.mc
+.sp 0.5
+\&... the dialog system displays its menu here ...
+.sp 0.5
+? t s
+? c
+s       Reachable Nonterminal Explicit HasChildren HasActions 
+.sp 0.5
+X:a     : X:b (1)
+X:b     : (0)
+Y:d     : Y:e (1)
+Y:e     : (0)
+.sp 0.5
+? C
+s       Reachable Nonterminal Explicit HasChildren HasActions 
+.sp 0.5
+X       : (0)
+Y       : (0)
+X:a     : X:b (1)
+X:b     : (0)
+Y:c     : (0)
+Y:d     : Y:e (1)
+Y:e     : (0)
+Y:f     : Y:c (1)
+.sp 0.5
+? x
+.)l
+.sh 2 "During Compilation"
+.pp
+Syntax errors in the attribute computations are not detected by the
+.i ag
+.mc \(bv
+tool but by the following compilation. In case of Modula-2 and Java as implementation language, the
+.mc
+errors are reported with respect to the line number of the generated evaluator module instead
+of the specification. However, the generated evaluator contains comments referring to the
+.mc \(bv
+line numbers in the specification. In case of C and C++ as implementation
+language, the errors are
+.mc
+reported with respect to the line number of the specification.
+In general, the generated source code is relatively readable.
+It consists of case statements where the case labels represent node types. The names of the
+attributes are prefixed by access pathes. They allow the identification of individual
+attribute computations which are more or less unchanged.
+.pp
+In a few cases,
+.i ag
+.mc \(bv
+can not distinguish conditional expressions (in C, C++, and Java) or case labels
+(in C, C++, Java, and Modula-2) from attribute denotations.
+.mc
+.(b
+Example:
+.sp 0.5
+.FT
+a := b ? c : d;
+.sp 0.5
+a := { switch (b) { case k : a = 1; }; };
+.sp 0.5
+a := { CASE b OF k : a := 1; END; };
+.)b
+In these ACs, the sequences c:d and k:a would erroneously be interpreted as attribute
+denotations. This mistake reappears later as syntax error in the generated evaluator. The
+problem is caused by the ambiguous use of the character ':'. Escaping the colon with
+the character '\\' solves the problem.
+.(b
+Example:
+.sp 0.5
+.FT
+a := b ? c \\: d;
+.sp 0.5
+a := { switch (b) { case k \\: a = 1; }; };
+.sp 0.5
+a := { CASE b OF k \\: a := 1; END; };
+.)b
+.sh 2 "During Execution"
+.pp
+When things go wrong, an attribute evaluator may either yield wrong results or crash with
+a runtime error. In both cases, the trace facility of
+.i ag
+can offer significant help to locate the problem. When the evaluator is regenerated with the
+additional option T, it prints a trace during execution on standard output. Every action of
+the evaluator prints a line in one of the following formats:
+.(b
+.FT
+<node type> e <attribute instance> = <value>
+<node type> c <number>             = T or F
+<node type> v <child name> <n>
+<node type> v parent
+.)b
+Every action starts with the type of the current node.
+.lp
+The letter e (evaluate) indicates the computation of the mentioned attribute instance. The
+resulting attribute value is printed using the type specific write macro also used by the
+ASCII writer of
+.i ast .
+.lp
+The letter c (check) indicates the execution of a CHECK statement which are internally
+distinguished by numbers.
+The value of the boolean expression is printed (T = TRUE, F = FALSE).
+.lp
+The letter v (visit) indicates either the n-th visit to a child node or to the parent node.
+.pp
+The trace output is usually voluminous. It should be requested for small inputs, only.
+It also increases the size of the evaluator by approximately a factor of two. In order to
+reduce the output volume or the size of the evaluator module, the trace can be restricted to
+e (and c) or v actions or to e actions without printing of the values. This is possible with
+the options X, Y, and Z (see section 9). If the option U is used, the trace is restricted
+to a subset of all node types. The names of the desired node types are read from a file named
+.i TraceTab .
+This is a text file containing a name of a node type in every line. The trace property is
+extended or inherited along the extension hierarchy. Therefore, it suffices to enumerate base
+types, only.
+.pp
+If the example in section 5 is processed with the command 'ag -cdimwDI0T hag' the trace
+produced for the input 2 is as follows:
+.(b
+.FT
+R                e F:n                      = 2
+R                v F 1
+.mc \(bv
+P1               e F                        = 0805ab78 +
+.mc
+P1               e F:n                      = 1
+P1               v F 1
+.mc \(bv
+P1               e F                        = 0805ab74 +
+.mc
+P1               e F:n                      = 0
+P1               v F 1
+P2               e r                        = 1
+P2               v parent
+P1               e r                        = 1
+P1               v parent
+P1               e r                        = 2
+P1               v parent
+R                e r                        = 2
+R                v parent
+.)b
+.mc \(bv
+.if 0 \{\
+.mc
+.sh 1 "Future Work
+.pp
+The following features should be added to
+.i ag :
+.ip -
+Optimization of attribute storage should be improved turning attributes into global variables.
+.ip -
+So-called
+.i demand
+attributes could be added, which are not stored in the tree but evaluated every time they are
+needed.
+.ip -
+So-called
+.i circular
+attribute grammars should be supported.
+.ip -
+A mechanism for turning non-OAGs into OAG ones like the
+.i "arrange orderly"
+feature of the GAG system\*([<\*([[KHZ82\*(]]\*(>] should be added.
+.ip -
+Integration of automatically determined evaluation sequences with user specified ones would
+be desirable.
+.mc \(bv
+.\}
+.mc
+.sh 1 Usage
+.pp
+.de TH
+..
+.lf 1 ./ag.1
+.TH AG 1 "" "CoCoLab Germany"
+.SH NAME
+ag \- generator for attribute evaluators
+.SH SYNOPSIS
+ag [ -options ] [ +options ] [ -l\fIdirectory\fP ] [ \fIfiles\fP ]
+.SH DESCRIPTION
+.I Ag
+generates a program module to evaluate an attribute computation specified by
+an attribute grammar.
+A typical application is the semantic analysis phase in a compiler.
+The input
+.I file
+contains an attribute grammar which describes the structure of all
+possible trees, the attributes, and the attribute computations.
+.I Ag
+checks whether the attribute grammar is
+.I ordered
+(OAG) or
+.I well-defined
+(WAG) and generates an evaluator consisting out of recursive procedures. If
+.I file
+is omitted the specification is read from standard input.
+.SH OPTIONS
+Normal options are introduced by -, some advanced options are introduced by +.
+.ta 0.5i 3i
+.nf
+.IP A
+generate all, same as -DI (default)
+.IP D
+generate header file or definition module
+.IP I
+generate implementation part or module
+.IP K
+generate an evaluator based on a stack automaton (default: recursive procedures)
+.IP L
+generate a (lazy) evaluator for WAG (default: OAG)
+.IP W
+suppress warnings
+.IP B
+allow missing attribute computations in extended node types
+.IP V
+print visit sequences
+.IP M
+print summary of all node types (rules) from source
+.IP P
+print dependency relations DP
+.IP S
+print dependency relations SNC
+.IP N
+print dependency relations DNC
+.IP O
+print dependency relations OAG
+.IP G
+print attribute instances sorted by declaration order
+.IP E
+print attribute instances sorted by evaluation order
+.IP C
+print dependencies introduced for total order (completion)
+.IP T
+generate evaluator with trace output (all actions, T = XZ)
+.IP U
+trace only node types specified in file TraceTab
+.IP X
+trace attribute evaluation actions with values
+.IP Y
+trace attribute evaluation actions without values
+.IP Z
+trace visit actions
+.IP +J
+start dialog system
+.IP Q
+browse internal data structure with text browser
+.IP 0
+optimize attribute storage
+.IP 1
+print inserted copy rules
+.IP 2
+print inherited attribute computation rules
+.IP 3
+print attribute storage assignment
+.IP 5
+generate source code to check for cyclic dependencies
+.IP 6
+generate # line directives
+.IP 7
+touch output files only if necessary
+.IP 8
+report storage consumption
+.IP 9
+generate source code to measure stack size
+.IP c
+generate C source code (default: Modula-2)
+.IP c+
+generate simple C++ source code
+.IP c++
+generate proper C++ source code
+.IP J
+generate Java source code
+.IP H
+print help information for evaluator module
+.IP +H
+print advanced help
+.IP l\fIdir\fP
+specify the directory dir where ag finds its tables
+.SH FILES
+.nf
+.ta 2i
+if output is in C:
+.sp 0.5
+<module>.h	header file of the generated evaluator module
+<module>.c	body of the generated evaluator module
+yy<module>.h	macro definitions
+.sp 0.5
+if output is in C++:
+.sp 0.5
+<module>.h	header file of the generated evaluator module
+<module>.cxx	body of the generated evaluator module
+yy<module>.h	macro definitions
+.sp 0.5
+if output is in Java:
+.sp 0.5
+<module>.java	class file of the generated evaluator class
+.sp 0.5
+if output is in Modula-2:
+.sp 0.5
+<module>.md	definition module of the generated evaluator module
+<module>.mi	implementation module of the generated evaluator module
+.fi
+.SH SEE\ ALSO
+.sp 0.5
+J. Grosch:
+"Ast - A Generator for Abstract Syntax Trees",
+CoCoLab Germany, Document No. 15
+.sp 0.5
+J. Grosch:
+"Ag - An Attribute Evaluator Generator",
+CoCoLab Germany, Document No. 16
+.sp 0.5
+J. Grosch:
+"Object-Oriented Attribute Grammars", in: A. E. Harmanci, E. Gelenbe (Eds.):
+Proceedings of the Fifth International Symposium on Computer and Information Sciences
+(ISCIS V), Cappadocia, Nevsehir, Turkey, 807-816, Oct. 1990
+.sp 0.5
+J. Grosch:
+"Object-Oriented Attribute Grammars",
+CoCoLab Germany, Document No. 23
+.lf 2170 /tmp/.doc
+.fi
+.sz 12
+.[]
+.[-
+.ds [F Den84
+.ds [A P\*(p] Dencker
+.ds [T Generative attributierte Grammatiken
+.ds [R Dissertation
+.ds [I Universit\\*at Karlsruhe
+.ds [D 1984
+.][
+.[-
+.ds [F GrK88
+.ds [A J\*(p] Grosch
+.as [A \*(n]E\*(p] Klein
+.ds [T \\*Ubersetzerbau-Praktikum
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [R Compiler Generation Report No. 9
+.ds [N 9
+.ds [D June 1988
+.][
+.[-
+.ds [F Gro90
+.ds [A J\*(p] Grosch
+.ds [T Object-Oriented Attribute Grammars
+.ds [E A\*(p]\*(a]E\*(p] Harmanci
+.as [E \*(n]E\*(p] Gelenbe
+.nr [E 2
+.ds [B Proceedings of the Fifth International Symposium on Computer and Information Sciences (ISCIS V)
+.ds [C Cappadocia, Nevsehir, Turkey
+.nr [P 1
+.ds [P 807-816
+.ds [D Oct. 1990
+.][
+.[-
+.ds [F Groa
+.ds [A J\*(p] Grosch
+.ds [T Ag - An Attribute Evaluator Generator
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 16
+.ds [N 16
+.][
+.[-
+.ds [F Grob
+.ds [A J\*(p] Grosch
+.ds [T Ast - A Generator for Abstract Syntax Trees
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 15
+.ds [N 15
+.][
+.[-
+.ds [F Groc
+.ds [A J\*(p] Grosch
+.ds [T Preprocessors
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 24
+.ds [N 24
+.][
+.[-
+.ds [F Grod
+.ds [A J\*(p] Grosch
+.ds [T Specification of a Minilax Interpreter
+.ds [I CoCoLab Germany
+.ds [R Cocktail Document No. 22
+.ds [N 22
+.][
+.[-
+.ds [F Kas80
+.ds [A U\*(p] Kastens
+.ds [T Ordered Attribute Grammars
+.nr [P 1
+.ds [P 229-256
+.ds [J Acta Inf.
+.ds [V 13
+.ds [D 1980
+.ds [N 3
+.][
+.[-
+.ds [F KHZ82
+.ds [A U\*(p] Kastens
+.as [A \*(c]B\*(p] Hutt
+.as [A \*(m]E\*(p] Zimmermann
+.ds [T GAG: A Practical Compiler Generator
+.ds [V 141
+.ds [S LNCS
+.ds [I Springer Verlag
+.ds [C Heidelberg
+.ds [D 1982
+.][
+.[-
+.ds [F VSK89
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.as [A \*(c]S\*(p]\*(a]D\*(p] Swierstra
+.as [A \*(m]M\*(p]\*(a]F\*(p] Kuiper
+.ds [T Higher Order Attribute Grammars
+.ds [J SI\&GPLAN Notices
+.ds [V 24
+.ds [N 7
+.nr [P 1
+.ds [P 131-145
+.ds [D July 1989
+.][
+.[-
+.ds [F Vog93
+.ds [A H\*(p]\*(a]H\*(p] Vogt
+.ds [T Higher Order Attribute Grammars
+.ds [I PhD Thesis, University of Utrecht
+.ds [D Feb. 1993
+.][
+.[-
+.ds [F WGS89
+.ds [A W\*(p]\*(a]M\*(p] Waite
+.as [A \*(c]J\*(p] Grosch
+.as [A \*(m]F\*(p]\*(a]W\*(p] Schr\\*oer
+.ds [T Three Compiler Specifications
+.ds [R GMD-Studie Nr. 166
+.ds [I GMD Forschungsstelle an der Universit\\*at Karlsruhe
+.ds [D Aug. 1989
+.][
+.bp
+.uh "Appendix 1: Syntax of the Specification Language"
+.sp
+.nf
+.FT
+.mc \(bv
+.\" .sz -2
+.mc
+RULE
+.sp 0.5
+/* parser grammar */
+.sp 0.5
+Specification    = <
+                 = ScannerName ParserCodes TreeCodes EvalCodes PrecPart
+                      StartPart PropPart DeclPart RulePart Modules .
+.mc \(bv
+                 = 'MODULE' Name ScannerName ParserCodes TreeCodes EvalCodes
+             PrecPart StartPart PropPart DeclPart RulePart 'END' Name Modules .
+.mc
+> .
+ScannerName      = <
+                 = .
+                 = 'SCANNER' .
+                 = 'SCANNER' Name .
+> .
+ParserCodes      = <
+                 = .
+                 = 'PARSER'      Codes .
+                 = 'PARSER' Name Codes .
+> .
+TreeCodes        = <
+                 =                                 SubUnit .
+                 = 'TREE'                          SubUnit Codes .
+.mc \(bv
+                 = 'TREE' DottedName               SubUnit Codes .
+                 = 'TREE' DottedName          Name SubUnit Codes .
+                 = 'TREE' DottedName 'PREFIX' Name SubUnit Codes .
+.mc
+> .
+EvalCodes        = <
+                 = .
+                 = 'EVAL'      Codes .
+                 = 'EVAL' Name Codes .
+> .
+Codes            = <
+                 = .
+                 = Codes 'IMPORT' tTargetCode .
+                 = Codes 'EXPORT' tTargetCode .
+                 = Codes 'GLOBAL' tTargetCode .
+                 = Codes 'LOCAL'  tTargetCode .
+                 = Codes 'BEGIN'  tTargetCode .
+                 = Codes 'CLOSE'  tTargetCode .
+> .
+SubUnit          = <
+                 = .
+                 = SubUnit 'SUBUNIT' Name .
+                 = SubUnit 'VIEW'    Name .
+> .
+PrecPart         = <
+                 = .
+                 = 'PREC' Precs .
+> .
+Precs            = <
+                 = .
+                 = Precs 'LEFT'  Names .
+                 = Precs 'RIGHT' Names .
+                 = Precs 'NONE'  Names .
+> .
+StartPart        = <
+                 = .
+                 = 'START' Names .
+> .
+PropPart         = Props .
+
+Props            = <
+                 =
+                 = Props 'PROPERTY' Properties
+                 = Props 'PROPERTY' Properties 'FOR' Names
+                 = Props 'SELECT' Names
+> .
+DeclPart         = <
+                 = .
+                 = 'DECLARE' Decls .
+> .
+Decls            = <
+                 = .
+   MoreNonterms  = Decls Names '=' AttrDecls '.' .
+   MoreTerminals = Decls Names ':' AttrDecls '.' .
+> .
+Names            = <
+                 = .
+                 = Names Name .
+                 = Names ',' .
+> .
+RulePart         = <
+                 = .
+                 = 'RULE' Types .
+> .
+Types            = <
+                 = .
+   Nonterminal0  = Types             BaseTypes '=' AttrDecls Extensions '.' .
+   Nonterminal1  = Types Name        BaseTypes '=' AttrDecls Extensions '.' .
+.mc \(bv
+   Terminal1     = Types Name        BaseTypes ':' TokenInfo
+                                                   AttrDecls Extensions '.' .
+   Terminal2     = Types Name tIdent BaseTypes ':' TokenInfo
+                                                   AttrDecls Extensions '.' .
+.mc
+   Abstract      = Types Name        BaseTypes ':='AttrDecls Extensions '.' .
+> .
+BaseTypes        = <
+                 = .
+                 = '<-' Names .
+> .
+TokenInfo        = <
+                 = TokenCode TokenCost .
+                 = TokenCode TokenRepr .
+> .
+TokenCode        = <
+                 = .
+                 = tInteger .
+> .
+TokenCost        = <
+                 = .
+                 = '$' tInteger .
+                 = '$' tInteger ',' tString .
+> .
+TokenRepr        = <
+                 = ',' tString .
+                 = ',' tString '$' tInteger .
+> .
+Extensions       = <
+                 = .
+                 = '<' Types '>' .
+> .
+AttrDecls        = <
+                 = .
+.mc \(bv
+   ChildSelect   = AttrDecls     Name ':' Name Properties .
+   ChildNoSelect = AttrDecls              Name Properties .
+.mc
+   AttrTyped     = AttrDecls '[' Name ':' Name Properties ']' .
+   AttrInteger   = AttrDecls '[' Name          Properties ']' .
+.mc \(bv
+   AttrTypedInit = AttrDecls '[' Name ':' Name ':=' tExpression ']' .
+   AttrIntInit   = AttrDecls '[' Name          ':=' tExpression ']' .
+.mc
+   ActionPart    = AttrDecls '{' Actions '}' .
+   UCActionPart  = AttrDecls '{[' Actions ']}' .
+   TrialParse    = AttrDecls '?' Name .
+   TrialParseNeg = AttrDecls '?' '-' Name .
+   CondParse     = AttrDecls '?' '{' Actions '}' .
+   CondParseNeg  = AttrDecls '?' '-' '{' Actions '}' .
+   Prec          = AttrDecls 'PREC' Name .
+> .
+Properties       = <
+                 = .
+                 = Properties 'INPUT' .
+                 = Properties 'OUTPUT' .
+                 = Properties 'SYNTHESIZED' .
+                 = Properties 'INHERITED' .
+                 = Properties 'THREAD' .
+                 = Properties 'IGNORE' .
+                 = Properties 'VIRTUAL' .
+                 = Properties 'REVERSE' .
+> .
+Actions          = <
+                 = .
+   Assign        = Actions Attributes ':=' tExpression ';' .
+   Copy          = Actions Attribute  ':-' Attribute   ';' .
+   AssignCode    = Actions Attributes ':=' '{' tStatement_Sequence '}' ';' .
+   After         = Actions Attributes 'AFTER'  Attributes ';' .
+   Before        = Actions Attributes 'BEFORE' Attributes ';' .
+   Condition     = Actions Checks ';' .
+> .
+Attributes       = <
+                 = .
+   LhsAttribute  = Attributes tIdent .
+   RhsAttribute  = Attributes tIdent ':' tIdent .
+   RemAttribute  = Attributes 'REMOTE' tExpression '=>' tIdent ':' tIdent .
+> .
+Modules          = <
+                 = .
+                 = Modules 'MODULE' Name ParserCodes TreeCodes EvalCodes
+                      PropPart DeclPart RulePart 'END' Name .
+> .
+Checks           = <
+                 = Check .
+                 = Check Checks .
+                 = Check AND_THEN Checks .
+> .
+Check            = <
+                 = 'CHECK' tExpression Statement .
+                 = 'CHECK' tExpression           .
+                 =                     Statement .
+> .
+Statement        = <
+                 = '=>' tStatement .
+                 = '=>' '{' tStatement_Sequence '}' .
+> .
+Name             = <
+                 = tIdent .
+                 = tString .
+> .
+.mc \(bv
+DottedName       = <
+                 = Name .
+                 = DottedName '.' Name . /* Java only */
+> .
+.mc
+.sp 0.5
+/* lexical grammar */
+.sp 0.5
+tIdent           : <
+                 = Letter .
+                 = tIdent Letter .
+                 = tIdent Digit .
+                 = tIdent '_' .
+> .
+tInteger         : <
+                 = Digit .
+                 = tInteger Digit .
+> .
+tString          : <
+                 = "'" Characters "'" .
+                 = '"' Characters '"' .
+> .
+tTargetCode      : '{' Characters '}' .
+.sp 0.5
+Comment          : '/*' Characters '*/' .
+.sp 0.5
+Characters       : <
+                 = .
+                 = Characters Character .
+> .
+.sp 0.5
+tExpression      : .    /* target language expression           */
+.sp 0.5
+tStatement       : .    /* target language statement            */
+.sp 0.5
+tStatement_Sequence: .  /* target language statement sequence   */
+.mc \(bv
+.\" .sz +2
+.mc
+.bp
+.uh "Appendix 2: Attribute Grammar for MiniLAX"
+.sp
+.nf
+.FT
+.mc \(bv
+.\" .sz -2
+.mc
+MODULE AbstractSyntax /* ------------------------------------------ */
+
+TREE IMPORT  {
+FROM Idents     IMPORT tIdent;
+FROM Position   IMPORT tPosition;
+}
+GLOBAL  {
+FROM Idents     IMPORT tIdent;
+FROM Position   IMPORT tPosition;
+}
+EVAL Semantic
+
+PROPERTY INPUT
+
+RULE
+
+MiniLAX         = Proc .
+Decls           = <
+   NoDecl       = .
+   Decl         = Next: Decls REV [Ident: tIdent] [Pos: tPosition] <
+      Var       = Type .
+      Proc      = Formals Decls Stats .
+   >.
+>.
+Formals         = <
+   NoFormal     = .
+   Formal       = Next: Formals REV [Ident: tIdent] [Pos: tPosition] Type .
+>.
+Type            = <
+   Integer      = .
+   Real         = .
+   Boolean      = .
+   Array        = Type OUT            [Lwb] [Upb] [Pos: tPosition] .
+   Ref          = Type OUT .
+   NoType       = .
+   ErrorType    = .
+>.
+Stats           = <
+   NoStat       = .
+   Stat         = Next: Stats REV <
+      Assign    = Adr Expr            [Pos: tPosition] .
+      Call      = Actuals             [Ident: tIdent] [Pos: tPosition] .
+      If        = Expr Then: Stats Else: Stats .
+      While     = Expr Stats .
+      Read      = Adr .
+      Write     = Expr .
+   >.
+>.
+Actuals         = <
+   NoActual     =                     [Pos: tPosition OUT] .
+   Actual       = Next: Actuals REV Expr .
+>.
+Expr            =                     [Pos: tPosition] <
+   Binary       = Lop: Expr Rop: Expr [Operator: SHORTCARD] .
+   Unary        = Expr                [Operator: SHORTCARD] .
+   IntConst     =                     [Value            OUT] .
+   RealConst    =                     [Value: REAL      OUT] .
+   BoolConst    =                     [Value: BOOLEAN   OUT] .
+   Adr          = <
+      Index     = Adr Expr .
+      Ident     =                     [Ident: tIdent] .
+   >.
+>.
+Coercions       = <
+   NoCoercion   = .
+   Coercion     = Next: Coercions OUT <
+      Content   = .             /* fetch contents of location    */
+      IntToReal = .             /* convert integer value to real */
+   >.
+>.
+
+END AbstractSyntax
+
+MODULE Output /* -------------------------------------------------- */
+
+PROPERTY OUTPUT
+
+DECLARE
+   Formals Decls        = [Decls: tObjects THREAD] .
+   Call Ident           = [Object: tObjects] [Level2: SHORTINT] .
+   If While             = [Label1] [Label2] .
+   Read Write Binary    = [TypeCode: SHORTCARD] .
+   Expr                 = Type Co: Coercions .
+   Index                = Type2: Type .
+
+END Output
+
+MODULE Decls /* -------------------------------------------------- */
+
+EVAL GLOBAL { FROM Defs IMPORT mNoObject, mProc, mVar, mProc2, mVar2, Identify; }
+
+DECLARE Formal Decl     = [Object: tvoid OUT] .
+
+RULE
+
+MiniLAX = { Proc:       DeclsIn := nNoObject                            ; } .
+Decl    = { Next:       DeclsIn := nNoObject                            ;
+                        DeclsOut:= Next:        DeclsOut                ;
+                        Object  := {}                                   ; } .
+Proc    = { Next:       DeclsIn := mProc (DeclsIn, Ident, Formals)      ;
+                        Object  := {mProc2 (Next:DeclsIn, Level, CodeSizeIn,
+                                   Formals:DataSizeOut, Decls:DataSizeOut);};
+            Formals:    DeclsIn := nNoObject                            ; } .
+Var     = { Next:       DeclsIn := mVar (DeclsIn, Ident, Type)          ;
+                        Object  := {mVar2 (Next:DeclsIn, Level, DataSizeIn);}; } .
+Formal  = { Next:       DeclsIn := mVar (DeclsIn, Ident, Type)          ;
+                        Object  := {mVar2 (Next:DeclsIn, Level, DataSizeIn);}; } .
+Call    = {             Object  := Identify (Ident, Env)                ; } .
+Ident   = {             Object  := Identify (Ident, Env)                ; } .
+
+END Decls
+
+MODULE Formals /* -------------------------------------------------- */
+
+EVAL GLOBAL     {
+FROM Defs       IMPORT tObjects, GetFormals;
+FROM Tree       IMPORT Formal;
+FROM Types      IMPORT CheckParams;
+}
+
+DECLARE Actuals = [Formals: MyTree] .
+
+RULE
+
+Call    = { Actuals:    Formals := GetFormals (Object)                  ;
+            => { CheckParams (Actuals, Actuals:Formals); }              ; } .
+Actual  = { Next:       Formals := {IF Formals^.Kind = Formal
+                                    THEN Next:Formals := Formals^.Formal.\\Next
+                                    ELSE Next:Formals := Formals;
+                                    END;}                               ; } .
+
+END Formals
+
+MODULE Env /* -------------------------------------------------- */
+
+EVAL GLOBAL     { FROM Defs      IMPORT tEnv, NoEnv, mEnv; }
+
+DECLARE Decls Stats Actuals Expr = [Env: tEnv INH] .
+
+RULE
+
+MiniLAX = { Proc:       Env     := NoEnv                                ; } .
+Proc    = { Stats:      Env     := mEnv (Decls:DeclsOut, Env)           ;
+            Decls:      Env     := Stats:       Env                     ; } .
+
+END Env
+
+MODULE Type /* -------------------------------------------------- */
+
+EVAL GLOBAL     {
+FROM Defs       IMPORT GetType;
+FROM Types      IMPORT GetElementType, Reduce, ResultType;
+FROM Tree       IMPORT tTree, mBoolean, mInteger, mReal, mRef, mNoType;
+}
+
+RULE
+
+Expr    = {             Type    := nNoType                              ; } .
+Binary  = {             Type    := ResultType (Lop:Type, Rop:Type, Operator); } .
+Unary   = {             Type    := ResultType (Expr:Type, nNoType, Operator); } .
+IntConst  = {           Type    := nInteger                             ; } .
+RealConst = {           Type    := nReal                                ; } .
+BoolConst = {           Type    := nBoolean                             ; } .
+Adr     = {             Type    := nNoType                              ; } .
+Index   = {             Type    := mRef (GetElementType (Type2))        ;
+                        Type2   := Reduce (Adr:Type)                    ; } .
+Ident   = {             Type    := GetType (Object)                     ; } .
+
+END Type
+
+MODULE TypeCode /* -------------------------------------------------- */
+
+EVAL GLOBAL     { FROM ICodeInt IMPORT IntType, RealType, BoolType; }
+
+DECLARE Read Write Binary = [Type2: tTree] .
+
+Read    = {             Type2    := Reduce (Adr:Type)                   ;
+                        TypeCode := ICodeType [Type2^.Kind]             ; } .
+Write   = {             Type2    := Reduce (Expr:Type)                  ;
+                        TypeCode := ICodeType [Type2^.Kind]             ; } .
+Binary  = {             Type2    := Reduce (Rop:Type)                   ;
+                        TypeCode := ICodeType [Type2^.Kind]             ; } .
+
+END TypeCode
+
+MODULE Co /* -------------------------------------------------- */
+
+EVAL GLOBAL     { FROM Types    IMPORT Reduce1, ReduceToRef, Coerce; }
+
+RULE
+
+Assign  = { Adr :       Co := Coerce (Adr :Type, ReduceToRef (Adr:Type));
+            Expr:       Co := Coerce (Expr:Type, Reduce (Adr:Type))     ; } .
+If      = { Expr:       Co := Coerce (Expr:Type, Reduce (Expr:Type))    ; } .
+While   = { Expr:       Co := Coerce (Expr:Type, Reduce (Expr:Type))    ; } .
+Read    = { Adr :       Co := Coerce (Adr :Type, ReduceToRef (Adr:Type)); } .
+Write   = { Expr:       Co := Coerce (Expr:Type, Reduce (Expr:Type))    ; } .
+Actual  = { Expr:       Co := {
+               IF Formals^.Kind = NoFormal
+               THEN Expr:Co := NIL;
+               ELSE Expr:Co := Coerce (Expr:Type, Reduce1 (Formals^.Formal.Type));
+               END; }                                                   ; } .
+Binary  = { Lop :       Co := Coerce (Lop :Type, Reduce (Lop:Type))     ;
+            Rop :       Co := Coerce (Rop :Type, Reduce (Rop:Type))     ; } .
+Unary   = { Expr:       Co := Coerce (Expr:Type, Reduce (Expr:Type))    ; } .
+Index   = { Adr :       Co := Coerce (Adr :Type, ReduceToRef (Adr:Type));
+            Expr:       Co := Coerce (Expr:Type, Reduce (Expr:Type))    ; } .
+
+END Co
+
+MODULE DataSize /* -------------------------------------------------- */
+
+EVAL GLOBAL     { FROM Types    IMPORT TypeSize; }
+
+DECLARE Decls Formals = [DataSize THREAD] .
+
+RULE
+
+MiniLAX = { Proc:       DataSizeIn      := 0                            ; } .
+Decl    = {             DataSizeOut     := Next:        DataSizeOut     ; } .
+Proc    = { Formals:    DataSizeIn      := 3                            ; } .
+Var     = { Next:       DataSizeIn := DataSizeIn + TypeSize (Reduce1 (Type)); } .
+Formal  = { Next:       DataSizeIn      :=              DataSizeIn + 1  ; } .
+
+END DataSize
+
+MODULE CodeSize /* -------------------------------------------------- */
+
+DECLARE Decls Stats Actuals Expr = [CodeSize THREAD] .
+        Expr Coercions           = [CoercionSize SYN] .
+
+RUL
+
+MiniLAX = { Proc: CodeSizeIn  := 0                   ; } .
+Decl    = {       CodeSizeOut := Next: CodeSizeOut   ; } .
+Proc    = { Stats:CodeSizeIn  :=       CodeSizeIn +1 ;             /* ENT */
+            Decls:CodeSizeIn  := Stats:CodeSizeOut+1 ;             /* RET */
+            Next: CodeSizeIn  := Decls:CodeSizeOut   ; } .
+Stat    = {       CodeSizeOut := Next: CodeSizeOut   ; } .
+Assign  = { Adr:  CodeSizeIn  :=       CodeSizeIn    ;
+            Expr: CodeSizeIn  := Adr:  CodeSizeOut+Adr:CoercionSize;
+.mc \(bv
+            Next: CodeSizeIn  := Expr: CodeSizeOut+Expr:CoercionSize+1;
+                                                                   /* STI */ } .
+.mc
+Call    = { Actuals:CodeSizeIn:=       CodeSizeIn+1  ;             /* MST */
+            Next: CodeSizeIn  := Actuals:CodeSizeOut+1;            /* JSR */ } .
+If      = { Expr: CodeSizeIn  :=       CodeSizeIn    ;
+.mc \(bv
+            Then: CodeSizeIn  := Expr: CodeSizeOut+Expr:CoercionSize+1;
+                                                                   /* FJP */
+.mc
+            Else: CodeSizeIn  := Then: CodeSizeOut+1 ;             /* JMP */
+            Next: CodeSizeIn  := Else: CodeSizeOut   ; } .
+While   = { Stats:CodeSizeIn  :=       CodeSizeIn +1 ;             /* JMP */
+            Expr: CodeSizeIn  := Stats:CodeSizeOut   ;
+            Next: CodeSizeIn  := Expr: CodeSizeOut+Expr:CoercionSize+2;
+                                                              /* INV, FJP */ } .
+Read    = { Adr:  CodeSizeIn  :=       CodeSizeIn    ;
+            Next: CodeSizeIn  := Adr:  CodeSizeOut+Adr:CoercionSize+2;
+                                                              /* REA, STI */ } .
+Write   = { Expr: CodeSizeIn  :=       CodeSizeIn    ;
+.mc \(bv
+            Next: CodeSizeIn  := Expr: CodeSizeOut+Expr:CoercionSize+1;
+                                                                   /* WRI */ } .
+.mc
+Actual  = { Expr: CodeSizeIn  :=       CodeSizeIn    ;
+            Next: CodeSizeIn  := Expr: CodeSizeOut+Expr:CoercionSize;
+                  CodeSizeOut := Next: CodeSizeOut   ; } .
+Binary  = { Rop:  CodeSizeIn  := Lop:  CodeSizeOut+Lop:CoercionSize;
+                  CodeSizeOut := Rop:  CodeSizeOut+Rop:CoercionSize+1;
+                                                  /* INV, MUL, ADD or LES */ } .
+.mc \(bv
+Unary   = {       CodeSizeOut := Expr: CodeSizeOut+Expr:CoercionSize+1;
+                                                                   /* NOT */ } .
+.mc
+IntConst  = {     CodeSizeOut :=       CodeSizeIn+1  ;             /* LDC */ } .
+RealConst = {     CodeSizeOut :=       CodeSizeIn+1  ;             /* LDC */ } .
+BoolConst = {     CodeSizeOut :=       CodeSizeIn+1  ;             /* LDC */ } .
+Index     = { Expr:CodeSizeIn := Adr:  CodeSizeOut+Adr:CoercionSize;
+                  CodeSizeOut := Expr: CodeSizeOut+Expr:CoercionSize+4;
+                                                    /* CHK, LDC, SUB, IXA */ } .
+Ident     = {     CodeSizeOut :=       CodeSizeIn+1  ;             /* LDA */ } .
+
+Expr      = {     CoercionSize:= Co:   CoercionSize  ; } .
+Coercions = {     CoercionSize:= 0                   ; } .
+Content   = {     CoercionSize:= Next: CoercionSize+1;             /* LDI */ } .
+IntToReal = {     CoercionSize:= Next: CoercionSize+1;             /* FLT */ } .
+
+END CodeSize
+
+MODULE Level /* -------------------------------------------------- */
+
+DECLARE Decls Formals Stats Actuals Expr = [Level: SHORTINT INH] .
+
+RULE
+
+MiniLAX = { Proc:       Level   := 0                                    ; } .
+Proc    = { Formals:    Level   :=              Level + 1               ;
+            Decls:      Level   := Formals:     Level                   ;
+            Stats:      Level   := Formals:     Level                   ; } .
+Call    = {             Level2  :=              Level                   ; } .
+Ident   = {             Level2  :=              Level                   ; } .
+
+END Level
+
+MODULE Label /* -------------------------------------------------- */
+
+RULE
+
+If      = {             Label1  := Else:        CodeSizeIn              ;
+                        Label2  := Else:        CodeSizeOut             ; } .
+While   = {             Label1  := Stats:       CodeSizeIn              ;
+                        Label2  := Expr:        CodeSizeIn              ; } .
+
+END Label
+
+MODULE Conditions /* -------------------------------------------------- */
+
+EVAL GLOBAL     {
+FROM Defs       IMPORT IsDeclared, IsObjectKind, NoObject, Proc, Var;
+FROM Tree       IMPORT Integer, Boolean, Array, ErrorType, NoFormal, IsType, Error;
+FROM Types      IMPORT IsAssignmentCompatible, IsSimpleType;
+}
+
+RULE
+
+Decl    = { CHECK NOT IsDeclared (Ident, DeclsIn)
+.mc \(bv
+            => Error ("identifier already declared"         , Pos)      ; } .
+.mc
+Formal  = { CHECK NOT IsDeclared (Ident, DeclsIn)
+.mc \(bv
+            => Error ("identifier already declared"         , Pos)      ;
+.mc
+            CHECK IsSimpleType (Reduce1 (Type))
+.mc \(bv
+            => Error ("value parameter must have simple type", Pos)     ; } .
+.mc
+Array   = { CHECK Lwb <= Upb
+.mc \(bv
+            => Error ("lower bound exceeds upper bound"     , Pos)      ; } .
+.mc
+Assign  = { CHECK IsAssignmentCompatible (Adr:Type, Expr:Type)
+.mc \(bv
+            => Error ("types not assignment compatible"     , Pos)      ; } .
+.mc
+Call    = { CHECK Object^.Kind # NoObject
+.mc \(bv
+            => Error ("identifier not declared"             , Pos) AND_THEN
+.mc
+            CHECK IsObjectKind (Object, Proc)
+.mc \(bv
+            => Error ("only procedures can be called"       , Pos)      ; } .
+.mc
+If      = { CHECK IsType (Reduce (Expr:Type), Boolean)
+.mc \(bv
+            => Error ("boolean expression required"         , Expr:Pos) ; } .
+.mc
+While   = { CHECK IsType (Reduce (Expr:Type), Boolean)
+.mc \(bv
+            => Error ("boolean expression required"         , Expr:Pos) ; } .
+.mc
+Read    = { CHECK IsSimpleType (Reduce (Adr:Type))
+.mc \(bv
+            => Error ("simple type operand required"        , Adr:Pos)  ; } .
+.mc
+Write   = { CHECK IsSimpleType (Reduce (Expr:Type))
+.mc \(bv
+            => Error ("simple type operand required"        , Expr:Pos) ; } .
+.mc
+Binary  = { CHECK Type^.Kind # ErrorType
+.mc \(bv
+            => Error ("operand types incompatible"          , Pos)      ; } .
+.mc
+Unary   = { CHECK Type^.Kind # ErrorType
+.mc \(bv
+            => Error ("operand types incompatible"          , Pos)      ; } .
+.mc
+Index   = { CHECK IsType (Reduce (Adr:Type), Array)
+.mc \(bv
+            => Error ("only arrays can be indexed"          , Adr:Pos)  ;
+.mc
+            CHECK IsType (Reduce (Expr:Type), Integer)
+.mc \(bv
+            => Error ("integer expression required"         , Expr:Pos) ; } .
+.mc
+Ident   = { CHECK Object^.Kind # NoObject
+.mc \(bv
+            => Error ("identifier not declared"             , Pos) AND_THEN
+.mc
+            CHECK IsObjectKind (Object, Var)
+.mc \(bv
+            => Error ("variable required"                   , Pos)      ; } .
+.mc
+
+END Conditions
+
+MODULE TypeDecls /* -------------------------------------------------- */
+
+TREE IMPORT     {
+FROM SYSTEM     IMPORT ADDRESS;
+FROM Defs       IMPORT tObjects, tEnv;
+IMPORT Errors, Scanner;
+
+PROCEDURE Error (Text: ARRAY OF CHAR; Position: Scanner.tPosition);
+
+TYPE tvoid      = RECORD END;
+
+CONST
+   Plus         = 1;
+   Times        = 2;
+   Less         = 3;
+   Not          = 4;
+}
+
+EXPORT          { TYPE MyTree = tTree; }
+
+GLOBAL          {
+FROM Strings    IMPORT tString, ArrayToString;
+IMPORT Errors, Scanner;
+
+PROCEDURE Error (Text: ARRAY OF CHAR; Position: tPosition);
+   BEGIN
+      Errors.Message (Text, Errors.Error, Position);
+   END Error;
+}
+
+EVAL GLOBAL     {
+TYPE MyTree     = Tree.tTree;
+
+VAR nNoObject   : tObjects;
+VAR nInteger, nReal, nBoolean, nNoType  : tTree;
+VAR ICodeType   : ARRAY [Integer .. Boolean] OF [IntType .. BoolType];
+}
+
+BEGIN   {
+   nNoObject    := mNoObject    ();
+   nInteger     := mInteger     ();
+   nReal        := mReal        ();
+   nBoolean     := mBoolean     ();
+   nNoType      := mNoType      ();
+
+   ICodeType [Tree.Integer      ] := IntType    ;
+   ICodeType [Tree.Real         ] := RealType   ;
+   ICodeType [Tree.Boolean      ] := BoolType   ;
+}
+
+END TypeDecls
+.fi
+.sz 12
+.bp 1
+.lp
+.b Contents
+.sp
+.xp

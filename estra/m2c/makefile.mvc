@@ -1,0 +1,200 @@
+!INCLUDE ..\..\config.mak
+
+CFLAGS	= $(CFG_CFLAGS) /W1 /I $(COMMON) /I $(REUSE)
+
+LDFLAGS	= $(COMMON_LIB) $(REUSE_LIB)
+
+all	:
+
+# HEAD
+
+all	: estra.exe
+
+ArgCheck.obj	: ArgCheck.c	\
+	ArgCheck.h	\
+	Scanner.h
+
+Automaton.obj	: Automaton.c	\
+	Automaton.h	\
+	Info.h	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h
+
+CodeM2.obj	: CodeM2.c	\
+	CodeM2.h	\
+	Types.h	\
+	Tree.h	\
+	Patterns.h	\
+	Scanner.h	\
+	Parser.h	\
+	Match.h	\
+	Grammar.h	\
+	Info.h	\
+	Environs.h	\
+	Automaton.h	\
+	ArgCheck.h
+
+Complete.obj	: Complete.c	\
+	Complete.h	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h	\
+	Info.h	\
+	Environs.h
+
+Environs.obj	: Environs.c	\
+	Environs.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h	\
+	Info.h	\
+	Patterns.h
+
+estra.obj	: estra.c	\
+	Tree.h	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h	\
+	Environs.h	\
+	Grammar.h	\
+	Test.h	\
+	Semantics.h	\
+	Reduced.h	\
+	Complete.h	\
+	Parser.h	\
+	Match.h	\
+	Automaton.h	\
+	Info.h	\
+	CodeM2.h	\
+	ArgCheck.h
+
+Grammar.obj	: Grammar.c	\
+	Grammar.h	\
+	Info.h	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h
+
+Info.obj	: Info.c	\
+	Info.h	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h
+
+Match.obj	: Match.c	\
+	Match.h	\
+	Types.h	\
+	Scanner.h	\
+	Patterns.h	\
+	Parser.h	\
+	Tree.h	\
+	Grammar.h	\
+	Info.h	\
+	Environs.h	\
+	Automaton.h	\
+	ArgCheck.h
+
+Parser.obj	: Parser.c	\
+	Parser.h	\
+	Scanner.h	\
+	Tree.h	\
+	Patterns.h	\
+	Types.h	\
+	Grammar.h	\
+	Info.h	\
+	Environs.h
+
+Patterns.obj	: Patterns.c	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h	\
+	Info.h
+
+Reduced.obj	: Reduced.c	\
+	Reduced.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h	\
+	Info.h	\
+	Patterns.h
+
+Scanner.obj	: Scanner.c	\
+	Scanner.h
+
+Semantics.obj	: Semantics.c	\
+	Semantics.h	\
+	Types.h	\
+	Tree.h	\
+	Scanner.h	\
+	Reduced.h	\
+	Patterns.h	\
+	Parser.h	\
+	Grammar.h	\
+	Info.h	\
+	Environs.h	\
+	Complete.h
+
+Test.obj	: Test.c	\
+	Test.h	\
+	ArgCheck.h	\
+	Scanner.h
+
+Tree.obj	: Tree.c	\
+	Tree.h	\
+	Patterns.h	\
+	Types.h	\
+	Scanner.h	\
+	Grammar.h	\
+	Info.h	\
+	Environs.h
+
+Types.obj	: Types.c	\
+	Types.h	\
+	Scanner.h
+
+SYSTEM_.obj	: SYSTEM_.c SYSTEM_.h
+
+estra_OBJS =	\
+	estra.obj	\
+	Tree.obj	\
+	Patterns.obj	\
+	Types.obj	\
+	Scanner.obj	\
+	Environs.obj	\
+	Grammar.obj	\
+	Test.obj	\
+	Semantics.obj	\
+	Reduced.obj	\
+	Complete.obj	\
+	Parser.obj	\
+	Match.obj	\
+	Automaton.obj	\
+	Info.obj	\
+	CodeM2.obj	\
+	ArgCheck.obj
+
+estra.exe	: $(estra_OBJS) $(SYSTEM)
+	$(CC) /nologo $(estra_OBJS) $(SYSTEM) /link /out:estra.exe $(LDFLAGS)
+
+install: estra.exe
+	if not exist $(CT_DIR)\bin\ mkdir $(CT_DIR)\bin
+	if not exist $(CT_DIR)\lib\ mkdir $(CT_DIR)\lib
+	if not exist $(CT_DIR)\lib\estra\ mkdir $(CT_DIR)\lib\estra
+	copy estra.exe $(CT_DIR)\lib\estra
+	copy ErrorTab $(CT_DIR)\lib\estra
+	echo %ct_dir%\lib\estra\estra %1 %2 %3 %4 %5 %6 %7 %8 %9 > $(CT_DIR)\bin\estra.bat
+
+# TAIL
+
+clean	:
+	del *.obj *.exe
+
+.SUFFIXES: .h .c .obj
+
+.c.obj:
+	$(CC) $(CFLAGS) /c $*.c
