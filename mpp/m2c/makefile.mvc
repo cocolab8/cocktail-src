@@ -38,8 +38,8 @@ mpp.exe	: $(mpp_OBJS) $(SYSTEM)
 	$(CC) /nologo $(mpp_OBJS) $(SYSTEM) /link /out:mpp.exe $(LDFLAGS)
 
 install: mpp.exe
-	if not exist $(CT_DIR)\bin\ mkdir $(CT_DIR)\bin
-	copy mpp.exe $(CT_DIR)\bin
+	if not exist "%ct_dir%"\bin\ mkdir "%ct_dir%"\bin
+	copy mpp.exe "%ct_dir%"\bin
 
 # TAIL
 

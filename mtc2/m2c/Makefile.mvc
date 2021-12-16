@@ -235,8 +235,8 @@ mtc2.exe	: $(mtc2_OBJS) $(SYSTEM)
 	$(CC) /nologo $(mtc2_OBJS) $(SYSTEM) /link /out:mtc2.exe $(LDFLAGS)
 
 install: mtc2.exe
-	if not exist $(CT_DIR)\bin\ mkdir $(CT_DIR)\bin
-	copy mtc2.exe $(CT_DIR)\bin
+	if not exist "%ct_dir%"\bin\ mkdir "%ct_dir%"\bin
+	copy mtc2.exe "%ct_dir%"\bin
 
 # TAIL
 
