@@ -1,4 +1,4 @@
-/* $Id: Estral.rex,v 2.3 1998/05/27 15:23:55 grosch rel $ */
+/* $Id: Estral.rex,v 2.4 2021/10/28 09:11:39 grosch Exp $ */
 
 EXPORT
 {
@@ -210,7 +210,9 @@ RULES
 			RETURN SymLBrace;
 			}
 
-#STD#	- {\n\t\ }	: {
+#STD#	\r		: {}
+
+#STD#	- {\r\n\t\ }	: {
 			GetWord (word);
 			char := Char (word, 1);
 			ErrorMessageI (eIllegalChar, eError, Attribute.Position,
@@ -219,7 +221,7 @@ RULES
 
 	/*	--------	str1, str2	--------	*/
 
-#str1#	-{\n\t'}+	:- {
+#str1#	- {\r\n\t'} +	:- {
 			GetWord (word);
 			Concatenate (string, word);
 			}
@@ -230,7 +232,7 @@ RULES
 			Concatenate (string, word);
 			}
 
-#str1#	\n		:- {
+#str1#	\r ? \n		:- {
 			Append (string, "'"); yyEol (0);
 			ErrorMessage (eEolString, eError, Attribute.Position);
 			Attribute.ident := MakeIdent (string);
@@ -247,7 +249,7 @@ RULES
 			}
 
 
-#str2#	-{\n\t"}+	:- {
+#str2#	- {\r\n\t"} +	:- {
 			GetWord (word);
 			Concatenate (string, word);
 			}
@@ -259,7 +261,7 @@ RULES
 			Concatenate (string, word);
 			}
 
-#str2#	\n		:- {
+#str2#	\r ? \n		:- {
 			Append (string, '"'); yyEol (0);
 			ErrorMessage (eEolString, eError, Attribute.Position);
 			Attribute.ident := MakeIdent (string);
@@ -279,7 +281,7 @@ RULES
 	/*	--------	comment1, comment2	--------	*/
 
 #comment1#	"*/"	:- { yyStart (STD); }
-#comment1#	-{\n\t*}+ :- {}
+#comment1#	- {\n\t*} + :- {}
 #comment1#	"*"	:- {}
 		
 #comment2#	"(*"	:- { INC (level); }
@@ -289,7 +291,7 @@ RULES
 			  yyStart (STD);
 			END;
 			}
-#comment2#	-{\n\t*(}+ :- {}
+#comment2#	- {\n\t*(} + :- {}
 #comment2#	"*"	:- {}
 #comment2#	"("	:- {}
 
@@ -346,7 +348,7 @@ RULES
 			}
 
 #code#	\'		: { GetWord (string); yyStart (codestr1); }
-#code#	\' -{\n\t'}* \' : { 
+#code#	\' - {\r\n\t'} * \' : { 
 			GetWord (word);
 			Attribute.ident := MakeIdent (word);
 			RETURN SymCodeString;
@@ -367,15 +369,15 @@ RULES
 			RETURN SymCodeSpace;
 			}
 
-#code#	\n		: {
+#code#	\r ? \n		: {
 			GetWord (string);
 			Attribute.ref := PutString (string);
 			yyEol (0);
 			RETURN SymCodeSpace;
 			}
 
-#code#	-{'"A-Za-z0-9./\{\}()\t\n\ } +
-	| -{\n\t}	: {
+#code#	- {'"A-Za-z0-9./\{\}()\r\t\n\ } +
+	| - {\r\n\t}	: {
 			GetWord (string);
 			Attribute.ref := PutString (string);
 			RETURN SymCodeRest;
@@ -384,7 +386,7 @@ RULES
 
 	/*	--------	codestr1, codestr2	--------	*/
 
-#codestr1# -{\n\t'}+	:- {
+#codestr1# - {\r\n\t'} + :- {
 			GetWord (word);
 			Concatenate (string, word);
 			}
@@ -395,7 +397,7 @@ RULES
 			Concatenate (string, word);
 			}
 
-#codestr1#	\n	:- {
+#codestr1#	\r ? \n	:- {
 			Append (string, "'"); yyEol (0);
 			ErrorMessage (eEolString, eError, Attribute.Position);
 			Attribute.ident := MakeIdent (string);
@@ -412,7 +414,7 @@ RULES
 			}
 
 
-#codestr2# -{\n\t"}+	:- {
+#codestr2# - {\r\n\t"} + :- {
 			GetWord (word);
 			Concatenate (string, word);
 			}
@@ -424,7 +426,7 @@ RULES
 			Concatenate (string, word);
 			}
 
-#codestr2#	\n	:- {
+#codestr2#	\r ? \n	:- {
 			Append (string, '"'); yyEol (0);
 			ErrorMessage (eEolString, eError, Attribute.Position);
 			Attribute.ident := MakeIdent (string);
@@ -450,7 +452,7 @@ RULES
 			RETURN SymCodeComment;
 			}
 
-#codecom1#	-{\n\t*}+ :- {
+#codecom1#	- {\r\n\t*} + :- {
 			GetWord (word);
 			Concatenate (string, word);
 			}
@@ -461,7 +463,7 @@ RULES
 			yyTab;
 			}
 
-#codecom1#	\n	:- {
+#codecom1#	\r ? \n	:- {
 			GetWord (word);
 			Concatenate (string, word);
 			Attribute.ref := PutString (string);
@@ -492,7 +494,7 @@ RULES
 			END;
 			}
 
-#codecom2#	-{\n\t*(}+ :- {
+#codecom2#	- {\r\n\t*(} + :- {
 			GetWord (word);
 			Concatenate (string, word);
 			}
@@ -503,7 +505,7 @@ RULES
 			yyTab;
 			}
 
-#codecom2#	\n	:- {
+#codecom2#	\r ? \n	:- {
 			GetWord (word);
 			Concatenate (string, word);
 			Attribute.ref := PutString (string);
