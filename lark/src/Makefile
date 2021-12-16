@@ -64,8 +64,8 @@ install:	lark lark.sh $(LIB)/lark
 
 # installation directories
 
-$(LIB)/lark:	$(LIB)
-	sh -c "if test ! -d $(LIB)/lark; then mkdir -p $(LIB)/lark; else true; fi"
+$(LIB)/lark:
+	mkdir -p $(LIB)/lark
 
 m2c:
 	$(MAKE) sources M2FLAGS="$(M2FLAGS) -d../../reuse/src -o../m2c" -f ../m2c/Makefile
@@ -87,8 +87,8 @@ installId:	larkId $(LIB)/Id
 	chmod a+rx $(BIN)/larkId
 	install -c -s -m 755 larkId $(LIB)/Id
 
-$(LIB)/Id:	$(LIB)
-	sh -c "if test ! -d $(LIB)/Id; then mkdir -p $(LIB)/Id; else true; fi"
+$(LIB)/Id:
+	mkdir -p $(LIB)/Id
 
 cleanId:
 	rm -f larkId*

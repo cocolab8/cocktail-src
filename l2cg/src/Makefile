@@ -28,8 +28,8 @@ install:	l2cg l2cg.sh $(LIB)/lalr
 
 # installation directories
 
-$(LIB)/lalr:	$(LIB)
-	sh -c "if test ! -d $(LIB)/lalr; then mkdir -p $(LIB)/lalr; else true; fi"
+$(LIB)/lalr:
+	mkdir -p $(LIB)/lalr
 
 m2c:
 	make $(SOURCES)

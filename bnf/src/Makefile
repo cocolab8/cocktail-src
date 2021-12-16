@@ -19,8 +19,8 @@ install: bnf bnf.sh $(LIB)/lalr
 
 # installation directories
 
-$(LIB)/lalr: $(LIB)
-	sh -c "if test ! -d $(LIB)/lalr; then mkdir -p $(LIB)/lalr; else true; fi"
+$(LIB)/lalr:
+	mkdir -p $(LIB)/lalr
 
 m2c:
 	make sources M2FLAGS="$(M2FLAGS) -d../../front/src -d../../reuse/src -o../m2c" -f ../m2c/Makefile

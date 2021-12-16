@@ -79,8 +79,8 @@ install:	rex rex.sh $(LIB)/rex
 
 # installation directories
 
-$(LIB)/rex:	$(LIB)
-	sh -c "if test ! -d $(LIB)/rex; then mkdir -p $(LIB)/rex; else true; fi"
+$(LIB)/rex:
+	mkdir -p $(LIB)/rex
 
 m2c:
 	make $(SOURCES)
@@ -105,8 +105,8 @@ installId:	rexId $(LIB)/Id
 	chmod a+rx $(BIN)/rexId
 	install -c -s -m 755 rexId $(LIB)/Id
 
-$(LIB)/Id:	$(LIB)
-	sh -c "if test ! -d $(LIB)/Id; then mkdir -p $(LIB)/Id; else true; fi"
+$(LIB)/Id:
+	mkdir -p $(LIB)/Id
 
 cleanId:
 	rm -f rexId*

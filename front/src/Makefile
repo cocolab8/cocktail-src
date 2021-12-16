@@ -35,8 +35,8 @@ install: ErrorTab $(LIB)/lalr
 
 # installation directories
 
-$(LIB)/lalr: $(LIB)
-	sh -c "if test ! -d $(LIB)/lalr; then mkdir -p $(LIB)/lalr; else true; fi"
+$(LIB)/lalr:
+	mkdir -p $(LIB)/lalr
 
 m2c:
 	make $(SOURCES)
@@ -65,8 +65,8 @@ installId: lalrId $(LIB)/Id
 	chmod a+rx $(BIN)/lalrId
 	install -c -s -m 755 lalrId $(LIB)/Id
 
-$(LIB)/Id: $(LIB)
-	sh -c "if test ! -d $(LIB)/Id; then mkdir -p $(LIB)/Id; else true; fi"
+$(LIB)/Id:
+	mkdir -p $(LIB)/Id
 
 cleanId:
 	rm -f lalrId*

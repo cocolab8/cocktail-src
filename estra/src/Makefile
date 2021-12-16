@@ -45,8 +45,8 @@ install:	estra estra.sh $(LIB)/estra
 
 # installation directories
 
-$(LIB)/estra:	$(LIB)
-	sh -c "if test ! -d $(LIB)/estra; then mkdir -p $(LIB)/estra; else true; fi"
+$(LIB)/estra:
+	mkdir -p $(LIB)/estra
 
 m2c:
 	make $(GENDEFS) $(GENIMPS) $(DEFS) $(IMPS) estra.mi

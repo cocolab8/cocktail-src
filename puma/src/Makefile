@@ -172,8 +172,8 @@ install:	puma puma.sh $(LIB)/puma
 
 # installation directories
 
-$(LIB)/puma:	$(LIB)
-	sh -c "if test ! -d $(LIB)/puma; then mkdir -p $(LIB)/puma; else true; fi"
+$(LIB)/puma:
+	mkdir -p $(LIB)/puma
 
 m2c:
 	make $(SOURCES)
@@ -200,8 +200,8 @@ installId:	pumaId $(LIB)/Id
 	chmod a+rx $(BIN)/pumaId
 	install -c -s -m 755 pumaId $(LIB)/Id
 
-$(LIB)/Id:	$(LIB)
-	sh -c "if test ! -d $(LIB)/Id; then mkdir -p $(LIB)/Id; else true; fi"
+$(LIB)/Id:
+	mkdir -p $(LIB)/Id
 
 cleanId:
 	rm -f pumaId*

@@ -33,13 +33,10 @@ install:	mtc2 $(BIN) $(LIB)/mtc2
 # installation directories
 
 $(BIN):
-	sh -c "if test ! -d $(BIN); then mkdir -p $(BIN); else true; fi"
+	mkdir -p $(BIN)
 
-$(LIB):
-	sh -c "if test ! -d $(LIB); then mkdir -p $(LIB); else true; fi"
-
-$(LIB)/mtc2:	$(LIB)
-	sh -c "if test ! -d $(LIB)/mtc2; then mkdir -p $(LIB)/mtc2; else true; fi"
+$(LIB)/mtc2:
+	mkdir -p $(LIB)/mtc2
 
 
 # HEAD

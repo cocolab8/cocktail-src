@@ -31,8 +31,8 @@ install: ell ell.sh $(LIB)/ell
 
 # installation directories
 
-$(LIB)/ell: $(LIB)
-	sh -c "if test ! -d $(LIB)/ell; then mkdir -p $(LIB)/ell; else true; fi"
+$(LIB)/ell:
+	mkdir -p $(LIB)/ell
 
 Scanner.mi Scanner.md:	ell.rex
 	rex -di ell.rex

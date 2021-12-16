@@ -295,8 +295,8 @@ install:	cg cg.sh lpp $(LIB)/cg
 
 # installation directories
 
-$(LIB)/cg:	$(LIB)
-	sh -c "if test ! -d $(LIB)/cg; then mkdir -p $(LIB)/cg; else true; fi"
+$(LIB)/cg:
+	mkdir -p $(LIB)/cg
 
 m2c:
 	make $(SOURCES)
@@ -323,8 +323,8 @@ installId:	cgId $(LIB)/Id
 	chmod a+rx $(BIN)/cgId
 	install -c -s -m 755 cgId $(LIB)/Id
 
-$(LIB)/Id:	$(LIB)
-	sh -c "if test ! -d $(LIB)/Id; then mkdir -p $(LIB)/Id; else true; fi"
+$(LIB)/Id:
+	mkdir -p $(LIB)/Id
 
 cleanId:
 	rm -f cgId*
