@@ -111,8 +111,8 @@ The commands for building Cocktail on Linux are as follows:
 
 
     ```
-    unzip cocktail-src.zip
-    cd cocktail-src
+    unzip cocktail-src-master.zip
+    cd cocktail-src-master
     ```
 
 2. Run config script:
@@ -128,8 +128,8 @@ The commands for building Cocktail on Linux are as follows:
 
     ```
     make support
-    make install_support DIR=.
-    PATH=`pwd`/bin:$PATH
+    make install_support DIR=$PWD
+    PATH=$PWD/bin:$PATH
     ```
 
     The parameter DIR specifies the location where the support tools are
@@ -289,8 +289,8 @@ follows:
 2. Unpack the source code archive of Cocktail:
 
     ```
-    7z x cocktail-src.zip
-    cd cocktail-src
+    7z x cocktail-src-master.zip
+    cd cocktail-src-master
     ```
 
 3. Compile and install the support tools estra, mpp, and mtc2:
